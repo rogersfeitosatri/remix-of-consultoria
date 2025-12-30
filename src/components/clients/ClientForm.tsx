@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Client, ServiceType, PlanType, CheckinFrequency, SERVICE_LABELS, PLAN_LABELS, CHECKIN_LABELS } from '@/types/client';
+import { Client } from '@/hooks/useClients';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,9 +8,29 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
 
+const SERVICE_LABELS = {
+  nutrition: 'Nutrição',
+  training: 'Treino',
+  both: 'Ambos',
+};
+
+const PLAN_LABELS = {
+  consultoria: 'Consultoria',
+  premium: 'Premium',
+};
+
+const CHECKIN_LABELS = {
+  daily: 'Diário',
+  weekly: 'Semanal',
+  biweekly: 'Quinzenal',
+  monthly: 'Mensal',
+  bimonthly: 'Bimestral',
+  quarterly: 'Trimestral',
+};
+
 interface ClientFormProps {
   client?: Client;
-  onSubmit: (data: Omit<Client, 'id' | 'createdAt'>) => void;
+  onSubmit: (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
   onClose: () => void;
 }
 
@@ -19,15 +39,15 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     name: client?.name || '',
     email: client?.email || '',
     phone: client?.phone || '',
-    serviceType: client?.serviceType || 'nutrition' as ServiceType,
-    planType: client?.planType || 'consultoria' as PlanType,
-    hasCheckin: client?.hasCheckin ?? true,
-    checkinFrequency: client?.checkinFrequency || 'weekly' as CheckinFrequency,
-    startDate: client?.startDate || new Date().toISOString().split('T')[0],
-    endDate: client?.endDate || '',
-    monthlyValue: client?.monthlyValue || 0,
+    service_type: client?.service_type || 'nutrition' as 'nutrition' | 'training' | 'both',
+    plan_type: client?.plan_type || 'consultoria' as 'consultoria' | 'premium',
+    has_checkin: client?.has_checkin ?? true,
+    checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly',
+    start_date: client?.start_date || new Date().toISOString().split('T')[0],
+    end_date: client?.end_date || '',
+    monthly_value: client?.monthly_value || 0,
     notes: client?.notes || '',
-    isActive: client?.isActive ?? true,
+    is_active: client?.is_active ?? true,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -37,7 +57,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-xl border border-border bg-card p-6 shadow-2xl animate-fade-in">
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl animate-fade-in">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-card-foreground">
             {client ? 'Editar Atleta' : 'Novo Atleta'}
@@ -68,7 +88,6 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="email@exemplo.com"
-                required
               />
             </div>
             <div className="space-y-2">
@@ -78,7 +97,6 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="(00) 00000-0000"
-                required
               />
             </div>
             <div className="space-y-2">
@@ -88,8 +106,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                 type="number"
                 min="0"
                 step="0.01"
-                value={formData.monthlyValue}
-                onChange={(e) => setFormData({ ...formData, monthlyValue: parseFloat(e.target.value) || 0 })}
+                value={formData.monthly_value}
+                onChange={(e) => setFormData({ ...formData, monthly_value: parseFloat(e.target.value) || 0 })}
                 placeholder="0,00"
                 required
               />
@@ -101,8 +119,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             <div className="space-y-2">
               <Label>Tipo de Serviço</Label>
               <Select
-                value={formData.serviceType}
-                onValueChange={(v) => setFormData({ ...formData, serviceType: v as ServiceType })}
+                value={formData.service_type}
+                onValueChange={(v) => setFormData({ ...formData, service_type: v as 'nutrition' | 'training' | 'both' })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -117,8 +135,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             <div className="space-y-2">
               <Label>Tipo de Plano</Label>
               <Select
-                value={formData.planType}
-                onValueChange={(v) => setFormData({ ...formData, planType: v as PlanType })}
+                value={formData.plan_type}
+                onValueChange={(v) => setFormData({ ...formData, plan_type: v as 'consultoria' | 'premium' })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -137,18 +155,18 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             <div className="flex items-center gap-4">
               <Switch
                 id="hasCheckin"
-                checked={formData.hasCheckin}
-                onCheckedChange={(v) => setFormData({ ...formData, hasCheckin: v })}
+                checked={formData.has_checkin}
+                onCheckedChange={(v) => setFormData({ ...formData, has_checkin: v })}
               />
               <Label htmlFor="hasCheckin">Possui Check-in</Label>
             </div>
             
-            {formData.hasCheckin && (
+            {formData.has_checkin && (
               <div className="space-y-2">
                 <Label>Frequência do Check-in</Label>
                 <Select
-                  value={formData.checkinFrequency}
-                  onValueChange={(v) => setFormData({ ...formData, checkinFrequency: v as CheckinFrequency })}
+                  value={formData.checkin_frequency || 'weekly'}
+                  onValueChange={(v) => setFormData({ ...formData, checkin_frequency: v as typeof formData.checkin_frequency })}
                 >
                   <SelectTrigger className="w-full sm:w-64">
                     <SelectValue />
@@ -170,8 +188,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               <Input
                 id="startDate"
                 type="date"
-                value={formData.startDate}
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                 required
               />
             </div>
@@ -180,8 +198,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               <Input
                 id="endDate"
                 type="date"
-                value={formData.endDate}
-                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                value={formData.end_date}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                 required
               />
             </div>
@@ -192,7 +210,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             <Label htmlFor="notes">Observações</Label>
             <Textarea
               id="notes"
-              value={formData.notes}
+              value={formData.notes || ''}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Anotações sobre o atleta..."
               rows={3}
@@ -203,8 +221,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
           <div className="flex items-center gap-4">
             <Switch
               id="isActive"
-              checked={formData.isActive}
-              onCheckedChange={(v) => setFormData({ ...formData, isActive: v })}
+              checked={formData.is_active}
+              onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
             />
             <Label htmlFor="isActive">Atleta Ativo</Label>
           </div>

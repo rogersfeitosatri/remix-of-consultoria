@@ -1,11 +1,17 @@
-import { useState } from 'react';
-import { Payment } from '@/types/client';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { updatePaymentStatus } from '@/lib/storage';
+import { useUpdatePaymentStatus } from '@/hooks/useClients';
+
+interface Payment {
+  id: string;
+  client_name: string;
+  due_date: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'overdue';
+}
 
 interface MonthlyRevenueProps {
   year: number;
@@ -13,10 +19,11 @@ interface MonthlyRevenueProps {
   payments: Payment[];
   total: number;
   onMonthChange: (year: number, month: number) => void;
-  onPaymentUpdate: () => void;
 }
 
-export function MonthlyRevenue({ year, month, payments, total, onMonthChange, onPaymentUpdate }: MonthlyRevenueProps) {
+export function MonthlyRevenue({ year, month, payments, total, onMonthChange }: MonthlyRevenueProps) {
+  const updatePaymentStatus = useUpdatePaymentStatus();
+
   const handlePreviousMonth = () => {
     if (month === 0) {
       onMonthChange(year - 1, 11);
@@ -33,11 +40,10 @@ export function MonthlyRevenue({ year, month, payments, total, onMonthChange, on
     }
   };
 
-  const togglePaymentStatus = (payment: Payment) => {
+  const togglePaymentStatus = async (payment: Payment) => {
     const newStatus = payment.status === 'paid' ? 'pending' : 'paid';
-    const paidDate = newStatus === 'paid' ? new Date().toISOString() : undefined;
-    updatePaymentStatus(payment.id, newStatus, paidDate);
-    onPaymentUpdate();
+    const paid_at = newStatus === 'paid' ? new Date().toISOString() : null;
+    await updatePaymentStatus.mutateAsync({ id: payment.id, status: newStatus, paid_at });
   };
 
   const paidTotal = payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
@@ -113,9 +119,9 @@ export function MonthlyRevenue({ year, month, payments, total, onMonthChange, on
                   {payment.status === 'paid' && <CheckCircle className="h-5 w-5" />}
                 </button>
                 <div>
-                  <p className="font-medium text-card-foreground">{payment.clientName}</p>
+                  <p className="font-medium text-card-foreground">{payment.client_name}</p>
                   <p className="text-sm text-muted-foreground">
-                    Vencimento: {format(parseISO(payment.dueDate), 'dd/MM/yyyy')}
+                    Vencimento: {format(parseISO(payment.due_date), 'dd/MM/yyyy')}
                   </p>
                 </div>
               </div>

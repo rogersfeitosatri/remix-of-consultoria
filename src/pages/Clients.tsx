@@ -1,65 +1,59 @@
-import { useEffect, useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { ClientsList } from '@/components/clients/ClientsList';
 import { ClientForm } from '@/components/clients/ClientForm';
-import { Client } from '@/types/client';
-import { getClients, addClient, updateClient, deleteClient } from '@/lib/storage';
+import { useClients, useAddClient, useUpdateClient, useDeleteClient, Client } from '@/hooks/useClients';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Clients() {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
+  const { data: clients = [], isLoading } = useClients();
+  const addClient = useAddClient();
+  const updateClient = useUpdateClient();
+  const deleteClientMutation = useDeleteClient();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadClients();
-  }, []);
-
-  useEffect(() => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      setFilteredClients(
-        clients.filter(
-          c =>
-            c.name.toLowerCase().includes(query) ||
-            c.email.toLowerCase().includes(query) ||
-            c.phone.includes(query)
-        )
-      );
-    } else {
-      setFilteredClients(clients);
-    }
+  const filteredClients = useMemo(() => {
+    if (!searchQuery) return clients;
+    const query = searchQuery.toLowerCase();
+    return clients.filter(
+      c =>
+        c.name.toLowerCase().includes(query) ||
+        c.email?.toLowerCase().includes(query) ||
+        c.phone?.includes(query)
+    );
   }, [searchQuery, clients]);
 
-  const loadClients = () => {
-    const data = getClients();
-    setClients(data);
-    setFilteredClients(data);
-  };
-
-  const handleSubmit = (data: Omit<Client, 'id' | 'createdAt'>) => {
-    if (editingClient) {
-      updateClient(editingClient.id, data);
+  const handleSubmit = async (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    try {
+      if (editingClient) {
+        await updateClient.mutateAsync({ id: editingClient.id, ...data });
+        toast({
+          title: 'Atleta atualizado',
+          description: 'Os dados foram salvos com sucesso.',
+        });
+      } else {
+        await addClient.mutateAsync(data);
+        toast({
+          title: 'Atleta cadastrado',
+          description: 'O novo atleta foi adicionado com sucesso.',
+        });
+      }
+      setShowForm(false);
+      setEditingClient(undefined);
+    } catch (error) {
       toast({
-        title: 'Atleta atualizado',
-        description: 'Os dados foram salvos com sucesso.',
-      });
-    } else {
-      addClient(data);
-      toast({
-        title: 'Atleta cadastrado',
-        description: 'O novo atleta foi adicionado com sucesso.',
+        title: 'Erro',
+        description: 'Ocorreu um erro ao salvar os dados.',
+        variant: 'destructive',
       });
     }
-    loadClients();
-    setShowForm(false);
-    setEditingClient(undefined);
   };
 
   const handleEdit = (client: Client) => {
@@ -67,15 +61,22 @@ export default function Clients() {
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja remover este atleta?')) {
-      deleteClient(id);
-      toast({
-        title: 'Atleta removido',
-        description: 'O atleta foi removido com sucesso.',
-        variant: 'destructive',
-      });
-      loadClients();
+      try {
+        await deleteClientMutation.mutateAsync(id);
+        toast({
+          title: 'Atleta removido',
+          description: 'O atleta foi removido com sucesso.',
+          variant: 'destructive',
+        });
+      } catch (error) {
+        toast({
+          title: 'Erro',
+          description: 'Ocorreu um erro ao remover o atleta.',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
@@ -83,6 +84,16 @@ export default function Clients() {
     setShowForm(false);
     setEditingClient(undefined);
   };
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -116,7 +127,7 @@ export default function Clients() {
         <div className="flex gap-4 text-sm text-muted-foreground">
           <span>{filteredClients.length} atletas encontrados</span>
           <span>•</span>
-          <span>{clients.filter(c => c.isActive).length} ativos</span>
+          <span>{clients.filter(c => c.is_active).length} ativos</span>
         </div>
 
         {/* List */}

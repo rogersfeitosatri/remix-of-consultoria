@@ -1,9 +1,20 @@
-import { Client, SERVICE_LABELS, PLAN_LABELS } from '@/types/client';
+import { Client } from '@/hooks/useClients';
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertTriangle, Bell, Phone, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+const SERVICE_LABELS = {
+  nutrition: 'Nutrição',
+  training: 'Treino',
+  both: 'Ambos',
+};
+
+const PLAN_LABELS = {
+  consultoria: 'Consultoria',
+  premium: 'Premium',
+};
 
 interface ExpiringClientsAlertProps {
   clients: Client[];
@@ -52,7 +63,7 @@ export function ExpiringClientsAlert({ clients }: ExpiringClientsAlertProps) {
 
       <div className="space-y-3">
         {clients.map((client) => {
-          const daysUntilExpiry = differenceInDays(parseISO(client.endDate), new Date());
+          const daysUntilExpiry = differenceInDays(parseISO(client.end_date), new Date());
           const isUrgent = daysUntilExpiry <= 7;
           const isExpired = daysUntilExpiry < 0;
 
@@ -85,30 +96,34 @@ export function ExpiringClientsAlert({ clients }: ExpiringClientsAlertProps) {
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <span>{SERVICE_LABELS[client.serviceType]}</span>
+                    <span>{SERVICE_LABELS[client.service_type]}</span>
                     <span>•</span>
-                    <span>{PLAN_LABELS[client.planType]}</span>
+                    <span>{PLAN_LABELS[client.plan_type]}</span>
                     <span>•</span>
-                    <span>Vence: {format(parseISO(client.endDate), "dd 'de' MMM", { locale: ptBR })}</span>
+                    <span>Vence: {format(parseISO(client.end_date), "dd 'de' MMM", { locale: ptBR })}</span>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 w-8 p-0"
-                    onClick={() => window.open(`tel:${client.phone}`)}
-                  >
-                    <Phone className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 w-8 p-0"
-                    onClick={() => window.open(`mailto:${client.email}`)}
-                  >
-                    <Mail className="h-4 w-4" />
-                  </Button>
+                  {client.phone && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                      onClick={() => window.open(`tel:${client.phone}`)}
+                    >
+                      <Phone className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {client.email && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                      onClick={() => window.open(`mailto:${client.email}`)}
+                    >
+                      <Mail className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

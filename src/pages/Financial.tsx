@@ -1,37 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { MonthlyRevenue } from '@/components/financial/MonthlyRevenue';
 import { UpcomingPayments } from '@/components/financial/UpcomingPayments';
 import { StatCard } from '@/components/dashboard/StatCard';
-import { getMonthlyRevenue, getUpcomingPayments, getTotalMonthlyRecurring, getPayments } from '@/lib/storage';
-import { Payment } from '@/types/client';
-import { DollarSign, TrendingUp, CreditCard, AlertCircle } from 'lucide-react';
+import { useClients, usePayments, getMonthlyRevenue, getUpcomingPayments, getTotalMonthlyRecurring } from '@/hooks/useClients';
+import { DollarSign, TrendingUp, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
+import { parseISO } from 'date-fns';
 
 export default function Financial() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [monthlyData, setMonthlyData] = useState<{ total: number; payments: Payment[] }>({ total: 0, payments: [] });
-  const [upcomingPayments, setUpcomingPayments] = useState<Payment[]>([]);
-  const [monthlyRecurring, setMonthlyRecurring] = useState(0);
-  const [overdueCount, setOverdueCount] = useState(0);
+  
+  const { data: clients = [], isLoading: clientsLoading } = useClients();
+  const { data: payments = [], isLoading: paymentsLoading } = usePayments();
 
-  useEffect(() => {
-    loadData();
-  }, [currentYear, currentMonth]);
+  const monthlyData = getMonthlyRevenue(payments, currentYear, currentMonth);
+  const upcomingPayments = getUpcomingPayments(payments, 30);
+  const monthlyRecurring = getTotalMonthlyRecurring(clients);
 
-  const loadData = () => {
-    setMonthlyData(getMonthlyRevenue(currentYear, currentMonth));
-    setUpcomingPayments(getUpcomingPayments(30));
-    setMonthlyRecurring(getTotalMonthlyRecurring());
-    
-    const allPayments = getPayments();
-    const overdue = allPayments.filter(p => {
-      if (p.status === 'paid') return false;
-      const dueDate = new Date(p.dueDate);
-      return dueDate < new Date();
-    });
-    setOverdueCount(overdue.length);
-  };
+  const overdueCount = payments.filter(p => {
+    if (p.status === 'paid') return false;
+    const dueDate = parseISO(p.due_date);
+    return dueDate < new Date();
+  }).length;
 
   const handleMonthChange = (year: number, month: number) => {
     setCurrentYear(year);
@@ -39,6 +30,18 @@ export default function Financial() {
   };
 
   const paidThisMonth = monthlyData.payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
+
+  const isLoading = clientsLoading || paymentsLoading;
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -89,7 +92,6 @@ export default function Financial() {
             payments={monthlyData.payments}
             total={monthlyData.total}
             onMonthChange={handleMonthChange}
-            onPaymentUpdate={loadData}
           />
           <UpcomingPayments payments={upcomingPayments} />
         </div>
