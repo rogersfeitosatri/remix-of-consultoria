@@ -119,7 +119,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    // Convert empty date strings to null for database compatibility
+    const dataToSubmit = {
+      ...formData,
+      first_consultation_date: formData.first_consultation_date || null,
+      notes: formData.notes || null,
+    };
+    onSubmit(dataToSubmit as any);
   };
 
   return (
