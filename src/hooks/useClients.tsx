@@ -155,10 +155,13 @@ function calculateConsultationCount(
   }[planDuration];
 
   if (consultationFrequency === 'monthly') {
-    return durationMonths; // One consultation per month
+    // One consultation per month (e.g., 6 months = 6 consultations)
+    return durationMonths;
   } else if (consultationFrequency === 'six_weeks') {
-    // One consultation every 6 weeks = ~1.5 months
-    return Math.floor(durationMonths / 1.5);
+    // One consultation every 6 weeks (~1.5 months)
+    // 6 months = ~4 consultations, 12 months = ~8 consultations
+    const weeksInPlan = durationMonths * 4.33; // Approximate weeks per month
+    return Math.max(1, Math.floor(weeksInPlan / 6));
   }
 
   return 1;
@@ -178,15 +181,15 @@ function generateConsultationSchedules(
 
   // Calculate total consultations based on plan duration and frequency
   const totalConsultations = calculateConsultationCount(planDuration, consultationFrequency);
-  let count = 0;
 
-  while (count < totalConsultations && currentDate <= planEndDate) {
-    // Send link date is the Monday closest to the consultation date
-    // For the first consultation, we use the date as is
-    // For subsequent consultations, we calculate the Monday closest to the expected date
-    const sendLinkDate = count === 0 
-      ? getClosestMonday(addWeeks(currentDate, -1)) // First consultation: Monday before
-      : getClosestMonday(currentDate); // Subsequent: Monday closest to the date
+  // Generate ALL consultation schedules based on the total count
+  for (let i = 0; i < totalConsultations; i++) {
+    // Don't schedule past the plan end date
+    if (currentDate > planEndDate) break;
+
+    // Calculate the send link date (Monday closest to 1 week before the consultation)
+    const sendLinkTargetDate = addWeeks(currentDate, -1);
+    const sendLinkDate = getClosestMonday(sendLinkTargetDate);
     
     schedules.push({
       client_id: clientId,
@@ -196,8 +199,7 @@ function generateConsultationSchedules(
       status: 'pending',
     });
 
-    count++;
-
+    // Calculate next consultation date based on frequency
     if (consultationFrequency === 'once') break;
     
     if (consultationFrequency === 'monthly') {
