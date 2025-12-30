@@ -67,7 +67,7 @@ export default function Dashboard() {
         {/* Alerts & Calendar */}
         <div className="grid gap-6 lg:grid-cols-2">
           <ExpiringClientsAlert clients={expiringThisMonth} />
-          <ConsultationCalendar consultations={consultationsThisMonth} />
+          <ConsultationCalendar consultations={consultationsThisMonth} clients={activeClients} />
         </div>
       </div>
     </Layout>

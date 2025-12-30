@@ -12,7 +12,7 @@ import { addMonths } from 'date-fns';
 const SERVICE_LABELS = {
   nutrition: 'Nutrição',
   training: 'Treino',
-  both: 'Ambos',
+  both: 'Combo',
 };
 
 const PLAN_LABELS = {
