@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { addMonths, format, parseISO, differenceInDays, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { addMonths, addWeeks, format, parseISO, differenceInDays, startOfMonth, endOfMonth, isWithinInterval, nextMonday } from 'date-fns';
 
 export interface Client {
   id: string;
@@ -11,6 +11,7 @@ export interface Client {
   phone: string | null;
   service_type: 'nutrition' | 'training' | 'both';
   plan_type: 'consultoria' | 'premium';
+  plan_duration: 'monthly' | 'quarterly' | 'semiannual' | 'annual';
   checkin_frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly' | null;
   has_checkin: boolean;
   start_date: string;
@@ -18,6 +19,10 @@ export interface Client {
   monthly_value: number;
   notes: string | null;
   is_active: boolean;
+  has_consultations: boolean;
+  consultation_count: number;
+  consultation_frequency: 'once' | 'monthly' | 'six_weeks' | null;
+  first_consultation_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +35,18 @@ export interface Payment {
   amount: number;
   status: 'pending' | 'paid' | 'overdue';
   paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+  client_name?: string;
+}
+
+export interface ConsultationSchedule {
+  id: string;
+  client_id: string;
+  user_id: string;
+  scheduled_date: string;
+  send_link_date: string;
+  status: 'pending' | 'sent' | 'completed';
   created_at: string;
   updated_at: string;
   client_name?: string;
@@ -77,6 +94,68 @@ export function usePayments() {
   });
 }
 
+export function useConsultationSchedules() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['consultation_schedules', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('consultation_schedules')
+        .select(`
+          *,
+          clients (name)
+        `)
+        .order('scheduled_date', { ascending: true });
+
+      if (error) throw error;
+      return data.map(s => ({
+        ...s,
+        client_name: s.clients?.name,
+      })) as (ConsultationSchedule & { client_name: string })[];
+    },
+    enabled: !!user,
+  });
+}
+
+function generateConsultationSchedules(
+  userId: string,
+  clientId: string,
+  firstConsultationDate: string,
+  consultationCount: number,
+  consultationFrequency: 'once' | 'monthly' | 'six_weeks',
+  endDate: string
+): Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] {
+  const schedules: Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] = [];
+  let currentDate = parseISO(firstConsultationDate);
+  const planEndDate = parseISO(endDate);
+  let count = 0;
+
+  while (count < consultationCount && currentDate <= planEndDate) {
+    const sendLinkDate = nextMonday(addWeeks(currentDate, -1));
+    
+    schedules.push({
+      client_id: clientId,
+      user_id: userId,
+      scheduled_date: format(currentDate, 'yyyy-MM-dd'),
+      send_link_date: format(sendLinkDate, 'yyyy-MM-dd'),
+      status: 'pending',
+    });
+
+    count++;
+
+    if (consultationFrequency === 'once') break;
+    
+    if (consultationFrequency === 'monthly') {
+      currentDate = addMonths(currentDate, 1);
+    } else if (consultationFrequency === 'six_weeks') {
+      currentDate = addWeeks(currentDate, 6);
+    }
+  }
+
+  return schedules;
+}
+
 export function useAddClient() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -121,11 +200,32 @@ export function useAddClient() {
         if (paymentsError) throw paymentsError;
       }
 
+      // Generate consultation schedules if applicable
+      if (client.has_consultations && client.first_consultation_date && client.consultation_frequency) {
+        const schedules = generateConsultationSchedules(
+          user.id,
+          client.id,
+          client.first_consultation_date,
+          client.consultation_count || 1,
+          client.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
+          client.end_date
+        );
+
+        if (schedules.length > 0) {
+          const { error: schedulesError } = await supabase
+            .from('consultation_schedules')
+            .insert(schedules);
+
+          if (schedulesError) throw schedulesError;
+        }
+      }
+
       return client;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
     },
   });
 }
@@ -166,6 +266,7 @@ export function useDeleteClient() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
     },
   });
 }
@@ -223,6 +324,17 @@ export function getUpcomingPayments(payments: (Payment & { client_name: string }
     .sort((a, b) => parseISO(a.due_date).getTime() - parseISO(b.due_date).getTime());
 }
 
+export function getOverduePayments(payments: (Payment & { client_name: string })[]) {
+  const today = new Date();
+  return payments
+    .filter(payment => {
+      if (payment.status === 'paid') return false;
+      const dueDate = parseISO(payment.due_date);
+      return dueDate < today;
+    })
+    .sort((a, b) => parseISO(a.due_date).getTime() - parseISO(b.due_date).getTime());
+}
+
 export function getMonthlyRevenue(payments: (Payment & { client_name: string })[], year: number, month: number) {
   const monthStart = startOfMonth(new Date(year, month));
   const monthEnd = endOfMonth(new Date(year, month));
@@ -239,4 +351,44 @@ export function getMonthlyRevenue(payments: (Payment & { client_name: string })[
 
 export function getTotalMonthlyRecurring(clients: Client[]): number {
   return clients.filter(c => c.is_active).reduce((sum, c) => sum + c.monthly_value, 0);
+}
+
+export function getMonthlyIncome(payments: (Payment & { client_name: string })[], year: number, month: number): number {
+  const monthStart = startOfMonth(new Date(year, month));
+  const monthEnd = endOfMonth(new Date(year, month));
+
+  return payments
+    .filter(payment => {
+      if (payment.status !== 'paid' || !payment.paid_at) return false;
+      const paidDate = parseISO(payment.paid_at);
+      return isWithinInterval(paidDate, { start: monthStart, end: monthEnd });
+    })
+    .reduce((sum, p) => sum + p.amount, 0);
+}
+
+export function getExpiringThisMonth(clients: Client[], year: number, month: number): Client[] {
+  const monthStart = startOfMonth(new Date(year, month));
+  const monthEnd = endOfMonth(new Date(year, month));
+
+  return clients
+    .filter(client => {
+      if (!client.is_active) return false;
+      const endDate = parseISO(client.end_date);
+      return isWithinInterval(endDate, { start: monthStart, end: monthEnd });
+    })
+    .sort((a, b) => parseISO(a.end_date).getTime() - parseISO(b.end_date).getTime());
+}
+
+export function getConsultationsThisMonth(
+  schedules: (ConsultationSchedule & { client_name: string })[],
+  year: number,
+  month: number
+) {
+  const monthStart = startOfMonth(new Date(year, month));
+  const monthEnd = endOfMonth(new Date(year, month));
+
+  return schedules.filter(schedule => {
+    const scheduledDate = parseISO(schedule.scheduled_date);
+    return isWithinInterval(scheduledDate, { start: monthStart, end: monthEnd });
+  });
 }

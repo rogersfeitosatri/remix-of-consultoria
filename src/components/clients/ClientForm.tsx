@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Client } from '@/hooks/useClients';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
+import { addMonths } from 'date-fns';
 
 const SERVICE_LABELS = {
   nutrition: 'Nutrição',
@@ -15,8 +16,15 @@ const SERVICE_LABELS = {
 };
 
 const PLAN_LABELS = {
-  consultoria: 'Consultoria',
-  premium: 'Premium',
+  consultoria: 'Consultoria (sem consultas)',
+  premium: 'Premium (com consultas)',
+};
+
+const PLAN_DURATION_LABELS = {
+  monthly: 'Mensal',
+  quarterly: 'Trimestral',
+  semiannual: 'Semestral',
+  annual: 'Anual',
 };
 
 const CHECKIN_LABELS = {
@@ -26,6 +34,12 @@ const CHECKIN_LABELS = {
   monthly: 'Mensal',
   bimonthly: 'Bimestral',
   quarterly: 'Trimestral',
+};
+
+const CONSULTATION_FREQUENCY_LABELS = {
+  once: '1 consulta apenas',
+  monthly: '1 a cada mês',
+  six_weeks: '1 a cada 6 semanas',
 };
 
 interface ClientFormProps {
@@ -41,6 +55,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     phone: client?.phone || '',
     service_type: client?.service_type || 'nutrition' as 'nutrition' | 'training' | 'both',
     plan_type: client?.plan_type || 'consultoria' as 'consultoria' | 'premium',
+    plan_duration: client?.plan_duration || 'monthly' as 'monthly' | 'quarterly' | 'semiannual' | 'annual',
     has_checkin: client?.has_checkin ?? true,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly',
     start_date: client?.start_date || new Date().toISOString().split('T')[0],
@@ -48,7 +63,53 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     monthly_value: client?.monthly_value || 0,
     notes: client?.notes || '',
     is_active: client?.is_active ?? true,
+    has_consultations: client?.has_consultations ?? false,
+    consultation_count: client?.consultation_count || 1,
+    consultation_frequency: client?.consultation_frequency || 'monthly' as 'once' | 'monthly' | 'six_weeks',
+    first_consultation_date: client?.first_consultation_date || '',
   });
+
+  // Calculate end date based on plan duration
+  useEffect(() => {
+    if (formData.start_date && formData.plan_duration) {
+      const startDate = new Date(formData.start_date);
+      let endDate: Date;
+      
+      switch (formData.plan_duration) {
+        case 'monthly':
+          endDate = addMonths(startDate, 1);
+          break;
+        case 'quarterly':
+          endDate = addMonths(startDate, 3);
+          break;
+        case 'semiannual':
+          endDate = addMonths(startDate, 6);
+          break;
+        case 'annual':
+          endDate = addMonths(startDate, 12);
+          break;
+        default:
+          endDate = addMonths(startDate, 1);
+      }
+      
+      // Only auto-set if not editing or if the client is new
+      if (!client || formData.end_date === '') {
+        setFormData(prev => ({
+          ...prev,
+          end_date: endDate.toISOString().split('T')[0]
+        }));
+      }
+    }
+  }, [formData.start_date, formData.plan_duration]);
+
+  // Set has_consultations based on plan type
+  useEffect(() => {
+    if (formData.plan_type === 'premium') {
+      setFormData(prev => ({ ...prev, has_consultations: true }));
+    } else {
+      setFormData(prev => ({ ...prev, has_consultations: false }));
+    }
+  }, [formData.plan_type]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +120,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl animate-fade-in">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-card-foreground">
+          <h2 className="text-xl font-bold text-foreground">
             {client ? 'Editar Atleta' : 'Novo Atleta'}
           </h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -100,7 +161,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="monthlyValue">Valor Mensal (R$)</Label>
+              <Label htmlFor="monthlyValue">Valor Pago (R$)</Label>
               <Input
                 id="monthlyValue"
                 type="number"
@@ -150,6 +211,70 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             </div>
           </div>
 
+          {/* Plan Duration */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Duração do Plano</Label>
+              <Select
+                value={formData.plan_duration}
+                onValueChange={(v) => setFormData({ ...formData, plan_duration: v as 'monthly' | 'quarterly' | 'semiannual' | 'annual' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(PLAN_DURATION_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Consultation Info (only for Premium) */}
+          {formData.has_consultations && (
+            <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
+              <h3 className="font-semibold text-foreground">Configuração de Consultas</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="consultationCount">Quantidade de Consultas</Label>
+                  <Input
+                    id="consultationCount"
+                    type="number"
+                    min="1"
+                    value={formData.consultation_count}
+                    onChange={(e) => setFormData({ ...formData, consultation_count: parseInt(e.target.value) || 1 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Periodicidade das Consultas</Label>
+                  <Select
+                    value={formData.consultation_frequency || 'monthly'}
+                    onValueChange={(v) => setFormData({ ...formData, consultation_frequency: v as 'once' | 'monthly' | 'six_weeks' })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(CONSULTATION_FREQUENCY_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="firstConsultation">Data da 1ª Consulta</Label>
+                  <Input
+                    id="firstConsultation"
+                    type="date"
+                    value={formData.first_consultation_date}
+                    onChange={(e) => setFormData({ ...formData, first_consultation_date: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Check-in */}
           <div className="space-y-4">
             <div className="flex items-center gap-4">
@@ -194,7 +319,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="endDate">Data de Término</Label>
+              <Label htmlFor="endDate">Data de Término (editável)</Label>
               <Input
                 id="endDate"
                 type="date"

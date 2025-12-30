@@ -5,7 +5,8 @@ import { ClientForm } from '@/components/clients/ClientForm';
 import { useClients, useAddClient, useUpdateClient, useDeleteClient, Client } from '@/hooks/useClients';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Search, Loader2, Users, UserX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Clients() {
@@ -19,16 +20,35 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const { toast } = useToast();
 
-  const filteredClients = useMemo(() => {
-    if (!searchQuery) return clients;
+  const activeClients = useMemo(() => {
+    return clients.filter(c => c.is_active);
+  }, [clients]);
+
+  const inactiveClients = useMemo(() => {
+    return clients.filter(c => !c.is_active);
+  }, [clients]);
+
+  const filteredActiveClients = useMemo(() => {
+    if (!searchQuery) return activeClients;
     const query = searchQuery.toLowerCase();
-    return clients.filter(
+    return activeClients.filter(
       c =>
         c.name.toLowerCase().includes(query) ||
         c.email?.toLowerCase().includes(query) ||
         c.phone?.includes(query)
     );
-  }, [searchQuery, clients]);
+  }, [searchQuery, activeClients]);
+
+  const filteredInactiveClients = useMemo(() => {
+    if (!searchQuery) return inactiveClients;
+    const query = searchQuery.toLowerCase();
+    return inactiveClients.filter(
+      c =>
+        c.name.toLowerCase().includes(query) ||
+        c.email?.toLowerCase().includes(query) ||
+        c.phone?.includes(query)
+    );
+  }, [searchQuery, inactiveClients]);
 
   const handleSubmit = async (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     try {
@@ -123,19 +143,48 @@ export default function Clients() {
           />
         </div>
 
-        {/* Stats */}
-        <div className="flex gap-4 text-sm text-muted-foreground">
-          <span>{filteredClients.length} atletas encontrados</span>
-          <span>•</span>
-          <span>{clients.filter(c => c.is_active).length} ativos</span>
-        </div>
-
-        {/* List */}
-        <ClientsList
-          clients={filteredClients}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
+        {/* Tabs */}
+        <Tabs defaultValue="active" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="active" className="gap-2">
+              <Users className="h-4 w-4" />
+              Ativos ({activeClients.length})
+            </TabsTrigger>
+            <TabsTrigger value="inactive" className="gap-2">
+              <UserX className="h-4 w-4" />
+              Inativos ({inactiveClients.length})
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="active" className="mt-6">
+            <div className="mb-4 text-sm text-muted-foreground">
+              {filteredActiveClients.length} atletas ativos encontrados
+            </div>
+            <ClientsList
+              clients={filteredActiveClients}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          </TabsContent>
+          
+          <TabsContent value="inactive" className="mt-6">
+            <div className="mb-4 text-sm text-muted-foreground">
+              {filteredInactiveClients.length} atletas inativos encontrados
+            </div>
+            {filteredInactiveClients.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <UserX className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum atleta inativo</p>
+              </div>
+            ) : (
+              <ClientsList
+                clients={filteredInactiveClients}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Form Modal */}

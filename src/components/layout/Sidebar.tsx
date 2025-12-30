@@ -20,8 +20,8 @@ export function Sidebar() {
             <Dumbbell className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-sidebar-foreground">ConsultaPro</h1>
-            <p className="text-xs text-muted-foreground">Gestão de Atletas</p>
+            <h1 className="text-lg font-bold text-sidebar-foreground">RF Assessoria</h1>
+            <p className="text-xs text-muted-foreground">Esportiva</p>
           </div>
         </div>
 
