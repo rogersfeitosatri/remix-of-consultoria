@@ -52,6 +52,111 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
   const hasSendLink = (date: Date) => sendLinkDates.some(d => isSameDay(d, date));
   const hasFirstConsultation = (date: Date) => firstConsultationDates.some(d => isSameDay(d, date));
 
+  const hasEvents = consultationsOnSelectedDate.length > 0 || 
+                   sendLinksOnSelectedDate.length > 0 || 
+                   firstConsultationsOnSelectedDate.length > 0;
+
+  // Event details component (reusable for mobile and desktop)
+  const EventDetails = () => (
+    <>
+      {/* First consultations on selected date */}
+      {firstConsultationsOnSelectedDate.length > 0 && (
+        <div className="mb-4">
+          <h5 className="text-xs font-semibold text-emerald-500 uppercase mb-2 flex items-center gap-1">
+            <CalendarIcon className="h-3 w-3" />
+            1ª Consulta
+          </h5>
+          <div className="space-y-2">
+            {firstConsultationsOnSelectedDate.map(client => (
+              <div
+                key={client.id}
+                className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-emerald-500/10 border-emerald-500/20"
+              >
+                <User className="h-4 w-4 text-emerald-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {client.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Primeira consulta do atleta
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Send links on selected date */}
+      {sendLinksOnSelectedDate.length > 0 && (
+        <div className="mb-4">
+          <h5 className="text-xs font-semibold text-amber-500 uppercase mb-2 flex items-center gap-1">
+            <Send className="h-3 w-3" />
+            Enviar Link de Agendamento
+          </h5>
+          <div className="space-y-2">
+            {sendLinksOnSelectedDate.map(consultation => (
+              <div
+                key={`link-${consultation.id}`}
+                className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-amber-500/10 border-amber-500/20"
+              >
+                <Send className="h-4 w-4 text-amber-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {consultation.client_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Consulta em {format(parseISO(consultation.scheduled_date), "dd/MM/yyyy")}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Consultations on selected date */}
+      {consultationsOnSelectedDate.length > 0 && (
+        <div className="mb-4">
+          <h5 className="text-xs font-semibold text-primary uppercase mb-2 flex items-center gap-1">
+            <CalendarDays className="h-3 w-3" />
+            Consultas Agendadas
+          </h5>
+          <div className="space-y-2">
+            {consultationsOnSelectedDate.map(consultation => (
+              <div
+                key={consultation.id}
+                className={cn(
+                  "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border",
+                  consultation.status === 'completed' 
+                    ? "bg-muted/50 border-muted" 
+                    : "bg-primary/10 border-primary/20"
+                )}
+              >
+                <User className="h-4 w-4 text-primary" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {consultation.client_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {consultation.status === 'completed' ? 'Realizada' : 
+                     consultation.status === 'sent' ? 'Link enviado' : 'Pendente'}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!hasEvents && (
+        <p className="text-sm text-muted-foreground">
+          Nenhum evento agendado para esta data.
+        </p>
+      )}
+    </>
+  );
+
   return (
     <Card className="border-border bg-card">
       <CardHeader className="p-4 sm:p-6">
@@ -62,40 +167,113 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
         <CardDescription className="text-xs sm:text-sm">Consultas agendadas e datas de envio de link</CardDescription>
       </CardHeader>
       <CardContent className="p-3 sm:p-4 lg:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:gap-8">
-          <div className="flex-shrink-0 overflow-x-auto">
+        {/* Desktop Layout: Calendar + Side Panel */}
+        <div className="hidden lg:flex lg:gap-6">
+          {/* Left: Calendar */}
+          <div className="flex flex-col">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              locale={ptBR}
+              className="rounded-md border border-border pointer-events-auto"
+              components={{
+                DayContent: ({ date }) => {
+                  const isConsultation = hasConsultation(date);
+                  const isSendLink = hasSendLink(date);
+                  const isFirstConsultation = hasFirstConsultation(date);
+                  const isMonday = getDay(date) === 1;
+
+                  return (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      <span>{date.getDate()}</span>
+                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex gap-0.5">
+                        {isFirstConsultation && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="1ª Consulta" />
+                        )}
+                        {isConsultation && !isFirstConsultation && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary" title="Consulta" />
+                        )}
+                        {isSendLink && isMonday && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Enviar Link" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                },
+              }}
+            />
+            
+            {/* Legend below calendar on desktop */}
+            <div className="mt-4">
+              <h4 className="font-medium text-sm text-foreground mb-2">
+                {selectedDate 
+                  ? format(selectedDate, "d 'de' MMMM", { locale: ptBR })
+                  : 'Selecione uma data'}
+              </h4>
+              <div className="flex flex-wrap gap-3 text-xs">
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                  <span className="text-muted-foreground">1ª Consulta</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                  <span className="text-muted-foreground">Consulta</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                  <span className="text-muted-foreground">Enviar Link</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Athletes list (only shown when there are events) */}
+          {hasEvents && (
+            <div className="flex-1 min-w-0 border-l border-border pl-6">
+              <h4 className="font-medium text-sm text-foreground mb-4">
+                Atletas - {selectedDate && format(selectedDate, "d 'de' MMMM", { locale: ptBR })}
+              </h4>
+              <EventDetails />
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Layout: Stacked */}
+        <div className="lg:hidden flex flex-col gap-4">
+          <div className="overflow-x-auto">
             <Calendar
               mode="single"
               selected={selectedDate}
               onSelect={setSelectedDate}
               locale={ptBR}
               className="rounded-md border border-border pointer-events-auto mx-auto"
-            components={{
-              DayContent: ({ date }) => {
-                const isConsultation = hasConsultation(date);
-                const isSendLink = hasSendLink(date);
-                const isFirstConsultation = hasFirstConsultation(date);
-                const isMonday = getDay(date) === 1;
+              components={{
+                DayContent: ({ date }) => {
+                  const isConsultation = hasConsultation(date);
+                  const isSendLink = hasSendLink(date);
+                  const isFirstConsultation = hasFirstConsultation(date);
+                  const isMonday = getDay(date) === 1;
 
-                return (
-                  <div className="relative w-full h-full flex items-center justify-center">
-                    <span>{date.getDate()}</span>
-                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex gap-0.5">
-                      {isFirstConsultation && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="1ª Consulta" />
-                      )}
-                      {isConsultation && !isFirstConsultation && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary" title="Consulta" />
-                      )}
-                      {isSendLink && isMonday && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Enviar Link" />
-                      )}
+                  return (
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      <span>{date.getDate()}</span>
+                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex gap-0.5">
+                        {isFirstConsultation && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="1ª Consulta" />
+                        )}
+                        {isConsultation && !isFirstConsultation && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary" title="Consulta" />
+                        )}
+                        {isSendLink && isMonday && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Enviar Link" />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              },
-            }}
-          />
+                  );
+                },
+              }}
+            />
           </div>
           
           <div className="flex-1 min-w-0">
@@ -106,7 +284,7 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
             </h4>
             
             {/* Legend */}
-            <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 text-xs">
+            <div className="flex flex-wrap gap-2 mb-4 text-xs">
               <div className="flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
                 <span className="text-muted-foreground">1ª Consulta</span>
@@ -121,103 +299,7 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
               </div>
             </div>
 
-            {/* First consultations on selected date */}
-            {firstConsultationsOnSelectedDate.length > 0 && (
-              <div className="mb-4">
-                <h5 className="text-xs font-semibold text-emerald-500 uppercase mb-2 flex items-center gap-1">
-                  <CalendarIcon className="h-3 w-3" />
-                  1ª Consulta
-                </h5>
-                <div className="space-y-2">
-                  {firstConsultationsOnSelectedDate.map(client => (
-                    <div
-                      key={client.id}
-                      className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-emerald-500/10 border-emerald-500/20"
-                    >
-                      <User className="h-4 w-4 text-emerald-500" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {client.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Primeira consulta do atleta
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Send links on selected date */}
-            {sendLinksOnSelectedDate.length > 0 && (
-              <div className="mb-4">
-                <h5 className="text-xs font-semibold text-amber-500 uppercase mb-2 flex items-center gap-1">
-                  <Send className="h-3 w-3" />
-                  Enviar Link de Agendamento
-                </h5>
-                <div className="space-y-2">
-                  {sendLinksOnSelectedDate.map(consultation => (
-                    <div
-                      key={`link-${consultation.id}`}
-                      className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-amber-500/10 border-amber-500/20"
-                    >
-                      <Send className="h-4 w-4 text-amber-500" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {consultation.client_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Consulta em {format(parseISO(consultation.scheduled_date), "dd/MM/yyyy")}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Consultations on selected date */}
-            {consultationsOnSelectedDate.length > 0 && (
-              <div className="mb-4">
-                <h5 className="text-xs font-semibold text-primary uppercase mb-2 flex items-center gap-1">
-                  <CalendarDays className="h-3 w-3" />
-                  Consultas Agendadas
-                </h5>
-                <div className="space-y-2">
-                  {consultationsOnSelectedDate.map(consultation => (
-                    <div
-                      key={consultation.id}
-                      className={cn(
-                        "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border",
-                        consultation.status === 'completed' 
-                          ? "bg-muted/50 border-muted" 
-                          : "bg-primary/10 border-primary/20"
-                      )}
-                    >
-                      <User className="h-4 w-4 text-primary" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {consultation.client_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {consultation.status === 'completed' ? 'Realizada' : 
-                           consultation.status === 'sent' ? 'Link enviado' : 'Pendente'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {consultationsOnSelectedDate.length === 0 && 
-             sendLinksOnSelectedDate.length === 0 && 
-             firstConsultationsOnSelectedDate.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Nenhum evento agendado para esta data.
-              </p>
-            )}
+            <EventDetails />
           </div>
         </div>
       </CardContent>
