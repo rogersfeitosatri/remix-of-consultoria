@@ -13,9 +13,10 @@ interface Payment {
 
 interface UpcomingPaymentsProps {
   payments: Payment[];
+  title?: string;
 }
 
-export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
+export function UpcomingPayments({ payments, title = 'Próximos Vencimentos' }: UpcomingPaymentsProps) {
   const total = payments.reduce((sum, p) => sum + p.amount, 0);
 
   if (payments.length === 0) {
@@ -26,8 +27,8 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
             <Calendar className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-card-foreground">Próximos Vencimentos</h3>
-            <p className="text-sm text-muted-foreground">Próximos 30 dias</p>
+            <h3 className="text-lg font-semibold text-card-foreground">{title}</h3>
+            <p className="text-sm text-muted-foreground">Pagamentos pendentes</p>
           </div>
         </div>
         <div className="py-8 text-center">
@@ -50,8 +51,8 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
             <Calendar className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-card-foreground">Próximos Vencimentos</h3>
-            <p className="text-sm text-muted-foreground">Próximos 30 dias</p>
+            <h3 className="text-lg font-semibold text-card-foreground">{title}</h3>
+            <p className="text-sm text-muted-foreground">Pagamentos pendentes</p>
           </div>
         </div>
         <div className="text-right">

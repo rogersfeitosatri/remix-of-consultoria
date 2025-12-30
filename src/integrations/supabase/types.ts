@@ -17,16 +17,21 @@ export type Database = {
       clients: {
         Row: {
           checkin_frequency: string | null
+          consultation_count: number | null
+          consultation_frequency: string | null
           created_at: string
           email: string | null
           end_date: string
+          first_consultation_date: string | null
           has_checkin: boolean
+          has_consultations: boolean | null
           id: string
           is_active: boolean
           monthly_value: number
           name: string
           notes: string | null
           phone: string | null
+          plan_duration: string | null
           plan_type: string
           service_type: string
           start_date: string
@@ -35,16 +40,21 @@ export type Database = {
         }
         Insert: {
           checkin_frequency?: string | null
+          consultation_count?: number | null
+          consultation_frequency?: string | null
           created_at?: string
           email?: string | null
           end_date: string
+          first_consultation_date?: string | null
           has_checkin?: boolean
+          has_consultations?: boolean | null
           id?: string
           is_active?: boolean
           monthly_value: number
           name: string
           notes?: string | null
           phone?: string | null
+          plan_duration?: string | null
           plan_type: string
           service_type: string
           start_date: string
@@ -53,16 +63,21 @@ export type Database = {
         }
         Update: {
           checkin_frequency?: string | null
+          consultation_count?: number | null
+          consultation_frequency?: string | null
           created_at?: string
           email?: string | null
           end_date?: string
+          first_consultation_date?: string | null
           has_checkin?: boolean
+          has_consultations?: boolean | null
           id?: string
           is_active?: boolean
           monthly_value?: number
           name?: string
           notes?: string | null
           phone?: string | null
+          plan_duration?: string | null
           plan_type?: string
           service_type?: string
           start_date?: string
@@ -70,6 +85,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      consultation_schedules: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          scheduled_date: string
+          send_link_date: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          scheduled_date: string
+          send_link_date: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          scheduled_date?: string
+          send_link_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consultation_schedules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {

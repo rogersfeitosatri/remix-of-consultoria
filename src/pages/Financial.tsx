@@ -1,28 +1,29 @@
 import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { MonthlyRevenue } from '@/components/financial/MonthlyRevenue';
 import { UpcomingPayments } from '@/components/financial/UpcomingPayments';
 import { StatCard } from '@/components/dashboard/StatCard';
-import { useClients, usePayments, getMonthlyRevenue, getUpcomingPayments, getTotalMonthlyRecurring } from '@/hooks/useClients';
+import { useClients, usePayments, getMonthlyRevenue, getUpcomingPayments, getTotalMonthlyRecurring, getOverduePayments } from '@/hooks/useClients';
 import { DollarSign, TrendingUp, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
 import { parseISO } from 'date-fns';
 
 export default function Financial() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialFilter = searchParams.get('filter') || 'all';
+  
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [filter, setFilter] = useState<'all' | 'overdue' | 'upcoming'>(initialFilter as 'all' | 'overdue' | 'upcoming');
   
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
 
   const monthlyData = getMonthlyRevenue(payments, currentYear, currentMonth);
   const upcomingPayments = getUpcomingPayments(payments, 30);
+  const overduePayments = getOverduePayments(payments);
   const monthlyRecurring = getTotalMonthlyRecurring(clients);
-
-  const overdueCount = payments.filter(p => {
-    if (p.status === 'paid') return false;
-    const dueDate = parseISO(p.due_date);
-    return dueDate < new Date();
-  }).length;
 
   const handleMonthChange = (year: number, month: number) => {
     setCurrentYear(year);
@@ -33,6 +34,11 @@ export default function Financial() {
 
   const isLoading = clientsLoading || paymentsLoading;
 
+  const handleFilterClick = (newFilter: 'overdue' | 'upcoming') => {
+    setFilter(newFilter);
+    navigate(`/financial?filter=${newFilter}`);
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -42,6 +48,12 @@ export default function Financial() {
       </Layout>
     );
   }
+
+  const displayPayments = filter === 'overdue' 
+    ? overduePayments 
+    : filter === 'upcoming' 
+      ? upcomingPayments 
+      : [...overduePayments, ...upcomingPayments];
 
   return (
     <Layout>
@@ -68,20 +80,30 @@ export default function Financial() {
             icon={<DollarSign className="h-6 w-6" />}
             variant="success"
           />
-          <StatCard
-            title="A Receber (30 dias)"
-            value={`R$ ${upcomingPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-            subtitle={`${upcomingPayments.length} pagamentos`}
-            icon={<CreditCard className="h-6 w-6" />}
-            variant="default"
-          />
-          <StatCard
-            title="Pagamentos Atrasados"
-            value={overdueCount}
-            subtitle="pendentes"
-            icon={<AlertCircle className="h-6 w-6" />}
-            variant="warning"
-          />
+          <button 
+            onClick={() => handleFilterClick('upcoming')}
+            className="text-left transition-transform hover:scale-[1.02]"
+          >
+            <StatCard
+              title="A Receber (30 dias)"
+              value={`R$ ${upcomingPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+              subtitle={`${upcomingPayments.length} pagamentos - Clique para ver`}
+              icon={<CreditCard className="h-6 w-6" />}
+              variant="default"
+            />
+          </button>
+          <button 
+            onClick={() => handleFilterClick('overdue')}
+            className="text-left transition-transform hover:scale-[1.02]"
+          >
+            <StatCard
+              title="Pagamentos Atrasados"
+              value={overduePayments.length}
+              subtitle="pendentes - Clique para ver"
+              icon={<AlertCircle className="h-6 w-6" />}
+              variant="warning"
+            />
+          </button>
         </div>
 
         {/* Content */}
@@ -93,7 +115,16 @@ export default function Financial() {
             total={monthlyData.total}
             onMonthChange={handleMonthChange}
           />
-          <UpcomingPayments payments={upcomingPayments} />
+          <UpcomingPayments 
+            payments={displayPayments} 
+            title={
+              filter === 'overdue' 
+                ? 'Pagamentos Atrasados' 
+                : filter === 'upcoming' 
+                  ? 'A Receber (30 dias)' 
+                  : 'Todos os Pagamentos'
+            }
+          />
         </div>
       </div>
     </Layout>
