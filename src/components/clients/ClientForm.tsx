@@ -42,6 +42,11 @@ const CONSULTATION_FREQUENCY_LABELS = {
   six_weeks: '1 a cada 6 semanas',
 };
 
+const PAYMENT_TYPE_LABELS = {
+  pix: 'PIX',
+  card: 'Cartão',
+};
+
 interface ClientFormProps {
   client?: Client;
   onSubmit: (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
@@ -67,6 +72,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     consultation_count: client?.consultation_count || 1,
     consultation_frequency: client?.consultation_frequency || 'monthly' as 'once' | 'monthly' | 'six_weeks',
     first_consultation_date: client?.first_consultation_date || '',
+    payment_type: client?.payment_type || 'pix' as 'pix' | 'card',
   });
 
   // Calculate end date based on plan duration
@@ -172,6 +178,22 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                 placeholder="0,00"
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de Pagamento</Label>
+              <Select
+                value={formData.payment_type}
+                onValueChange={(v) => setFormData({ ...formData, payment_type: v as 'pix' | 'card' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(PAYMENT_TYPE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

@@ -18,10 +18,11 @@ interface MonthlyRevenueProps {
   month: number;
   payments: Payment[];
   total: number;
+  newPlans?: { count: number; total: number };
   onMonthChange: (year: number, month: number) => void;
 }
 
-export function MonthlyRevenue({ year, month, payments, total, onMonthChange }: MonthlyRevenueProps) {
+export function MonthlyRevenue({ year, month, payments, total, newPlans, onMonthChange }: MonthlyRevenueProps) {
   const updatePaymentStatus = useUpdatePaymentStatus();
 
   const handlePreviousMonth = () => {
@@ -68,7 +69,7 @@ export function MonthlyRevenue({ year, month, payments, total, onMonthChange }: 
       </div>
 
       {/* Summary */}
-      <div className="grid gap-4 sm:grid-cols-3 mb-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         <div className="rounded-lg bg-muted/50 p-4">
           <p className="text-sm text-muted-foreground">Total Esperado</p>
           <p className="mt-1 text-2xl font-bold text-card-foreground">
@@ -87,6 +88,14 @@ export function MonthlyRevenue({ year, month, payments, total, onMonthChange }: 
             R$ {pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
         </div>
+        {newPlans && (
+          <div className="rounded-lg bg-primary/10 p-4">
+            <p className="text-sm text-primary">Novos Planos ({newPlans.count})</p>
+            <p className="mt-1 text-2xl font-bold text-primary">
+              R$ {newPlans.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Payments List */}
