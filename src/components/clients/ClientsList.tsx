@@ -1,9 +1,29 @@
-import { Client, SERVICE_LABELS, PLAN_LABELS, CHECKIN_LABELS } from '@/types/client';
+import { Client } from '@/hooks/useClients';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+const SERVICE_LABELS = {
+  nutrition: 'Nutrição',
+  training: 'Treino',
+  both: 'Ambos',
+};
+
+const PLAN_LABELS = {
+  consultoria: 'Consultoria',
+  premium: 'Premium',
+};
+
+const CHECKIN_LABELS = {
+  daily: 'Diário',
+  weekly: 'Semanal',
+  biweekly: 'Quinzenal',
+  monthly: 'Mensal',
+  bimonthly: 'Bimestral',
+  quarterly: 'Trimestral',
+};
 
 interface ClientsListProps {
   clients: Client[];
@@ -29,7 +49,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   return (
     <div className="grid gap-4">
       {clients.map((client) => {
-        const daysUntilExpiry = differenceInDays(parseISO(client.endDate), new Date());
+        const daysUntilExpiry = differenceInDays(parseISO(client.end_date), new Date());
         const isExpiring = daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
         const isExpired = daysUntilExpiry < 0;
 
@@ -38,7 +58,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
             key={client.id}
             className={cn(
               'glass-card rounded-xl p-5 transition-all hover:shadow-lg',
-              !client.isActive && 'opacity-60'
+              !client.is_active && 'opacity-60'
             )}
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -46,13 +66,13 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-lg font-semibold text-card-foreground">{client.name}</h3>
-                  {!client.isActive && (
+                  {!client.is_active && (
                     <span className="alert-badge bg-muted text-muted-foreground">Inativo</span>
                   )}
-                  {isExpired && client.isActive && (
+                  {isExpired && client.is_active && (
                     <span className="alert-badge bg-destructive/10 text-destructive">Vencido</span>
                   )}
-                  {isExpiring && client.isActive && (
+                  {isExpiring && client.is_active && (
                     <span className="alert-badge bg-warning/10 text-warning">
                       {daysUntilExpiry} dias restantes
                     </span>
@@ -60,26 +80,30 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <Mail className="h-3.5 w-3.5" />
-                    {client.email}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Phone className="h-3.5 w-3.5" />
-                    {client.phone}
-                  </span>
+                  {client.email && (
+                    <span className="inline-flex items-center gap-1">
+                      <Mail className="h-3.5 w-3.5" />
+                      {client.email}
+                    </span>
+                  )}
+                  {client.phone && (
+                    <span className="inline-flex items-center gap-1">
+                      <Phone className="h-3.5 w-3.5" />
+                      {client.phone}
+                    </span>
+                  )}
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="inline-flex items-center rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                    {SERVICE_LABELS[client.serviceType]}
+                    {SERVICE_LABELS[client.service_type]}
                   </span>
                   <span className="inline-flex items-center rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
-                    {PLAN_LABELS[client.planType]}
+                    {PLAN_LABELS[client.plan_type]}
                   </span>
-                  {client.hasCheckin && client.checkinFrequency && (
+                  {client.has_checkin && client.checkin_frequency && (
                     <span className="inline-flex items-center rounded-md bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
-                      Check-in {CHECKIN_LABELS[client.checkinFrequency]}
+                      Check-in {CHECKIN_LABELS[client.checkin_frequency]}
                     </span>
                   )}
                 </div>
@@ -93,8 +117,8 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                     <span>Período</span>
                   </div>
                   <p className="mt-1 font-medium text-card-foreground">
-                    {format(parseISO(client.startDate), 'dd/MM/yy', { locale: ptBR })} -{' '}
-                    {format(parseISO(client.endDate), 'dd/MM/yy', { locale: ptBR })}
+                    {format(parseISO(client.start_date), 'dd/MM/yy', { locale: ptBR })} -{' '}
+                    {format(parseISO(client.end_date), 'dd/MM/yy', { locale: ptBR })}
                   </p>
                 </div>
 
@@ -104,7 +128,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                     <span>Valor Mensal</span>
                   </div>
                   <p className="mt-1 font-semibold text-card-foreground">
-                    R$ {client.monthlyValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {client.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
 

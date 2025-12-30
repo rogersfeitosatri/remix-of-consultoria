@@ -1,35 +1,30 @@
-import { useEffect, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { ExpiringClientsAlert } from '@/components/dashboard/ExpiringClientsAlert';
 import { UpcomingPayments } from '@/components/financial/UpcomingPayments';
-import { 
-  getClients, 
-  getClientsExpiringWithin, 
-  getUpcomingPayments,
-  getTotalMonthlyRecurring 
-} from '@/lib/storage';
-import { Client, Payment } from '@/types/client';
-import { Users, DollarSign, AlertTriangle, TrendingUp } from 'lucide-react';
+import { useClients, usePayments, getExpiringClients, getUpcomingPayments, getTotalMonthlyRecurring } from '@/hooks/useClients';
+import { Users, DollarSign, AlertTriangle, TrendingUp, Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [expiringClients, setExpiringClients] = useState<Client[]>([]);
-  const [upcomingPayments, setUpcomingPayments] = useState<Payment[]>([]);
-  const [monthlyRecurring, setMonthlyRecurring] = useState(0);
+  const { data: clients = [], isLoading: clientsLoading } = useClients();
+  const { data: payments = [], isLoading: paymentsLoading } = usePayments();
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const activeClients = clients.filter(c => c.is_active);
+  const expiringClients = getExpiringClients(clients, 30);
+  const upcomingPayments = getUpcomingPayments(payments, 30);
+  const monthlyRecurring = getTotalMonthlyRecurring(clients);
 
-  const loadData = () => {
-    const allClients = getClients();
-    const activeClients = allClients.filter(c => c.isActive);
-    setClients(activeClients);
-    setExpiringClients(getClientsExpiringWithin(30));
-    setUpcomingPayments(getUpcomingPayments(30));
-    setMonthlyRecurring(getTotalMonthlyRecurring());
-  };
+  const isLoading = clientsLoading || paymentsLoading;
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -44,7 +39,7 @@ export default function Dashboard() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Atletas Ativos"
-            value={clients.length}
+            value={activeClients.length}
             subtitle="cadastrados"
             icon={<Users className="h-6 w-6" />}
             variant="primary"

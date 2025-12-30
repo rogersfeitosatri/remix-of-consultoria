@@ -14,7 +14,134 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clients: {
+        Row: {
+          checkin_frequency: string | null
+          created_at: string
+          email: string | null
+          end_date: string
+          has_checkin: boolean
+          id: string
+          is_active: boolean
+          monthly_value: number
+          name: string
+          notes: string | null
+          phone: string | null
+          plan_type: string
+          service_type: string
+          start_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checkin_frequency?: string | null
+          created_at?: string
+          email?: string | null
+          end_date: string
+          has_checkin?: boolean
+          id?: string
+          is_active?: boolean
+          monthly_value: number
+          name: string
+          notes?: string | null
+          phone?: string | null
+          plan_type: string
+          service_type: string
+          start_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          checkin_frequency?: string | null
+          created_at?: string
+          email?: string | null
+          end_date?: string
+          has_checkin?: boolean
+          id?: string
+          is_active?: boolean
+          monthly_value?: number
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          plan_type?: string
+          service_type?: string
+          start_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          client_id: string
+          created_at: string
+          due_date: string
+          id: string
+          paid_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          client_id: string
+          created_at?: string
+          due_date: string
+          id?: string
+          paid_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          paid_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

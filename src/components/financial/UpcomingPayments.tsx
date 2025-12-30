@@ -1,8 +1,15 @@
-import { Payment } from '@/types/client';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Clock, AlertCircle, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface Payment {
+  id: string;
+  client_name: string;
+  due_date: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'overdue';
+}
 
 interface UpcomingPaymentsProps {
   payments: Payment[];
@@ -58,7 +65,7 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
       <div className="space-y-3">
         {payments.map((payment) => {
           const today = new Date();
-          const dueDate = parseISO(payment.dueDate);
+          const dueDate = parseISO(payment.due_date);
           const daysUntilDue = differenceInDays(dueDate, today);
           const isOverdue = daysUntilDue < 0;
           const isUrgent = daysUntilDue <= 7 && daysUntilDue >= 0;
@@ -83,7 +90,7 @@ export function UpcomingPayments({ payments }: UpcomingPaymentsProps) {
                   {isOverdue ? <AlertCircle className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
                 </div>
                 <div>
-                  <p className="font-medium text-card-foreground">{payment.clientName}</p>
+                  <p className="font-medium text-card-foreground">{payment.client_name}</p>
                   <p className="text-sm text-muted-foreground">
                     {format(dueDate, "dd 'de' MMMM", { locale: ptBR })}
                   </p>
