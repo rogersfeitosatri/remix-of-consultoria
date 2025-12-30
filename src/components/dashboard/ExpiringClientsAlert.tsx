@@ -77,12 +77,12 @@ export function ExpiringClientsAlert({ clients }: ExpiringClientsAlertProps) {
                 !isUrgent && !isExpired && 'border-border bg-card'
               )}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-semibold text-card-foreground">{client.name}</h4>
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="font-semibold text-card-foreground truncate">{client.name}</h4>
                     <span className={cn(
-                      'alert-badge',
+                      'alert-badge text-xs whitespace-nowrap',
                       isExpired && 'bg-destructive/10 text-destructive',
                       isUrgent && !isExpired && 'bg-warning/10 text-warning',
                       !isUrgent && !isExpired && 'bg-primary/10 text-primary'
@@ -95,11 +95,11 @@ export function ExpiringClientsAlert({ clients }: ExpiringClientsAlertProps) {
                       }
                     </span>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
                     <span>{SERVICE_LABELS[client.service_type]}</span>
-                    <span>•</span>
+                    <span className="hidden sm:inline">•</span>
                     <span>{PLAN_LABELS[client.plan_type]}</span>
-                    <span>•</span>
+                    <span className="hidden sm:inline">•</span>
                     <span>Vence: {format(parseISO(client.end_date), "dd 'de' MMM", { locale: ptBR })}</span>
                   </div>
                 </div>

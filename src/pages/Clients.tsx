@@ -117,23 +117,23 @@ export default function Clients() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Atletas</h1>
-            <p className="mt-1 text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Atletas</h1>
+            <p className="mt-1 text-sm sm:text-base text-muted-foreground">
               Gerencie seus atletas e acompanhamentos
             </p>
           </div>
-          <Button onClick={() => setShowForm(true)} className="gap-2">
+          <Button onClick={() => setShowForm(true)} className="gap-2 w-full sm:w-auto">
             <Plus className="h-4 w-4" />
             Novo Atleta
           </Button>
         </div>
 
         {/* Search */}
-        <div className="relative max-w-md">
+        <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por nome, email ou telefone..."
@@ -145,14 +145,14 @@ export default function Clients() {
 
         {/* Tabs */}
         <Tabs defaultValue="active" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="active" className="gap-2">
-              <Users className="h-4 w-4" />
-              Ativos ({activeClients.length})
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="active" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Users className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Ativos</span> ({activeClients.length})
             </TabsTrigger>
-            <TabsTrigger value="inactive" className="gap-2">
-              <UserX className="h-4 w-4" />
-              Inativos ({inactiveClients.length})
+            <TabsTrigger value="inactive" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+              <UserX className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Inativos</span> ({inactiveClients.length})
             </TabsTrigger>
           </TabsList>
           

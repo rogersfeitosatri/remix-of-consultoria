@@ -16,10 +16,10 @@ interface StatCardProps {
 export function StatCard({ title, value, subtitle, icon, trend, variant = 'default' }: StatCardProps) {
   return (
     <div className="stat-card">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">{title}</p>
-          <p className="mt-2 text-3xl font-bold text-card-foreground">{value}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-muted-foreground truncate">{title}</p>
+          <p className="mt-2 text-2xl sm:text-3xl font-bold text-card-foreground break-words">{value}</p>
           {subtitle && (
             <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
           )}
@@ -34,7 +34,7 @@ export function StatCard({ title, value, subtitle, icon, trend, variant = 'defau
           )}
         </div>
         <div className={cn(
-          'flex h-12 w-12 items-center justify-center rounded-xl',
+          'flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl flex-shrink-0',
           variant === 'warning' && 'bg-warning/10 text-warning',
           variant === 'success' && 'bg-success/10 text-success',
           variant === 'primary' && 'bg-primary/10 text-primary',
