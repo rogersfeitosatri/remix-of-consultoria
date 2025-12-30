@@ -54,22 +54,22 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
 
   return (
     <Card className="border-border bg-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <CalendarDays className="h-5 w-5 text-primary" />
+      <CardHeader className="p-4 sm:p-6">
+        <CardTitle className="flex items-center gap-2 text-foreground text-base sm:text-lg">
+          <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
           Calendário de Consultas
         </CardTitle>
-        <CardDescription>Consultas agendadas e datas de envio de link</CardDescription>
+        <CardDescription className="text-xs sm:text-sm">Consultas agendadas e datas de envio de link</CardDescription>
       </CardHeader>
-      <CardContent className="p-4 lg:p-6">
-        <div className="flex flex-col lg:flex-row gap-4 lg:gap-8">
-          <div className="flex-shrink-0">
+      <CardContent className="p-3 sm:p-4 lg:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:gap-8">
+          <div className="flex-shrink-0 overflow-x-auto">
             <Calendar
               mode="single"
               selected={selectedDate}
               onSelect={setSelectedDate}
               locale={ptBR}
-              className="rounded-md border border-border pointer-events-auto w-full lg:w-auto"
+              className="rounded-md border border-border pointer-events-auto mx-auto"
             components={{
               DayContent: ({ date }) => {
                 const isConsultation = hasConsultation(date);
@@ -98,7 +98,7 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
           />
           </div>
           
-          <div className="flex-1 min-w-0 lg:pl-4">
+          <div className="flex-1 min-w-0">
             <h4 className="font-medium text-sm text-foreground mb-3">
               {selectedDate 
                 ? format(selectedDate, "d 'de' MMMM", { locale: ptBR })
@@ -106,17 +106,17 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
             </h4>
             
             {/* Legend */}
-            <div className="flex flex-wrap gap-3 mb-4 text-xs">
+            <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 text-xs">
               <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
                 <span className="text-muted-foreground">1ª Consulta</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-primary" />
+                <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
                 <span className="text-muted-foreground">Consulta</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
                 <span className="text-muted-foreground">Enviar Link</span>
               </div>
             </div>
@@ -132,7 +132,7 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
                   {firstConsultationsOnSelectedDate.map(client => (
                     <div
                       key={client.id}
-                      className="flex items-center gap-3 p-3 rounded-lg border bg-emerald-500/10 border-emerald-500/20"
+                      className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-emerald-500/10 border-emerald-500/20"
                     >
                       <User className="h-4 w-4 text-emerald-500" />
                       <div className="flex-1 min-w-0">
@@ -160,7 +160,7 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
                   {sendLinksOnSelectedDate.map(consultation => (
                     <div
                       key={`link-${consultation.id}`}
-                      className="flex items-center gap-3 p-3 rounded-lg border bg-amber-500/10 border-amber-500/20"
+                      className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-amber-500/10 border-amber-500/20"
                     >
                       <Send className="h-4 w-4 text-amber-500" />
                       <div className="flex-1 min-w-0">
@@ -189,7 +189,7 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
                     <div
                       key={consultation.id}
                       className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg border",
+                        "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border",
                         consultation.status === 'completed' 
                           ? "bg-muted/50 border-muted" 
                           : "bg-primary/10 border-primary/20"

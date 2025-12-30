@@ -58,15 +58,15 @@ export default function Financial() {
 
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-4 sm:space-y-6 lg:space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Financeiro</h1>
-          <p className="mt-1 text-muted-foreground">Controle de recebimentos e pagamentos</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Financeiro</h1>
+          <p className="mt-1 text-sm sm:text-base text-muted-foreground">Controle de recebimentos e pagamentos</p>
         </div>
 
         {/* Stats */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Receita Recorrente"
             value={`R$ ${monthlyRecurring.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
@@ -108,7 +108,7 @@ export default function Financial() {
         </div>
 
         {/* Content */}
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
           <MonthlyRevenue
             year={currentYear}
             month={currentMonth}
