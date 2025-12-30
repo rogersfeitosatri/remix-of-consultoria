@@ -4,7 +4,7 @@ import { Layout } from '@/components/layout/Layout';
 import { MonthlyRevenue } from '@/components/financial/MonthlyRevenue';
 import { UpcomingPayments } from '@/components/financial/UpcomingPayments';
 import { StatCard } from '@/components/dashboard/StatCard';
-import { useClients, usePayments, getMonthlyRevenue, getUpcomingPayments, getTotalMonthlyRecurring, getOverduePayments } from '@/hooks/useClients';
+import { useClients, usePayments, getMonthlyRevenue, getUpcomingPayments, getTotalMonthlyRecurring, getOverduePayments, getNewPlansThisMonth } from '@/hooks/useClients';
 import { DollarSign, TrendingUp, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
 import { parseISO } from 'date-fns';
 
@@ -24,6 +24,7 @@ export default function Financial() {
   const upcomingPayments = getUpcomingPayments(payments, 30);
   const overduePayments = getOverduePayments(payments);
   const monthlyRecurring = getTotalMonthlyRecurring(clients);
+  const newPlans = getNewPlansThisMonth(clients, currentYear, currentMonth);
 
   const handleMonthChange = (year: number, month: number) => {
     setCurrentYear(year);
@@ -113,6 +114,7 @@ export default function Financial() {
             month={currentMonth}
             payments={monthlyData.payments}
             total={monthlyData.total}
+            newPlans={newPlans}
             onMonthChange={handleMonthChange}
           />
           <UpcomingPayments 

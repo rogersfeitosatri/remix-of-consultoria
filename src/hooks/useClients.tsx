@@ -23,6 +23,7 @@ export interface Client {
   consultation_count: number;
   consultation_frequency: 'once' | 'monthly' | 'six_weeks' | null;
   first_consultation_date: string | null;
+  payment_type: 'pix' | 'card';
   created_at: string;
   updated_at: string;
 }
@@ -351,6 +352,21 @@ export function getMonthlyRevenue(payments: (Payment & { client_name: string })[
 
 export function getTotalMonthlyRecurring(clients: Client[]): number {
   return clients.filter(c => c.is_active).reduce((sum, c) => sum + c.monthly_value, 0);
+}
+
+export function getNewPlansThisMonth(clients: Client[], year: number, month: number): { count: number; total: number } {
+  const monthStart = startOfMonth(new Date(year, month));
+  const monthEnd = endOfMonth(new Date(year, month));
+
+  const newClients = clients.filter(client => {
+    const startDate = parseISO(client.start_date);
+    return isWithinInterval(startDate, { start: monthStart, end: monthEnd });
+  });
+
+  return {
+    count: newClients.length,
+    total: newClients.reduce((sum, c) => sum + c.monthly_value, 0),
+  };
 }
 
 export function getMonthlyIncome(payments: (Payment & { client_name: string })[], year: number, month: number): number {
