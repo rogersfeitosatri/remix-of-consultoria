@@ -61,14 +61,15 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
         </CardTitle>
         <CardDescription>Consultas agendadas e datas de envio de link</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-col lg:flex-row gap-4">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            locale={ptBR}
-            className="rounded-md border border-border pointer-events-auto"
+      <CardContent className="p-4 lg:p-6">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-8">
+          <div className="flex-shrink-0">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              locale={ptBR}
+              className="rounded-md border border-border pointer-events-auto w-full lg:w-auto"
             components={{
               DayContent: ({ date }) => {
                 const isConsultation = hasConsultation(date);
@@ -95,8 +96,9 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
               },
             }}
           />
+          </div>
           
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 lg:pl-4">
             <h4 className="font-medium text-sm text-foreground mb-3">
               {selectedDate 
                 ? format(selectedDate, "d 'de' MMMM", { locale: ptBR })
