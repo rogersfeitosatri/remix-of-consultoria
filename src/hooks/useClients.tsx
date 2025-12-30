@@ -122,12 +122,17 @@ export function useConsultationSchedules() {
 // Helper to calculate the closest Monday to a date (before or after)
 function getClosestMonday(date: Date): Date {
   const dayOfWeek = date.getDay();
-  // Days from Monday: Sun=6, Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5
+  // Days from Monday: Sun=0->6, Mon=1->0, Tue=2->1, Wed=3->2, Thu=4->3, Fri=5->4, Sat=6->5
   const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   
-  if (daysFromMonday <= 3) {
-    // Closer to the previous Monday
-    return addWeeks(date, 0 - Math.floor(daysFromMonday / 7));
+  if (daysFromMonday === 0) {
+    // Already Monday
+    return date;
+  } else if (daysFromMonday <= 3) {
+    // Closer to the previous Monday (subtract days)
+    const previousMonday = new Date(date);
+    previousMonday.setDate(date.getDate() - daysFromMonday);
+    return previousMonday;
   } else {
     // Closer to the next Monday
     return nextMonday(date);
