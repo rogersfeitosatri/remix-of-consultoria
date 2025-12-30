@@ -119,21 +119,69 @@ export function useConsultationSchedules() {
   });
 }
 
+// Helper to calculate the closest Monday to a date (before or after)
+function getClosestMonday(date: Date): Date {
+  const dayOfWeek = date.getDay();
+  // Days from Monday: Sun=6, Mon=0, Tue=1, Wed=2, Thu=3, Fri=4, Sat=5
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  
+  if (daysFromMonday <= 3) {
+    // Closer to the previous Monday
+    return addWeeks(date, 0 - Math.floor(daysFromMonday / 7));
+  } else {
+    // Closer to the next Monday
+    return nextMonday(date);
+  }
+}
+
+// Calculate number of consultations based on plan duration and frequency
+function calculateConsultationCount(
+  planDuration: 'monthly' | 'quarterly' | 'semiannual' | 'annual',
+  consultationFrequency: 'once' | 'monthly' | 'six_weeks'
+): number {
+  if (consultationFrequency === 'once') return 1;
+
+  // Plan duration in months
+  const durationMonths = {
+    monthly: 1,
+    quarterly: 3,
+    semiannual: 6,
+    annual: 12,
+  }[planDuration];
+
+  if (consultationFrequency === 'monthly') {
+    return durationMonths; // One consultation per month
+  } else if (consultationFrequency === 'six_weeks') {
+    // One consultation every 6 weeks = ~1.5 months
+    return Math.floor(durationMonths / 1.5);
+  }
+
+  return 1;
+}
+
 function generateConsultationSchedules(
   userId: string,
   clientId: string,
   firstConsultationDate: string,
-  consultationCount: number,
   consultationFrequency: 'once' | 'monthly' | 'six_weeks',
+  planDuration: 'monthly' | 'quarterly' | 'semiannual' | 'annual',
   endDate: string
 ): Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] {
   const schedules: Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] = [];
   let currentDate = parseISO(firstConsultationDate);
   const planEndDate = parseISO(endDate);
+
+  // Calculate total consultations based on plan duration and frequency
+  const totalConsultations = calculateConsultationCount(planDuration, consultationFrequency);
   let count = 0;
 
-  while (count < consultationCount && currentDate <= planEndDate) {
-    const sendLinkDate = nextMonday(addWeeks(currentDate, -1));
+  while (count < totalConsultations && currentDate <= planEndDate) {
+    // Send link date is the Monday closest to the consultation date
+    // For the first consultation, we use the date as is
+    // For subsequent consultations, we calculate the Monday closest to the expected date
+    const sendLinkDate = count === 0 
+      ? getClosestMonday(addWeeks(currentDate, -1)) // First consultation: Monday before
+      : getClosestMonday(currentDate); // Subsequent: Monday closest to the date
     
     schedules.push({
       client_id: clientId,
@@ -207,8 +255,8 @@ export function useAddClient() {
           user.id,
           client.id,
           client.first_consultation_date,
-          client.consultation_count || 1,
           client.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
+          client.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual',
           client.end_date
         );
 
