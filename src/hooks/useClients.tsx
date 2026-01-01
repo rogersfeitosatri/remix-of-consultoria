@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { addMonths, addWeeks, format, parseISO, differenceInDays, startOfMonth, endOfMonth, isWithinInterval, nextMonday, getDay } from 'date-fns';
+import { addMonths, addWeeks, format, parseISO, differenceInDays, startOfMonth, endOfMonth, isWithinInterval, nextMonday } from 'date-fns';
 
 export interface Client {
   id: string;
@@ -119,16 +119,8 @@ export function useConsultationSchedules() {
   });
 }
 
-// Helper to get the first Monday ON or AFTER a given date
-function getNextOrSameMonday(date: Date): Date {
-  const dayOfWeek = getDay(date);
-  
-  if (dayOfWeek === 1) {
-    // Already Monday
-    return date;
-  }
-  
-  // Get next Monday
+// Helper to get the first Monday AFTER a given date (never the same day)
+function getFirstMondayAfter(date: Date): Date {
   return nextMonday(date);
 }
 
@@ -172,60 +164,73 @@ function generateConsultationSchedules(
   const firstDate = parseISO(firstConsultationDate);
   const planEndDate = parseISO(endDate);
 
+  console.debug(
+    `[Automação Consultas] Iniciando ciclo de automação para client_id=${clientId} | frequência=${consultationFrequency} | duração=${planDuration} | término=${format(planEndDate, 'yyyy-MM-dd')} | 1ª consulta=${format(firstDate, 'yyyy-MM-dd')}`
+  );
+
   // If only one consultation or no recurring frequency, just add the first one
   if (consultationFrequency === 'once') {
     schedules.push({
       client_id: clientId,
       user_id: userId,
       scheduled_date: format(firstDate, 'yyyy-MM-dd'),
-      send_link_date: format(firstDate, 'yyyy-MM-dd'), // No need to send link for first consultation (already manually scheduled)
+      // A primeira consulta é marcada manualmente, então não criamos tarefa de envio de link
+      send_link_date: format(firstDate, 'yyyy-MM-dd'),
       status: 'pending',
     });
     return schedules;
   }
 
-  // First consultation is manually scheduled - we don't need a "send link" task for it
-  // We store it as a consultation schedule for reference
+  // Primeira consulta: agendada manualmente (guardamos no histórico de schedules)
   schedules.push({
     client_id: clientId,
     user_id: userId,
     scheduled_date: format(firstDate, 'yyyy-MM-dd'),
-    send_link_date: format(firstDate, 'yyyy-MM-dd'), // Same date - no link needed (already scheduled manually)
+    // Mesma data para permitir diferenciar no calendário (não é tarefa de envio)
+    send_link_date: format(firstDate, 'yyyy-MM-dd'),
     status: 'pending',
   });
 
-  // Generate subsequent consultation "send link" tasks
-  // The logic: starting from the first consultation, calculate the end of each interval
-  // and create a "send link" task on the first Monday AFTER that interval ends
-  
+  // Loop de criação de tarefas de envio de link, até ultrapassar o término do plano
   let currentConsultationDate = firstDate;
-  
+  let loop = 0;
+
   while (true) {
-    // Calculate the end of the interval (1 month or 6 weeks from current consultation)
+    loop += 1;
+
+    // Fim do intervalo (1 mês ou 6 semanas) a partir da consulta base
     let intervalEndDate: Date;
     if (consultationFrequency === 'monthly') {
       intervalEndDate = addMonths(currentConsultationDate, 1);
-    } else { // six_weeks
+    } else {
       intervalEndDate = addWeeks(currentConsultationDate, 6);
     }
-    
-    // The "send link" date is the first Monday ON or AFTER the interval end
-    const sendLinkDate = getNextOrSameMonday(intervalEndDate);
-    
-    // Stop if the send link date exceeds the plan end date
-    if (sendLinkDate > planEndDate) break;
-    
-    // The scheduled consultation date is the interval end date (approximate, will be scheduled by patient)
-    // We use the interval end as the "scheduled_date" to show when the consultation should occur
+
+    // A tarefa deve ser criada na primeira segunda-feira APÓS o fim do intervalo
+    const sendLinkDate = getFirstMondayAfter(intervalEndDate);
+
+    console.debug(
+      `[Automação Consultas] Loop ${loop}: base=${format(currentConsultationDate, 'yyyy-MM-dd')} | fim_intervalo=${format(intervalEndDate, 'yyyy-MM-dd')} | próxima_tarefa=${format(sendLinkDate, 'yyyy-MM-dd')}`
+    );
+
+    // Condição de parada: se a próxima tarefa ultrapassa o término do plano
+    if (sendLinkDate > planEndDate) {
+      console.debug(
+        `[Automação Consultas] Loop finalizado: próxima_tarefa=${format(sendLinkDate, 'yyyy-MM-dd')} ultrapassa término=${format(planEndDate, 'yyyy-MM-dd')}`
+      );
+      break;
+    }
+
     schedules.push({
       client_id: clientId,
       user_id: userId,
+      // Mantemos a data "prevista" da consulta como fim do intervalo (sem mudar arquitetura)
       scheduled_date: format(intervalEndDate, 'yyyy-MM-dd'),
       send_link_date: format(sendLinkDate, 'yyyy-MM-dd'),
       status: 'pending',
     });
-    
-    // Move to next interval (the next consultation starts from when this one should occur)
+
+    // Próximo ciclo parte do fim do intervalo atual
     currentConsultationDate = intervalEndDate;
   }
 

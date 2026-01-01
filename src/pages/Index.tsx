@@ -2,7 +2,7 @@ import { Layout } from '@/components/layout/Layout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { ExpiringClientsAlert } from '@/components/dashboard/ExpiringClientsAlert';
 import { ConsultationCalendar } from '@/components/dashboard/ConsultationCalendar';
-import { useClients, usePayments, useConsultationSchedules, getExpiringThisMonth, getMonthlyIncome, getConsultationsThisMonth } from '@/hooks/useClients';
+import { useClients, usePayments, useConsultationSchedules, getExpiringThisMonth, getMonthlyIncome } from '@/hooks/useClients';
 import { Users, DollarSign, AlertTriangle, Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -16,7 +16,7 @@ export default function Dashboard() {
   const activeClients = clients.filter(c => c.is_active);
   const expiringThisMonth = getExpiringThisMonth(clients, currentYear, currentMonth);
   const monthlyIncome = getMonthlyIncome(payments, currentYear, currentMonth);
-  const consultationsThisMonth = getConsultationsThisMonth(consultations, currentYear, currentMonth);
+  
 
   const isLoading = clientsLoading || paymentsLoading || consultationsLoading;
 
@@ -67,7 +67,7 @@ export default function Dashboard() {
         {/* Alerts & Calendar */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
           <ExpiringClientsAlert clients={expiringThisMonth} />
-          <ConsultationCalendar consultations={consultationsThisMonth} clients={activeClients} />
+          <ConsultationCalendar consultations={consultations} clients={activeClients} />
         </div>
       </div>
     </Layout>
