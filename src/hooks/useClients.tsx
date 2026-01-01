@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { addMonths, addWeeks, format, parseISO, differenceInDays, startOfMonth, endOfMonth, isWithinInterval, nextMonday } from 'date-fns';
+import { addMonths, addWeeks, format, parseISO, differenceInDays, startOfMonth, endOfMonth, isWithinInterval, nextMonday, getDay } from 'date-fns';
 
 export interface Client {
   id: string;
@@ -119,24 +119,17 @@ export function useConsultationSchedules() {
   });
 }
 
-// Helper to calculate the closest Monday to a date (before or after)
-function getClosestMonday(date: Date): Date {
-  const dayOfWeek = date.getDay();
-  // Days from Monday: Sun=0->6, Mon=1->0, Tue=2->1, Wed=3->2, Thu=4->3, Fri=5->4, Sat=6->5
-  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+// Helper to get the first Monday ON or AFTER a given date
+function getNextOrSameMonday(date: Date): Date {
+  const dayOfWeek = getDay(date);
   
-  if (daysFromMonday === 0) {
+  if (dayOfWeek === 1) {
     // Already Monday
     return date;
-  } else if (daysFromMonday <= 3) {
-    // Closer to the previous Monday (subtract days)
-    const previousMonday = new Date(date);
-    previousMonday.setDate(date.getDate() - daysFromMonday);
-    return previousMonday;
-  } else {
-    // Closer to the next Monday
-    return nextMonday(date);
   }
+  
+  // Get next Monday
+  return nextMonday(date);
 }
 
 // Calculate number of consultations based on plan duration and frequency
@@ -176,37 +169,64 @@ function generateConsultationSchedules(
   endDate: string
 ): Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] {
   const schedules: Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] = [];
-  let currentDate = parseISO(firstConsultationDate);
+  const firstDate = parseISO(firstConsultationDate);
   const planEndDate = parseISO(endDate);
 
-  // Calculate total consultations based on plan duration and frequency
-  const totalConsultations = calculateConsultationCount(planDuration, consultationFrequency);
-
-  // Generate ALL consultation schedules based on the total count
-  for (let i = 0; i < totalConsultations; i++) {
-    // Don't schedule past the plan end date
-    if (currentDate > planEndDate) break;
-
-    // Calculate the send link date (Monday closest to 1 week before the consultation)
-    const sendLinkTargetDate = addWeeks(currentDate, -1);
-    const sendLinkDate = getClosestMonday(sendLinkTargetDate);
-    
+  // If only one consultation or no recurring frequency, just add the first one
+  if (consultationFrequency === 'once') {
     schedules.push({
       client_id: clientId,
       user_id: userId,
-      scheduled_date: format(currentDate, 'yyyy-MM-dd'),
+      scheduled_date: format(firstDate, 'yyyy-MM-dd'),
+      send_link_date: format(firstDate, 'yyyy-MM-dd'), // No need to send link for first consultation (already manually scheduled)
+      status: 'pending',
+    });
+    return schedules;
+  }
+
+  // First consultation is manually scheduled - we don't need a "send link" task for it
+  // We store it as a consultation schedule for reference
+  schedules.push({
+    client_id: clientId,
+    user_id: userId,
+    scheduled_date: format(firstDate, 'yyyy-MM-dd'),
+    send_link_date: format(firstDate, 'yyyy-MM-dd'), // Same date - no link needed (already scheduled manually)
+    status: 'pending',
+  });
+
+  // Generate subsequent consultation "send link" tasks
+  // The logic: starting from the first consultation, calculate the end of each interval
+  // and create a "send link" task on the first Monday AFTER that interval ends
+  
+  let currentConsultationDate = firstDate;
+  
+  while (true) {
+    // Calculate the end of the interval (1 month or 6 weeks from current consultation)
+    let intervalEndDate: Date;
+    if (consultationFrequency === 'monthly') {
+      intervalEndDate = addMonths(currentConsultationDate, 1);
+    } else { // six_weeks
+      intervalEndDate = addWeeks(currentConsultationDate, 6);
+    }
+    
+    // The "send link" date is the first Monday ON or AFTER the interval end
+    const sendLinkDate = getNextOrSameMonday(intervalEndDate);
+    
+    // Stop if the send link date exceeds the plan end date
+    if (sendLinkDate > planEndDate) break;
+    
+    // The scheduled consultation date is the interval end date (approximate, will be scheduled by patient)
+    // We use the interval end as the "scheduled_date" to show when the consultation should occur
+    schedules.push({
+      client_id: clientId,
+      user_id: userId,
+      scheduled_date: format(intervalEndDate, 'yyyy-MM-dd'),
       send_link_date: format(sendLinkDate, 'yyyy-MM-dd'),
       status: 'pending',
     });
-
-    // Calculate next consultation date based on frequency
-    if (consultationFrequency === 'once') break;
     
-    if (consultationFrequency === 'monthly') {
-      currentDate = addMonths(currentDate, 1);
-    } else if (consultationFrequency === 'six_weeks') {
-      currentDate = addWeeks(currentDate, 6);
-    }
+    // Move to next interval (the next consultation starts from when this one should occur)
+    currentConsultationDate = intervalEndDate;
   }
 
   return schedules;
@@ -344,6 +364,75 @@ export function useUpdatePaymentStatus() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+    },
+  });
+}
+
+// Mutation to update consultation schedule (for editing send_link_date or status)
+export function useUpdateConsultationSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<ConsultationSchedule> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('consultation_schedules')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+    },
+  });
+}
+
+// Mutation to delete a consultation schedule
+export function useDeleteConsultationSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('consultation_schedules')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+    },
+  });
+}
+
+// Mutation to add a consultation schedule manually
+export function useAddConsultationSchedule() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (scheduleData: { client_id: string; scheduled_date: string; send_link_date: string }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('consultation_schedules')
+        .insert({
+          ...scheduleData,
+          user_id: user.id,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
     },
   });
 }
