@@ -73,6 +73,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     consultation_frequency: client?.consultation_frequency || 'monthly' as 'once' | 'monthly' | 'six_weeks',
     first_consultation_date: client?.first_consultation_date || '',
     payment_type: client?.payment_type || 'pix' as 'pix' | 'card',
+    payment_day: client?.payment_day || null as number | null,
   });
 
   // Calculate end date based on plan duration
@@ -200,6 +201,18 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paymentDay">Dia do Pagamento</Label>
+              <Input
+                id="paymentDay"
+                type="number"
+                min="1"
+                max="31"
+                value={formData.payment_day || ''}
+                onChange={(e) => setFormData({ ...formData, payment_day: e.target.value ? parseInt(e.target.value) : null })}
+                placeholder="Ex: 10"
+              />
             </div>
           </div>
 
