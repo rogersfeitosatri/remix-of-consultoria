@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, Dumbbell, X } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, Dumbbell, X, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -15,6 +16,11 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
+  const { signOut, user } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
 
   return (
     <>
@@ -78,16 +84,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             })}
           </nav>
 
-          {/* Footer */}
-          <div className="border-t border-sidebar-border p-4">
-            <div className="rounded-lg bg-sidebar-accent p-4">
-              <p className="text-xs font-medium text-sidebar-accent-foreground">
-                Modo Babá Ativo
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Alertas de vencimento ligados
-              </p>
-            </div>
+          {/* Footer with user info and logout */}
+          <div className="border-t border-sidebar-border p-4 space-y-3">
+            {user && (
+              <div className="rounded-lg bg-sidebar-accent p-3">
+                <p className="text-xs font-medium text-sidebar-accent-foreground truncate">
+                  {user.email}
+                </p>
+              </div>
+            )}
+            <button
+              onClick={handleSignOut}
+              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <LogOut className="h-5 w-5 flex-shrink-0" />
+              <span>Sair</span>
+            </button>
           </div>
         </div>
       </aside>
