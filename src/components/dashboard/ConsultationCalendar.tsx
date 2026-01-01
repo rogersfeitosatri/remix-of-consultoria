@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
-import { 
-  ConsultationSchedule, 
-  Client, 
-  useUpdateConsultationSchedule, 
+import {
+  ConsultationSchedule,
+  Client,
+  useUpdateConsultationSchedule,
   useDeleteConsultationSchedule,
   useAddConsultationSchedule,
-  useClients
+  useClients,
 } from '@/hooks/useClients';
-import { format, parseISO, isSameDay, getDay, nextMonday } from 'date-fns';
+import { format, parseISO, isSameDay, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarDays, User, Send, Calendar as CalendarIcon, Trash2, Edit2, Plus, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -54,14 +54,41 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
   // Filter only clients that have consultations
   const clientsWithConsultations = (allClients || []).filter(c => c.has_consultations && c.is_active);
 
-  // Dates with scheduled consultations (excluding first consultation which is send_link_date === scheduled_date)
+  const clientsById = useMemo(() => {
+    const map = new Map<string, Client>();
+    [...clients, ...(allClients || [])].forEach(c => map.set(c.id, c));
+    return map;
+  }, [clients, allClients]);
+
+  // Uma linha em consultation_schedules pode representar:
+  // 1) a 1ª consulta (scheduled_date === send_link_date === first_consultation_date) -> NÃO é tarefa de envio
+  // 2) uma consulta prevista (scheduled_date != send_link_date)
+  // 3) uma tarefa manual "enviar link" (scheduled_date === send_link_date, mas NÃO é a 1ª consulta)
+  const isFirstConsultationRow = (s: ConsultationSchedule) => {
+    const first = clientsById.get(s.client_id)?.first_consultation_date;
+    return !!first && s.scheduled_date === first && s.send_link_date === first;
+  };
+
+  const isSendLinkOnlyTaskRow = (s: ConsultationSchedule) => {
+    return s.scheduled_date === s.send_link_date && !isFirstConsultationRow(s);
+  };
+
+  const isConsultationEventRow = (s: ConsultationSchedule) => {
+    return s.scheduled_date !== s.send_link_date;
+  };
+
+  const isSendLinkEventRow = (s: ConsultationSchedule) => {
+    return !isFirstConsultationRow(s) && (s.scheduled_date !== s.send_link_date || isSendLinkOnlyTaskRow(s));
+  };
+
+  // Dates with scheduled consultations
   const consultationDates = consultations
-    .filter(c => c.send_link_date !== c.scheduled_date)
+    .filter(isConsultationEventRow)
     .map(c => parseISO(c.scheduled_date));
-  
-  // Dates for sending links (only pending ones where send_link_date is different from scheduled_date)
+
+  // Dates for sending links (only pending ones)
   const sendLinkDates = consultations
-    .filter(c => c.status === 'pending' && c.send_link_date !== c.scheduled_date)
+    .filter(c => c.status === 'pending' && isSendLinkEventRow(c))
     .map(c => parseISO(c.send_link_date));
 
   // First consultation dates from clients
@@ -70,36 +97,26 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
     .map(c => parseISO(c.first_consultation_date!));
 
   // Items for selected date
-  const consultationsOnSelectedDate = selectedDate 
-    ? consultations.filter(c => 
-        c.send_link_date !== c.scheduled_date && 
-        isSameDay(parseISO(c.scheduled_date), selectedDate)
-      )
+  const consultationsOnSelectedDate = selectedDate
+    ? consultations.filter(c => isConsultationEventRow(c) && isSameDay(parseISO(c.scheduled_date), selectedDate))
     : [];
 
   const sendLinksOnSelectedDate = selectedDate
-    ? consultations.filter(c => 
-        c.status === 'pending' && 
-        c.send_link_date !== c.scheduled_date &&
-        isSameDay(parseISO(c.send_link_date), selectedDate)
-      )
+    ? consultations.filter(c => c.status === 'pending' && isSendLinkEventRow(c) && isSameDay(parseISO(c.send_link_date), selectedDate))
     : [];
 
   const firstConsultationsOnSelectedDate = selectedDate
-    ? clients.filter(c => 
-        c.first_consultation_date && 
-        c.is_active &&
-        isSameDay(parseISO(c.first_consultation_date), selectedDate)
-      )
+    ? clients.filter(c => c.first_consultation_date && c.is_active && isSameDay(parseISO(c.first_consultation_date), selectedDate))
     : [];
 
   const hasConsultation = (date: Date) => consultationDates.some(d => isSameDay(d, date));
   const hasSendLink = (date: Date) => sendLinkDates.some(d => isSameDay(d, date));
   const hasFirstConsultation = (date: Date) => firstConsultationDates.some(d => isSameDay(d, date));
 
-  const hasEvents = consultationsOnSelectedDate.length > 0 || 
-                   sendLinksOnSelectedDate.length > 0 || 
-                   firstConsultationsOnSelectedDate.length > 0;
+  const hasEvents =
+    consultationsOnSelectedDate.length > 0 ||
+    sendLinksOnSelectedDate.length > 0 ||
+    firstConsultationsOnSelectedDate.length > 0;
 
   const handleEditSendLink = (schedule: ConsultationSchedule & { client_name: string }) => {
     setEditingSchedule(schedule);
