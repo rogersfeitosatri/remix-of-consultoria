@@ -6,8 +6,28 @@ import { useClients, useAddClient, useUpdateClient, useDeleteClient, Client } fr
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Loader2, Users, UserX } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Plus, Search, Loader2, Users, UserX, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+const SERVICE_OPTIONS = [
+  { value: 'all', label: 'Todos os Serviços' },
+  { value: 'nutrition', label: 'Nutrição' },
+  { value: 'training', label: 'Treino' },
+  { value: 'both', label: 'Ambos' },
+];
+
+const PLAN_OPTIONS = [
+  { value: 'all', label: 'Todos os Planos' },
+  { value: 'consultoria', label: 'Consultoria' },
+  { value: 'premium', label: 'Premium' },
+];
 
 export default function Clients() {
   const { data: clients = [], isLoading } = useClients();
@@ -18,6 +38,8 @@ export default function Clients() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
+  const [serviceFilter, setServiceFilter] = useState('all');
+  const [planFilter, setPlanFilter] = useState('all');
   const { toast } = useToast();
 
   const activeClients = useMemo(() => {
@@ -28,27 +50,39 @@ export default function Clients() {
     return clients.filter(c => !c.is_active);
   }, [clients]);
 
+  const applyFilters = (clientList: Client[]) => {
+    return clientList.filter(c => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = 
+          c.name.toLowerCase().includes(query) ||
+          c.email?.toLowerCase().includes(query) ||
+          c.phone?.includes(query);
+        if (!matchesSearch) return false;
+      }
+      
+      // Service filter
+      if (serviceFilter !== 'all' && c.service_type !== serviceFilter) {
+        return false;
+      }
+      
+      // Plan filter
+      if (planFilter !== 'all' && c.plan_type !== planFilter) {
+        return false;
+      }
+      
+      return true;
+    });
+  };
+
   const filteredActiveClients = useMemo(() => {
-    if (!searchQuery) return activeClients;
-    const query = searchQuery.toLowerCase();
-    return activeClients.filter(
-      c =>
-        c.name.toLowerCase().includes(query) ||
-        c.email?.toLowerCase().includes(query) ||
-        c.phone?.includes(query)
-    );
-  }, [searchQuery, activeClients]);
+    return applyFilters(activeClients);
+  }, [searchQuery, activeClients, serviceFilter, planFilter]);
 
   const filteredInactiveClients = useMemo(() => {
-    if (!searchQuery) return inactiveClients;
-    const query = searchQuery.toLowerCase();
-    return inactiveClients.filter(
-      c =>
-        c.name.toLowerCase().includes(query) ||
-        c.email?.toLowerCase().includes(query) ||
-        c.phone?.includes(query)
-    );
-  }, [searchQuery, inactiveClients]);
+    return applyFilters(inactiveClients);
+  }, [searchQuery, inactiveClients, serviceFilter, planFilter]);
 
   const handleSubmit = async (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     try {
@@ -132,15 +166,45 @@ export default function Clients() {
           </Button>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, email ou telefone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        {/* Search and Filters */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1 sm:max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, email ou telefone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Select value={planFilter} onValueChange={setPlanFilter}>
+              <SelectTrigger className="w-[160px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Plano" />
+              </SelectTrigger>
+              <SelectContent>
+                {PLAN_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={serviceFilter} onValueChange={setServiceFilter}>
+              <SelectTrigger className="w-[160px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Serviço" />
+              </SelectTrigger>
+              <SelectContent>
+                {SERVICE_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Tabs */}

@@ -93,7 +93,7 @@ export function UpcomingPayments({ payments, title = 'Próximos Vencimentos' }: 
                 <div>
                   <p className="font-medium text-card-foreground">{payment.client_name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {format(dueDate, "dd 'de' MMMM", { locale: ptBR })}
+                    {format(dueDate, "dd/MM/yyyy", { locale: ptBR })}
                   </p>
                 </div>
               </div>
