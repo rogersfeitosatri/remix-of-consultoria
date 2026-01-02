@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, Dumbbell, X, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, Dumbbell, X, LogOut, CalendarDays, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -7,6 +7,8 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clients', icon: Users, label: 'Atletas' },
   { to: '/financial', icon: Wallet, label: 'Financeiro' },
+  { to: '/calendar', icon: CalendarDays, label: 'Calendário' },
+  { to: '/settings', icon: Settings, label: 'Configurações' },
 ];
 
 interface SidebarProps {

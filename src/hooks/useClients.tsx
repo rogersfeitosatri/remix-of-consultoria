@@ -257,30 +257,21 @@ export function useAddClient() {
 
       if (error) throw error;
 
-      // Generate payments for this client
-      const startDate = parseISO(client.start_date);
-      const endDate = parseISO(client.end_date);
-      const payments = [];
-
-      let currentDate = startDate;
-      while (currentDate <= endDate) {
-        payments.push({
+      // Generate only ONE payment entry for subscription (FIN-02)
+      // Instead of creating multiple payments for each month, we create a single
+      // entry that represents the subscription/contract
+      const clientStartDate = parseISO(client.start_date);
+      const { error: paymentError } = await supabase
+        .from('payments')
+        .insert({
           user_id: user.id,
           client_id: client.id,
-          due_date: format(currentDate, 'yyyy-MM-dd'),
+          due_date: format(clientStartDate, 'yyyy-MM-dd'),
           amount: client.monthly_value,
           status: 'pending' as const,
         });
-        currentDate = addMonths(currentDate, 1);
-      }
 
-      if (payments.length > 0) {
-        const { error: paymentsError } = await supabase
-          .from('payments')
-          .insert(payments);
-
-        if (paymentsError) throw paymentsError;
-      }
+      if (paymentError) throw paymentError;
 
       // Generate consultation schedules if applicable
       if (client.has_consultations && client.first_consultation_date && client.consultation_frequency) {
