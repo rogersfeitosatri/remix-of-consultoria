@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { Menu, Dumbbell } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface LayoutProps {
   children: ReactNode;
@@ -8,10 +9,16 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
       
       {/* Mobile Header */}
       <header className="fixed top-0 left-0 right-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background px-4 lg:hidden">
@@ -30,7 +37,10 @@ export function Layout({ children }: LayoutProps) {
       </header>
       
       {/* Main Content */}
-      <main className="min-h-screen pt-14 lg:pt-0 lg:ml-64">
+      <main className={cn(
+        "min-h-screen pt-14 lg:pt-0 transition-all duration-300",
+        sidebarCollapsed ? "lg:ml-16" : "lg:ml-64"
+      )}>
         <div className="p-4 sm:p-6 lg:p-8">
           {children}
         </div>
