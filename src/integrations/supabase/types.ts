@@ -30,7 +30,7 @@ export type Database = {
           monthly_value: number
           name: string
           notes: string | null
-          payment_day: number | null
+          payment_date: string | null
           payment_type: string | null
           phone: string | null
           plan_duration: string | null
@@ -55,7 +55,7 @@ export type Database = {
           monthly_value: number
           name: string
           notes?: string | null
-          payment_day?: number | null
+          payment_date?: string | null
           payment_type?: string | null
           phone?: string | null
           plan_duration?: string | null
@@ -80,7 +80,7 @@ export type Database = {
           monthly_value?: number
           name?: string
           notes?: string | null
-          payment_day?: number | null
+          payment_date?: string | null
           payment_type?: string | null
           phone?: string | null
           plan_duration?: string | null

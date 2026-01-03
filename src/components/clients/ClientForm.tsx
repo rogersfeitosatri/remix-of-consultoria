@@ -73,7 +73,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     consultation_frequency: client?.consultation_frequency || 'monthly' as 'once' | 'monthly' | 'six_weeks',
     first_consultation_date: client?.first_consultation_date || '',
     payment_type: client?.payment_type || 'pix' as 'pix' | 'card',
-    payment_day: client?.payment_day || null as number | null,
+    payment_date: client?.payment_date || '',
   });
 
   // Calculate end date based on plan duration
@@ -125,6 +125,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       ...formData,
       first_consultation_date: formData.first_consultation_date || null,
       notes: formData.notes || null,
+      payment_date: formData.payment_date || null,
     };
     onSubmit(dataToSubmit as any);
   };
@@ -203,15 +204,12 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="paymentDay">Dia do Pagamento</Label>
+              <Label htmlFor="paymentDate">Data de Pagamento</Label>
               <Input
-                id="paymentDay"
-                type="number"
-                min="1"
-                max="31"
-                value={formData.payment_day || ''}
-                onChange={(e) => setFormData({ ...formData, payment_day: e.target.value ? parseInt(e.target.value) : null })}
-                placeholder="Ex: 10"
+                id="paymentDate"
+                type="date"
+                value={formData.payment_date || ''}
+                onChange={(e) => setFormData({ ...formData, payment_date: e.target.value || '' })}
               />
             </div>
           </div>
