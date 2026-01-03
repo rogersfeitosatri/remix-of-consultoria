@@ -24,7 +24,7 @@ export interface Client {
   consultation_frequency: 'once' | 'monthly' | 'six_weeks' | null;
   first_consultation_date: string | null;
   payment_type: 'pix' | 'card';
-  payment_day: number | null;
+  payment_date: string | null;
   created_at: string;
   updated_at: string;
 }
