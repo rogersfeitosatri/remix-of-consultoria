@@ -66,42 +66,42 @@ export default function Financial() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 sm:gap-3 lg:gap-4 grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Receita Recorrente"
             value={`R$ ${monthlyRecurring.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             subtitle="por mês"
-            icon={<TrendingUp className="h-6 w-6" />}
+            icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
             variant="primary"
           />
           <StatCard
             title="Recebido no Mês"
             value={`R$ ${paidThisMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             subtitle="confirmados"
-            icon={<DollarSign className="h-6 w-6" />}
+            icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />}
             variant="success"
           />
           <button 
             onClick={() => handleFilterClick('upcoming')}
-            className="text-left transition-transform hover:scale-[1.02]"
+            className="text-left transition-transform hover:scale-[1.02] h-full"
           >
             <StatCard
               title="A Receber (30 dias)"
               value={`R$ ${upcomingPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              subtitle={`${upcomingPayments.length} pagamentos - Clique para ver`}
-              icon={<CreditCard className="h-6 w-6" />}
+              subtitle={`${upcomingPayments.length} pagamentos`}
+              icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />}
               variant="default"
             />
           </button>
           <button 
             onClick={() => handleFilterClick('overdue')}
-            className="text-left transition-transform hover:scale-[1.02]"
+            className="text-left transition-transform hover:scale-[1.02] h-full"
           >
             <StatCard
               title="Pagamentos Atrasados"
               value={overduePayments.length}
-              subtitle="pendentes - Clique para ver"
-              icon={<AlertCircle className="h-6 w-6" />}
+              subtitle="pendentes"
+              icon={<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />}
               variant="warning"
             />
           </button>

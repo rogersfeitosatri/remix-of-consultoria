@@ -21,21 +21,21 @@ export function UpcomingPayments({ payments, title = 'Próximos Vencimentos' }: 
 
   if (payments.length === 0) {
     return (
-      <div className="glass-card rounded-xl p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <Calendar className="h-5 w-5 text-primary" />
+      <div className="glass-card rounded-xl p-4 sm:p-6">
+        <div className="flex items-center gap-2 sm:gap-3 mb-4">
+          <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10">
+            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-card-foreground">{title}</h3>
-            <p className="text-sm text-muted-foreground">Pagamentos pendentes</p>
+            <h3 className="text-base sm:text-lg font-semibold text-card-foreground">{title}</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">Pagamentos pendentes</p>
           </div>
         </div>
-        <div className="py-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success/10">
-            <span className="text-2xl">✓</span>
+        <div className="py-6 sm:py-8 text-center">
+          <div className="mx-auto mb-3 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-success/10">
+            <span className="text-xl sm:text-2xl">✓</span>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Nenhum pagamento pendente para os próximos 30 dias
           </p>
         </div>
@@ -44,26 +44,26 @@ export function UpcomingPayments({ payments, title = 'Próximos Vencimentos' }: 
   }
 
   return (
-    <div className="glass-card rounded-xl p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-            <Calendar className="h-5 w-5 text-primary" />
+    <div className="glass-card rounded-xl p-4 sm:p-6">
+      <div className="flex items-start sm:items-center justify-between gap-2 mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-card-foreground">{title}</h3>
-            <p className="text-sm text-muted-foreground">Pagamentos pendentes</p>
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-lg font-semibold text-card-foreground truncate">{title}</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">Pagamentos pendentes</p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">Total</p>
-          <p className="text-xl font-bold text-card-foreground">
+        <div className="text-right flex-shrink-0">
+          <p className="text-xs sm:text-sm text-muted-foreground">Total</p>
+          <p className="text-base sm:text-lg lg:text-xl font-bold text-card-foreground whitespace-nowrap">
             R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3">
         {payments.map((payment) => {
           const today = new Date();
           const dueDate = parseISO(payment.due_date);
@@ -75,32 +75,32 @@ export function UpcomingPayments({ payments, title = 'Próximos Vencimentos' }: 
             <div
               key={payment.id}
               className={cn(
-                'flex items-center justify-between rounded-lg border p-4',
+                'flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 rounded-lg border p-3 sm:p-4',
                 isOverdue && 'border-destructive/30 bg-destructive/5',
                 isUrgent && !isOverdue && 'border-warning/30 bg-warning/5',
                 !isUrgent && !isOverdue && 'border-border'
               )}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <div className={cn(
-                  'flex h-10 w-10 items-center justify-center rounded-full',
+                  'flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full flex-shrink-0',
                   isOverdue && 'bg-destructive/10 text-destructive',
                   isUrgent && !isOverdue && 'bg-warning/10 text-warning',
                   !isUrgent && !isOverdue && 'bg-muted text-muted-foreground'
                 )}>
-                  {isOverdue ? <AlertCircle className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
+                  {isOverdue ? <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" /> : <Clock className="h-4 w-4 sm:h-5 sm:w-5" />}
                 </div>
-                <div>
-                  <p className="font-medium text-card-foreground">{payment.client_name}</p>
-                  <p className="text-sm text-muted-foreground">
+                <div className="min-w-0">
+                  <p className="text-sm sm:text-base font-medium text-card-foreground truncate">{payment.client_name}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     {format(dueDate, "dd/MM/yyyy", { locale: ptBR })}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 pl-10 sm:pl-0">
                 <span className={cn(
-                  'alert-badge',
+                  'alert-badge text-xs',
                   isOverdue && 'bg-destructive/10 text-destructive',
                   isUrgent && !isOverdue && 'bg-warning/10 text-warning',
                   !isUrgent && !isOverdue && 'bg-muted text-muted-foreground'
@@ -112,7 +112,7 @@ export function UpcomingPayments({ payments, title = 'Próximos Vencimentos' }: 
                       : `em ${daysUntilDue} dias`
                   }
                 </span>
-                <span className="text-lg font-semibold text-card-foreground">
+                <span className="text-sm sm:text-base font-semibold text-card-foreground whitespace-nowrap">
                   R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
