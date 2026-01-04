@@ -76,7 +76,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     payment_date: client?.payment_date || '',
   });
 
-  // Calculate end date based on plan duration
+  // Calculate end date based on plan duration - always auto-calculate when start_date or plan_duration changes
   useEffect(() => {
     if (formData.start_date && formData.plan_duration) {
       const startDate = new Date(formData.start_date);
@@ -99,13 +99,11 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
           endDate = addMonths(startDate, 1);
       }
       
-      // Only auto-set if not editing or if the client is new
-      if (!client || formData.end_date === '') {
-        setFormData(prev => ({
-          ...prev,
-          end_date: endDate.toISOString().split('T')[0]
-        }));
-      }
+      // Always auto-calculate the end date when start_date or plan_duration changes
+      setFormData(prev => ({
+        ...prev,
+        end_date: endDate.toISOString().split('T')[0]
+      }));
     }
   }, [formData.start_date, formData.plan_duration]);
 
