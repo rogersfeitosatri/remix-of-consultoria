@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import {
   ConsultationSchedule,
@@ -10,9 +9,9 @@ import {
   useAddConsultationSchedule,
   useClients,
 } from '@/hooks/useClients';
-import { format, parseISO, isSameDay, getDay } from 'date-fns';
+import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, User, Send, Calendar as CalendarIcon, Trash2, Edit2, Plus, Check, X } from 'lucide-react';
+import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -31,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 
 interface ConsultationCalendarProps {
@@ -39,12 +39,12 @@ interface ConsultationCalendarProps {
 }
 
 export function ConsultationCalendar({ consultations, clients = [] }: ConsultationCalendarProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [editingSchedule, setEditingSchedule] = useState<(ConsultationSchedule & { client_name: string }) | null>(null);
-  const [newSendLinkDate, setNewSendLinkDate] = useState<Date | undefined>();
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [newScheduleDate, setNewScheduleDate] = useState<Date | undefined>();
+  const [editingSchedule, setEditingSchedule] = useState<(ConsultationSchedule & { client_name: string }) | null>(null);
+  const [newSendLinkDate, setNewSendLinkDate] = useState<Date | undefined>();
 
   const updateSchedule = useUpdateConsultationSchedule();
   const deleteSchedule = useDeleteConsultationSchedule();
@@ -60,67 +60,83 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
     return map;
   }, [clients, allClients]);
 
-  // Uma linha em consultation_schedules pode representar:
-  // 1) a 1ª consulta (scheduled_date === send_link_date === first_consultation_date) -> NÃO é tarefa de envio
-  // 2) uma consulta prevista (scheduled_date != send_link_date)
-  // 3) uma tarefa manual "enviar link" (scheduled_date === send_link_date, mas NÃO é a 1ª consulta)
+  // Calculate consultation number for each schedule
+  const getConsultationNumber = (schedule: ConsultationSchedule): { current: number; total: number } | null => {
+    const client = clientsById.get(schedule.client_id);
+    if (!client || !client.consultation_count) return null;
+
+    // Get all consultations for this client ordered by date
+    const clientConsultations = consultations
+      .filter(c => c.client_id === schedule.client_id)
+      .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
+
+    const index = clientConsultations.findIndex(c => c.id === schedule.id);
+    if (index === -1) return null;
+
+    return {
+      current: index + 1,
+      total: client.consultation_count
+    };
+  };
+
+  // Check if row is first consultation
   const isFirstConsultationRow = (s: ConsultationSchedule) => {
     const first = clientsById.get(s.client_id)?.first_consultation_date;
     return !!first && s.scheduled_date === first && s.send_link_date === first;
   };
 
-  const isSendLinkOnlyTaskRow = (s: ConsultationSchedule) => {
-    return s.scheduled_date === s.send_link_date && !isFirstConsultationRow(s);
-  };
-
-  const isConsultationEventRow = (s: ConsultationSchedule) => {
-    return s.scheduled_date !== s.send_link_date;
-  };
-
+  // Check if row is a send link task (not first consultation)
   const isSendLinkEventRow = (s: ConsultationSchedule) => {
-    return !isFirstConsultationRow(s) && (s.scheduled_date !== s.send_link_date || isSendLinkOnlyTaskRow(s));
+    return !isFirstConsultationRow(s) && s.status === 'pending';
   };
 
-  // Dates with scheduled consultations
-  const consultationDates = consultations
-    .filter(isConsultationEventRow)
-    .map(c => parseISO(c.scheduled_date));
+  // Generate calendar days for the current month view
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    
+    return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  }, [currentMonth]);
 
-  // Dates for sending links (only pending ones)
-  const sendLinkDates = consultations
-    .filter(c => c.status === 'pending' && isSendLinkEventRow(c))
-    .map(c => parseISO(c.send_link_date));
+  // Get events for a specific date
+  const getEventsForDate = (date: Date) => {
+    const events: { type: 'first' | 'sendLink'; schedule?: ConsultationSchedule & { client_name: string }; client?: Client }[] = [];
 
-  // First consultation dates from clients
-  const firstConsultationDates = clients
-    .filter(c => c.first_consultation_date && c.is_active)
-    .map(c => parseISO(c.first_consultation_date!));
+    // First consultations from clients
+    clients
+      .filter(c => c.first_consultation_date && c.is_active && isSameDay(parseISO(c.first_consultation_date), date))
+      .forEach(client => {
+        events.push({ type: 'first', client });
+      });
 
-  // Items for selected date
-  const consultationsOnSelectedDate = selectedDate
-    ? consultations.filter(c => isConsultationEventRow(c) && isSameDay(parseISO(c.scheduled_date), selectedDate))
-    : [];
+    // Send link tasks (pending only) - using send_link_date
+    consultations
+      .filter(c => isSendLinkEventRow(c) && isSameDay(parseISO(c.send_link_date), date))
+      .forEach(schedule => {
+        events.push({ type: 'sendLink', schedule });
+      });
 
-  const sendLinksOnSelectedDate = selectedDate
-    ? consultations.filter(c => c.status === 'pending' && isSendLinkEventRow(c) && isSameDay(parseISO(c.send_link_date), selectedDate))
-    : [];
+    return events;
+  };
 
-  const firstConsultationsOnSelectedDate = selectedDate
-    ? clients.filter(c => c.first_consultation_date && c.is_active && isSameDay(parseISO(c.first_consultation_date), selectedDate))
-    : [];
+  const handleMarkAsSent = async (id: string) => {
+    try {
+      await updateSchedule.mutateAsync({ id, status: 'sent' });
+      toast.success('Marcado como enviado');
+    } catch (error) {
+      toast.error('Erro ao atualizar status');
+    }
+  };
 
-  const hasConsultation = (date: Date) => consultationDates.some(d => isSameDay(d, date));
-  const hasSendLink = (date: Date) => sendLinkDates.some(d => isSameDay(d, date));
-  const hasFirstConsultation = (date: Date) => firstConsultationDates.some(d => isSameDay(d, date));
-
-  const hasEvents =
-    consultationsOnSelectedDate.length > 0 ||
-    sendLinksOnSelectedDate.length > 0 ||
-    firstConsultationsOnSelectedDate.length > 0;
-
-  const handleEditSendLink = (schedule: ConsultationSchedule & { client_name: string }) => {
-    setEditingSchedule(schedule);
-    setNewSendLinkDate(parseISO(schedule.send_link_date));
+  const handleDeleteSchedule = async (id: string) => {
+    try {
+      await deleteSchedule.mutateAsync(id);
+      toast.success('Tarefa removida');
+    } catch (error) {
+      toast.error('Erro ao remover tarefa');
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -139,34 +155,12 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
     }
   };
 
-  const handleDeleteSchedule = async (id: string) => {
-    try {
-      await deleteSchedule.mutateAsync(id);
-      toast.success('Tarefa removida');
-    } catch (error) {
-      toast.error('Erro ao remover tarefa');
-    }
-  };
-
-  const handleMarkAsSent = async (id: string) => {
-    try {
-      await updateSchedule.mutateAsync({
-        id,
-        status: 'sent',
-      });
-      toast.success('Marcado como enviado');
-    } catch (error) {
-      toast.error('Erro ao atualizar status');
-    }
-  };
-
   const handleAddManualSchedule = async () => {
     if (!selectedClientId || !newScheduleDate) {
       toast.error('Selecione o atleta e a data');
       return;
     }
 
-    // Ensure it's a Monday
     const dayOfWeek = getDay(newScheduleDate);
     if (dayOfWeek !== 1) {
       toast.error('A data deve ser uma segunda-feira');
@@ -188,180 +182,7 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
     }
   };
 
-  // Event details component (reusable for mobile and desktop)
-  const EventDetails = () => (
-    <>
-      {/* First consultations on selected date */}
-      {firstConsultationsOnSelectedDate.length > 0 && (
-        <div className="mb-4">
-          <h5 className="text-xs font-semibold text-emerald-500 uppercase mb-2 flex items-center gap-1">
-            <CalendarIcon className="h-3 w-3" />
-            1ª Consulta
-          </h5>
-          <div className="space-y-2">
-            {firstConsultationsOnSelectedDate.map(client => (
-              <div
-                key={client.id}
-                className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-emerald-500/10 border-emerald-500/20"
-              >
-                <User className="h-4 w-4 text-emerald-500" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {client.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Primeira consulta do atleta
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Send links on selected date */}
-      {sendLinksOnSelectedDate.length > 0 && (
-        <div className="mb-4">
-          <h5 className="text-xs font-semibold text-amber-500 uppercase mb-2 flex items-center gap-1">
-            <Send className="h-3 w-3" />
-            Enviar Link de Agendamento
-          </h5>
-          <div className="space-y-2">
-            {sendLinksOnSelectedDate.map(consultation => (
-              <div
-                key={`link-${consultation.id}`}
-                className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border bg-amber-500/10 border-amber-500/20"
-              >
-                <Send className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {consultation.client_name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Consulta prevista: {format(parseISO(consultation.scheduled_date), "dd/MM/yyyy")}
-                  </p>
-                </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
-                    onClick={() => handleMarkAsSent(consultation.id)}
-                    title="Marcar como enviado"
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                  </Button>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        title="Alterar data"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                      <div className="p-3">
-                        <p className="text-sm font-medium mb-2">Mover para outra segunda-feira:</p>
-                        <Calendar
-                          mode="single"
-                          selected={editingSchedule?.id === consultation.id ? newSendLinkDate : parseISO(consultation.send_link_date)}
-                          onSelect={(date) => {
-                            if (date && getDay(date) === 1) {
-                              setEditingSchedule(consultation);
-                              setNewSendLinkDate(date);
-                            } else if (date) {
-                              toast.error('Selecione uma segunda-feira');
-                            }
-                          }}
-                          locale={ptBR}
-                          className="rounded-md border pointer-events-auto"
-                          modifiers={{
-                            monday: (date) => getDay(date) === 1
-                          }}
-                          modifiersStyles={{
-                            monday: { fontWeight: 'bold' }
-                          }}
-                        />
-                        {editingSchedule?.id === consultation.id && newSendLinkDate && (
-                          <div className="flex gap-2 mt-2">
-                            <Button size="sm" onClick={handleSaveEdit} className="flex-1">
-                              Salvar
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => {
-                                setEditingSchedule(null);
-                                setNewSendLinkDate(undefined);
-                              }}
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => handleDeleteSchedule(consultation.id)}
-                    title="Remover tarefa"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Consultations on selected date */}
-      {consultationsOnSelectedDate.length > 0 && (
-        <div className="mb-4">
-          <h5 className="text-xs font-semibold text-primary uppercase mb-2 flex items-center gap-1">
-            <CalendarDays className="h-3 w-3" />
-            Consultas Agendadas
-          </h5>
-          <div className="space-y-2">
-            {consultationsOnSelectedDate.map(consultation => (
-              <div
-                key={consultation.id}
-                className={cn(
-                  "flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border",
-                  consultation.status === 'completed' 
-                    ? "bg-muted/50 border-muted" 
-                    : "bg-primary/10 border-primary/20"
-                )}
-              >
-                <User className="h-4 w-4 text-primary" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">
-                    {consultation.client_name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {consultation.status === 'completed' ? 'Realizada' : 
-                     consultation.status === 'sent' ? 'Link enviado' : 'Pendente'}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!hasEvents && (
-        <p className="text-sm text-muted-foreground">
-          Nenhum evento agendado para esta data.
-        </p>
-      )}
-    </>
-  );
+  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   return (
     <Card className="border-border bg-card">
@@ -372,7 +193,9 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
               <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               Calendário de Consultas
             </CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Consultas agendadas e datas de envio de link</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
+              Tarefas de envio de link e primeiras consultas
+            </CardDescription>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
@@ -439,140 +262,201 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
           </Dialog>
         </div>
       </CardHeader>
-      <CardContent className="p-3 sm:p-4 lg:p-6">
-        {/* Desktop Layout: Calendar + Side Panel */}
-        <div className="hidden lg:flex lg:gap-6">
-          {/* Left: Calendar */}
-          <div className="flex flex-col">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              locale={ptBR}
-              className="rounded-md border border-border pointer-events-auto"
-              components={{
-                DayContent: ({ date }) => {
-                  const isConsultation = hasConsultation(date);
-                  const isSendLink = hasSendLink(date);
-                  const isFirstConsultation = hasFirstConsultation(date);
-                  const isMonday = getDay(date) === 1;
-
-                  return (
-                    <div className="relative w-full h-full flex items-center justify-center">
-                      <span>{date.getDate()}</span>
-                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex gap-0.5">
-                        {isFirstConsultation && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="1ª Consulta" />
-                        )}
-                        {isConsultation && !isFirstConsultation && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary" title="Consulta" />
-                        )}
-                        {isSendLink && isMonday && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Enviar Link" />
-                        )}
-                      </div>
-                    </div>
-                  );
-                },
-              }}
-            />
-            
-            {/* Legend below calendar on desktop */}
-            <div className="mt-4">
-              <h4 className="font-medium text-sm text-foreground mb-2">
-                {selectedDate 
-                  ? format(selectedDate, "d 'de' MMMM", { locale: ptBR })
-                  : 'Selecione uma data'}
-              </h4>
-              <div className="flex flex-wrap gap-3 text-xs">
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
-                  <span className="text-muted-foreground">1ª Consulta</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                  <span className="text-muted-foreground">Consulta</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
-                  <span className="text-muted-foreground">Enviar Link</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Athletes list (only shown when there are events) */}
-          {hasEvents && (
-            <div className="flex-1 min-w-0 border-l border-border pl-6">
-              <h4 className="font-medium text-sm text-foreground mb-4">
-                Atletas - {selectedDate && format(selectedDate, "d 'de' MMMM", { locale: ptBR })}
-              </h4>
-              <EventDetails />
-            </div>
-          )}
+      <CardContent className="p-2 sm:p-4 lg:p-6">
+        {/* Month Navigation */}
+        <div className="flex items-center justify-between mb-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <h3 className="text-lg font-semibold text-foreground capitalize">
+            {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+          </h3>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
         </div>
 
-        {/* Mobile Layout: Stacked */}
-        <div className="lg:hidden flex flex-col gap-4">
-          <div className="overflow-x-auto">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              locale={ptBR}
-              className="rounded-md border border-border pointer-events-auto mx-auto"
-              components={{
-                DayContent: ({ date }) => {
-                  const isConsultation = hasConsultation(date);
-                  const isSendLink = hasSendLink(date);
-                  const isFirstConsultation = hasFirstConsultation(date);
-                  const isMonday = getDay(date) === 1;
-
-                  return (
-                    <div className="relative w-full h-full flex items-center justify-center">
-                      <span>{date.getDate()}</span>
-                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex gap-0.5">
-                        {isFirstConsultation && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="1ª Consulta" />
-                        )}
-                        {isConsultation && !isFirstConsultation && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary" title="Consulta" />
-                        )}
-                        {isSendLink && isMonday && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Enviar Link" />
-                        )}
-                      </div>
-                    </div>
-                  );
-                },
-              }}
-            />
+        {/* Legend */}
+        <div className="flex flex-wrap gap-4 mb-4 text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500" />
+            <span className="text-muted-foreground">1ª Consulta</span>
           </div>
-          
-          <div className="flex-1 min-w-0">
-            <h4 className="font-medium text-sm text-foreground mb-3">
-              {selectedDate 
-                ? format(selectedDate, "d 'de' MMMM", { locale: ptBR })
-                : 'Selecione uma data'}
-            </h4>
-            
-            {/* Legend */}
-            <div className="flex flex-wrap gap-2 mb-4 text-xs">
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
-                <span className="text-muted-foreground">1ª Consulta</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                <span className="text-muted-foreground">Consulta</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
-                <span className="text-muted-foreground">Enviar Link</span>
-              </div>
-            </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500" />
+            <span className="text-muted-foreground">Enviar Link</span>
+          </div>
+        </div>
 
-            <EventDetails />
+        {/* Calendar Grid */}
+        <div className="border border-border rounded-lg overflow-hidden">
+          {/* Week days header */}
+          <div className="grid grid-cols-7 bg-muted/50">
+            {weekDays.map(day => (
+              <div
+                key={day}
+                className="p-2 text-center text-xs font-semibold text-foreground border-b border-border"
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar days grid */}
+          <div className="grid grid-cols-7">
+            {calendarDays.map((day, index) => {
+              const events = getEventsForDate(day);
+              const isCurrentMonth = isSameMonth(day, currentMonth);
+              const isToday = isSameDay(day, new Date());
+
+              return (
+                <div
+                  key={day.toISOString()}
+                  className={cn(
+                    "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative",
+                    !isCurrentMonth && "bg-muted/30",
+                    isToday && "bg-primary/5",
+                    index % 7 === 0 && "border-l-0",
+                    index < 7 && "border-t-0"
+                  )}
+                >
+                  {/* Day number */}
+                  <div className={cn(
+                    "text-sm font-medium mb-1",
+                    !isCurrentMonth && "text-muted-foreground/50",
+                    isToday && "text-primary font-bold"
+                  )}>
+                    {format(day, 'd')}
+                  </div>
+
+                  {/* Events */}
+                  <div className="space-y-1 overflow-y-auto max-h-[70px] sm:max-h-[85px]">
+                    {events.map((event, eventIndex) => {
+                      if (event.type === 'first' && event.client) {
+                        return (
+                          <div
+                            key={`first-${event.client.id}`}
+                            className="text-[10px] sm:text-xs p-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-foreground truncate"
+                            title={`1ª Consulta: ${event.client.name}`}
+                          >
+                            <span className="hidden sm:inline">1ª </span>
+                            {event.client.name}
+                          </div>
+                        );
+                      }
+
+                      if (event.type === 'sendLink' && event.schedule) {
+                        const consultNum = getConsultationNumber(event.schedule);
+                        const displayName = consultNum 
+                          ? `${event.schedule.client_name} - ${consultNum.current}/${consultNum.total}`
+                          : event.schedule.client_name;
+
+                        return (
+                          <Popover key={`link-${event.schedule.id}`}>
+                            <PopoverTrigger asChild>
+                              <div
+                                className="text-[10px] sm:text-xs p-1 rounded bg-amber-500/20 border border-amber-500/30 text-foreground truncate cursor-pointer hover:bg-amber-500/30 transition-colors"
+                                title={`Enviar Link: ${displayName}`}
+                              >
+                                <Send className="h-2.5 w-2.5 inline mr-0.5 sm:mr-1" />
+                                <span className="hidden sm:inline">{displayName}</span>
+                                <span className="sm:hidden">{event.schedule.client_name.split(' ')[0]}</span>
+                              </div>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-3" align="start">
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="font-medium text-sm">{displayName}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Enviar link: {format(parseISO(event.schedule.send_link_date), "dd/MM/yyyy")}
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
+                                    onClick={() => handleMarkAsSent(event.schedule!.id)}
+                                  >
+                                    <Check className="h-3.5 w-3.5 mr-1" />
+                                    Enviado
+                                  </Button>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Button size="sm" variant="outline">
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-3" align="start">
+                                      <p className="text-sm font-medium mb-2">Mover para outra segunda-feira:</p>
+                                      <Calendar
+                                        mode="single"
+                                        selected={editingSchedule?.id === event.schedule!.id ? newSendLinkDate : parseISO(event.schedule!.send_link_date)}
+                                        onSelect={(date) => {
+                                          if (date && getDay(date) === 1) {
+                                            setEditingSchedule(event.schedule!);
+                                            setNewSendLinkDate(date);
+                                          } else if (date) {
+                                            toast.error('Selecione uma segunda-feira');
+                                          }
+                                        }}
+                                        locale={ptBR}
+                                        className="rounded-md border pointer-events-auto"
+                                        modifiers={{
+                                          monday: (date) => getDay(date) === 1
+                                        }}
+                                        modifiersStyles={{
+                                          monday: { fontWeight: 'bold' }
+                                        }}
+                                      />
+                                      {editingSchedule?.id === event.schedule!.id && newSendLinkDate && (
+                                        <div className="flex gap-2 mt-2">
+                                          <Button size="sm" onClick={handleSaveEdit} className="flex-1">
+                                            Salvar
+                                          </Button>
+                                          <Button 
+                                            size="sm" 
+                                            variant="outline" 
+                                            onClick={() => {
+                                              setEditingSchedule(null);
+                                              setNewSendLinkDate(undefined);
+                                            }}
+                                          >
+                                            Cancelar
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </PopoverContent>
+                                  </Popover>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => handleDeleteSchedule(event.schedule!.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        );
+                      }
+
+                      return null;
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </CardContent>
