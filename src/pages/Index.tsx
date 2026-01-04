@@ -1,7 +1,7 @@
 import { Layout } from '@/components/layout/Layout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { ExpiringClientsAlert } from '@/components/dashboard/ExpiringClientsAlert';
-import { ConsultationCalendar } from '@/components/dashboard/ConsultationCalendar';
+import { CalendarPreview } from '@/components/dashboard/CalendarPreview';
 import { useClients, usePayments, useConsultationSchedules, getExpiringThisMonth, getMonthlyIncome } from '@/hooks/useClients';
 import { Users, DollarSign, AlertTriangle, Loader2 } from 'lucide-react';
 
@@ -67,7 +67,7 @@ export default function Dashboard() {
         {/* Alerts & Calendar */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
           <ExpiringClientsAlert clients={expiringThisMonth} />
-          <ConsultationCalendar consultations={consultations} clients={activeClients} />
+          <CalendarPreview consultations={consultations} clients={activeClients} />
         </div>
       </div>
     </Layout>
