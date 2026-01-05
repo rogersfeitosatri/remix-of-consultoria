@@ -1,13 +1,15 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, PersonStanding, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Users, Wallet, PersonStanding, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clients', icon: Users, label: 'Atletas' },
   { to: '/financial', icon: Wallet, label: 'Financeiro' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendário' },
+  { to: '/checkin', icon: ClipboardList, label: 'Checkin' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
 ];
 
@@ -20,10 +22,15 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut, user } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const handleViewAsAthlete = () => {
+    navigate('/athlete');
   };
 
   return (
@@ -106,6 +113,21 @@ export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse
 
           {/* Footer with user info and logout */}
           <div className="border-t border-sidebar-border p-4 space-y-3">
+            {/* View as Athlete Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleViewAsAthlete}
+              title={isCollapsed ? "Ver como atleta" : undefined}
+              className={cn(
+                "w-full gap-2 text-xs",
+                isCollapsed && "lg:justify-center lg:px-2"
+              )}
+            >
+              <Eye className="h-4 w-4 flex-shrink-0" />
+              <span className={cn(isCollapsed && "lg:hidden")}>Ver como atleta</span>
+            </Button>
+            
             {user && !isCollapsed && (
               <div className="rounded-lg bg-sidebar-accent p-3 lg:block hidden">
                 <p className="text-xs font-medium text-sidebar-accent-foreground truncate">

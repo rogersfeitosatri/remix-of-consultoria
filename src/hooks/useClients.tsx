@@ -304,10 +304,21 @@ export function useAddClient() {
 }
 
 export function useUpdateClient() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Client> & { id: string }) => {
+      // First get the current client data to compare
+      const { data: currentClient, error: fetchError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Update the client
       const { data, error } = await supabase
         .from('clients')
         .update(updates)
@@ -316,10 +327,49 @@ export function useUpdateClient() {
         .single();
 
       if (error) throw error;
+
+      // Check if we need to regenerate consultation schedules
+      const relevantFieldsChanged = 
+        updates.start_date !== undefined ||
+        updates.end_date !== undefined ||
+        updates.first_consultation_date !== undefined ||
+        updates.consultation_frequency !== undefined ||
+        updates.has_consultations !== undefined ||
+        updates.plan_duration !== undefined;
+
+      if (relevantFieldsChanged && user) {
+        const updatedClient = data as Client;
+        
+        // Delete existing schedules for this client
+        await supabase
+          .from('consultation_schedules')
+          .delete()
+          .eq('client_id', id);
+
+        // Regenerate if consultations are enabled
+        if (updatedClient.has_consultations && updatedClient.first_consultation_date && updatedClient.consultation_frequency) {
+          const schedules = generateConsultationSchedules(
+            user.id,
+            id,
+            updatedClient.first_consultation_date,
+            updatedClient.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
+            updatedClient.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual',
+            updatedClient.end_date
+          );
+
+          if (schedules.length > 0) {
+            await supabase
+              .from('consultation_schedules')
+              .insert(schedules);
+          }
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
     },
   });
 }
