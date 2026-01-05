@@ -22,6 +22,10 @@ interface Question {
   scale_max: number;
   is_required: boolean;
   order_index: number;
+  has_comment_field: boolean;
+  comment_field_label: string | null;
+  comment_field_required: boolean;
+  comment_field_type: 'short' | 'medium' | null;
 }
 
 interface Form {
@@ -44,6 +48,7 @@ export default function PublicCheckinForm() {
   const [athleteName, setAthleteName] = useState('');
   const [athleteEmail, setAthleteEmail] = useState('');
   const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [comments, setComments] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchForm = async () => {
@@ -70,8 +75,9 @@ export default function PublicCheckinForm() {
         const typedQuestions = questionsData as Question[];
         setQuestions(typedQuestions);
 
-        // Initialize answers
+        // Initialize answers and comments
         const initialAnswers: Record<string, any> = {};
+        const initialComments: Record<string, string> = {};
         typedQuestions.forEach((q) => {
           if (q.question_type === 'checkbox') {
             initialAnswers[q.id] = [];
@@ -80,8 +86,12 @@ export default function PublicCheckinForm() {
           } else {
             initialAnswers[q.id] = '';
           }
+          if (q.has_comment_field) {
+            initialComments[q.id] = '';
+          }
         });
         setAnswers(initialAnswers);
+        setComments(initialComments);
       } catch (error) {
         console.error('Error fetching form:', error);
         toast.error('Formulário não encontrado ou inativo');
@@ -95,6 +105,10 @@ export default function PublicCheckinForm() {
 
   const handleAnswerChange = (questionId: string, value: any) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
+
+  const handleCommentChange = (questionId: string, value: string) => {
+    setComments(prev => ({ ...prev, [questionId]: value }));
   };
 
   const handleCheckboxChange = (questionId: string, option: string, checked: boolean) => {
@@ -132,6 +146,14 @@ export default function PublicCheckinForm() {
           return;
         }
       }
+      // Validate required comment fields
+      if (question.has_comment_field && question.comment_field_required) {
+        const comment = comments[question.id];
+        if (!comment || !comment.trim()) {
+          toast.error(`Por favor preencha o comentário: ${question.comment_field_label}`);
+          return;
+        }
+      }
     }
 
     setSubmitting(true);
@@ -154,13 +176,22 @@ export default function PublicCheckinForm() {
 
       const clientId = clients[0].id;
 
+      // Prepare responses with comments
+      const responsesWithComments: Record<string, any> = {};
+      questions.forEach((q) => {
+        responsesWithComments[q.id] = {
+          answer: answers[q.id],
+          comment: q.has_comment_field ? comments[q.id] || null : null,
+        };
+      });
+
       // Submit response
       const { error: submitError } = await supabase
         .from('checkin_responses')
         .insert({
           form_id: formId,
           client_id: clientId,
-          responses: answers,
+          responses: responsesWithComments,
         });
 
       if (submitError) throw submitError;
@@ -345,6 +376,39 @@ export default function PublicCheckinForm() {
                           step={1}
                           className="w-full"
                         />
+                      </div>
+                    )}
+
+                    {/* Comment attachment field */}
+                    {question.has_comment_field && (
+                      <div className="mt-4 pt-4 border-t border-border/50">
+                        <Label 
+                          htmlFor={`comment-${question.id}`}
+                          className={cn(
+                            "text-sm text-muted-foreground",
+                            question.comment_field_required && "after:content-['*'] after:ml-0.5 after:text-red-500"
+                          )}
+                        >
+                          {question.comment_field_label || 'Comentário'}
+                        </Label>
+                        {question.comment_field_type === 'short' ? (
+                          <Input
+                            id={`comment-${question.id}`}
+                            value={comments[question.id] || ''}
+                            onChange={(e) => handleCommentChange(question.id, e.target.value)}
+                            placeholder="Seu comentário..."
+                            className="mt-2"
+                          />
+                        ) : (
+                          <Textarea
+                            id={`comment-${question.id}`}
+                            value={comments[question.id] || ''}
+                            onChange={(e) => handleCommentChange(question.id, e.target.value)}
+                            placeholder="Seu comentário..."
+                            rows={3}
+                            className="mt-2"
+                          />
+                        )}
                       </div>
                     )}
                   </div>

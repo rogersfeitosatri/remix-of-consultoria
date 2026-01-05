@@ -45,6 +45,10 @@ export default function CheckinFormBuilder() {
     scale_min: 1,
     scale_max: 10,
     is_required: false,
+    has_comment_field: false,
+    comment_field_label: 'Se quiser explicar melhor, comente aqui',
+    comment_field_required: false,
+    comment_field_type: 'short' as 'short' | 'medium',
   });
 
   const [editingTitle, setEditingTitle] = useState(false);
@@ -103,6 +107,12 @@ export default function CheckinFormBuilder() {
       scale_max: newQuestion.scale_max,
       is_required: newQuestion.is_required,
       order_index: questions.length,
+      has_comment_field: ['multiple_choice', 'checkbox', 'scale'].includes(newQuestion.question_type) 
+        ? newQuestion.has_comment_field 
+        : false,
+      comment_field_label: newQuestion.has_comment_field ? newQuestion.comment_field_label : null,
+      comment_field_required: newQuestion.has_comment_field ? newQuestion.comment_field_required : false,
+      comment_field_type: newQuestion.has_comment_field ? newQuestion.comment_field_type : null,
     };
 
     try {
@@ -116,6 +126,10 @@ export default function CheckinFormBuilder() {
         scale_min: 1,
         scale_max: 10,
         is_required: false,
+        has_comment_field: false,
+        comment_field_label: 'Se quiser explicar melhor, comente aqui',
+        comment_field_required: false,
+        comment_field_type: 'short',
       });
     } catch (error) {
       toast.error('Erro ao adicionar pergunta');
@@ -318,6 +332,20 @@ export default function CheckinFormBuilder() {
                               ))}
                             </div>
                           )}
+                          {question.has_comment_field && (
+                            <div className="mt-2 p-2 bg-muted/50 rounded-md">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <span className="font-medium">Campo anexo:</span>
+                                {question.comment_field_label}
+                                {question.comment_field_required && (
+                                  <Badge variant="secondary" className="text-xs ml-1">Obrigatório</Badge>
+                                )}
+                                <Badge variant="outline" className="text-xs ml-1">
+                                  {question.comment_field_type === 'short' ? 'Texto curto' : 'Texto médio'}
+                                </Badge>
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -431,6 +459,58 @@ export default function CheckinFormBuilder() {
                     />
                     <Label htmlFor="required">Pergunta obrigatória</Label>
                   </div>
+
+                  {/* Comment attachment field configuration */}
+                  {['multiple_choice', 'checkbox', 'scale'].includes(newQuestion.question_type) && (
+                    <div className="space-y-4 border-t pt-4 mt-4">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="has_comment_field"
+                          checked={newQuestion.has_comment_field}
+                          onCheckedChange={(checked) => setNewQuestion(prev => ({ ...prev, has_comment_field: checked }))}
+                        />
+                        <Label htmlFor="has_comment_field">Adicionar campo anexo de comentário</Label>
+                      </div>
+
+                      {newQuestion.has_comment_field && (
+                        <div className="space-y-4 pl-4 border-l-2 border-primary/20">
+                          <div className="space-y-2">
+                            <Label>Título do campo</Label>
+                            <Input
+                              value={newQuestion.comment_field_label}
+                              onChange={(e) => setNewQuestion(prev => ({ ...prev, comment_field_label: e.target.value }))}
+                              placeholder="Se quiser explicar melhor, comente aqui"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Tipo de resposta</Label>
+                            <Select
+                              value={newQuestion.comment_field_type}
+                              onValueChange={(value: 'short' | 'medium') => setNewQuestion(prev => ({ ...prev, comment_field_type: value }))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="short">Texto curto (1 linha)</SelectItem>
+                                <SelectItem value="medium">Texto médio (3 linhas)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              id="comment_field_required"
+                              checked={newQuestion.comment_field_required}
+                              onCheckedChange={(checked) => setNewQuestion(prev => ({ ...prev, comment_field_required: checked }))}
+                            />
+                            <Label htmlFor="comment_field_required">Campo de comentário obrigatório</Label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsAddQuestionOpen(false)}>
@@ -473,13 +553,22 @@ export default function CheckinFormBuilder() {
                     <CardContent>
                       <div className="space-y-3">
                         {questions.map((question) => {
-                          const answer = response.responses[question.id];
+                          const responseData = response.responses[question.id];
+                          // Handle both old format (direct value) and new format (object with answer/comment)
+                          const answer = responseData?.answer !== undefined ? responseData.answer : responseData;
+                          const comment = responseData?.comment;
                           return (
                             <div key={question.id} className="border-l-2 border-primary/20 pl-3">
                               <p className="text-sm font-medium text-muted-foreground">{question.question_text}</p>
                               <p className="text-sm mt-1">
                                 {Array.isArray(answer) ? answer.join(', ') : answer || '-'}
                               </p>
+                              {comment && (
+                                <div className="mt-1 pl-2 border-l border-muted text-xs text-muted-foreground italic">
+                                  <span className="font-medium">{question.comment_field_label || 'Comentário'}:</span>{' '}
+                                  {comment}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
