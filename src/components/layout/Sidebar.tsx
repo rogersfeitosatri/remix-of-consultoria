@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, Dumbbell, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, PersonStanding, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -50,7 +50,7 @@ export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse
           <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
             <div className={cn("flex items-center gap-3", isCollapsed && "lg:justify-center lg:w-full")}>
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary flex-shrink-0">
-                <Dumbbell className="h-5 w-5 text-primary-foreground" />
+                <PersonStanding className="h-5 w-5 text-primary-foreground" />
               </div>
               <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
                 <h1 className="text-lg font-bold text-sidebar-foreground truncate">RF Assessoria</h1>

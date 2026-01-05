@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Dumbbell, Loader2, ArrowLeft } from 'lucide-react';
+import { PersonStanding, Loader2, ArrowLeft } from 'lucide-react';
 
 type AuthMode = 'login' | 'signup' | 'forgot-password';
 
@@ -126,9 +126,9 @@ export default function Auth() {
           {/* Header */}
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/60">
-              <Dumbbell className="h-8 w-8 text-primary-foreground" />
+              <PersonStanding className="h-8 w-8 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl font-bold text-card-foreground">ConsultoriaFit</h1>
+            <h1 className="text-2xl font-bold text-card-foreground">RF Assessoria</h1>
             <p className="mt-2 text-muted-foreground">{getTitle()}</p>
           </div>
 
