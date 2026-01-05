@@ -14,8 +14,125 @@ export type Database = {
   }
   public: {
     Tables: {
+      checkin_forms: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      checkin_questions: {
+        Row: {
+          created_at: string
+          form_id: string
+          id: string
+          is_required: boolean | null
+          options: Json | null
+          order_index: number
+          question_text: string
+          question_type: string
+          scale_max: number | null
+          scale_min: number | null
+        }
+        Insert: {
+          created_at?: string
+          form_id: string
+          id?: string
+          is_required?: boolean | null
+          options?: Json | null
+          order_index?: number
+          question_text: string
+          question_type: string
+          scale_max?: number | null
+          scale_min?: number | null
+        }
+        Update: {
+          created_at?: string
+          form_id?: string
+          id?: string
+          is_required?: boolean | null
+          options?: Json | null
+          order_index?: number
+          question_text?: string
+          question_type?: string
+          scale_max?: number | null
+          scale_min?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_questions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkin_responses: {
+        Row: {
+          client_id: string
+          form_id: string
+          id: string
+          responses: Json
+          submitted_at: string
+        }
+        Insert: {
+          client_id: string
+          form_id: string
+          id?: string
+          responses: Json
+          submitted_at?: string
+        }
+        Update: {
+          client_id?: string
+          form_id?: string
+          id?: string
+          responses?: Json
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_responses_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
+          athlete_user_id: string | null
           checkin_frequency: string | null
           consultation_count: number | null
           consultation_frequency: string | null
@@ -41,6 +158,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          athlete_user_id?: string | null
           checkin_frequency?: string | null
           consultation_count?: number | null
           consultation_frequency?: string | null
@@ -66,6 +184,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          athlete_user_id?: string | null
           checkin_frequency?: string | null
           consultation_count?: number | null
           consultation_frequency?: string | null
@@ -204,15 +323,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "athlete"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -339,6 +485,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "athlete"],
+    },
   },
 } as const
