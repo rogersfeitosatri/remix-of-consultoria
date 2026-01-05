@@ -120,7 +120,7 @@ export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse
               onClick={handleViewAsAthlete}
               title={isCollapsed ? "Ver como atleta" : undefined}
               className={cn(
-                "w-full gap-2 text-xs",
+                "w-full gap-2 text-xs border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive",
                 isCollapsed && "lg:justify-center lg:px-2"
               )}
             >
