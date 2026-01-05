@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useAthleteClient, useCheckinResponses } from '@/hooks/useUserRole';
+import { useUserRole, useAthleteClient, useCheckinResponses } from '@/hooks/useUserRole';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PersonStanding, LogOut, User, Calendar, FileText, ClipboardList } from 'lucide-react';
+import { PersonStanding, LogOut, User, Calendar, FileText, ClipboardList, ArrowLeft, Eye } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function AthleteDashboard() {
   const navigate = useNavigate();
   const { user, signOut, loading: authLoading } = useAuth();
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
   const { data: client, isLoading: clientLoading } = useAthleteClient();
   const { data: checkinResponses = [], isLoading: responsesLoading } = useCheckinResponses(client?.id);
 
@@ -23,7 +24,11 @@ export default function AthleteDashboard() {
     navigate('/auth');
   };
 
-  if (authLoading || clientLoading) {
+  const handleBackToAdmin = () => {
+    navigate('/');
+  };
+
+  if (authLoading || clientLoading || roleLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -33,6 +38,148 @@ export default function AthleteDashboard() {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // If admin is viewing, show demo/preview mode
+  if (isAdmin && !client) {
+    const demoClient = {
+      name: 'Atleta Demonstração',
+      is_active: true,
+      plan_type: 'Premium',
+      plan_duration: 'monthly',
+      service_type: 'both',
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      has_checkin: true,
+      checkin_frequency: 'weekly',
+      has_consultations: true,
+      consultation_frequency: 'monthly',
+    };
+    
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Admin Preview Banner */}
+        <div className="bg-destructive text-destructive-foreground py-2 px-4 flex items-center justify-center gap-2">
+          <Eye className="h-4 w-4" />
+          <span className="text-sm font-medium">Modo Visualização - Esta é uma prévia da área do atleta</span>
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            className="ml-4 h-7"
+            onClick={handleBackToAdmin}
+          >
+            <ArrowLeft className="h-3 w-3 mr-1" />
+            Voltar ao painel
+          </Button>
+        </div>
+        
+        {/* Header */}
+        <header className="border-b border-border bg-card">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+                <PersonStanding className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold">RF Assessoria</h1>
+                <p className="text-xs text-muted-foreground">Esportiva</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-medium">{demoClient.name}</p>
+                <p className="text-xs text-muted-foreground">atleta@exemplo.com</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content - Demo */}
+        <main className="max-w-4xl mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-1">Olá, {demoClient.name.split(' ')[0]}!</h2>
+            <p className="text-muted-foreground">Bem-vindo à sua área de atleta</p>
+          </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="plan" className="gap-2">
+                <User className="h-4 w-4" />
+                Meu Plano
+              </TabsTrigger>
+              <TabsTrigger value="checkins" className="gap-2">
+                <ClipboardList className="h-4 w-4" />
+                Histórico de Checkins
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="plan" className="space-y-6">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Status do Plano</CardTitle>
+                    <Badge variant="default">Ativo</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Tipo de Plano</p>
+                      <p className="font-medium">Premium</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Duração</p>
+                      <p className="font-medium">Mensal</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Tipo de Serviço</p>
+                      <p className="font-medium">Nutrição + Treinamento</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Dias Restantes</p>
+                      <p className="font-medium">90 dias</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Período do Plano</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    <Calendar className="h-8 w-8 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Início - Término</p>
+                      <p className="font-medium">
+                        {format(new Date(), 'dd/MM/yyyy', { locale: ptBR })} - {format(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), 'dd/MM/yyyy', { locale: ptBR })}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="checkins" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Seus Checkins</CardTitle>
+                  <CardDescription>Histórico de formulários preenchidos</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Nenhum checkin realizado ainda.</p>
+                    <p className="text-sm">Os checkins aparecerão aqui quando o atleta responder.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </main>
+      </div>
+    );
   }
 
   if (!client) {
