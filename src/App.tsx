@@ -44,7 +44,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
   return <>{children}</>;
 }
 
-function AthleteRoute({ children }: { children: React.ReactNode }) {
+function AthleteRoute({ children, allowAdmin = false }: { children: React.ReactNode; allowAdmin?: boolean }) {
   const { user, loading } = useAuth();
   const { role, isLoading: roleLoading } = useUserRole();
 
@@ -60,8 +60,8 @@ function AthleteRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Redirect admins to admin dashboard
-  if (role === 'admin') {
+  // Allow admins to view athlete area if allowAdmin is true
+  if (role === 'admin' && !allowAdmin) {
     return <Navigate to="/" replace />;
   }
 
@@ -73,7 +73,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/auth" element={<Auth />} />
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
-      <Route path="/athlete" element={<AthleteRoute><AthleteDashboard /></AthleteRoute>} />
+      <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
       <Route path="/" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
       <Route path="/clients" element={<ProtectedRoute adminOnly><Clients /></ProtectedRoute>} />
       <Route path="/financial" element={<ProtectedRoute adminOnly><Financial /></ProtectedRoute>} />
