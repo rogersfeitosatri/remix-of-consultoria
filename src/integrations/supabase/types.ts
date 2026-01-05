@@ -46,8 +46,12 @@ export type Database = {
       }
       checkin_questions: {
         Row: {
+          comment_field_label: string | null
+          comment_field_required: boolean
+          comment_field_type: string | null
           created_at: string
           form_id: string
+          has_comment_field: boolean
           id: string
           is_required: boolean | null
           options: Json | null
@@ -58,8 +62,12 @@ export type Database = {
           scale_min: number | null
         }
         Insert: {
+          comment_field_label?: string | null
+          comment_field_required?: boolean
+          comment_field_type?: string | null
           created_at?: string
           form_id: string
+          has_comment_field?: boolean
           id?: string
           is_required?: boolean | null
           options?: Json | null
@@ -70,8 +78,12 @@ export type Database = {
           scale_min?: number | null
         }
         Update: {
+          comment_field_label?: string | null
+          comment_field_required?: boolean
+          comment_field_type?: string | null
           created_at?: string
           form_id?: string
+          has_comment_field?: boolean
           id?: string
           is_required?: boolean | null
           options?: Json | null

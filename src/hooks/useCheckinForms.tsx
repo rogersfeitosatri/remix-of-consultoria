@@ -15,6 +15,11 @@ export interface CheckinQuestion {
   is_required: boolean;
   order_index: number;
   created_at: string;
+  // Comment attachment fields
+  has_comment_field: boolean;
+  comment_field_label: string | null;
+  comment_field_required: boolean;
+  comment_field_type: 'short' | 'medium' | null;
 }
 
 export interface CheckinForm {
