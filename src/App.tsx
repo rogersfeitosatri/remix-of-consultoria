@@ -17,6 +17,7 @@ import AthleteDashboard from "./pages/AthleteDashboard";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
+import Forms from "./pages/Forms";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -63,7 +64,7 @@ function AthleteRoute({ children, allowAdmin = false }: { children: React.ReactN
 
   // Allow admins to view athlete area if allowAdmin is true
   if (role === 'admin' && !allowAdmin) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   return <>{children}</>;
@@ -80,6 +81,7 @@ function AppRoutes() {
       <Route path="/clients" element={<ProtectedRoute adminOnly><Clients /></ProtectedRoute>} />
       <Route path="/financial" element={<ProtectedRoute adminOnly><Financial /></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute adminOnly><CalendarPage /></ProtectedRoute>} />
+      <Route path="/forms" element={<ProtectedRoute adminOnly><Forms /></ProtectedRoute>} />
       <Route path="/checkin" element={<ProtectedRoute adminOnly><Checkin /></ProtectedRoute>} />
       <Route path="/checkin/:formId" element={<ProtectedRoute adminOnly><CheckinFormBuilder /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
