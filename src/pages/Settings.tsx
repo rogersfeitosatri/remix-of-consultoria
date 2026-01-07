@@ -814,6 +814,135 @@ export default function Settings() {
             </p>
           </CardContent>
         </Card>
+
+        {/* Full Backup Card */}
+        <Card className="border-border bg-card border-primary/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileDown className="h-5 w-5 text-primary" />
+              Backup Completo do Sistema
+            </CardTitle>
+            <CardDescription>
+              Exporte todos os dados do sistema para backup (atletas, checkins, agendamentos, formulários, etc.)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg bg-muted/50 p-4">
+              <h4 className="font-medium text-foreground mb-2">Dados incluídos no backup:</h4>
+              <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Atletas
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Pagamentos
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Perfis de Atleta
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Check-ins
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Anamneses
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Agendamentos
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Consultas
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Materiais de Suporte
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  Contas a Pagar
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button 
+                onClick={async () => {
+                  try {
+                    const { exportFullBackup } = await import('@/hooks/useBackup');
+                    await exportFullBackup();
+                    toast.success('Backup exportado com sucesso!');
+                  } catch (error) {
+                    toast.error('Erro ao exportar backup');
+                    console.error(error);
+                  }
+                }}
+                className="gap-2"
+              >
+                <FileDown className="h-4 w-4" />
+                Baixar Backup Completo
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Restore Backup Card */}
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-primary" />
+              Restaurar Backup
+            </CardTitle>
+            <CardDescription>
+              Restaure dados a partir de um arquivo de backup (.xlsx)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Atenção:</strong> Esta função irá adicionar novos registros ao sistema. 
+                Dados existentes não serão sobrescritos. Use com cuidado.
+              </AlertDescription>
+            </Alert>
+
+            <input
+              type="file"
+              id="backup-file-input"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                
+                try {
+                  const { importFullBackup } = await import('@/hooks/useBackup');
+                  const results = await importFullBackup(file);
+                  const totalImported = results.reduce((sum, r) => sum + r.count, 0);
+                  toast.success(`Backup restaurado! ${totalImported} registros importados.`);
+                } catch (error) {
+                  toast.error('Erro ao restaurar backup');
+                  console.error(error);
+                } finally {
+                  e.target.value = '';
+                }
+              }}
+              accept=".xlsx"
+              className="hidden"
+            />
+
+            <Button 
+              variant="outline"
+              onClick={() => document.getElementById('backup-file-input')?.click()}
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Selecionar Arquivo de Backup
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );

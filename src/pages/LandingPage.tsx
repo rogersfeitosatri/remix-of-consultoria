@@ -129,8 +129,8 @@ export default function LandingPage() {
                   <Calendar className="w-5 h-5 md:w-6 md:h-6 text-black" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base md:text-lg text-white">Check-up de progresso com 3 semanas</h3>
-                  <p className="text-gray-400 text-sm md:text-base">Com 3 semanas, você preenche um check-up para avaliarmos peso, medidas e suas sensações. É o momento de solicitar ajustes.</p>
+                  <h3 className="font-bold text-base md:text-lg text-white">Check-up a cada 15 dias para ajustes</h3>
+                  <p className="text-gray-400 text-sm md:text-base">A cada 15 dias, você preenche um check-up para avaliarmos peso, medidas e suas sensações. É o momento de solicitar ajustes no seu plano.</p>
                 </div>
               </div>
               
@@ -139,8 +139,8 @@ export default function LandingPage() {
                   <MessageCircle className="w-5 h-5 md:w-6 md:h-6 text-black" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base md:text-lg text-white">Suporte exclusivo no app</h3>
-                  <p className="text-gray-400 text-sm md:text-base">Tire todas as suas dúvidas diretamente com o especialista pelo chat dentro do próprio aplicativo.</p>
+                  <h3 className="font-bold text-base md:text-lg text-white">Suporte direto com o Nutri no Daily do app</h3>
+                  <p className="text-gray-400 text-sm md:text-base">Tire todas as suas dúvidas diretamente com o nutricionista pelo Daily dentro do próprio aplicativo de dieta.</p>
                 </div>
               </div>
             </div>
@@ -161,7 +161,7 @@ export default function LandingPage() {
               { step: "1", title: "Inscrição", desc: "Clique no botão e garanta sua vaga." },
               { step: "2", title: "Diagnóstico", desc: "Preencha o formulário de diagnóstico detalhado sobre sua rotina e treinos." },
               { step: "3", title: "Recebimento", desc: "Em até 48h úteis, seu plano alimentar personalizado estará disponível no app." },
-              { step: "4", title: "Acompanhamento", desc: "Com 3 semanas, faça seu check-up e receba os ajustes necessários." },
+              { step: "4", title: "Acompanhamento", desc: "A cada 15 dias, faça seu check-up e receba os ajustes necessários." },
             ].map((item, index) => (
               <div key={index} className="text-center">
                 <div className="w-12 h-12 md:w-16 md:h-16 bg-[hsl(43,74%,49%)] text-black rounded-full flex items-center justify-center text-xl md:text-2xl font-bold mx-auto mb-3 md:mb-4">
