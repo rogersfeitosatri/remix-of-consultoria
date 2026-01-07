@@ -7,12 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PersonStanding, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Settings, BookOpen, Utensils, TrendingUp, FileText, Youtube } from 'lucide-react';
+import { PersonStanding, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Settings, BookOpen, Utensils, TrendingUp, FileText, Youtube, Menu } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { EvolutionCharts } from '@/components/athlete/EvolutionCharts';
 import { ChangePasswordForm } from '@/components/athlete/ChangePasswordForm';
+import { AthleteSidebar } from '@/components/athlete/AthleteSidebar';
 
 // YouTube embed helper
 function getYouTubeEmbedUrl(url: string): string | null {
@@ -250,6 +251,14 @@ export default function AthleteDashboard() {
       <header className="border-b border-gray-800 bg-black sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {/* Mobile Menu */}
+            <AthleteSidebar
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              clientName={client.name}
+              userEmail={user.email || ''}
+              onSignOut={handleSignOut}
+            />
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(43,74%,49%)]">
               <PersonStanding className="h-5 w-5 text-black" />
             </div>
@@ -263,7 +272,7 @@ export default function AthleteDashboard() {
               <p className="text-sm font-medium text-white">{client.name}</p>
               <p className="text-xs text-gray-400">{user.email}</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-white hover:bg-gray-800">
+            <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-white hover:bg-gray-800 hidden sm:flex">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
