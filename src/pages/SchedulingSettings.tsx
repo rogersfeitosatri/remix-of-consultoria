@@ -32,6 +32,7 @@ import {
   useDeleteSchedulingBlock,
   useAppointments,
 } from '@/hooks/useScheduling';
+import { TimeBlocksManager } from '@/components/scheduling/TimeBlocksManager';
 import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
@@ -304,7 +305,7 @@ export default function SchedulingSettings() {
               </CardContent>
             </Card>
 
-            <Button onClick={handleSave} disabled={saveSettings.isPending} className="w-full sm:w-auto">
+            <Button onClick={handleSave} disabled={saveSettings.isPending} className="w-full sm:w-auto mb-6">
               {saveSettings.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -314,6 +315,11 @@ export default function SchedulingSettings() {
                 'Salvar Configurações'
               )}
             </Button>
+
+            {/* Time Blocks Manager - Multiple time blocks per day */}
+            {settings?.id && (
+              <TimeBlocksManager settingsId={settings.id} workingDays={workingDays} />
+            )}
           </TabsContent>
 
           <TabsContent value="blocks" className="space-y-6">

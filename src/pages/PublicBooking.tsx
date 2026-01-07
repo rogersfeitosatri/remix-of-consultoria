@@ -6,6 +6,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { PersonStanding, CalendarDays, Clock, CheckCircle2, Loader2 } from 'lucide-react';
 import { useSchedulingSettingsBySlug, useSchedulingBlocks, useAppointmentsByDate, useCreateAppointment } from '@/hooks/useScheduling';
+import { useTimeBlocksBySettingsSlug } from '@/hooks/useTimeBlocks';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO, addMinutes, isBefore, isAfter, isSameDay, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -19,6 +20,7 @@ export default function PublicBooking() {
   
   const { data: settings, isLoading: settingsLoading } = useSchedulingSettingsBySlug(slug);
   const { data: blocks = [] } = useSchedulingBlocks(settings?.user_id);
+  const { data: timeBlocks = [] } = useTimeBlocksBySettingsSlug(slug);
   
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>();
@@ -72,46 +74,72 @@ export default function PublicBooking() {
     );
     if (fullDayBlock) return [];
 
-    // Parse working hours
-    const [startHour, startMin] = settings.working_hours_start.split(':').map(Number);
-    const [endHour, endMin] = settings.working_hours_end.split(':').map(Number);
+    // Check if there are specific time blocks for this day
+    const dayTimeBlocks = timeBlocks.filter(tb => tb.day_of_week === dayOfWeek);
     
-    let currentTime = new Date(selectedDate);
-    currentTime.setHours(startHour, startMin, 0, 0);
+    // Define working periods - use time blocks if available, otherwise use general settings
+    const workingPeriods: { start: string; end: string }[] = [];
     
-    const endTime = new Date(selectedDate);
-    endTime.setHours(endHour, endMin, 0, 0);
-
-    while (isBefore(currentTime, endTime)) {
-      const timeStr = format(currentTime, 'HH:mm');
-      const slotEnd = addMinutes(currentTime, settings.slot_duration_minutes);
-      
-      // Check if slot is blocked by time range
-      const isBlocked = blocks.some(b => {
-        if (b.block_date !== dateStr || b.block_type !== 'time_range') return false;
-        const blockStart = b.start_time?.substring(0, 5);
-        const blockEnd = b.end_time?.substring(0, 5);
-        return timeStr >= blockStart! && timeStr < blockEnd!;
+    if (dayTimeBlocks.length > 0) {
+      // Use specific time blocks for this day
+      dayTimeBlocks.forEach(tb => {
+        workingPeriods.push({
+          start: tb.start_time.substring(0, 5),
+          end: tb.end_time.substring(0, 5),
+        });
       });
-
-      // Check if slot is already booked
-      const isBooked = existingAppointments.some(a => {
-        const aptTime = a.appointment_time?.substring(0, 5);
-        return aptTime === timeStr;
+    } else {
+      // Use general working hours
+      workingPeriods.push({
+        start: settings.working_hours_start.substring(0, 5),
+        end: settings.working_hours_end.substring(0, 5),
       });
-
-      // Check if slot is in the past (for today)
-      const isPast = isSameDay(selectedDate, new Date()) && isBefore(currentTime, new Date());
-
-      if (!isBlocked && !isBooked && !isPast) {
-        slots.push(timeStr);
-      }
-
-      currentTime = addMinutes(currentTime, settings.slot_duration_minutes);
     }
 
-    return slots;
-  }, [settings, selectedDate, blocks, existingAppointments]);
+    // Generate slots for each working period
+    workingPeriods.forEach(period => {
+      const [startHour, startMin] = period.start.split(':').map(Number);
+      const [endHour, endMin] = period.end.split(':').map(Number);
+      
+      let currentTime = new Date(selectedDate);
+      currentTime.setHours(startHour, startMin, 0, 0);
+      
+      const endTime = new Date(selectedDate);
+      endTime.setHours(endHour, endMin, 0, 0);
+
+      while (isBefore(currentTime, endTime)) {
+        const timeStr = format(currentTime, 'HH:mm');
+        const slotEnd = addMinutes(currentTime, settings.slot_duration_minutes);
+        
+        // Check if slot is blocked by time range
+        const isBlocked = blocks.some(b => {
+          if (b.block_date !== dateStr || b.block_type !== 'time_range') return false;
+          const blockStart = b.start_time?.substring(0, 5);
+          const blockEnd = b.end_time?.substring(0, 5);
+          return timeStr >= blockStart! && timeStr < blockEnd!;
+        });
+
+        // Check if slot is already booked
+        const isBooked = existingAppointments.some(a => {
+          const aptTime = a.appointment_time?.substring(0, 5);
+          return aptTime === timeStr;
+        });
+
+        // Check if slot is in the past (for today)
+        const isPast = isSameDay(selectedDate, new Date()) && isBefore(currentTime, new Date());
+
+        if (!isBlocked && !isBooked && !isPast) {
+          slots.push(timeStr);
+        }
+
+        currentTime = addMinutes(currentTime, settings.slot_duration_minutes);
+      }
+    });
+
+    // Sort and remove duplicates
+    return [...new Set(slots)].sort();
+  }, [settings, selectedDate, blocks, existingAppointments, timeBlocks]);
+  
 
   const handleConfirmBooking = async () => {
     if (!selectedDate || !selectedTime || !consultationSchedule || !settings) {
