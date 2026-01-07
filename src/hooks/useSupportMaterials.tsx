@@ -60,12 +60,24 @@ export function useSupportMaterials(category?: string) {
 }
 
 export function useAthleteSupportMaterials(category?: string) {
+  const { user } = useAuth();
+  
   return useQuery({
-    queryKey: ['athlete-support-materials', category],
+    queryKey: ['athlete-support-materials', category, user?.id],
     queryFn: async () => {
+      // First get the client to find the admin's user_id
+      const { data: client } = await supabase
+        .from('clients')
+        .select('user_id')
+        .eq('athlete_user_id', user?.id)
+        .maybeSingle();
+      
+      if (!client) return [];
+      
       let query = supabase
         .from('support_materials')
         .select('*')
+        .eq('user_id', client.user_id)
         .eq('is_active', true)
         .order('order_index', { ascending: true });
       
@@ -77,6 +89,7 @@ export function useAthleteSupportMaterials(category?: string) {
       if (error) throw error;
       return data as SupportMaterial[];
     },
+    enabled: !!user,
   });
 }
 
@@ -174,17 +187,30 @@ export function useDietAppConfig() {
 }
 
 export function useAthleteDietAppConfig() {
+  const { user } = useAuth();
+  
   return useQuery({
-    queryKey: ['athlete-diet-app-config'],
+    queryKey: ['athlete-diet-app-config', user?.id],
     queryFn: async () => {
+      // First get the client to find the admin's user_id
+      const { data: client } = await supabase
+        .from('clients')
+        .select('user_id')
+        .eq('athlete_user_id', user?.id)
+        .maybeSingle();
+      
+      if (!client) return null;
+      
       const { data, error } = await supabase
         .from('diet_app_config')
         .select('*')
+        .eq('user_id', client.user_id)
         .maybeSingle();
       
       if (error) throw error;
       return data as DietAppConfig | null;
     },
+    enabled: !!user,
   });
 }
 

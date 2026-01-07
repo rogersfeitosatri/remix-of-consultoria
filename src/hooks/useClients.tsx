@@ -263,18 +263,21 @@ export function useAddClient() {
 
       if (error) throw error;
 
-      // Generate only ONE payment entry for subscription (FIN-02)
-      // Instead of creating multiple payments for each month, we create a single
-      // entry that represents the subscription/contract
+      // Generate payment entry for the client
+      // If payment_date is set, mark as paid on that date
       const clientStartDate = parseISO(client.start_date);
+      const paymentDate = client.payment_date ? parseISO(client.payment_date) : clientStartDate;
+      const isPaid = !!client.payment_date;
+      
       const { error: paymentError } = await supabase
         .from('payments')
         .insert({
           user_id: user.id,
           client_id: client.id,
-          due_date: format(clientStartDate, 'yyyy-MM-dd'),
+          due_date: format(paymentDate, 'yyyy-MM-dd'),
           amount: client.monthly_value,
-          status: 'pending' as const,
+          status: isPaid ? 'paid' : 'pending',
+          paid_at: isPaid ? new Date().toISOString() : null,
         });
 
       if (paymentError) throw paymentError;

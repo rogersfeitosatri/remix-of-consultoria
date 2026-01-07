@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { MonthlyRevenue } from '@/components/financial/MonthlyRevenue';
 import { UpcomingPayments } from '@/components/financial/UpcomingPayments';
+import { ExpensesSection } from '@/components/financial/ExpensesSection';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { ExpiringClientsAlert } from '@/components/dashboard/ExpiringClientsAlert';
 import { useClients, usePayments, getMonthlyRevenue, getUpcomingPayments, getTotalMonthlyRecurring, getOverduePayments, getNewPlansThisMonth, getExpiringClients } from '@/hooks/useClients';
@@ -130,6 +131,9 @@ export default function Financial() {
             }
           />
         </div>
+
+        {/* Expenses Section */}
+        <ExpensesSection />
 
         {/* Modo Babá - Planos vencendo */}
         <ExpiringClientsAlert clients={expiringClients} />

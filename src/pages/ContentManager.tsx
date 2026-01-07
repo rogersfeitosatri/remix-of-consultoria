@@ -58,19 +58,19 @@ export default function ContentManager() {
   const [contentType, setContentType] = useState<'text' | 'youtube_video'>('text');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   
-  // Diet config state
+  // Diet config state - initialized from dietConfig when available
   const [appInstructions, setAppInstructions] = useState('');
   const [appCode, setAppCode] = useState('');
   const [supportInstructions, setSupportInstructions] = useState('');
+  const [configInitialized, setConfigInitialized] = useState(false);
 
   // Load diet config when it's available
-  useState(() => {
-    if (dietConfig) {
-      setAppInstructions(dietConfig.app_download_instructions || '');
-      setAppCode(dietConfig.app_code || '');
-      setSupportInstructions(dietConfig.support_instructions || '');
-    }
-  });
+  if (dietConfig && !configInitialized) {
+    setAppInstructions(dietConfig.app_download_instructions || '');
+    setAppCode(dietConfig.app_code || '');
+    setSupportInstructions(dietConfig.support_instructions || '');
+    setConfigInitialized(true);
+  }
 
   const handleOpenDialog = (material?: any) => {
     if (material) {
