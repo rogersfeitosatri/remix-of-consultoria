@@ -47,13 +47,27 @@ Deno.serve(async (req) => {
     const existingUser = existingUsers.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
 
     if (existingUser) {
-      // User already exists, just link the client
+      // User already exists, link the client
       const { error: updateError } = await supabaseAdmin
         .from("clients")
         .update({ athlete_user_id: existingUser.id })
         .eq("id", clientId);
 
       if (updateError) throw updateError;
+
+      // Ensure athlete role exists (upsert style - ignore if already exists)
+      const { error: roleError } = await supabaseAdmin
+        .from("user_roles")
+        .upsert({
+          user_id: existingUser.id,
+          role: "athlete",
+        }, { onConflict: 'user_id,role' });
+
+      if (roleError) {
+        console.error("Error ensuring athlete role for existing user:", roleError);
+      } else {
+        console.log("Athlete role ensured for existing user:", existingUser.id);
+      }
 
       return new Response(
         JSON.stringify({ 
