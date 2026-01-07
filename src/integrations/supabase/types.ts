@@ -849,6 +849,73 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_checkins: {
+        Row: {
+          client_id: string
+          created_at: string
+          form_id: string | null
+          id: string
+          notes: string | null
+          response_id: string | null
+          scheduled_send_date: string
+          scheduled_send_time: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          form_id?: string | null
+          id?: string
+          notes?: string | null
+          response_id?: string | null
+          scheduled_send_date: string
+          scheduled_send_time?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          form_id?: string | null
+          id?: string
+          notes?: string | null
+          response_id?: string | null
+          scheduled_send_date?: string
+          scheduled_send_time?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_checkins_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_checkins_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_checkins_response_id_fkey"
+            columns: ["response_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
