@@ -291,20 +291,24 @@ export default function AthleteDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-900 border border-gray-800 p-1">
-            <TabsTrigger value="onboarding" className="gap-2 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white">
+          <TabsList className="grid w-full grid-cols-5 bg-gray-900 border border-gray-800 p-1">
+            <TabsTrigger value="onboarding" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs sm:text-sm">
               <BookOpen className="h-4 w-4" />
               <span className="hidden sm:inline">Onboarding</span>
             </TabsTrigger>
-            <TabsTrigger value="dieta" className="gap-2 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white">
+            <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs sm:text-sm">
               <Utensils className="h-4 w-4" />
               <span className="hidden sm:inline">Dieta</span>
             </TabsTrigger>
-            <TabsTrigger value="evolucao" className="gap-2 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white">
+            <TabsTrigger value="evolucao" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs sm:text-sm">
               <TrendingUp className="h-4 w-4" />
               <span className="hidden sm:inline">Evolução</span>
             </TabsTrigger>
-            <TabsTrigger value="config" className="gap-2 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white">
+            <TabsTrigger value="material" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs sm:text-sm">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Material</span>
+            </TabsTrigger>
+            <TabsTrigger value="config" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs sm:text-sm">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Config</span>
             </TabsTrigger>
@@ -448,34 +452,38 @@ export default function AthleteDashboard() {
               </CardContent>
             </Card>
 
-            {/* Support Materials */}
-            {supportMaterials.length > 0 && (
+          </TabsContent>
+
+          {/* Material Tab */}
+          <TabsContent value="material" className="space-y-4">
+            {supportMaterials.length === 0 ? (
               <Card className="bg-gray-900 border-gray-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-white">
-                    <FileText className="h-5 w-5 text-[hsl(43,74%,49%)]" />
-                    Material de Suporte
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {supportMaterials.map((material) => (
-                    <div key={material.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
-                      <h4 className="font-medium text-white mb-2">{material.title}</h4>
-                      {material.content_type === 'text' ? (
-                        <p className="text-sm text-gray-300 whitespace-pre-wrap">{material.content}</p>
-                      ) : (
-                        <div className="aspect-video rounded-lg overflow-hidden">
-                          <iframe
-                            src={getYouTubeEmbedUrl(material.youtube_url || '') || ''}
-                            className="w-full h-full"
-                            allowFullScreen
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <CardContent className="py-12 text-center">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Material de suporte em breve...</p>
                 </CardContent>
               </Card>
+            ) : (
+              supportMaterials.map((material) => (
+                <Card key={material.id} className="bg-gray-900 border-gray-800">
+                  <CardHeader>
+                    <CardTitle className="text-white">{material.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {material.content_type === 'text' ? (
+                      <p className="text-gray-300 whitespace-pre-wrap">{material.content}</p>
+                    ) : (
+                      <div className="aspect-video rounded-lg overflow-hidden">
+                        <iframe
+                          src={getYouTubeEmbedUrl(material.youtube_url || '') || ''}
+                          className="w-full h-full"
+                          allowFullScreen
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
             )}
           </TabsContent>
 
