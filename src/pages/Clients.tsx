@@ -119,24 +119,46 @@ export default function Clients() {
                 variant: 'destructive',
               });
             } else if (options?.sendCredentials && data.phone) {
-              // Enviar credenciais via WhatsApp
-              const phoneClean = data.phone.replace(/\D/g, '');
+              // Enviar credenciais via Z-API (WhatsApp direto)
               const baseUrl = window.location.origin;
               const message = `🏃 *RF Assessoria - Bem-vindo!*\n\nOlá ${data.name}!\n\nSua conta foi criada com sucesso.\n\n📧 *Login:* ${data.email}\n🔑 *Senha:* 123456\n\n🔗 Acesse: ${baseUrl}/auth\n\n⚠️ Recomendamos trocar sua senha no primeiro acesso.\n\nQualquer dúvida, estamos à disposição!`;
-              const whatsappUrl = `https://wa.me/55${phoneClean}?text=${encodeURIComponent(message)}`;
-              window.open(whatsappUrl, '_blank');
+              
+              try {
+                const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
+                  body: {
+                    clientId: newClient.id,
+                    message: message,
+                  },
+                });
+                
+                if (whatsappError) {
+                  console.error('Erro ao enviar WhatsApp:', whatsappError);
+                  toast({
+                    title: 'Aviso',
+                    description: 'Atleta cadastrado, mas houve erro ao enviar credenciais via WhatsApp.',
+                    variant: 'destructive',
+                  });
+                } else {
+                  toast({
+                    title: 'Credenciais enviadas',
+                    description: 'Mensagem de boas-vindas enviada via WhatsApp com sucesso!',
+                  });
+                }
+              } catch (whatsappErr) {
+                console.error('Erro ao enviar WhatsApp:', whatsappErr);
+              }
             }
           } catch (err) {
             console.error('Erro ao processar conta do atleta:', err);
           }
         }
         
-        toast({
-          title: 'Atleta cadastrado',
-          description: options?.sendCredentials 
-            ? 'Atleta criado! Abrindo WhatsApp para enviar credenciais...'
-            : 'O novo atleta foi adicionado com sucesso.',
-        });
+        if (!options?.sendCredentials) {
+          toast({
+            title: 'Atleta cadastrado',
+            description: 'O novo atleta foi adicionado com sucesso.',
+          });
+        }
       }
       setShowForm(false);
       setEditingClient(undefined);
