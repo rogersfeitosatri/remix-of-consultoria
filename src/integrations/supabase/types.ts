@@ -151,6 +151,221 @@ export type Database = {
           },
         ]
       }
+      athlete_profiles: {
+        Row: {
+          anamnese_submitted_at: string | null
+          bedtime: string | null
+          birth_date: string | null
+          city_state: string | null
+          client_id: string
+          created_at: string
+          current_supplements: string | null
+          current_weight: number | null
+          diet_stop_reason: string | null
+          diet_types: string | null
+          disliked_foods: string | null
+          evacuation_frequency: string | null
+          favorite_foods: string | null
+          food_allergies: string | null
+          full_name: string | null
+          gender: string | null
+          gluten_intolerance: string | null
+          height: number | null
+          hip_circumference: number | null
+          hours_sitting: string | null
+          id: string
+          ideal_weight: number | null
+          injury_history: string | null
+          intestinal_function: string | null
+          intestinal_problems: Json | null
+          intestinal_problems_other: string | null
+          lactose_intolerance: string | null
+          main_goal: string | null
+          max_weight: number | null
+          meal_afternoon_snack: Json | null
+          meal_afternoon_snack_enabled: boolean | null
+          meal_breakfast: Json | null
+          meal_dinner: Json | null
+          meal_lunch: Json | null
+          meal_morning_snack: Json | null
+          meal_morning_snack_enabled: boolean | null
+          meal_supper: Json | null
+          meal_supper_enabled: boolean | null
+          min_adult_weight: number | null
+          nutritional_followup: string | null
+          past_supplements: string | null
+          phone: string | null
+          practices_running: string | null
+          previous_diets: string | null
+          profession: string | null
+          races_participated: string | null
+          religious_restrictions: string | null
+          running_time: string | null
+          secondary_goal: string | null
+          sedentary_work: string | null
+          sleep_hours: string | null
+          sleep_quality: string | null
+          specific_target: string | null
+          stress_cause: string | null
+          stress_level: string | null
+          target_deadline: string | null
+          updated_at: string
+          used_supplements_before: string | null
+          uses_supplements: string | null
+          waist_circumference: number | null
+          wake_time: string | null
+          weekend_changes: string | null
+          weekend_description: string | null
+          weekly_frequency: string | null
+          weekly_volume_km: number | null
+          work_schedule: string | null
+        }
+        Insert: {
+          anamnese_submitted_at?: string | null
+          bedtime?: string | null
+          birth_date?: string | null
+          city_state?: string | null
+          client_id: string
+          created_at?: string
+          current_supplements?: string | null
+          current_weight?: number | null
+          diet_stop_reason?: string | null
+          diet_types?: string | null
+          disliked_foods?: string | null
+          evacuation_frequency?: string | null
+          favorite_foods?: string | null
+          food_allergies?: string | null
+          full_name?: string | null
+          gender?: string | null
+          gluten_intolerance?: string | null
+          height?: number | null
+          hip_circumference?: number | null
+          hours_sitting?: string | null
+          id?: string
+          ideal_weight?: number | null
+          injury_history?: string | null
+          intestinal_function?: string | null
+          intestinal_problems?: Json | null
+          intestinal_problems_other?: string | null
+          lactose_intolerance?: string | null
+          main_goal?: string | null
+          max_weight?: number | null
+          meal_afternoon_snack?: Json | null
+          meal_afternoon_snack_enabled?: boolean | null
+          meal_breakfast?: Json | null
+          meal_dinner?: Json | null
+          meal_lunch?: Json | null
+          meal_morning_snack?: Json | null
+          meal_morning_snack_enabled?: boolean | null
+          meal_supper?: Json | null
+          meal_supper_enabled?: boolean | null
+          min_adult_weight?: number | null
+          nutritional_followup?: string | null
+          past_supplements?: string | null
+          phone?: string | null
+          practices_running?: string | null
+          previous_diets?: string | null
+          profession?: string | null
+          races_participated?: string | null
+          religious_restrictions?: string | null
+          running_time?: string | null
+          secondary_goal?: string | null
+          sedentary_work?: string | null
+          sleep_hours?: string | null
+          sleep_quality?: string | null
+          specific_target?: string | null
+          stress_cause?: string | null
+          stress_level?: string | null
+          target_deadline?: string | null
+          updated_at?: string
+          used_supplements_before?: string | null
+          uses_supplements?: string | null
+          waist_circumference?: number | null
+          wake_time?: string | null
+          weekend_changes?: string | null
+          weekend_description?: string | null
+          weekly_frequency?: string | null
+          weekly_volume_km?: number | null
+          work_schedule?: string | null
+        }
+        Update: {
+          anamnese_submitted_at?: string | null
+          bedtime?: string | null
+          birth_date?: string | null
+          city_state?: string | null
+          client_id?: string
+          created_at?: string
+          current_supplements?: string | null
+          current_weight?: number | null
+          diet_stop_reason?: string | null
+          diet_types?: string | null
+          disliked_foods?: string | null
+          evacuation_frequency?: string | null
+          favorite_foods?: string | null
+          food_allergies?: string | null
+          full_name?: string | null
+          gender?: string | null
+          gluten_intolerance?: string | null
+          height?: number | null
+          hip_circumference?: number | null
+          hours_sitting?: string | null
+          id?: string
+          ideal_weight?: number | null
+          injury_history?: string | null
+          intestinal_function?: string | null
+          intestinal_problems?: Json | null
+          intestinal_problems_other?: string | null
+          lactose_intolerance?: string | null
+          main_goal?: string | null
+          max_weight?: number | null
+          meal_afternoon_snack?: Json | null
+          meal_afternoon_snack_enabled?: boolean | null
+          meal_breakfast?: Json | null
+          meal_dinner?: Json | null
+          meal_lunch?: Json | null
+          meal_morning_snack?: Json | null
+          meal_morning_snack_enabled?: boolean | null
+          meal_supper?: Json | null
+          meal_supper_enabled?: boolean | null
+          min_adult_weight?: number | null
+          nutritional_followup?: string | null
+          past_supplements?: string | null
+          phone?: string | null
+          practices_running?: string | null
+          previous_diets?: string | null
+          profession?: string | null
+          races_participated?: string | null
+          religious_restrictions?: string | null
+          running_time?: string | null
+          secondary_goal?: string | null
+          sedentary_work?: string | null
+          sleep_hours?: string | null
+          sleep_quality?: string | null
+          specific_target?: string | null
+          stress_cause?: string | null
+          stress_level?: string | null
+          target_deadline?: string | null
+          updated_at?: string
+          used_supplements_before?: string | null
+          uses_supplements?: string | null
+          waist_circumference?: number | null
+          wake_time?: string | null
+          weekend_changes?: string | null
+          weekend_description?: string | null
+          weekly_frequency?: string | null
+          weekly_volume_km?: number | null
+          work_schedule?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checkin_forms: {
         Row: {
           created_at: string
@@ -512,6 +727,60 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      question_templates: {
+        Row: {
+          category: string
+          comment_field_label: string | null
+          comment_field_required: boolean | null
+          created_at: string
+          has_comment_field: boolean
+          id: string
+          is_required: boolean
+          options: Json | null
+          question_text: string
+          question_type: string
+          scale_max: number | null
+          scale_min: number | null
+          section: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          comment_field_label?: string | null
+          comment_field_required?: boolean | null
+          created_at?: string
+          has_comment_field?: boolean
+          id?: string
+          is_required?: boolean
+          options?: Json | null
+          question_text: string
+          question_type: string
+          scale_max?: number | null
+          scale_min?: number | null
+          section?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          comment_field_label?: string | null
+          comment_field_required?: boolean | null
+          created_at?: string
+          has_comment_field?: boolean
+          id?: string
+          is_required?: boolean
+          options?: Json | null
+          question_text?: string
+          question_type?: string
+          scale_max?: number | null
+          scale_min?: number | null
+          section?: string
           updated_at?: string
           user_id?: string
         }
