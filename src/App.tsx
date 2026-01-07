@@ -12,6 +12,7 @@ import CalendarPage from "./pages/Calendar";
 import Settings from "./pages/Settings";
 import Checkin from "./pages/Checkin";
 import CheckinFormBuilder from "./pages/CheckinFormBuilder";
+import AnamneseFormBuilder from "./pages/AnamneseFormBuilder";
 import PublicCheckinForm from "./pages/PublicCheckinForm";
 import AthleteDashboard from "./pages/AthleteDashboard";
 import Auth from "./pages/Auth";
@@ -84,6 +85,7 @@ function AppRoutes() {
       <Route path="/forms" element={<ProtectedRoute adminOnly><Forms /></ProtectedRoute>} />
       <Route path="/checkin" element={<ProtectedRoute adminOnly><Checkin /></ProtectedRoute>} />
       <Route path="/checkin/:formId" element={<ProtectedRoute adminOnly><CheckinFormBuilder /></ProtectedRoute>} />
+      <Route path="/anamnese/:formId" element={<ProtectedRoute adminOnly><AnamneseFormBuilder /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
