@@ -30,14 +30,19 @@ import {
   useDeleteSupportMaterial,
   useDietAppConfig,
   useSaveDietAppConfig,
+  type SupportMaterialCategory,
 } from '@/hooks/useSupportMaterials';
 import { BookOpen, Utensils, FileText, Plus, Trash2, Edit, Loader2, Youtube, FileText as TextIcon, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CATEGORIES = [
-  { value: 'onboarding', label: 'Onboarding', icon: BookOpen },
-  { value: 'dieta', label: 'Dieta', icon: Utensils },
-  { value: 'material_suporte', label: 'Material de Suporte', icon: FileText },
+  { value: 'dashboard', label: 'Início', icon: BookOpen },
+  { value: 'dieta', label: 'Plano Alimentar', icon: Utensils },
+  { value: 'checkins', label: 'Check-ins', icon: FileText },
+  { value: 'feedbacks', label: 'Feedbacks', icon: FileText },
+  { value: 'materiais', label: 'Materiais', icon: FileText },
+  { value: 'historico', label: 'Histórico', icon: FileText },
+  { value: 'perfil', label: 'Perfil', icon: FileText },
 ];
 
 export default function ContentManager() {
@@ -48,7 +53,7 @@ export default function ContentManager() {
   const deleteMaterial = useDeleteSupportMaterial();
   const saveDietConfig = useSaveDietAppConfig();
 
-  const [activeTab, setActiveTab] = useState('onboarding');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<any>(null);
   
@@ -92,7 +97,7 @@ export default function ContentManager() {
   const handleSaveMaterial = async () => {
     try {
       const data = {
-        category: activeTab as 'onboarding' | 'dieta' | 'material_suporte',
+        category: activeTab as SupportMaterialCategory,
         title,
         content: contentType === 'text' ? content : null,
         content_type: contentType,
@@ -168,11 +173,11 @@ export default function ContentManager() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-7 h-auto">
             {CATEGORIES.map(cat => (
-              <TabsTrigger key={cat.value} value={cat.value} className="gap-2">
-                <cat.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{cat.label}</span>
+              <TabsTrigger key={cat.value} value={cat.value} className="gap-1 text-xs px-2 py-2">
+                <cat.icon className="h-3 w-3" />
+                <span className="hidden lg:inline">{cat.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
