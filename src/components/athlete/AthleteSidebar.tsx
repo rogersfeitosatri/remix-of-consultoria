@@ -1,18 +1,16 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { 
   Menu, 
-  X, 
-  Home, 
-  BookOpen, 
-  Utensils, 
-  TrendingUp, 
-  FileText, 
-  Settings,
   LogOut,
-  PersonStanding
+  PersonStanding,
+  Utensils,
+  ClipboardCheck,
+  MessageSquare,
+  FileText,
+  History,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -25,11 +23,13 @@ interface AthleteSidebarProps {
 }
 
 const menuItems = [
-  { id: 'onboarding', label: 'Onboarding', icon: BookOpen },
-  { id: 'dieta', label: 'Dieta', icon: Utensils },
-  { id: 'evolucao', label: 'Evolução', icon: TrendingUp },
-  { id: 'material', label: 'Material', icon: FileText },
-  { id: 'config', label: 'Configurações', icon: Settings },
+  { id: 'dashboard', label: 'Início', icon: PersonStanding },
+  { id: 'dieta', label: 'Plano Alimentar', icon: Utensils },
+  { id: 'checkins', label: 'Check-ins', icon: ClipboardCheck },
+  { id: 'feedbacks', label: 'Feedbacks', icon: MessageSquare },
+  { id: 'materiais', label: 'Materiais', icon: FileText },
+  { id: 'historico', label: 'Histórico', icon: History },
+  { id: 'perfil', label: 'Perfil', icon: User },
 ];
 
 export function AthleteSidebar({ 

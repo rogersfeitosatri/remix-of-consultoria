@@ -91,6 +91,21 @@ Deno.serve(async (req) => {
 
     if (updateError) throw updateError;
 
+    // Add athlete role (NEVER admin)
+    const { error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .insert({
+        user_id: authData.user.id,
+        role: "athlete",
+      });
+
+    if (roleError) {
+      console.error("Error adding athlete role:", roleError);
+      // Continue anyway, role can be added manually
+    } else {
+      console.log("Athlete role assigned to user:", authData.user.id);
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
