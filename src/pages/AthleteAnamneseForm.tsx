@@ -5,6 +5,7 @@ import { useAthleteClient } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -571,10 +572,9 @@ export default function AthleteAnamneseForm() {
 
             <div className="space-y-2">
               <Label>Telefone/WhatsApp</Label>
-              <Input
+              <PhoneInput
                 value={formData.telefone}
-                onChange={(e) => updateFormData('telefone', e.target.value)}
-                placeholder="(00) 00000-0000"
+                onChange={(value) => updateFormData('telefone', value)}
               />
             </div>
 
