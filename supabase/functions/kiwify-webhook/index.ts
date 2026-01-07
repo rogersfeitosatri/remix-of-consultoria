@@ -146,7 +146,101 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
     console.error('Error creating payment:', paymentError);
   }
 
+  // Generate scheduled checkins
+  try {
+    const checkinSchedules = generateCheckinSchedules(
+      adminUserId,
+      newClient.id,
+      clientData.start_date,
+      clientData.end_date,
+      'weekly' // Default weekly for Kiwify clients
+    );
+
+    if (checkinSchedules.length > 0) {
+      await supabase.from('scheduled_checkins').insert(checkinSchedules);
+      console.log(`Created ${checkinSchedules.length} scheduled checkins for client:`, newClient.id);
+    }
+  } catch (checkinError) {
+    console.error('Error creating scheduled checkins:', checkinError);
+  }
+
   return newClient;
+}
+
+// Helper function to calculate first valid Monday for checkin
+// Rule: If next Monday is less than 6 days away, skip to the following Monday
+function calculateFirstCheckinMonday(startDate: Date): Date {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const baseDate = startDate < today ? today : new Date(startDate);
+  baseDate.setHours(0, 0, 0, 0);
+  
+  // Get the next Monday from baseDate
+  const dayOfWeek = baseDate.getDay();
+  const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+  
+  let firstMonday = new Date(baseDate);
+  firstMonday.setDate(baseDate.getDate() + daysUntilMonday);
+  
+  // Calculate days until this Monday
+  const diffTime = firstMonday.getTime() - baseDate.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // If less than 6 days until the Monday, skip to the next Monday
+  if (diffDays < 6) {
+    firstMonday.setDate(firstMonday.getDate() + 7);
+  }
+  
+  return firstMonday;
+}
+
+// Generate scheduled checkins based on client's plan
+function generateCheckinSchedules(
+  userId: string,
+  clientId: string,
+  startDate: string,
+  endDate: string,
+  checkinFrequency: string
+): { client_id: string; user_id: string; form_id: null; scheduled_send_date: string; scheduled_send_time: string; status: string; sent_at: null; response_id: null; notes: null }[] {
+  const schedules: any[] = [];
+  
+  const planStart = new Date(startDate);
+  const planEnd = new Date(endDate);
+  
+  // Calculate first valid Monday
+  let currentMonday = calculateFirstCheckinMonday(planStart);
+  
+  // Frequency in weeks
+  const frequencyWeeks: Record<string, number> = {
+    daily: 1, // Still send on Mondays only
+    weekly: 1,
+    biweekly: 2,
+    monthly: 4,
+    bimonthly: 8,
+    quarterly: 12,
+  };
+  
+  const weeksBetween = frequencyWeeks[checkinFrequency] || 1;
+  
+  while (currentMonday <= planEnd) {
+    schedules.push({
+      client_id: clientId,
+      user_id: userId,
+      form_id: null,
+      scheduled_send_date: currentMonday.toISOString().split('T')[0],
+      scheduled_send_time: '07:00:00',
+      status: 'pending',
+      sent_at: null,
+      response_id: null,
+      notes: null,
+    });
+    
+    // Move to next scheduled Monday
+    currentMonday.setDate(currentMonday.getDate() + weeksBetween * 7);
+  }
+  
+  return schedules;
 }
 
 serve(async (req) => {

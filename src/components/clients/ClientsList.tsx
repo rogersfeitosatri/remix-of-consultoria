@@ -1,7 +1,7 @@
 import { Client } from '@/hooks/useClients';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign, Brain } from 'lucide-react';
+import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign, Brain, History, BadgeCheck, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -109,6 +109,13 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                       Check-in {CHECKIN_LABELS[client.checkin_frequency]}
                     </span>
                   )}
+                  {/* Registration source badge */}
+                  {client.registration_source === 'kiwify' && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 px-2.5 py-1 text-xs font-medium text-purple-500">
+                      <Zap className="h-3 w-3" />
+                      Kiwify
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -137,6 +144,15 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
 
                 {/* Actions */}
                 <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => navigate(`/clients/${client.id}/history`)}
+                    className="h-9 w-9"
+                    title="Histórico de Check-ins"
+                  >
+                    <History className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="icon"

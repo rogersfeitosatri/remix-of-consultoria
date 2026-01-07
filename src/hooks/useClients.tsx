@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { addMonths, addWeeks, format, parseISO, differenceInDays, startOfMonth, endOfMonth, isWithinInterval, nextMonday } from 'date-fns';
+import { generateCheckinSchedules } from './useScheduledCheckins';
 
 export interface Client {
   id: string;
@@ -298,12 +299,34 @@ export function useAddClient() {
         }
       }
 
+      // Generate scheduled checkins if has_checkin is enabled
+      if (client.has_checkin && client.checkin_frequency) {
+        const checkinSchedules = generateCheckinSchedules(
+          user.id,
+          client.id,
+          client.start_date,
+          client.end_date,
+          client.checkin_frequency
+        );
+
+        if (checkinSchedules.length > 0) {
+          const { error: checkinError } = await supabase
+            .from('scheduled_checkins')
+            .insert(checkinSchedules);
+
+          if (checkinError) {
+            console.error('Error creating checkin schedules:', checkinError);
+          }
+        }
+      }
+
       return client;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['scheduled_checkins'] });
     },
   });
 }
@@ -334,7 +357,7 @@ export function useUpdateClient() {
       if (error) throw error;
 
       // Check if we need to regenerate consultation schedules
-      const relevantFieldsChanged = 
+      const consultationFieldsChanged = 
         updates.start_date !== undefined ||
         updates.end_date !== undefined ||
         updates.first_consultation_date !== undefined ||
@@ -342,7 +365,14 @@ export function useUpdateClient() {
         updates.has_consultations !== undefined ||
         updates.plan_duration !== undefined;
 
-      if (relevantFieldsChanged && user) {
+      // Check if we need to regenerate checkin schedules
+      const checkinFieldsChanged =
+        updates.start_date !== undefined ||
+        updates.end_date !== undefined ||
+        updates.has_checkin !== undefined ||
+        updates.checkin_frequency !== undefined;
+
+      if (consultationFieldsChanged && user) {
         const updatedClient = data as Client;
         
         // Delete existing schedules for this client
@@ -370,11 +400,41 @@ export function useUpdateClient() {
         }
       }
 
+      // Regenerate checkin schedules if relevant fields changed
+      if (checkinFieldsChanged && user) {
+        const updatedClient = data as Client;
+        
+        // Delete only pending scheduled checkins
+        await supabase
+          .from('scheduled_checkins')
+          .delete()
+          .eq('client_id', id)
+          .eq('status', 'pending');
+
+        // Regenerate if checkins are enabled
+        if (updatedClient.has_checkin && updatedClient.checkin_frequency) {
+          const checkinSchedules = generateCheckinSchedules(
+            user.id,
+            id,
+            updatedClient.start_date,
+            updatedClient.end_date,
+            updatedClient.checkin_frequency
+          );
+
+          if (checkinSchedules.length > 0) {
+            await supabase
+              .from('scheduled_checkins')
+              .insert(checkinSchedules);
+          }
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['scheduled_checkins'] });
     },
   });
 }
