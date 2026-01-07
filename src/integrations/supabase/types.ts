@@ -483,6 +483,84 @@ export type Database = {
           },
         ]
       }
+      challenge_activities: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          order_index: number | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          order_index?: number | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          order_index?: number | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      challenge_weekly_marks: {
+        Row: {
+          activity_id: string
+          client_id: string
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          week_number: number
+        }
+        Insert: {
+          activity_id: string
+          client_id: string
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          week_number: number
+        }
+        Update: {
+          activity_id?: string
+          client_id?: string
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_weekly_marks_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "challenge_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_weekly_marks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checkin_ai_analyses: {
         Row: {
           alerts: string[] | null
@@ -871,6 +949,79 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_control_cycles: {
+        Row: {
+          client_id: string
+          created_at: string
+          end_date: string
+          id: string
+          is_active: boolean | null
+          start_date: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          end_date: string
+          id?: string
+          is_active?: boolean | null
+          start_date: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          end_date?: string
+          id?: string
+          is_active?: boolean | null
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_control_cycles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_control_entries: {
+        Row: {
+          created_at: string
+          cycle_id: string
+          entry_date: string
+          id: string
+          updated_at: string
+          waist_circumference: number | null
+          weight: number | null
+        }
+        Insert: {
+          created_at?: string
+          cycle_id: string
+          entry_date: string
+          id?: string
+          updated_at?: string
+          waist_circumference?: number | null
+          weight?: number | null
+        }
+        Update: {
+          created_at?: string
+          cycle_id?: string
+          entry_date?: string
+          id?: string
+          updated_at?: string
+          waist_circumference?: number | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_control_entries_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "daily_control_cycles"
             referencedColumns: ["id"]
           },
         ]
