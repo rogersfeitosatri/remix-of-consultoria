@@ -6,15 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PersonStanding, LogOut, User, Calendar, FileText, ClipboardList, ArrowLeft, Eye } from 'lucide-react';
+import { PersonStanding, LogOut, User, Calendar, FileText, ClipboardList, ArrowLeft, Eye, Lock, ClipboardCheck } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function AthleteDashboard() {
   const navigate = useNavigate();
   const { user, signOut, loading: authLoading } = useAuth();
   const { isAdmin, isLoading: roleLoading } = useUserRole();
-  const { data: client, isLoading: clientLoading } = useAthleteClient();
+  const { data: client, isLoading: clientLoading, refetch: refetchClient } = useAthleteClient();
   const { data: checkinResponses = [], isLoading: responsesLoading } = useCheckinResponses(client?.id);
 
   const [activeTab, setActiveTab] = useState('plan');
@@ -27,6 +28,13 @@ export default function AthleteDashboard() {
   const handleBackToAdmin = () => {
     navigate('/admin');
   };
+
+  const handleFillAnamnese = () => {
+    navigate('/athlete/anamnese');
+  };
+
+  // Check if anamnese is pending
+  const isPendingAnamnese = client?.athlete_status === 'pending_anamnese';
 
   if (authLoading || clientLoading || roleLoading) {
     return (
