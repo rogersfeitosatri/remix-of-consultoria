@@ -238,26 +238,32 @@ export default function CheckinReview() {
     },
   });
 
-  // Mutation to send feedback (mark as sent)
+  // Mutation to send feedback via WhatsApp
   const sendMutation = useMutation({
     mutationFn: async () => {
       if (!feedback?.id) throw new Error('Feedback not found');
-      const { error } = await supabase
-        .from('checkin_feedbacks')
-        .update({
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-        })
-        .eq('id', feedback.id);
+      if (!checkinResponse?.client_id) throw new Error('Client not found');
+      
+      // Call WhatsApp send function
+      const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+        body: { 
+          clientId: checkinResponse.client_id,
+          message: editedFeedback || feedback.final_feedback,
+          feedbackId: feedback.id,
+        },
+      });
+      
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
-      toast.success('Feedback marcado como enviado!');
+      queryClient.invalidateQueries({ queryKey: ['pending_checkins_dashboard'] });
+      toast.success('Feedback enviado via WhatsApp!');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error sending:', error);
-      toast.error('Erro ao marcar como enviado');
+      toast.error('Erro ao enviar WhatsApp: ' + (error.message || 'Verifique a configuração'));
     },
   });
 
@@ -550,17 +556,17 @@ export default function CheckinReview() {
                     <Button
                       onClick={() => sendMutation.mutate()}
                       disabled={sendMutation.isPending}
-                      className="gap-2"
+                      className="gap-2 bg-green-600 hover:bg-green-700"
                     >
                       {sendMutation.isPending ? (
                         <>
                           <RefreshCw className="h-4 w-4 animate-spin" />
-                          Enviando...
+                          Enviando WhatsApp...
                         </>
                       ) : (
                         <>
                           <Send className="h-4 w-4" />
-                          Marcar como Enviado
+                          Enviar WhatsApp
                         </>
                       )}
                     </Button>
