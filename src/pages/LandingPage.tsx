@@ -40,18 +40,12 @@ export default function LandingPage() {
                 Alcance seu peso ideal, melhore sua performance e corra mais leve sem perder o gás nos treinos.
               </h2>
               
-              <div className="flex flex-col sm:flex-row gap-4 items-start">
-                <a href={KIWIFY_LINK} target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black text-lg px-8 py-6 rounded-lg shadow-lg font-bold">
-                    QUERO CORRER MAIS LEVE!
-                    <ArrowRight className="ml-2 w-5 h-5" />
-                  </Button>
-                </a>
-                <div className="text-white">
-                  <span className="text-3xl font-bold text-[hsl(43,74%,49%)]">R$ 97,00</span>
-                  <span className="block text-sm text-gray-500">Valor Único</span>
-                </div>
-              </div>
+              <a href={KIWIFY_LINK} target="_blank" rel="noopener noreferrer">
+                <Button size="lg" className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black text-lg px-8 py-6 rounded-lg shadow-lg font-bold">
+                  QUERO CORRER MAIS LEVE!
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+              </a>
             </div>
             
             {/* Image */}
@@ -164,7 +158,7 @@ export default function LandingPage() {
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-5xl mx-auto">
             {[
-              { step: "1", title: "Inscrição", desc: "Clique no botão e garanta sua vaga por apenas R$ 97,00." },
+              { step: "1", title: "Inscrição", desc: "Clique no botão e garanta sua vaga." },
               { step: "2", title: "Diagnóstico", desc: "Preencha o formulário de diagnóstico detalhado sobre sua rotina e treinos." },
               { step: "3", title: "Recebimento", desc: "Em até 48h úteis, seu plano alimentar personalizado estará disponível no app." },
               { step: "4", title: "Acompanhamento", desc: "Com 3 semanas, faça seu check-up e receba os ajustes necessários." },
@@ -227,7 +221,7 @@ export default function LandingPage() {
           <div className="max-w-md mx-auto">
             <a href={KIWIFY_LINK} target="_blank" rel="noopener noreferrer">
               <Button size="lg" className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black text-base md:text-lg py-6 rounded-lg shadow-lg mb-4 font-bold">
-                GARANTA SUA VAGA POR APENAS R$ 97,00!
+                GARANTA SUA VAGA AGORA!
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </a>
