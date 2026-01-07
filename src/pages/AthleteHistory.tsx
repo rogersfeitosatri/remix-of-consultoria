@@ -190,7 +190,11 @@ export default function AthleteHistory() {
             ) : (
               <div className="space-y-3">
                 {checkinResponses.map((response) => (
-                  <Card key={response.id}>
+                  <Card 
+                    key={response.id}
+                    className="cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => navigate(`/checkin-review/${response.id}`)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -204,9 +208,12 @@ export default function AthleteHistory() {
                             </p>
                           </div>
                         </div>
-                        <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
-                          Respondido
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
+                            Respondido
+                          </Badge>
+                          <ArrowLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

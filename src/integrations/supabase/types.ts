@@ -426,6 +426,133 @@ export type Database = {
           },
         ]
       }
+      checkin_ai_analyses: {
+        Row: {
+          alerts: string[] | null
+          checkin_response_id: string
+          client_id: string
+          created_at: string
+          evolution_trend: string
+          id: string
+          model_used: string | null
+          raw_response: string | null
+          suggested_feedback: string
+          updated_at: string
+          weekly_summary: string
+        }
+        Insert: {
+          alerts?: string[] | null
+          checkin_response_id: string
+          client_id: string
+          created_at?: string
+          evolution_trend: string
+          id?: string
+          model_used?: string | null
+          raw_response?: string | null
+          suggested_feedback: string
+          updated_at?: string
+          weekly_summary: string
+        }
+        Update: {
+          alerts?: string[] | null
+          checkin_response_id?: string
+          client_id?: string
+          created_at?: string
+          evolution_trend?: string
+          id?: string
+          model_used?: string | null
+          raw_response?: string | null
+          suggested_feedback?: string
+          updated_at?: string
+          weekly_summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_ai_analyses_checkin_response_id_fkey"
+            columns: ["checkin_response_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_responses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_ai_analyses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkin_feedbacks: {
+        Row: {
+          ai_analysis_id: string | null
+          approved_at: string | null
+          approved_by: string | null
+          checkin_response_id: string
+          client_id: string
+          created_at: string
+          final_feedback: string | null
+          id: string
+          sent_at: string | null
+          sent_via: string | null
+          status: string
+          suggested_feedback: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_analysis_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          checkin_response_id: string
+          client_id: string
+          created_at?: string
+          final_feedback?: string | null
+          id?: string
+          sent_at?: string | null
+          sent_via?: string | null
+          status?: string
+          suggested_feedback?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_analysis_id?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          checkin_response_id?: string
+          client_id?: string
+          created_at?: string
+          final_feedback?: string | null
+          id?: string
+          sent_at?: string | null
+          sent_via?: string | null
+          status?: string
+          suggested_feedback?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_feedbacks_ai_analysis_id_fkey"
+            columns: ["ai_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_ai_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_feedbacks_checkin_response_id_fkey"
+            columns: ["checkin_response_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_responses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_feedbacks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checkin_forms: {
         Row: {
           created_at: string
