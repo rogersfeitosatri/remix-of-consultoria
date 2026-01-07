@@ -1,1 +1,4 @@
 project_id = "vhzxnatgwravidvbehwi"
+
+[functions.kiwify-webhook]
+verify_jwt = false

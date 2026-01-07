@@ -1,0 +1,134 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const webhookSecret = Deno.env.get('KIWIFY_WEBHOOK_SECRET');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Parse the webhook payload
+    const payload = await req.json();
+    console.log('Kiwify webhook received:', JSON.stringify(payload, null, 2));
+
+    // Validate webhook signature if secret is configured
+    const signatureHeader = req.headers.get('x-kiwify-signature') || req.headers.get('signature');
+    
+    if (webhookSecret && signatureHeader) {
+      // Kiwify sends the signature in the header
+      if (signatureHeader !== webhookSecret) {
+        console.error('Invalid webhook signature');
+        return new Response(
+          JSON.stringify({ error: 'Invalid signature' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Create Supabase client with service role key for admin access
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Extract data from Kiwify webhook
+    // Kiwify sends different event types: order_approved, order_refunded, etc.
+    const eventType = payload.order_status || payload.event || 'approved';
+    const customer = payload.Customer || payload.customer || {};
+    const product = payload.Product || payload.product || {};
+    const order = payload.Order || payload.order || {};
+
+    const purchaseData = {
+      email: customer.email || payload.email,
+      name: customer.full_name || customer.name || payload.name,
+      phone: customer.mobile || customer.phone || payload.phone,
+      product_id: product.id || payload.product_id,
+      product_name: product.name || payload.product_name,
+      order_id: order.order_id || payload.order_id || payload.id,
+      status: eventType === 'order_approved' || eventType === 'approved' ? 'approved' : eventType,
+      purchase_date: order.created_at || payload.created_at || new Date().toISOString(),
+      webhook_data: payload,
+    };
+
+    console.log('Processed purchase data:', purchaseData);
+
+    // Validate required fields
+    if (!purchaseData.email) {
+      console.error('Missing required field: email');
+      return new Response(
+        JSON.stringify({ error: 'Missing required field: email' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if purchase already exists (by order_id)
+    if (purchaseData.order_id) {
+      const { data: existingPurchase } = await supabase
+        .from('kiwify_purchases')
+        .select('id')
+        .eq('order_id', purchaseData.order_id)
+        .single();
+
+      if (existingPurchase) {
+        console.log('Purchase already exists, updating status');
+        const { error: updateError } = await supabase
+          .from('kiwify_purchases')
+          .update({ 
+            status: purchaseData.status,
+            webhook_data: purchaseData.webhook_data
+          })
+          .eq('order_id', purchaseData.order_id);
+
+        if (updateError) {
+          console.error('Error updating purchase:', updateError);
+          return new Response(
+            JSON.stringify({ error: 'Error updating purchase', details: updateError }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Purchase updated' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Insert new purchase
+    const { data: insertedPurchase, error: insertError } = await supabase
+      .from('kiwify_purchases')
+      .insert(purchaseData)
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error inserting purchase:', insertError);
+      return new Response(
+        JSON.stringify({ error: 'Error inserting purchase', details: insertError }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Purchase inserted successfully:', insertedPurchase);
+
+    return new Response(
+      JSON.stringify({ success: true, purchase: insertedPurchase }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Error processing webhook:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(
+      JSON.stringify({ error: 'Internal server error', details: errorMessage }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
