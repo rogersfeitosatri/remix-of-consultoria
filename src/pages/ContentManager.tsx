@@ -32,44 +32,60 @@ import {
   useSaveDietAppConfig,
   type SupportMaterialCategory,
 } from '@/hooks/useSupportMaterials';
-import { BookOpen, Utensils, FileText, Plus, Trash2, Edit, Loader2, Youtube, FileText as TextIcon, GripVertical } from 'lucide-react';
+import {
+  useChallengeActivities,
+  useCreateChallengeActivity,
+  useUpdateChallengeActivity,
+  useDeleteChallengeActivity,
+} from '@/hooks/useChallengeActivities';
+import { Home, Utensils, History, FileText, Target, Calendar, Plus, Trash2, Edit, Loader2, Youtube, FileText as TextIcon, GripVertical } from 'lucide-react';
 import { toast } from 'sonner';
 
+// 6 módulos conforme especificado
 const CATEGORIES = [
-  { value: 'dashboard', label: 'Início', icon: BookOpen },
-  { value: 'dieta', label: 'Plano Alimentar', icon: Utensils },
-  { value: 'checkins', label: 'Check-ins', icon: FileText },
-  { value: 'feedbacks', label: 'Feedbacks', icon: FileText },
-  { value: 'materiais', label: 'Materiais', icon: FileText },
-  { value: 'historico', label: 'Histórico', icon: FileText },
-  { value: 'perfil', label: 'Perfil', icon: FileText },
+  { value: 'inicio', label: 'Início', icon: Home, description: 'Texto de boas-vindas e orientações iniciais' },
+  { value: 'dieta', label: 'Acesso à Dieta', icon: Utensils, description: 'Orientações de acesso ao app da dieta' },
+  { value: 'historico', label: 'Histórico', icon: History, description: 'Check-ins e orientações (visualização)' },
+  { value: 'materiais', label: 'Materiais', icon: FileText, description: 'Textos, vídeos e links de suporte' },
+  { value: 'desafio42', label: 'Desafio 42', icon: Target, description: 'Atividades comportamentais semanais' },
+  { value: 'controle', label: 'Controle Diário', icon: Calendar, description: 'Instruções do controle de peso/cintura' },
 ];
 
 export default function ContentManager() {
   const { data: materials = [], isLoading: materialsLoading } = useSupportMaterials();
   const { data: dietConfig, isLoading: configLoading } = useDietAppConfig();
+  const { data: challengeActivities = [], isLoading: activitiesLoading } = useChallengeActivities();
   const createMaterial = useCreateSupportMaterial();
   const updateMaterial = useUpdateSupportMaterial();
   const deleteMaterial = useDeleteSupportMaterial();
   const saveDietConfig = useSaveDietAppConfig();
+  const createActivity = useCreateChallengeActivity();
+  const updateActivity = useUpdateChallengeActivity();
+  const deleteActivity = useDeleteChallengeActivity();
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('inicio');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<any>(null);
+  const [isActivityDialogOpen, setIsActivityDialogOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<any>(null);
   
-  // Form state
+  // Form state for materials
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [contentType, setContentType] = useState<'text' | 'youtube_video'>('text');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   
-  // Diet config state - initialized from dietConfig when available
+  // Form state for activities
+  const [activityTitle, setActivityTitle] = useState('');
+  const [activityDescription, setActivityDescription] = useState('');
+  
+  // Diet config state
   const [appInstructions, setAppInstructions] = useState('');
   const [appCode, setAppCode] = useState('');
   const [supportInstructions, setSupportInstructions] = useState('');
   const [configInitialized, setConfigInitialized] = useState(false);
 
-  // Load diet config when it's available
+  // Load diet config when available
   if (dietConfig && !configInitialized) {
     setAppInstructions(dietConfig.app_download_instructions || '');
     setAppCode(dietConfig.app_code || '');
@@ -92,6 +108,19 @@ export default function ContentManager() {
       setYoutubeUrl('');
     }
     setIsDialogOpen(true);
+  };
+
+  const handleOpenActivityDialog = (activity?: any) => {
+    if (activity) {
+      setEditingActivity(activity);
+      setActivityTitle(activity.title || '');
+      setActivityDescription(activity.description || '');
+    } else {
+      setEditingActivity(null);
+      setActivityTitle('');
+      setActivityDescription('');
+    }
+    setIsActivityDialogOpen(true);
   };
 
   const handleSaveMaterial = async () => {
@@ -117,10 +146,41 @@ export default function ContentManager() {
     }
   };
 
+  const handleSaveActivity = async () => {
+    try {
+      if (editingActivity) {
+        await updateActivity.mutateAsync({ 
+          id: editingActivity.id, 
+          title: activityTitle, 
+          description: activityDescription 
+        });
+        toast.success('Atividade atualizada!');
+      } else {
+        await createActivity.mutateAsync({ 
+          title: activityTitle, 
+          description: activityDescription 
+        });
+        toast.success('Atividade criada!');
+      }
+      setIsActivityDialogOpen(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao salvar');
+    }
+  };
+
   const handleDeleteMaterial = async (id: string) => {
     try {
       await deleteMaterial.mutateAsync(id);
       toast.success('Conteúdo removido!');
+    } catch (error) {
+      toast.error('Erro ao remover');
+    }
+  };
+
+  const handleDeleteActivity = async (id: string) => {
+    try {
+      await deleteActivity.mutateAsync(id);
+      toast.success('Atividade removida!');
     } catch (error) {
       toast.error('Erro ao remover');
     }
@@ -135,6 +195,15 @@ export default function ContentManager() {
     }
   };
 
+  const handleToggleActivityActive = async (id: string, isActive: boolean) => {
+    try {
+      await updateActivity.mutateAsync({ id, is_active: isActive });
+      toast.success(isActive ? 'Atividade ativada' : 'Atividade desativada');
+    } catch (error) {
+      toast.error('Erro ao atualizar');
+    }
+  };
+
   const handleSaveDietConfig = async () => {
     try {
       await saveDietConfig.mutateAsync({
@@ -142,15 +211,14 @@ export default function ContentManager() {
         app_code: appCode,
         support_instructions: supportInstructions,
       });
-      toast.success('Configurações da dieta salvas!');
+      toast.success('Configurações salvas!');
     } catch (error: any) {
       toast.error(error.message || 'Erro ao salvar');
     }
   };
 
   const filteredMaterials = materials.filter(m => m.category === activeTab);
-
-  const isLoading = materialsLoading || configLoading;
+  const isLoading = materialsLoading || configLoading || activitiesLoading;
 
   if (isLoading) {
     return (
@@ -166,226 +234,361 @@ export default function ContentManager() {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Gestão de Conteúdo</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Conteúdo da Área do Atleta</h1>
           <p className="mt-1 text-sm sm:text-base text-muted-foreground">
-            Gerencie os conteúdos exibidos na área do atleta
+            Configure aqui todo o conteúdo que será exibido na área de membros do atleta
           </p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 h-auto">
+          <TabsList className="grid w-full grid-cols-6 h-auto">
             {CATEGORIES.map(cat => (
-              <TabsTrigger key={cat.value} value={cat.value} className="gap-1 text-xs px-2 py-2">
-                <cat.icon className="h-3 w-3" />
+              <TabsTrigger key={cat.value} value={cat.value} className="gap-1 text-xs px-2 py-2 flex-col sm:flex-row">
+                <cat.icon className="h-4 w-4" />
                 <span className="hidden lg:inline">{cat.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
 
-          {CATEGORIES.map(cat => (
-            <TabsContent key={cat.value} value={cat.value} className="space-y-6">
-              {/* Diet Config - Only show in "dieta" tab */}
-              {cat.value === 'dieta' && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Configurações do App de Dieta</CardTitle>
-                    <CardDescription>Configure as informações de acesso ao app para seus atletas</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Instruções para Download do App</Label>
-                      <Textarea
-                        value={appInstructions}
-                        onChange={(e) => setAppInstructions(e.target.value)}
-                        placeholder="Explique como baixar o aplicativo..."
-                        rows={3}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Código do App</Label>
-                      <Input
-                        value={appCode}
-                        onChange={(e) => setAppCode(e.target.value)}
-                        placeholder="Ex: ABC123"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Instruções de Suporte (Daily)</Label>
-                      <Textarea
-                        value={supportInstructions}
-                        onChange={(e) => setSupportInstructions(e.target.value)}
-                        placeholder="Explique como usar o suporte dentro do app..."
-                        rows={3}
-                      />
-                    </div>
-                    <Button onClick={handleSaveDietConfig} disabled={saveDietConfig.isPending}>
-                      {saveDietConfig.isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Salvando...
-                        </>
-                      ) : (
-                        'Salvar Configurações'
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Content List */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg">Conteúdos de {cat.label}</CardTitle>
-                      <CardDescription>
-                        {cat.value === 'material_suporte' 
-                          ? 'Adicione textos e vídeos de apoio para seus atletas'
-                          : 'Adicione informações e instruções para esta seção'}
-                      </CardDescription>
-                    </div>
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" className="gap-2" onClick={() => handleOpenDialog()}>
-                          <Plus className="h-4 w-4" />
-                          Adicionar
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>
-                            {editingMaterial ? 'Editar Conteúdo' : 'Novo Conteúdo'}
-                          </DialogTitle>
-                          <DialogDescription>
-                            Adicione textos ou links de vídeos do YouTube
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label>Título</Label>
-                            <Input
-                              value={title}
-                              onChange={(e) => setTitle(e.target.value)}
-                              placeholder="Título do conteúdo"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Tipo de Conteúdo</Label>
-                            <Select value={contentType} onValueChange={(v) => setContentType(v as 'text' | 'youtube_video')}>
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="text">
-                                  <span className="flex items-center gap-2">
-                                    <TextIcon className="h-4 w-4" />
-                                    Texto
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="youtube_video">
-                                  <span className="flex items-center gap-2">
-                                    <Youtube className="h-4 w-4" />
-                                    Vídeo do YouTube
-                                  </span>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {contentType === 'text' ? (
-                            <div className="space-y-2">
-                              <Label>Conteúdo</Label>
-                              <Textarea
-                                value={content}
-                                onChange={(e) => setContent(e.target.value)}
-                                placeholder="Digite o conteúdo..."
-                                rows={5}
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Dica: Use formato estilo Twitter - textos curtos e diretos
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              <Label>URL do YouTube</Label>
-                              <Input
-                                value={youtubeUrl}
-                                onChange={(e) => setYoutubeUrl(e.target.value)}
-                                placeholder="https://youtube.com/watch?v=..."
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                            Cancelar
-                          </Button>
-                          <Button 
-                            onClick={handleSaveMaterial} 
-                            disabled={createMaterial.isPending || updateMaterial.isPending}
-                          >
-                            Salvar
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+          {/* ======== ABA INÍCIO ======== */}
+          <TabsContent value="inicio" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Boas-vindas e Orientações</CardTitle>
+                    <CardDescription>
+                      Adicione textos de boas-vindas, resumo do programa e orientações iniciais
+                    </CardDescription>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {filteredMaterials.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      Nenhum conteúdo cadastrado nesta categoria
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {filteredMaterials.map((material) => (
-                        <div
-                          key={material.id}
-                          className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30"
-                        >
-                          <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                          <div className="flex-shrink-0">
-                            {material.content_type === 'youtube_video' ? (
-                              <Youtube className="h-5 w-5 text-red-500" />
-                            ) : (
-                              <TextIcon className="h-5 w-5 text-primary" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{material.title || 'Sem título'}</p>
-                            {material.content_type === 'text' && material.content && (
-                              <p className="text-xs text-muted-foreground truncate mt-0.5">
-                                {material.content.substring(0, 100)}...
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={material.is_active}
-                              onCheckedChange={(checked) => handleToggleActive(material.id, checked)}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenDialog(material)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteMaterial(material.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
+                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2" onClick={() => handleOpenDialog()}>
+                        <Plus className="h-4 w-4" />
+                        Adicionar
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{editingMaterial ? 'Editar Conteúdo' : 'Novo Conteúdo'}</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Título</Label>
+                          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título do conteúdo" />
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          ))}
+                        <div className="space-y-2">
+                          <Label>Tipo</Label>
+                          <Select value={contentType} onValueChange={(v) => setContentType(v as 'text' | 'youtube_video')}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="text"><span className="flex items-center gap-2"><TextIcon className="h-4 w-4" /> Texto</span></SelectItem>
+                              <SelectItem value="youtube_video"><span className="flex items-center gap-2"><Youtube className="h-4 w-4" /> Vídeo YouTube</span></SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {contentType === 'text' ? (
+                          <div className="space-y-2">
+                            <Label>Conteúdo</Label>
+                            <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Digite o conteúdo..." rows={5} />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Label>URL do YouTube</Label>
+                            <Input value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." />
+                          </div>
+                        )}
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSaveMaterial} disabled={createMaterial.isPending || updateMaterial.isPending}>Salvar</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {filteredMaterials.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nenhum conteúdo cadastrado</p>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredMaterials.map((material) => (
+                      <div key={material.id} className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
+                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex-shrink-0">
+                          {material.content_type === 'youtube_video' ? <Youtube className="h-5 w-5 text-red-500" /> : <TextIcon className="h-5 w-5 text-primary" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{material.title || 'Sem título'}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch checked={material.is_active} onCheckedChange={(checked) => handleToggleActive(material.id, checked)} />
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(material)}><Edit className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteMaterial(material.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ======== ABA DIETA ======== */}
+          <TabsContent value="dieta" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Configurações do App de Dieta</CardTitle>
+                <CardDescription>Configure as orientações de acesso ao app para seus atletas</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Instruções para Download do App</Label>
+                  <Textarea value={appInstructions} onChange={(e) => setAppInstructions(e.target.value)} placeholder="Explique como baixar o aplicativo..." rows={4} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Código do App</Label>
+                  <Input value={appCode} onChange={(e) => setAppCode(e.target.value)} placeholder="Ex: ABC123" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Instruções de Suporte</Label>
+                  <Textarea value={supportInstructions} onChange={(e) => setSupportInstructions(e.target.value)} placeholder="Explique como usar o suporte..." rows={3} />
+                </div>
+                <Button onClick={handleSaveDietConfig} disabled={saveDietConfig.isPending}>
+                  {saveDietConfig.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando...</> : 'Salvar Configurações'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ======== ABA HISTÓRICO ======== */}
+          <TabsContent value="historico" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Histórico de Check-ins e Orientações</CardTitle>
+                <CardDescription>Este conteúdo é gerado automaticamente pelo sistema</CardDescription>
+              </CardHeader>
+              <CardContent className="py-8 text-center">
+                <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">Os check-ins, feedbacks e gráficos de evolução são exibidos automaticamente para o atleta com base nas respostas enviadas.</p>
+                <p className="text-sm text-muted-foreground mt-2">Você pode visualizar esses dados na página de cada atleta.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ======== ABA MATERIAIS ======== */}
+          <TabsContent value="materiais" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Materiais de Suporte</CardTitle>
+                    <CardDescription>Adicione textos, vídeos e links para seus atletas</CardDescription>
+                  </div>
+                  <Dialog open={isDialogOpen && activeTab === 'materiais'} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2" onClick={() => handleOpenDialog()}>
+                        <Plus className="h-4 w-4" />
+                        Adicionar
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{editingMaterial ? 'Editar Material' : 'Novo Material'}</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Título</Label>
+                          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título do material" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Tipo</Label>
+                          <Select value={contentType} onValueChange={(v) => setContentType(v as 'text' | 'youtube_video')}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="text"><span className="flex items-center gap-2"><TextIcon className="h-4 w-4" /> Texto</span></SelectItem>
+                              <SelectItem value="youtube_video"><span className="flex items-center gap-2"><Youtube className="h-4 w-4" /> Vídeo YouTube</span></SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {contentType === 'text' ? (
+                          <div className="space-y-2">
+                            <Label>Conteúdo</Label>
+                            <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Digite o conteúdo..." rows={5} />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Label>URL do YouTube</Label>
+                            <Input value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..." />
+                          </div>
+                        )}
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSaveMaterial} disabled={createMaterial.isPending || updateMaterial.isPending}>Salvar</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {filteredMaterials.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nenhum material cadastrado. Quando vazio, o atleta verá uma mensagem padrão.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredMaterials.map((material) => (
+                      <div key={material.id} className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
+                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex-shrink-0">
+                          {material.content_type === 'youtube_video' ? <Youtube className="h-5 w-5 text-red-500" /> : <TextIcon className="h-5 w-5 text-primary" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{material.title || 'Sem título'}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch checked={material.is_active} onCheckedChange={(checked) => handleToggleActive(material.id, checked)} />
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(material)}><Edit className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteMaterial(material.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ======== ABA DESAFIO 42 ======== */}
+          <TabsContent value="desafio42" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Desafio 42 — Adesão à Dieta</CardTitle>
+                    <CardDescription>Configure as 6 atividades comportamentais que o atleta marcará semanalmente</CardDescription>
+                  </div>
+                  <Dialog open={isActivityDialogOpen} onOpenChange={setIsActivityDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2" onClick={() => handleOpenActivityDialog()}>
+                        <Plus className="h-4 w-4" />
+                        Adicionar Atividade
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{editingActivity ? 'Editar Atividade' : 'Nova Atividade'}</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Título da Atividade</Label>
+                          <Input value={activityTitle} onChange={(e) => setActivityTitle(e.target.value)} placeholder="Ex: Beber 2L de água por dia" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Descrição (opcional)</Label>
+                          <Textarea value={activityDescription} onChange={(e) => setActivityDescription(e.target.value)} placeholder="Detalhes sobre como realizar a atividade..." rows={3} />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsActivityDialogOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSaveActivity} disabled={createActivity.isPending || updateActivity.isPending}>Salvar</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {challengeActivities.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Nenhuma atividade cadastrada. Adicione até 6 atividades comportamentais.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {challengeActivities.map((activity, index) => (
+                      <div key={activity.id} className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium">{index + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{activity.title}</p>
+                          {activity.description && <p className="text-xs text-muted-foreground truncate">{activity.description}</p>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch checked={activity.is_active} onCheckedChange={(checked) => handleToggleActivityActive(activity.id, checked)} />
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenActivityDialog(activity)}><Edit className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteActivity(activity.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ======== ABA CONTROLE DIÁRIO ======== */}
+          <TabsContent value="controle" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Controle Diário</CardTitle>
+                    <CardDescription>Configure as instruções do controle de peso e cintura</CardDescription>
+                  </div>
+                  <Dialog open={isDialogOpen && activeTab === 'controle'} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2" onClick={() => handleOpenDialog()}>
+                        <Plus className="h-4 w-4" />
+                        Adicionar Instrução
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{editingMaterial ? 'Editar Instrução' : 'Nova Instrução'}</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Título</Label>
+                          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título da instrução" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Conteúdo</Label>
+                          <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Instruções detalhadas..." rows={5} />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSaveMaterial} disabled={createMaterial.isPending || updateMaterial.isPending}>Salvar</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-6 p-4 rounded-lg bg-muted/50 border">
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Como funciona:</strong> O atleta informa a data de início, o sistema gera um calendário de 6 semanas. 
+                    O atleta registra peso e circunferência da cintura, e gráficos automáticos são exibidos abaixo. 
+                    Há um botão para resetar o ciclo (ciclos anteriores ficam arquivados).
+                  </p>
+                </div>
+                {filteredMaterials.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">Adicione instruções sobre como o atleta deve usar o controle diário.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredMaterials.map((material) => (
+                      <div key={material.id} className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
+                        <TextIcon className="h-5 w-5 text-primary" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{material.title || 'Sem título'}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch checked={material.is_active} onCheckedChange={(checked) => handleToggleActive(material.id, checked)} />
+                          <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(material)}><Edit className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteMaterial(material.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
