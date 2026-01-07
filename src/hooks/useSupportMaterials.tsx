@@ -65,19 +65,10 @@ export function useAthleteSupportMaterials(category?: string) {
   return useQuery({
     queryKey: ['athlete-support-materials', category, user?.id],
     queryFn: async () => {
-      // First get the client to find the admin's user_id
-      const { data: client } = await supabase
-        .from('clients')
-        .select('user_id')
-        .eq('athlete_user_id', user?.id)
-        .maybeSingle();
-      
-      if (!client) return [];
-      
+      // Fetch ALL active support materials (shown to all athletes)
       let query = supabase
         .from('support_materials')
         .select('*')
-        .eq('user_id', client.user_id)
         .eq('is_active', true)
         .order('order_index', { ascending: true });
       
@@ -192,19 +183,11 @@ export function useAthleteDietAppConfig() {
   return useQuery({
     queryKey: ['athlete-diet-app-config', user?.id],
     queryFn: async () => {
-      // First get the client to find the admin's user_id
-      const { data: client } = await supabase
-        .from('clients')
-        .select('user_id')
-        .eq('athlete_user_id', user?.id)
-        .maybeSingle();
-      
-      if (!client) return null;
-      
+      // Fetch ANY diet app config (first one found - for single-admin scenario)
       const { data, error } = await supabase
         .from('diet_app_config')
         .select('*')
-        .eq('user_id', client.user_id)
+        .limit(1)
         .maybeSingle();
       
       if (error) throw error;

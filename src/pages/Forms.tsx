@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, FileText, Edit, Trash2, Eye, Copy } from 'lucide-react';
+import { Plus, ClipboardList, FileText, Edit, Trash2, Copy } from 'lucide-react';
 import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm } from '@/hooks/useCheckinForms';
 import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm } from '@/hooks/useAnamneseForms';
 import { useToast } from '@/hooks/use-toast';
@@ -31,6 +31,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PendingReviewsList } from '@/components/forms/PendingReviewsList';
+import { PendingAnamneseList } from '@/components/forms/PendingAnamneseList';
 
 export default function Forms() {
   const navigate = useNavigate();
@@ -151,7 +153,11 @@ export default function Forms() {
           </TabsList>
 
           {/* Checkin Forms */}
-          <TabsContent value="checkin" className="space-y-4 mt-6">
+          <TabsContent value="checkin" className="space-y-6 mt-6">
+            {/* Pending Reviews List */}
+            <PendingReviewsList />
+
+            {/* Forms List */}
             {checkinLoading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -239,7 +245,10 @@ export default function Forms() {
           </TabsContent>
 
           {/* Anamnese Forms */}
-          <TabsContent value="anamnese" className="space-y-4 mt-6">
+          <TabsContent value="anamnese" className="space-y-6 mt-6">
+            {/* Pending Anamnese List */}
+            <PendingAnamneseList />
+
             {anamneseLoading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

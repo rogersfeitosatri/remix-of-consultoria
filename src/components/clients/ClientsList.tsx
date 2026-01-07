@@ -1,10 +1,15 @@
 import { Client } from '@/hooks/useClients';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign, Brain, History, BadgeCheck, Zap } from 'lucide-react';
+import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign, Brain, History, Zap, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useCheckinForms } from '@/hooks/useCheckinForms';
+import { useSchedulingSettings } from '@/hooks/useScheduling';
+import { toast } from 'sonner';
+import { useState } from 'react';
 
 const SERVICE_LABELS = {
   nutrition: 'Nutrição',
@@ -34,6 +39,84 @@ interface ClientsListProps {
 
 export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   const navigate = useNavigate();
+  const { data: checkinForms = [] } = useCheckinForms();
+  const { data: schedulingSettings } = useSchedulingSettings();
+  const [sendingCheckin, setSendingCheckin] = useState<string | null>(null);
+  const [sendingBooking, setSendingBooking] = useState<string | null>(null);
+
+  const handleSendCheckinManually = async (client: Client) => {
+    if (!client.phone) {
+      toast.error('Cliente não possui telefone cadastrado');
+      return;
+    }
+
+    const activeForm = checkinForms.find(f => f.is_active);
+    if (!activeForm) {
+      toast.error('Nenhum formulário de check-in ativo');
+      return;
+    }
+
+    setSendingCheckin(client.id);
+    try {
+      const checkinLink = `${window.location.origin}/form/${activeForm.id}`;
+      const message = `Olá ${client.name.split(' ')[0]}! 👋\n\nÉ hora do seu check-in semanal!\n\nPreencha o formulário no link abaixo:\n${checkinLink}\n\nQualquer dúvida, estou à disposição! 💪`;
+
+      const { error } = await supabase.functions.invoke('send-whatsapp', {
+        body: { clientId: client.id, message },
+      });
+
+      if (error) throw error;
+      toast.success('Check-in enviado via WhatsApp!');
+    } catch (error: any) {
+      console.error('Error sending checkin:', error);
+      toast.error('Erro ao enviar check-in: ' + (error.message || 'Verifique as configurações'));
+    } finally {
+      setSendingCheckin(null);
+    }
+  };
+
+  const handleSendBookingManually = async (client: Client) => {
+    if (!client.phone) {
+      toast.error('Cliente não possui telefone cadastrado');
+      return;
+    }
+
+    if (!schedulingSettings?.booking_link_slug) {
+      toast.error('Configure o link de agendamento nas configurações');
+      return;
+    }
+
+    setSendingBooking(client.id);
+    try {
+      // Create a consultation schedule with booking token
+      const { data: schedule, error: scheduleError } = await supabase
+        .from('consultation_schedules')
+        .insert({
+          client_id: client.id,
+          user_id: schedulingSettings.user_id,
+          scheduled_date: format(new Date(), 'yyyy-MM-dd'),
+          send_link_date: format(new Date(), 'yyyy-MM-dd'),
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (scheduleError) throw scheduleError;
+
+      // Call edge function to send booking link
+      const { error } = await supabase.functions.invoke('send-booking-link', {
+        body: { consultationScheduleId: schedule.id },
+      });
+
+      if (error) throw error;
+      toast.success('Link de agendamento enviado via WhatsApp!');
+    } catch (error: any) {
+      console.error('Error sending booking:', error);
+      toast.error('Erro ao enviar link: ' + (error.message || 'Verifique as configurações'));
+    } finally {
+      setSendingBooking(null);
+    }
+  };
 
   if (clients.length === 0) {
     return (
@@ -143,7 +226,33 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {client.phone && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSendCheckinManually(client)}
+                        disabled={sendingCheckin === client.id}
+                        className="gap-1 text-xs"
+                        title="Enviar Check-in via WhatsApp"
+                      >
+                        <MessageCircle className="h-3 w-3" />
+                        {sendingCheckin === client.id ? '...' : 'Checkin'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSendBookingManually(client)}
+                        disabled={sendingBooking === client.id}
+                        className="gap-1 text-xs"
+                        title="Enviar Link de Consulta via WhatsApp"
+                      >
+                        <CalendarCheck className="h-3 w-3" />
+                        {sendingBooking === client.id ? '...' : 'Consulta'}
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="outline"
                     size="icon"
