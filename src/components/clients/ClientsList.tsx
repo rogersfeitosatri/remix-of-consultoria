@@ -1,9 +1,10 @@
 import { Client } from '@/hooks/useClients';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign } from 'lucide-react';
+import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 const SERVICE_LABELS = {
   nutrition: 'Nutrição',
@@ -32,6 +33,8 @@ interface ClientsListProps {
 }
 
 export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
+  const navigate = useNavigate();
+
   if (clients.length === 0) {
     return (
       <div className="glass-card rounded-xl p-12 text-center">
@@ -134,6 +137,15 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
 
                 {/* Actions */}
                 <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => navigate(`/clients/${client.id}/analysis`)}
+                    className="h-9 w-9"
+                    title="Análise IA"
+                  >
+                    <Brain className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="icon"
