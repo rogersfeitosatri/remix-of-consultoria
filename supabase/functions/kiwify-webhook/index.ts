@@ -47,6 +47,38 @@ async function sendWhatsAppMessage(phone: string, message: string) {
   }
 }
 
+// Function to create user account for athlete
+async function createAthleteUser(supabase: any, email: string, password: string) {
+  try {
+    const { data, error } = await supabase.auth.admin.createUser({
+      email: email,
+      password: password,
+      email_confirm: true,
+    });
+
+    if (error) {
+      console.error('Error creating user account:', error);
+      return null;
+    }
+
+    console.log('User account created:', data.user?.id);
+    
+    // Add athlete role
+    if (data.user) {
+      await supabase.from('user_roles').insert({
+        user_id: data.user.id,
+        role: 'athlete',
+      });
+      console.log('Athlete role assigned to user:', data.user.id);
+    }
+
+    return data.user;
+  } catch (error) {
+    console.error('Error in createAthleteUser:', error);
+    return null;
+  }
+}
+
 // Function to create client automatically from Kiwify purchase
 async function createClientFromPurchase(supabase: any, purchaseData: any) {
   // Get the first admin user to be the owner of this client
@@ -76,6 +108,10 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
     console.log('Client already exists:', existingClient.id);
     return existingClient;
   }
+
+  // Create user account for athlete with temporary password
+  const temporaryPassword = '123456';
+  const athleteUser = await createAthleteUser(supabase, purchaseData.email, temporaryPassword);
 
   // Determine plan details based on product price/name
   // R$97 plan = 6 weeks duration
@@ -115,6 +151,7 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
     checkin_frequency: 'weekly',
     athlete_status: 'pending_anamnese',
     registration_source: 'kiwify',
+    athlete_user_id: athleteUser?.id || null,
     notes: `Compra automática via Kiwify.\nProduto: ${purchaseData.product_name || 'N/A'}\nOrder ID: ${purchaseData.order_id || 'N/A'}\nValor: R$ ${productPrice}\nForma de pagamento: ${paymentType === 'pix' ? 'PIX' : 'Cartão'}`,
   };
 
@@ -131,7 +168,7 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
 
   console.log('Client created successfully:', newClient);
 
-  // Create initial payment record
+  // Create initial payment record as PAID (already paid via Kiwify)
   try {
     await supabase.from('payments').insert({
       user_id: adminUserId,
@@ -164,7 +201,7 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
     console.error('Error creating scheduled checkins:', checkinError);
   }
 
-  return newClient;
+  return { client: newClient, athleteUser, temporaryPassword };
 }
 
 // Helper function to calculate first valid Monday for checkin
@@ -367,15 +404,24 @@ serve(async (req) => {
     // If payment is approved, create client and send WhatsApp message
     if (purchaseData.status === 'approved') {
       // Create client automatically
-      const client = await createClientFromPurchase(supabase, purchaseData);
+      const result = await createClientFromPurchase(supabase, purchaseData);
 
-      // Send WhatsApp notification if phone is available
-      if (purchaseData.phone) {
+      // Send WhatsApp notification with credentials if phone is available
+      if (purchaseData.phone && result) {
+        const appUrl = Deno.env.get('APP_URL') || 'https://vhzxnatgwravidvbehwi.lovableproject.com';
+        
         const message = `✅ *Pagamento confirmado!*
 
 Olá, ${purchaseData.name || 'atleta'}!
 
 Seu acesso à *Área do Atleta* foi liberado com sucesso! 🎉
+
+📧 *Email:* ${purchaseData.email}
+🔐 *Senha temporária:* 123456
+
+⚠️ *Importante:* Recomendamos que você altere sua senha após o primeiro acesso.
+
+🔗 *Acesse sua área:* ${appUrl}/auth
 
 Para iniciar o seu acompanhamento, é necessário preencher a *anamnese inicial obrigatória*.
 
@@ -390,7 +436,8 @@ _Equipe de Acompanhamento_`;
         JSON.stringify({ 
           success: true, 
           purchase: insertedPurchase,
-          client: client,
+          client: result?.client,
+          userCreated: !!result?.athleteUser,
           message: 'Purchase recorded, client created and notification sent'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

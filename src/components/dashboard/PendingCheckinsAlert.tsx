@@ -106,7 +106,10 @@ export function PendingCheckinsAlert() {
   }
 
   return (
-    <Card className={totalPending > 0 ? "border-orange-500/30" : ""}>
+    <Card 
+      className={`${totalPending > 0 ? "border-orange-500/30 cursor-pointer hover:border-orange-500/50 transition-colors" : ""}`}
+      onClick={totalPending > 0 ? () => navigate('/checkin') : undefined}
+    >
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -118,6 +121,9 @@ export function PendingCheckinsAlert() {
               </Badge>
             )}
           </CardTitle>
+          {totalPending > 0 && (
+            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+          )}
         </div>
         <CardDescription>
           Check-ins aguardando análise ou envio de feedback
