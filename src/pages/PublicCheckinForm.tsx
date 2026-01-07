@@ -186,15 +186,28 @@ export default function PublicCheckinForm() {
       });
 
       // Submit response
-      const { error: submitError } = await supabase
+      const { data: responseData, error: submitError } = await supabase
         .from('checkin_responses')
         .insert({
           form_id: formId,
           client_id: clientId,
           responses: responsesWithComments,
-        });
+        })
+        .select('id')
+        .single();
 
       if (submitError) throw submitError;
+
+      // Trigger automatic AI analysis (fire and forget)
+      if (responseData?.id) {
+        supabase.functions.invoke('analyze-checkin', {
+          body: { checkinResponseId: responseData.id },
+        }).then(() => {
+          console.log('AI analysis triggered successfully');
+        }).catch((err) => {
+          console.error('AI analysis trigger failed:', err);
+        });
+      }
 
       setSubmitted(true);
       toast.success('Checkin enviado com sucesso!');
