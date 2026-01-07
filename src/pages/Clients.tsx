@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Plus, Search, Loader2, Users, UserX, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const SERVICE_OPTIONS = [
   { value: 'all', label: 'Todos os Serviços' },
@@ -84,7 +85,10 @@ export default function Clients() {
     return applyFilters(inactiveClients);
   }, [searchQuery, inactiveClients, serviceFilter, planFilter]);
 
-  const handleSubmit = async (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const handleSubmit = async (
+    data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
+    options?: { sendCredentials: boolean; skipAnamnese: boolean }
+  ) => {
     try {
       if (editingClient) {
         await updateClient.mutateAsync({ id: editingClient.id, ...data });
@@ -93,10 +97,45 @@ export default function Clients() {
           description: 'Os dados foram salvos com sucesso.',
         });
       } else {
-        await addClient.mutateAsync(data);
+        // Criar o atleta primeiro
+        const newClient = await addClient.mutateAsync(data);
+        
+        // Se email foi fornecido, criar conta de usuário auth
+        if (data.email) {
+          try {
+            const { data: authResult, error: authError } = await supabase.functions.invoke('create-athlete-auth', {
+              body: {
+                email: data.email,
+                name: data.name,
+                clientId: newClient.id,
+              },
+            });
+
+            if (authError) {
+              console.error('Erro ao criar conta do atleta:', authError);
+              toast({
+                title: 'Aviso',
+                description: 'Atleta cadastrado, mas houve erro ao criar conta de acesso.',
+                variant: 'destructive',
+              });
+            } else if (options?.sendCredentials && data.phone) {
+              // Enviar credenciais via WhatsApp
+              const phoneClean = data.phone.replace(/\D/g, '');
+              const baseUrl = window.location.origin;
+              const message = `🏃 *RF Assessoria - Bem-vindo!*\n\nOlá ${data.name}!\n\nSua conta foi criada com sucesso.\n\n📧 *Login:* ${data.email}\n🔑 *Senha:* 123456\n\n🔗 Acesse: ${baseUrl}/auth\n\n⚠️ Recomendamos trocar sua senha no primeiro acesso.\n\nQualquer dúvida, estamos à disposição!`;
+              const whatsappUrl = `https://wa.me/55${phoneClean}?text=${encodeURIComponent(message)}`;
+              window.open(whatsappUrl, '_blank');
+            }
+          } catch (err) {
+            console.error('Erro ao processar conta do atleta:', err);
+          }
+        }
+        
         toast({
           title: 'Atleta cadastrado',
-          description: 'O novo atleta foi adicionado com sucesso.',
+          description: options?.sendCredentials 
+            ? 'Atleta criado! Abrindo WhatsApp para enviar credenciais...'
+            : 'O novo atleta foi adicionado com sucesso.',
         });
       }
       setShowForm(false);

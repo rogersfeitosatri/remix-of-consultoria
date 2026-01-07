@@ -21,7 +21,6 @@ const PLAN_LABELS = {
 };
 
 const PLAN_DURATION_LABELS = {
-  six_weeks: '6 Semanas (Kiwify R$97)',
   monthly: 'Mensal',
   quarterly: 'Trimestral',
   semiannual: 'Semestral',
@@ -57,18 +56,21 @@ const PAYMENT_TYPE_LABELS = {
 
 interface ClientFormProps {
   client?: Client;
-  onSubmit: (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
+  onSubmit: (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>, options?: { sendCredentials: boolean; skipAnamnese: boolean }) => void;
   onClose: () => void;
 }
 
 export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
+  const [sendCredentials, setSendCredentials] = useState(!client); // Apenas para novos cadastros
+  const [skipAnamnese, setSkipAnamnese] = useState(false);
+  
   const [formData, setFormData] = useState({
     name: client?.name || '',
     email: client?.email || '',
     phone: client?.phone || '',
     service_type: client?.service_type || 'nutrition' as 'nutrition' | 'training' | 'both',
     plan_type: client?.plan_type || 'consultoria' as 'consultoria' | 'premium',
-    plan_duration: client?.plan_duration || 'monthly' as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
+    plan_duration: client?.plan_duration || 'monthly' as 'monthly' | 'quarterly' | 'semiannual' | 'annual',
     has_checkin: client?.has_checkin ?? true,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly',
     start_date: client?.start_date || new Date().toISOString().split('T')[0],
@@ -93,9 +95,6 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       let endDate: Date;
       
       switch (formData.plan_duration) {
-        case 'six_weeks':
-          endDate = addWeeks(startDate, 6);
-          break;
         case 'monthly':
           endDate = addMonths(startDate, 1);
           break;
@@ -131,14 +130,18 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Se pular anamnese, definir status como ativo
+    const athleteStatus = skipAnamnese ? 'active' : formData.athlete_status;
+    
     // Convert empty date strings to null for database compatibility
     const dataToSubmit = {
       ...formData,
+      athlete_status: athleteStatus,
       first_consultation_date: formData.first_consultation_date || null,
       notes: formData.notes || null,
       payment_date: formData.payment_date || null,
     };
-    onSubmit(dataToSubmit as any);
+    onSubmit(dataToSubmit as any, { sendCredentials, skipAnamnese });
   };
 
   return (
@@ -267,7 +270,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               <Label>Duração do Plano</Label>
               <Select
                 value={formData.plan_duration}
-                onValueChange={(v) => setFormData({ ...formData, plan_duration: v as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks' })}
+                onValueChange={(v) => setFormData({ ...formData, plan_duration: v as 'monthly' | 'quarterly' | 'semiannual' | 'annual' })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -420,6 +423,47 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             </div>
           </div>
 
+          {/* Opções de cadastro (apenas para novos atletas) */}
+          {!client && (
+            <div className="space-y-4 p-4 border border-primary/30 rounded-lg bg-primary/5">
+              <h3 className="font-semibold text-foreground">Opções de Cadastro</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <Switch
+                    id="sendCredentials"
+                    checked={sendCredentials}
+                    onCheckedChange={setSendCredentials}
+                    disabled={!formData.email || !formData.phone}
+                  />
+                  <div>
+                    <Label htmlFor="sendCredentials" className="cursor-pointer">
+                      Enviar credenciais via WhatsApp
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Envia email e senha padrão (123456) para o atleta
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <Switch
+                    id="skipAnamnese"
+                    checked={skipAnamnese}
+                    onCheckedChange={setSkipAnamnese}
+                  />
+                  <div>
+                    <Label htmlFor="skipAnamnese" className="cursor-pointer">
+                      Pular obrigatoriedade da anamnese
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Atleta pode acessar o sistema sem preencher anamnese
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Origem do Cadastro (somente visualização) */}
           {client && (
             <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
