@@ -73,24 +73,6 @@ export default function Auth() {
           });
         }
       } else {
-        // Signup mode - check if email is authorized (purchased via Kiwify)
-        const { data: authorizedUser, error: checkError } = await supabase
-          .from('kiwify_purchases' as any)
-          .select('email')
-          .eq('email', formData.email.toLowerCase().trim())
-          .eq('status', 'approved')
-          .maybeSingle();
-
-        if (checkError || !authorizedUser) {
-          toast({
-            title: 'Acesso não autorizado',
-            description: 'Você precisa efetuar a compra pelo Kiwify para se cadastrar. Se já comprou, aguarde alguns minutos e tente novamente.',
-            variant: 'destructive',
-          });
-          setIsSubmitting(false);
-          return;
-        }
-
         if (!formData.fullName.trim()) {
           toast({
             title: 'Nome obrigatório',
@@ -272,14 +254,6 @@ export default function Auth() {
               </Button>
             </form>
 
-            {/* Info for signup */}
-            {mode === 'signup' && (
-              <div className="mt-6 p-4 rounded-xl bg-gray-900/50 border border-[hsl(43,74%,49%)]/20">
-                <p className="text-sm text-gray-400 text-center">
-                  <span className="text-[hsl(43,74%,49%)] font-medium">Atenção:</span> O cadastro está disponível apenas para quem já efetuou a compra pelo Kiwify.
-                </p>
-              </div>
-            )}
 
             {/* Forgot password link */}
             {mode === 'login' && (
