@@ -875,6 +875,36 @@ export type Database = {
           },
         ]
       }
+      diet_app_config: {
+        Row: {
+          app_code: string | null
+          app_download_instructions: string | null
+          created_at: string
+          id: string
+          support_instructions: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          app_code?: string | null
+          app_download_instructions?: string | null
+          created_at?: string
+          id?: string
+          support_instructions?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          app_code?: string | null
+          app_download_instructions?: string | null
+          created_at?: string
+          id?: string
+          support_instructions?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       kiwify_purchases: {
         Row: {
           created_at: string
@@ -1175,6 +1205,83 @@ export type Database = {
           working_days?: Json
           working_hours_end?: string
           working_hours_start?: string
+        }
+        Relationships: []
+      }
+      scheduling_time_blocks: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          settings_id: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          settings_id: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          settings_id?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduling_time_blocks_settings_id_fkey"
+            columns: ["settings_id"]
+            isOneToOne: false
+            referencedRelation: "scheduling_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_materials: {
+        Row: {
+          category: string
+          content: string | null
+          content_type: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          order_index: number | null
+          title: string | null
+          updated_at: string
+          user_id: string
+          youtube_url: string | null
+        }
+        Insert: {
+          category: string
+          content?: string | null
+          content_type: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          order_index?: number | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+          youtube_url?: string | null
+        }
+        Update: {
+          category?: string
+          content?: string | null
+          content_type?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          order_index?: number | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+          youtube_url?: string | null
         }
         Relationships: []
       }
