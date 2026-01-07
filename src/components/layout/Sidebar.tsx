@@ -5,11 +5,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clients', icon: Users, label: 'Atletas' },
   { to: '/financial', icon: Wallet, label: 'Financeiro' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendário' },
-  { to: '/checkin', icon: ClipboardList, label: 'Checkin' },
+  { to: '/forms', icon: ClipboardList, label: 'Formulários' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
 ];
 

@@ -25,7 +25,7 @@ export default function AthleteDashboard() {
   };
 
   const handleBackToAdmin = () => {
-    navigate('/');
+    navigate('/admin');
   };
 
   if (authLoading || clientLoading || roleLoading) {
