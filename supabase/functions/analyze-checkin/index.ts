@@ -14,16 +14,16 @@ serve(async (req) => {
   }
 
   try {
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!openAIApiKey) {
-      throw new Error('OPENAI_API_KEY is not configured');
-    }
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
 
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase configuration is missing');
+    }
+
+    if (!lovableApiKey) {
+      throw new Error('LOVABLE_API_KEY is not configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -105,7 +105,7 @@ serve(async (req) => {
 
     console.log('Data fetched successfully for:', checkinResponse.clients?.name);
 
-    // Build the prompt for ChatGPT
+    // Build the prompt for AI
     const prompt = buildAnalysisPrompt(
       checkinResponse,
       questions || [],
@@ -114,17 +114,17 @@ serve(async (req) => {
       athleteProfile
     );
 
-    console.log('Sending request to OpenAI...');
+    console.log('Sending request to Lovable AI...');
 
-    // Call OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call Lovable AI API
+    const response = await fetch('https://ai.lovable.dev/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${lovableApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'openai/gpt-5-mini',
         messages: [
           {
             role: 'system',
@@ -151,21 +151,20 @@ IMPORTANTE:
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 2000,
+        max_completion_tokens: 2000,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenAI API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
+      console.error('Lovable AI API error:', response.status, errorText);
+      throw new Error(`AI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
 
-    console.log('OpenAI response received');
+    console.log('AI response received');
 
     // Parse the AI response
     let analysisData;
@@ -198,7 +197,7 @@ IMPORTANTE:
       alerts: analysisData.alerts || [],
       suggested_feedback: analysisData.suggested_feedback,
       raw_response: aiResponse,
-      model_used: 'gpt-4o-mini',
+      model_used: 'openai/gpt-5-mini',
     };
 
     let result;
