@@ -211,6 +211,63 @@ export type Database = {
           },
         ]
       }
+      appointments: {
+        Row: {
+          appointment_date: string
+          appointment_time: string
+          client_id: string
+          consultation_schedule_id: string | null
+          created_at: string
+          duration_minutes: number
+          id: string
+          notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          appointment_date: string
+          appointment_time: string
+          client_id: string
+          consultation_schedule_id?: string | null
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          appointment_date?: string
+          appointment_time?: string
+          client_id?: string
+          consultation_schedule_id?: string | null
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_consultation_schedule_id_fkey"
+            columns: ["consultation_schedule_id"]
+            isOneToOne: false
+            referencedRelation: "consultation_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_profiles: {
         Row: {
           anamnese_submitted_at: string | null
@@ -770,30 +827,39 @@ export type Database = {
       }
       consultation_schedules: {
         Row: {
+          booking_expires_at: string | null
+          booking_token: string | null
           client_id: string
           created_at: string
           id: string
           scheduled_date: string
+          scheduled_time: string | null
           send_link_date: string
           status: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          booking_expires_at?: string | null
+          booking_token?: string | null
           client_id: string
           created_at?: string
           id?: string
           scheduled_date: string
+          scheduled_time?: string | null
           send_link_date: string
           status?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          booking_expires_at?: string | null
+          booking_token?: string | null
           client_id?: string
           created_at?: string
           id?: string
           scheduled_date?: string
+          scheduled_time?: string | null
           send_link_date?: string
           status?: string
           updated_at?: string
@@ -1042,6 +1108,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scheduling_blocks: {
+        Row: {
+          block_date: string
+          block_type: string
+          created_at: string
+          end_time: string | null
+          id: string
+          reason: string | null
+          start_time: string | null
+          user_id: string
+        }
+        Insert: {
+          block_date: string
+          block_type?: string
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          reason?: string | null
+          start_time?: string | null
+          user_id: string
+        }
+        Update: {
+          block_date?: string
+          block_type?: string
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          reason?: string | null
+          start_time?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scheduling_settings: {
+        Row: {
+          booking_link_slug: string | null
+          created_at: string
+          id: string
+          slot_duration_minutes: number
+          updated_at: string
+          user_id: string
+          working_days: Json
+          working_hours_end: string
+          working_hours_start: string
+        }
+        Insert: {
+          booking_link_slug?: string | null
+          created_at?: string
+          id?: string
+          slot_duration_minutes?: number
+          updated_at?: string
+          user_id: string
+          working_days?: Json
+          working_hours_end?: string
+          working_hours_start?: string
+        }
+        Update: {
+          booking_link_slug?: string | null
+          created_at?: string
+          id?: string
+          slot_duration_minutes?: number
+          updated_at?: string
+          user_id?: string
+          working_days?: Json
+          working_hours_end?: string
+          working_hours_start?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

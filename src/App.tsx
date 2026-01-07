@@ -23,6 +23,8 @@ import Forms from "./pages/Forms";
 import AthleteAnalysis from "./pages/AthleteAnalysis";
 import AthleteHistory from "./pages/AthleteHistory";
 import CheckinReview from "./pages/CheckinReview";
+import SchedulingSettings from "./pages/SchedulingSettings";
+import PublicBooking from "./pages/PublicBooking";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -81,12 +83,14 @@ function AppRoutes() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
+      <Route path="/agendar/:slug" element={<PublicBooking />} />
       <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
       <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteAnamneseForm /></AthleteRoute>} />
       <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
       <Route path="/clients" element={<ProtectedRoute adminOnly><Clients /></ProtectedRoute>} />
       <Route path="/financial" element={<ProtectedRoute adminOnly><Financial /></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute adminOnly><CalendarPage /></ProtectedRoute>} />
+      <Route path="/scheduling" element={<ProtectedRoute adminOnly><SchedulingSettings /></ProtectedRoute>} />
       <Route path="/forms" element={<ProtectedRoute adminOnly><Forms /></ProtectedRoute>} />
       <Route path="/checkin" element={<ProtectedRoute adminOnly><Checkin /></ProtectedRoute>} />
       <Route path="/checkin/:formId" element={<ProtectedRoute adminOnly><CheckinFormBuilder /></ProtectedRoute>} />

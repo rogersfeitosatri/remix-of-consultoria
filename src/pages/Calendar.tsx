@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import {
   ConsultationSchedule,
@@ -120,6 +121,21 @@ export default function CalendarPage() {
       });
 
     return events;
+  };
+
+  const handleSendBookingLink = async (id: string) => {
+    try {
+      toast.loading('Enviando link de agendamento...');
+      const { error } = await supabase.functions.invoke('send-booking-link', {
+        body: { consultationScheduleId: id },
+      });
+      toast.dismiss();
+      if (error) throw error;
+      toast.success('Link de agendamento enviado via WhatsApp!');
+    } catch (error: any) {
+      toast.dismiss();
+      toast.error(error.message || 'Erro ao enviar link. Configure o agendamento primeiro.');
+    }
   };
 
   const handleMarkAsSent = async (id: string) => {
