@@ -205,6 +205,108 @@ export default function AthleteDashboard() {
     );
   }
 
+  // Show blocked content if anamnese is pending
+  if (isPendingAnamnese) {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <header className="border-b border-border bg-card">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+                <PersonStanding className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold">RF Assessoria</h1>
+                <p className="text-xs text-muted-foreground">Esportiva</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-medium">{client.name}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Blocked Content */}
+        <main className="max-w-2xl mx-auto px-4 py-12">
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-amber-500/10 border-2 border-amber-500/30">
+                  <Lock className="h-12 w-12 text-amber-500" />
+                </div>
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Área Bloqueada</h2>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              Para liberar o acesso completo à sua área de atleta e iniciar seu acompanhamento, 
+              você precisa preencher a anamnese inicial obrigatória.
+            </p>
+          </div>
+
+          <Alert className="mb-8 border-amber-500/50 bg-amber-500/10">
+            <ClipboardCheck className="h-4 w-4 text-amber-500" />
+            <AlertTitle className="text-amber-500">Anamnese Obrigatória</AlertTitle>
+            <AlertDescription>
+              A anamnese é fundamental para conhecermos seu perfil, histórico e objetivos. 
+              Com base nas suas respostas, montaremos um plano personalizado para você.
+            </AlertDescription>
+          </Alert>
+
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-primary" />
+                O que você vai preencher:
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2">
+                  <span className="text-primary">✓</span> Dados pessoais e rotina
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-primary">✓</span> Histórico de corrida e objetivos
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-primary">✓</span> Peso, altura e medidas
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-primary">✓</span> Sono, estresse e histórico de dietas
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-primary">✓</span> Suplementação e sensibilidade intestinal
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-primary">✓</span> Restrições alimentares
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-primary">✓</span> Rotina alimentar detalhada por refeição
+                </li>
+              </ul>
+              <p className="text-xs text-muted-foreground mt-4">
+                ⏱️ Tempo estimado: 15-20 minutos
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="mt-8 flex justify-center">
+            <Button size="lg" onClick={handleFillAnamnese} className="gap-2 text-lg px-8 py-6">
+              <ClipboardCheck className="h-5 w-5" />
+              Preencher Anamnese Inicial
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   const daysRemaining = differenceInDays(parseISO(client.end_date), new Date());
 
   const planDurationLabel = {
