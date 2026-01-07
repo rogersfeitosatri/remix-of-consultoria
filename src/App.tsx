@@ -48,8 +48,9 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
     return <Navigate to="/auth" replace />;
   }
 
-  // Redirect athletes to their dashboard
-  if (role === 'athlete' && adminOnly) {
+  // CRITICAL: Only users with explicit 'admin' role can access admin routes
+  // Users without role or with 'athlete' role are redirected to athlete area
+  if (adminOnly && role !== 'admin') {
     return <Navigate to="/athlete" replace />;
   }
 
