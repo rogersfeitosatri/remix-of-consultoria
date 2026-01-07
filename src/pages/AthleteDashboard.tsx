@@ -6,10 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PersonStanding, LogOut, User, Calendar, FileText, ClipboardList, ArrowLeft, Eye, Lock, ClipboardCheck } from 'lucide-react';
+import { PersonStanding, LogOut, User, Calendar, FileText, ClipboardList, ArrowLeft, Eye, Lock, ClipboardCheck, BarChart3, Settings } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { EvolutionCharts } from '@/components/athlete/EvolutionCharts';
+import { ChangePasswordForm } from '@/components/athlete/ChangePasswordForm';
 
 export default function AthleteDashboard() {
   const navigate = useNavigate();
@@ -17,7 +19,8 @@ export default function AthleteDashboard() {
   const { isAdmin, isLoading: roleLoading } = useUserRole();
   const { data: client, isLoading: clientLoading, refetch: refetchClient } = useAthleteClient();
   const { data: checkinResponses = [], isLoading: responsesLoading } = useCheckinResponses(client?.id);
-
+  
+  const [showCharts, setShowCharts] = useState(false);
   const [activeTab, setActiveTab] = useState('plan');
 
   const handleSignOut = async () => {
@@ -356,14 +359,18 @@ export default function AthleteDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="plan" className="gap-2">
               <User className="h-4 w-4" />
               Meu Plano
             </TabsTrigger>
             <TabsTrigger value="checkins" className="gap-2">
               <ClipboardList className="h-4 w-4" />
-              Histórico de Checkins
+              Checkins
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Config
             </TabsTrigger>
           </TabsList>
 
@@ -487,6 +494,24 @@ export default function AthleteDashboard() {
           </TabsContent>
 
           <TabsContent value="checkins" className="space-y-4">
+            {/* Evolution Charts Toggle */}
+            <div className="flex justify-end">
+              <Button
+                variant={showCharts ? "default" : "outline"}
+                onClick={() => setShowCharts(!showCharts)}
+                className="gap-2"
+              >
+                <BarChart3 className="h-4 w-4" />
+                {showCharts ? 'Ocultar Gráficos' : 'Gerar Gráficos de Evolução'}
+              </Button>
+            </div>
+
+            {/* Evolution Charts */}
+            {showCharts && checkinResponses.length > 0 && (
+              <EvolutionCharts checkinResponses={checkinResponses} />
+            )}
+
+            {/* Checkin List */}
             {responsesLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -524,6 +549,11 @@ export default function AthleteDashboard() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-4">
+            <ChangePasswordForm />
           </TabsContent>
         </Tabs>
       </main>
