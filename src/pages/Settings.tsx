@@ -420,6 +420,8 @@ export default function Settings() {
         first_consultation_date: firstConsultationDate,
         is_active: parseBoolean(row['Atleta Ativo'] as string | number | null | undefined) !== false,
         notes: String(row['Observações'] || '').trim() || null,
+        athlete_status: 'active' as const,
+        registration_source: 'manual' as const,
       },
       errors: [],
     };
