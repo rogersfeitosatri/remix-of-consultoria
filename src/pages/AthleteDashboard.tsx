@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PersonStanding, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Settings, BookOpen, Utensils, TrendingUp, FileText, Youtube, Menu } from 'lucide-react';
+import { PersonStanding, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Settings, BookOpen, Utensils, TrendingUp, FileText, User, MessageSquare, History } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -40,7 +40,7 @@ export default function AthleteDashboard() {
   const { data: supportMaterials = [] } = useAthleteSupportMaterials('material_suporte');
   
   const [showCharts, setShowCharts] = useState(false);
-  const [activeTab, setActiveTab] = useState('onboarding');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   const handleSignOut = async () => {
     await signOut();
@@ -76,14 +76,14 @@ export default function AthleteDashboard() {
     both: 'Nutrição + Treinamento',
   }[client?.service_type || 'both'];
 
-  // Admin preview mode
+  // Admin preview mode - Show complete structure for Admin verification
   if (isAdmin && !client) {
     return (
       <div className="min-h-screen bg-black text-white">
         {/* Admin Preview Banner */}
         <div className="bg-[hsl(43,74%,49%)] text-black py-2 px-4 flex items-center justify-center gap-2">
           <Eye className="h-4 w-4" />
-          <span className="text-sm font-medium">Modo Visualização - Esta é uma prévia da área do atleta</span>
+          <span className="text-sm font-medium">Modo Visualização - Prévia completa da área do atleta</span>
           <Button 
             variant="secondary" 
             size="sm" 
@@ -116,13 +116,126 @@ export default function AthleteDashboard() {
           </div>
         </header>
 
-        <main className="max-w-4xl mx-auto px-4 py-8">
-          <div className="mb-8">
+        {/* Status Badge Demo */}
+        <div className="bg-gray-900 border-b border-gray-800">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-400">Plano:</span>
+              <span className="text-sm font-medium text-white">Nutrição + Treinamento</span>
+            </div>
+            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Ativo</Badge>
+          </div>
+        </div>
+
+        <main className="max-w-4xl mx-auto px-4 py-6">
+          <div className="mb-6">
             <h2 className="text-2xl font-bold text-white mb-1">Olá, Atleta!</h2>
             <p className="text-gray-400">Bem-vindo à sua área de membros</p>
           </div>
           
-          <p className="text-gray-400 text-center py-12">Prévia do dashboard do atleta</p>
+          {/* Preview Tabs - Full Structure */}
+          <Tabs defaultValue="dashboard" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-7 bg-gray-900 border border-gray-800 p-1">
+              <TabsTrigger value="dashboard" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+                <PersonStanding className="h-4 w-4" />
+                <span className="hidden lg:inline">Início</span>
+              </TabsTrigger>
+              <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+                <Utensils className="h-4 w-4" />
+                <span className="hidden lg:inline">Dieta</span>
+              </TabsTrigger>
+              <TabsTrigger value="checkins" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+                <ClipboardCheck className="h-4 w-4" />
+                <span className="hidden lg:inline">Check-ins</span>
+              </TabsTrigger>
+              <TabsTrigger value="feedbacks" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden lg:inline">Feedbacks</span>
+              </TabsTrigger>
+              <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+                <FileText className="h-4 w-4" />
+                <span className="hidden lg:inline">Materiais</span>
+              </TabsTrigger>
+              <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+                <History className="h-4 w-4" />
+                <span className="hidden lg:inline">Histórico</span>
+              </TabsTrigger>
+              <TabsTrigger value="perfil" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+                <User className="h-4 w-4" />
+                <span className="hidden lg:inline">Perfil</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dashboard">
+              <Card className="bg-gray-900 border-gray-800">
+                <CardContent className="py-12 text-center">
+                  <PersonStanding className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Painel inicial do atleta</p>
+                  <p className="text-xs text-gray-500 mt-2">Resumo geral e boas-vindas</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="dieta">
+              <Card className="bg-gray-900 border-gray-800">
+                <CardContent className="py-12 text-center">
+                  <Utensils className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Conteúdo em breve</p>
+                  <p className="text-xs text-gray-500 mt-2">Plano alimentar e instruções de acesso ao app</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="checkins">
+              <Card className="bg-gray-900 border-gray-800">
+                <CardContent className="py-12 text-center">
+                  <ClipboardCheck className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Conteúdo em breve</p>
+                  <p className="text-xs text-gray-500 mt-2">Formulários de check-in pendentes e enviados</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="feedbacks">
+              <Card className="bg-gray-900 border-gray-800">
+                <CardContent className="py-12 text-center">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Conteúdo em breve</p>
+                  <p className="text-xs text-gray-500 mt-2">Feedbacks do nutricionista</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="materiais">
+              <Card className="bg-gray-900 border-gray-800">
+                <CardContent className="py-12 text-center">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Conteúdo em breve</p>
+                  <p className="text-xs text-gray-500 mt-2">Material de suporte e vídeos</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="historico">
+              <Card className="bg-gray-900 border-gray-800">
+                <CardContent className="py-12 text-center">
+                  <History className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Conteúdo em breve</p>
+                  <p className="text-xs text-gray-500 mt-2">Evolução e gráficos de progresso</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="perfil">
+              <Card className="bg-gray-900 border-gray-800">
+                <CardContent className="py-12 text-center">
+                  <User className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Conteúdo em breve</p>
+                  <p className="text-xs text-gray-500 mt-2">Dados do atleta e configurações</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </main>
       </div>
     );
@@ -300,60 +413,78 @@ export default function AthleteDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-gray-900 border border-gray-800 p-1">
-            <TabsTrigger value="onboarding" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs sm:text-sm">
-              <BookOpen className="h-4 w-4" />
-              <span className="hidden sm:inline">Onboarding</span>
+          <TabsList className="grid w-full grid-cols-7 bg-gray-900 border border-gray-800 p-1">
+            <TabsTrigger value="dashboard" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+              <PersonStanding className="h-4 w-4" />
+              <span className="hidden lg:inline">Início</span>
             </TabsTrigger>
-            <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs sm:text-sm">
+            <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
               <Utensils className="h-4 w-4" />
-              <span className="hidden sm:inline">Dieta</span>
+              <span className="hidden lg:inline">Dieta</span>
             </TabsTrigger>
-            <TabsTrigger value="evolucao" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs sm:text-sm">
-              <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Evolução</span>
+            <TabsTrigger value="checkins" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+              <ClipboardCheck className="h-4 w-4" />
+              <span className="hidden lg:inline">Check-ins</span>
             </TabsTrigger>
-            <TabsTrigger value="material" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs sm:text-sm">
+            <TabsTrigger value="feedbacks" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden lg:inline">Feedbacks</span>
+            </TabsTrigger>
+            <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
               <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Material</span>
+              <span className="hidden lg:inline">Materiais</span>
             </TabsTrigger>
-            <TabsTrigger value="config" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs sm:text-sm">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Config</span>
+            <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+              <History className="h-4 w-4" />
+              <span className="hidden lg:inline">Histórico</span>
+            </TabsTrigger>
+            <TabsTrigger value="perfil" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs">
+              <User className="h-4 w-4" />
+              <span className="hidden lg:inline">Perfil</span>
             </TabsTrigger>
           </TabsList>
 
-          {/* Onboarding Tab */}
-          <TabsContent value="onboarding" className="space-y-4">
-            {onboardingMaterials.length === 0 ? (
-              <Card className="bg-gray-900 border-gray-800">
-                <CardContent className="py-12 text-center">
-                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-600" />
-                  <p className="text-gray-400">Conteúdo de onboarding em breve...</p>
-                </CardContent>
-              </Card>
-            ) : (
-              onboardingMaterials.map((material) => (
-                <Card key={material.id} className="bg-gray-900 border-gray-800">
-                  <CardHeader>
-                    <CardTitle className="text-white">{material.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {material.content_type === 'text' ? (
-                      <p className="text-gray-300 whitespace-pre-wrap">{material.content}</p>
-                    ) : (
-                      <div className="aspect-video rounded-lg overflow-hidden">
-                        <iframe
-                          src={getYouTubeEmbedUrl(material.youtube_url || '') || ''}
-                          className="w-full h-full"
-                          allowFullScreen
-                        />
+          {/* Dashboard/Início Tab */}
+          <TabsContent value="dashboard" className="space-y-4">
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-white">
+                  <PersonStanding className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                  Bem-vindo ao seu painel
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Aqui você encontra um resumo geral do seu acompanhamento
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {onboardingMaterials.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                    <p className="text-gray-400">Conteúdo de boas-vindas em breve...</p>
+                    <p className="text-xs text-gray-500 mt-2">Aguardando liberação pelo seu nutricionista</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {onboardingMaterials.map((material) => (
+                      <div key={material.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
+                        <h4 className="font-medium text-white mb-2">{material.title}</h4>
+                        {material.content_type === 'text' ? (
+                          <p className="text-gray-300 text-sm whitespace-pre-wrap">{material.content}</p>
+                        ) : (
+                          <div className="aspect-video rounded-lg overflow-hidden">
+                            <iframe
+                              src={getYouTubeEmbedUrl(material.youtube_url || '') || ''}
+                              className="w-full h-full"
+                              allowFullScreen
+                            />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))
-            )}
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Dieta Tab */}
@@ -362,13 +493,19 @@ export default function AthleteDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-white">
                   <Utensils className="h-5 w-5 text-[hsl(43,74%,49%)]" />
-                  Como baixar o app
+                  Plano Alimentar
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-300 whitespace-pre-wrap">
-                  {dietConfig?.app_download_instructions || 'Instruções em breve...'}
-                </p>
+                {dietConfig?.app_download_instructions ? (
+                  <p className="text-gray-300 whitespace-pre-wrap">{dietConfig.app_download_instructions}</p>
+                ) : (
+                  <div className="py-8 text-center">
+                    <Utensils className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                    <p className="text-gray-400">Conteúdo em breve</p>
+                    <p className="text-xs text-gray-500 mt-2">Instruções de acesso ao app de dieta</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -396,36 +533,15 @@ export default function AthleteDashboard() {
             )}
           </TabsContent>
 
-          {/* Evolução Tab */}
-          <TabsContent value="evolucao" className="space-y-6">
-            {/* Charts Section */}
+          {/* Check-ins Tab */}
+          <TabsContent value="checkins" className="space-y-4">
             <Card className="bg-gray-900 border-gray-800">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-white">Gráficos de Evolução</CardTitle>
-                    <CardDescription className="text-gray-400">Acompanhe seu progresso ao longo do tempo</CardDescription>
-                  </div>
-                  <Button 
-                    onClick={() => setShowCharts(!showCharts)}
-                    className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-semibold"
-                  >
-                    {showCharts ? 'Ocultar Gráficos' : 'Gerar Gráficos'}
-                  </Button>
-                </div>
-              </CardHeader>
-              {showCharts && (
-                <CardContent>
-                  <EvolutionCharts checkinResponses={checkinResponses} />
-                </CardContent>
-              )}
-            </Card>
-
-            {/* Checkin History */}
-            <Card className="bg-gray-900 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white">Histórico de Check-ins</CardTitle>
-                <CardDescription className="text-gray-400">Seus formulários preenchidos e feedback do nutricionista</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-white">
+                  <ClipboardCheck className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                  Check-ins
+                </CardTitle>
+                <CardDescription className="text-gray-400">Seus formulários de acompanhamento</CardDescription>
               </CardHeader>
               <CardContent>
                 {responsesLoading ? (
@@ -434,8 +550,9 @@ export default function AthleteDashboard() {
                   </div>
                 ) : checkinResponses.length === 0 ? (
                   <div className="text-center py-8">
-                    <TrendingUp className="h-12 w-12 mx-auto mb-4 text-gray-600" />
-                    <p className="text-gray-400">Nenhum check-in realizado ainda.</p>
+                    <ClipboardCheck className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                    <p className="text-gray-400">Conteúdo em breve</p>
+                    <p className="text-xs text-gray-500 mt-2">Nenhum check-in realizado ainda</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -460,16 +577,34 @@ export default function AthleteDashboard() {
                 )}
               </CardContent>
             </Card>
-
           </TabsContent>
 
-          {/* Material Tab */}
-          <TabsContent value="material" className="space-y-4">
+          {/* Feedbacks Tab */}
+          <TabsContent value="feedbacks" className="space-y-4">
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-white">
+                  <MessageSquare className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                  Feedbacks
+                </CardTitle>
+                <CardDescription className="text-gray-400">Retornos do seu nutricionista</CardDescription>
+              </CardHeader>
+              <CardContent className="py-8 text-center">
+                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                <p className="text-gray-400">Conteúdo em breve</p>
+                <p className="text-xs text-gray-500 mt-2">Feedbacks do nutricionista aparecerão aqui</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Materiais Tab */}
+          <TabsContent value="materiais" className="space-y-4">
             {supportMaterials.length === 0 ? (
               <Card className="bg-gray-900 border-gray-800">
                 <CardContent className="py-12 text-center">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" />
-                  <p className="text-gray-400">Material de suporte em breve...</p>
+                  <p className="text-gray-400">Conteúdo em breve</p>
+                  <p className="text-xs text-gray-500 mt-2">Material de suporte e vídeos</p>
                 </CardContent>
               </Card>
             ) : (
@@ -496,8 +631,67 @@ export default function AthleteDashboard() {
             )}
           </TabsContent>
 
-          {/* Config Tab */}
-          <TabsContent value="config" className="space-y-4">
+          {/* Histórico Tab */}
+          <TabsContent value="historico" className="space-y-6">
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-white">
+                      <History className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                      Gráficos de Evolução
+                    </CardTitle>
+                    <CardDescription className="text-gray-400">Acompanhe seu progresso ao longo do tempo</CardDescription>
+                  </div>
+                  <Button 
+                    onClick={() => setShowCharts(!showCharts)}
+                    className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-semibold"
+                  >
+                    {showCharts ? 'Ocultar Gráficos' : 'Gerar Gráficos'}
+                  </Button>
+                </div>
+              </CardHeader>
+              {showCharts ? (
+                <CardContent>
+                  <EvolutionCharts checkinResponses={checkinResponses} />
+                </CardContent>
+              ) : (
+                <CardContent className="py-8 text-center">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Clique em "Gerar Gráficos" para visualizar sua evolução</p>
+                </CardContent>
+              )}
+            </Card>
+          </TabsContent>
+
+          {/* Perfil Tab */}
+          <TabsContent value="perfil" className="space-y-4">
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-white">
+                  <User className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                  Meu Perfil
+                </CardTitle>
+                <CardDescription className="text-gray-400">Seus dados e configurações</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
+                    <p className="text-sm text-gray-400">Nome</p>
+                    <p className="text-white font-medium">{client.name}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
+                    <p className="text-sm text-gray-400">Email</p>
+                    <p className="text-white font-medium">{user.email}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
+                    <p className="text-sm text-gray-400">Plano</p>
+                    <p className="text-white font-medium">{serviceTypeLabel}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card className="bg-gray-900 border-gray-800">
               <CardHeader>
                 <CardTitle className="text-white">Alterar Senha</CardTitle>
