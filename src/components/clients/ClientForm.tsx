@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
-import { addMonths } from 'date-fns';
+import { addMonths, addWeeks } from 'date-fns';
 
 const SERVICE_LABELS = {
   nutrition: 'Nutrição',
@@ -21,10 +21,18 @@ const PLAN_LABELS = {
 };
 
 const PLAN_DURATION_LABELS = {
+  six_weeks: '6 Semanas (Kiwify R$97)',
   monthly: 'Mensal',
   quarterly: 'Trimestral',
   semiannual: 'Semestral',
   annual: 'Anual',
+};
+
+const ATHLETE_STATUS_LABELS = {
+  pending_anamnese: 'Aguardando Anamnese',
+  active: 'Ativo',
+  paused: 'Pausado',
+  completed: 'Encerrado',
 };
 
 const CHECKIN_LABELS = {
@@ -60,7 +68,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     phone: client?.phone || '',
     service_type: client?.service_type || 'nutrition' as 'nutrition' | 'training' | 'both',
     plan_type: client?.plan_type || 'consultoria' as 'consultoria' | 'premium',
-    plan_duration: client?.plan_duration || 'monthly' as 'monthly' | 'quarterly' | 'semiannual' | 'annual',
+    plan_duration: client?.plan_duration || 'monthly' as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
     has_checkin: client?.has_checkin ?? true,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly',
     start_date: client?.start_date || new Date().toISOString().split('T')[0],
@@ -74,6 +82,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     first_consultation_date: client?.first_consultation_date || '',
     payment_type: client?.payment_type || 'pix' as 'pix' | 'card',
     payment_date: client?.payment_date || '',
+    athlete_status: client?.athlete_status || 'pending_anamnese' as 'pending_anamnese' | 'active' | 'paused' | 'completed',
+    registration_source: client?.registration_source || 'manual' as 'manual' | 'kiwify',
   });
 
   // Calculate end date based on plan duration - always auto-calculate when start_date or plan_duration changes
@@ -83,6 +93,9 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       let endDate: Date;
       
       switch (formData.plan_duration) {
+        case 'six_weeks':
+          endDate = addWeeks(startDate, 6);
+          break;
         case 'monthly':
           endDate = addMonths(startDate, 1);
           break;
@@ -254,7 +267,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               <Label>Duração do Plano</Label>
               <Select
                 value={formData.plan_duration}
-                onValueChange={(v) => setFormData({ ...formData, plan_duration: v as 'monthly' | 'quarterly' | 'semiannual' | 'annual' })}
+                onValueChange={(v) => setFormData({ ...formData, plan_duration: v as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks' })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -379,15 +392,45 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             />
           </div>
 
-          {/* Status */}
-          <div className="flex items-center gap-4">
-            <Switch
-              id="isActive"
-              checked={formData.is_active}
-              onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
-            />
-            <Label htmlFor="isActive">Atleta Ativo</Label>
+          {/* Status do Atleta */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Status do Atleta</Label>
+              <Select
+                value={formData.athlete_status || 'pending_anamnese'}
+                onValueChange={(v) => setFormData({ ...formData, athlete_status: v as 'pending_anamnese' | 'active' | 'paused' | 'completed' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(ATHLETE_STATUS_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-4 pt-6">
+              <Switch
+                id="isActive"
+                checked={formData.is_active}
+                onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
+              />
+              <Label htmlFor="isActive">Atleta Ativo</Label>
+            </div>
           </div>
+
+          {/* Origem do Cadastro (somente visualização) */}
+          {client && (
+            <div className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">
+              <span className="font-medium">Origem do cadastro: </span>
+              {formData.registration_source === 'kiwify' ? (
+                <span className="text-primary">Kiwify (automático)</span>
+              ) : (
+                <span>Manual (admin)</span>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t border-border">

@@ -47,7 +47,7 @@ async function sendWhatsAppMessage(phone: string, message: string) {
   }
 }
 
-// Function to create client automatically
+// Function to create client automatically from Kiwify purchase
 async function createClientFromPurchase(supabase: any, purchaseData: any) {
   // Get the first admin user to be the owner of this client
   const { data: adminRole } = await supabase
@@ -77,25 +77,45 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
     return existingClient;
   }
 
-  // Create new client
+  // Determine plan details based on product price/name
+  // R$97 plan = 6 weeks duration
+  const productPrice = purchaseData.amount || 97;
+  const is97Plan = productPrice <= 100; // R$97 plan
+  
   const startDate = new Date();
   const endDate = new Date();
-  endDate.setMonth(endDate.getMonth() + 1); // Default 1 month plan
+  
+  if (is97Plan) {
+    // 6 weeks plan for R$97
+    endDate.setDate(endDate.getDate() + 42); // 6 weeks = 42 days
+  } else {
+    // Default 1 month plan for other prices
+    endDate.setMonth(endDate.getMonth() + 1);
+  }
+
+  // Determine payment type from Kiwify data
+  const paymentMethod = purchaseData.payment_method?.toLowerCase() || '';
+  const paymentType = paymentMethod.includes('pix') ? 'pix' : 'card';
 
   const clientData = {
     user_id: adminUserId,
     name: purchaseData.name || 'Cliente Kiwify',
     email: purchaseData.email,
     phone: purchaseData.phone,
-    service_type: 'online',
-    plan_type: purchaseData.product_name || 'Plano Kiwify',
-    plan_duration: 'monthly',
+    service_type: 'nutrition', // Default to nutrition
+    plan_type: 'consultoria', // Default plan type
+    plan_duration: is97Plan ? 'six_weeks' : 'monthly',
     start_date: startDate.toISOString().split('T')[0],
     end_date: endDate.toISOString().split('T')[0],
-    monthly_value: 0, // Will be updated by admin
+    monthly_value: productPrice,
+    payment_type: paymentType,
+    payment_date: startDate.toISOString().split('T')[0],
     is_active: true,
+    has_checkin: true,
+    checkin_frequency: 'weekly',
     athlete_status: 'pending_anamnese',
-    notes: `Compra automática via Kiwify. Produto: ${purchaseData.product_name || 'N/A'}. Order ID: ${purchaseData.order_id || 'N/A'}`,
+    registration_source: 'kiwify',
+    notes: `Compra automática via Kiwify.\nProduto: ${purchaseData.product_name || 'N/A'}\nOrder ID: ${purchaseData.order_id || 'N/A'}\nValor: R$ ${productPrice}\nForma de pagamento: ${paymentType === 'pix' ? 'PIX' : 'Cartão'}`,
   };
 
   const { data: newClient, error } = await supabase
@@ -110,6 +130,22 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
   }
 
   console.log('Client created successfully:', newClient);
+
+  // Create initial payment record
+  try {
+    await supabase.from('payments').insert({
+      user_id: adminUserId,
+      client_id: newClient.id,
+      due_date: startDate.toISOString().split('T')[0],
+      amount: productPrice,
+      status: 'paid',
+      paid_at: new Date().toISOString(),
+    });
+    console.log('Payment record created for client:', newClient.id);
+  } catch (paymentError) {
+    console.error('Error creating payment:', paymentError);
+  }
+
   return newClient;
 }
 
@@ -151,6 +187,13 @@ serve(async (req) => {
     const customer = payload.Customer || payload.customer || {};
     const product = payload.Product || payload.product || {};
     const order = payload.Order || payload.order || {};
+    const subscription = payload.Subscription || payload.subscription || {};
+    const commissions = payload.Commissions || payload.commissions || {};
+
+    // Extract payment information
+    const charges = commissions.charges || [];
+    const productValue = product.product_value || order.product_value || charges[0]?.amount || 97;
+    const paymentMethod = charges[0]?.payment_method || order.payment_method || payload.payment_method || 'card';
 
     const purchaseData = {
       email: customer.email || payload.email,
@@ -161,6 +204,8 @@ serve(async (req) => {
       order_id: order.order_id || payload.order_id || payload.id,
       status: eventType === 'order_approved' || eventType === 'approved' ? 'approved' : eventType,
       purchase_date: order.created_at || payload.created_at || new Date().toISOString(),
+      amount: parseFloat(productValue) || 97,
+      payment_method: paymentMethod,
       webhook_data: payload,
     };
 

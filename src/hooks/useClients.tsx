@@ -11,7 +11,7 @@ export interface Client {
   phone: string | null;
   service_type: 'nutrition' | 'training' | 'both';
   plan_type: 'consultoria' | 'premium';
-  plan_duration: 'monthly' | 'quarterly' | 'semiannual' | 'annual';
+  plan_duration: 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks';
   checkin_frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly' | null;
   has_checkin: boolean;
   start_date: string;
@@ -25,6 +25,8 @@ export interface Client {
   first_consultation_date: string | null;
   payment_type: 'pix' | 'card';
   payment_date: string | null;
+  athlete_status: 'pending_anamnese' | 'active' | 'paused' | 'completed' | null;
+  registration_source: 'manual' | 'kiwify';
   created_at: string;
   updated_at: string;
 }
@@ -127,26 +129,29 @@ function getFirstMondayAfter(date: Date): Date {
 
 // Calculate number of consultations based on plan duration and frequency
 function calculateConsultationCount(
-  planDuration: 'monthly' | 'quarterly' | 'semiannual' | 'annual',
+  planDuration: 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
   consultationFrequency: 'once' | 'monthly' | 'six_weeks'
 ): number {
   if (consultationFrequency === 'once') return 1;
 
-  // Plan duration in months
-  const durationMonths = {
+  // Plan duration in months/weeks
+  const durationMonths: Record<string, number> = {
+    six_weeks: 1.5, // 6 weeks = ~1.5 months
     monthly: 1,
     quarterly: 3,
     semiannual: 6,
     annual: 12,
-  }[planDuration];
+  };
+
+  const months = durationMonths[planDuration] || 1;
 
   if (consultationFrequency === 'monthly') {
     // One consultation per month (e.g., 6 months = 6 consultations)
-    return durationMonths;
+    return Math.max(1, Math.floor(months));
   } else if (consultationFrequency === 'six_weeks') {
     // One consultation every 6 weeks (~1.5 months)
     // 6 months = ~4 consultations, 12 months = ~8 consultations
-    const weeksInPlan = durationMonths * 4.33; // Approximate weeks per month
+    const weeksInPlan = months * 4.33; // Approximate weeks per month
     return Math.max(1, Math.floor(weeksInPlan / 6));
   }
 
@@ -158,7 +163,7 @@ function generateConsultationSchedules(
   clientId: string,
   firstConsultationDate: string,
   consultationFrequency: 'once' | 'monthly' | 'six_weeks',
-  planDuration: 'monthly' | 'quarterly' | 'semiannual' | 'annual',
+  planDuration: 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
   endDate: string
 ): Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] {
   const schedules: Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] = [];
@@ -280,7 +285,7 @@ export function useAddClient() {
           client.id,
           client.first_consultation_date,
           client.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
-          client.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual',
+          client.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
           client.end_date
         );
 
@@ -353,7 +358,7 @@ export function useUpdateClient() {
             id,
             updatedClient.first_consultation_date,
             updatedClient.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
-            updatedClient.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual',
+            updatedClient.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
             updatedClient.end_date
           );
 

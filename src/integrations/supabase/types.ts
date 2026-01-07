@@ -577,6 +577,7 @@ export type Database = {
           phone: string | null
           plan_duration: string | null
           plan_type: string
+          registration_source: string | null
           service_type: string
           start_date: string
           updated_at: string
@@ -604,6 +605,7 @@ export type Database = {
           phone?: string | null
           plan_duration?: string | null
           plan_type: string
+          registration_source?: string | null
           service_type: string
           start_date: string
           updated_at?: string
@@ -631,6 +633,7 @@ export type Database = {
           phone?: string | null
           plan_duration?: string | null
           plan_type?: string
+          registration_source?: string | null
           service_type?: string
           start_date?: string
           updated_at?: string
