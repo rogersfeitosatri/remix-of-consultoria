@@ -59,7 +59,7 @@ export default function AthleteDashboard() {
 
   const serviceTypeLabel = { nutrition: 'Nutrição', training: 'Treinamento', both: 'Nutrição + Treinamento' }[client?.service_type || 'both'];
 
-  // Admin preview mode
+  // Admin preview mode - show the same content as athletes
   if (isAdmin && !client) {
     return (
       <div className="min-h-screen bg-black text-white">
@@ -84,7 +84,59 @@ export default function AthleteDashboard() {
           </div>
         </header>
         <main className="max-w-4xl mx-auto px-4 py-6">
-          <p className="text-gray-400">Prévia da área do atleta</p>
+          <div className="mb-6"><h2 className="text-2xl font-bold text-white mb-1">Prévia da Área do Atleta</h2><p className="text-gray-400">Visualize como o atleta verá o conteúdo configurado</p></div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid w-full grid-cols-6 bg-gray-900 border border-gray-800 p-1">
+              <TabsTrigger value="inicio" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Home className="h-4 w-4" /><span className="hidden lg:inline">Início</span></TabsTrigger>
+              <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Utensils className="h-4 w-4" /><span className="hidden lg:inline">Dieta</span></TabsTrigger>
+              <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><ClipboardCheck className="h-4 w-4" /><span className="hidden lg:inline">Histórico</span></TabsTrigger>
+              <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><FileText className="h-4 w-4" /><span className="hidden lg:inline">Materiais</span></TabsTrigger>
+              <TabsTrigger value="desafio42" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Target className="h-4 w-4" /><span className="hidden lg:inline">Desafio 42</span></TabsTrigger>
+              <TabsTrigger value="controle" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Calendar className="h-4 w-4" /><span className="hidden lg:inline">Controle</span></TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="inicio">
+              <Card className="bg-gray-900 border-gray-800">
+                <CardHeader><CardTitle className="text-white">Bem-vindo ao seu painel</CardTitle></CardHeader>
+                <CardContent>
+                  {inicioMaterials.length === 0 ? <p className="text-gray-400 text-center py-8">Nenhum conteúdo de boas-vindas configurado. Configure na aba "Conteúdo" → "Início".</p> : (
+                    <div className="space-y-4">{inicioMaterials.map((m) => (
+                      <div key={m.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
+                        <h4 className="font-medium text-white mb-2">{m.title}</h4>
+                        {m.content_type === 'text' ? <p className="text-gray-300 text-sm whitespace-pre-wrap">{m.content}</p> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}
+                      </div>
+                    ))}</div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="dieta">
+              <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Acesso à Dieta</CardTitle></CardHeader><CardContent>{dietConfig?.app_download_instructions ? <p className="text-gray-300 whitespace-pre-wrap">{dietConfig.app_download_instructions}</p> : <p className="text-gray-400 text-center py-8">Configure as instruções de acesso à dieta na aba "Conteúdo" → "Acesso à Dieta".</p>}</CardContent></Card>
+              {dietConfig?.app_code && <Card className="bg-gray-900 border-gray-800 border-[hsl(43,74%,49%)]/30 mt-4"><CardContent className="py-6 text-center"><p className="text-sm text-gray-400 mb-2">Código do App</p><p className="text-3xl font-bold text-[hsl(43,74%,49%)] font-mono">{dietConfig.app_code}</p></CardContent></Card>}
+            </TabsContent>
+
+            <TabsContent value="historico">
+              <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Histórico de Check-ins</CardTitle></CardHeader><CardContent>
+                <p className="text-gray-400 text-center py-8">Prévia - Check-ins dos atletas aparecerão aqui</p>
+              </CardContent></Card>
+            </TabsContent>
+
+            <TabsContent value="materiais">
+              {supportMaterials.length === 0 ? <Card className="bg-gray-900 border-gray-800"><CardContent className="py-12 text-center"><FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" /><p className="text-gray-400">Nenhum material configurado. Adicione na aba "Conteúdo" → "Materiais de Suporte".</p></CardContent></Card> : supportMaterials.map((m) => (
+                <Card key={m.id} className="bg-gray-900 border-gray-800 mb-4"><CardHeader><CardTitle className="text-white">{m.title}</CardTitle></CardHeader><CardContent>{m.content_type === 'text' ? <p className="text-gray-300 whitespace-pre-wrap">{m.content}</p> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}</CardContent></Card>
+              ))}
+            </TabsContent>
+
+            <TabsContent value="desafio42">
+              <Challenge42Section clientId={null} isPreview />
+            </TabsContent>
+
+            <TabsContent value="controle">
+              <DailyControlSection clientId={null} isPreview />
+            </TabsContent>
+          </Tabs>
         </main>
       </div>
     );

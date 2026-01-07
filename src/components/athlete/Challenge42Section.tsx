@@ -7,12 +7,13 @@ import { useAthleteChallengeActivities, useAthleteWeeklyMarks, useToggleWeeklyMa
 import { toast } from 'sonner';
 
 interface Challenge42SectionProps {
-  clientId: string;
+  clientId: string | null;
+  isPreview?: boolean;
 }
 
-export function Challenge42Section({ clientId }: Challenge42SectionProps) {
+export function Challenge42Section({ clientId, isPreview = false }: Challenge42SectionProps) {
   const { data: activities = [], isLoading: activitiesLoading } = useAthleteChallengeActivities();
-  const { data: marks = [], isLoading: marksLoading } = useAthleteWeeklyMarks(clientId);
+  const { data: marks = [], isLoading: marksLoading } = useAthleteWeeklyMarks(clientId || '');
   const toggleMark = useToggleWeeklyMark();
   
   const [currentWeek] = useState(() => {
@@ -26,6 +27,7 @@ export function Challenge42Section({ clientId }: Challenge42SectionProps) {
   const isLoading = activitiesLoading || marksLoading;
 
   const handleToggle = async (activityId: string, weekNumber: number, currentlyCompleted: boolean) => {
+    if (isPreview || !clientId) return;
     try {
       await toggleMark.mutateAsync({
         clientId,
@@ -62,8 +64,8 @@ export function Challenge42Section({ clientId }: Challenge42SectionProps) {
       <Card className="bg-gray-900 border-gray-800">
         <CardContent className="py-12 text-center">
           <Target className="h-12 w-12 mx-auto mb-4 text-gray-600" />
-          <p className="text-gray-400">Desafio 42 em breve</p>
-          <p className="text-xs text-gray-500 mt-2">As atividades serão configuradas pelo seu nutricionista</p>
+          <p className="text-gray-400">{isPreview ? 'Nenhuma atividade configurada. Configure na aba "Conteúdo" → "Desafio 42".' : 'Desafio 42 em breve'}</p>
+          {!isPreview && <p className="text-xs text-gray-500 mt-2">As atividades serão configuradas pelo seu nutricionista</p>}
         </CardContent>
       </Card>
     );

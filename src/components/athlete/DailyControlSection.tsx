@@ -13,12 +13,13 @@ import { toast } from 'sonner';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DailyControlSectionProps {
-  clientId: string;
+  clientId: string | null;
+  isPreview?: boolean;
 }
 
-export function DailyControlSection({ clientId }: DailyControlSectionProps) {
-  const { data: activeCycle, isLoading: cycleLoading } = useActiveCycle(clientId);
-  const { data: allCycles = [] } = useAllCycles(clientId);
+export function DailyControlSection({ clientId, isPreview = false }: DailyControlSectionProps) {
+  const { data: activeCycle, isLoading: cycleLoading } = useActiveCycle(clientId || '');
+  const { data: allCycles = [] } = useAllCycles(clientId || '');
   const { data: entries = [] } = useCycleEntries(activeCycle?.id);
   const { data: instructions = [] } = useAthleteSupportMaterials('controle');
   const startCycle = useStartCycle();
@@ -31,6 +32,7 @@ export function DailyControlSection({ clientId }: DailyControlSectionProps) {
   const [waist, setWaist] = useState('');
 
   const handleStartCycle = async () => {
+    if (isPreview || !clientId) return;
     try {
       await startCycle.mutateAsync({ clientId, startDate: new Date(startDate) });
       toast.success('Ciclo iniciado!');
@@ -40,6 +42,7 @@ export function DailyControlSection({ clientId }: DailyControlSectionProps) {
   };
 
   const handleResetCycle = async () => {
+    if (isPreview || !clientId) return;
     try {
       await resetCycle.mutateAsync({ clientId, startDate: new Date() });
       toast.success('Novo ciclo iniciado! O anterior foi arquivado.');
@@ -112,6 +115,15 @@ export function DailyControlSection({ clientId }: DailyControlSectionProps) {
           </Card>
         )}
 
+        {instructions.length === 0 && isPreview && (
+          <Card className="bg-gray-900 border-gray-800">
+            <CardContent className="py-8 text-center">
+              <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+              <p className="text-gray-400">Nenhuma instrução configurada. Configure na aba "Conteúdo" → "Controle Diário".</p>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="bg-gray-900 border-gray-800">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
@@ -119,7 +131,7 @@ export function DailyControlSection({ clientId }: DailyControlSectionProps) {
               Iniciar Controle Diário
             </CardTitle>
             <CardDescription className="text-gray-400">
-              Defina a data de início para começar seu ciclo de 6 semanas
+              {isPreview ? 'Prévia do formulário que o atleta verá para iniciar o ciclo' : 'Defina a data de início para começar seu ciclo de 6 semanas'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -130,11 +142,12 @@ export function DailyControlSection({ clientId }: DailyControlSectionProps) {
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 className="bg-gray-800 border-gray-700 text-white"
+                disabled={isPreview}
               />
             </div>
             <Button 
               onClick={handleStartCycle} 
-              disabled={startCycle.isPending}
+              disabled={startCycle.isPending || isPreview}
               className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold"
             >
               <Play className="h-4 w-4 mr-2" />
