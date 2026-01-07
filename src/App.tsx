@@ -16,6 +16,7 @@ import PublicCheckinForm from "./pages/PublicCheckinForm";
 import AthleteDashboard from "./pages/AthleteDashboard";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import LandingPage from "./pages/LandingPage";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -71,6 +72,7 @@ function AthleteRoute({ children, allowAdmin = false }: { children: React.ReactN
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/landing" element={<LandingPage />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
       <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
