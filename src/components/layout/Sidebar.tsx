@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, PersonStanding, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, PersonStanding, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText, Link } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ const navItems = [
   { to: '/calendar', icon: CalendarDays, label: 'Calendário' },
   { to: '/scheduling', icon: Clock, label: 'Agendamento' },
   { to: '/content', icon: FileText, label: 'Conteúdo' },
+  { to: '/link-bio', icon: Link, label: 'Link da Bio' },
   { to: '/forms', icon: ClipboardList, label: 'Formulários' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
 ];

@@ -26,6 +26,8 @@ import CheckinReview from "./pages/CheckinReview";
 import SchedulingSettings from "./pages/SchedulingSettings";
 import PublicBooking from "./pages/PublicBooking";
 import ContentManager from "./pages/ContentManager";
+import LinkBio from "./pages/LinkBio";
+import LinkBioManager from "./pages/LinkBioManager";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -82,6 +84,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/bio" element={<LinkBio />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
       <Route path="/agendar/:slug" element={<PublicBooking />} />
@@ -93,6 +96,7 @@ function AppRoutes() {
       <Route path="/calendar" element={<ProtectedRoute adminOnly><CalendarPage /></ProtectedRoute>} />
       <Route path="/scheduling" element={<ProtectedRoute adminOnly><SchedulingSettings /></ProtectedRoute>} />
       <Route path="/content" element={<ProtectedRoute adminOnly><ContentManager /></ProtectedRoute>} />
+      <Route path="/link-bio" element={<ProtectedRoute adminOnly><LinkBioManager /></ProtectedRoute>} />
       <Route path="/forms" element={<ProtectedRoute adminOnly><Forms /></ProtectedRoute>} />
       <Route path="/checkin" element={<ProtectedRoute adminOnly><Checkin /></ProtectedRoute>} />
       <Route path="/checkin/:formId" element={<ProtectedRoute adminOnly><CheckinFormBuilder /></ProtectedRoute>} />

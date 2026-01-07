@@ -69,16 +69,9 @@ export default function Financial() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-2 sm:gap-3 lg:gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 sm:gap-3 lg:gap-4 grid-cols-3">
           <StatCard
-            title="Receita Recorrente"
-            value={`R$ ${monthlyRecurring.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-            subtitle="por mês"
-            icon={<TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />}
-            variant="primary"
-          />
-          <StatCard
-            title="Recebido no Mês"
+            title="Entradas do Mês"
             value={`R$ ${paidThisMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             subtitle="confirmados"
             icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />}
@@ -89,7 +82,7 @@ export default function Financial() {
             className="text-left transition-transform hover:scale-[1.02] h-full"
           >
             <StatCard
-              title="A Receber (30 dias)"
+              title="Vencimentos do Mês"
               value={`R$ ${upcomingPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
               subtitle={`${upcomingPayments.length} pagamentos`}
               icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />}
@@ -101,7 +94,7 @@ export default function Financial() {
             className="text-left transition-transform hover:scale-[1.02] h-full"
           >
             <StatCard
-              title="Pagamentos Atrasados"
+              title="Vencidos"
               value={overduePayments.length}
               subtitle="pendentes"
               icon={<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />}
@@ -112,31 +105,18 @@ export default function Financial() {
 
         {/* Content */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
-          <MonthlyRevenue
-            year={currentYear}
-            month={currentMonth}
-            payments={monthlyData.payments}
-            total={monthlyData.total}
-            newPlans={newPlans}
-            onMonthChange={handleMonthChange}
-          />
           <UpcomingPayments 
             payments={displayPayments} 
             title={
               filter === 'overdue' 
                 ? 'Pagamentos Atrasados' 
                 : filter === 'upcoming' 
-                  ? 'A Receber (30 dias)' 
+                  ? 'Vencimentos do Mês' 
                   : 'Todos os Pagamentos'
             }
           />
+          <ExpensesSection />
         </div>
-
-        {/* Expenses Section */}
-        <ExpensesSection />
-
-        {/* Modo Babá - Planos vencendo */}
-        <ExpiringClientsAlert clients={expiringClients} />
       </div>
     </Layout>
   );
