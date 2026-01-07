@@ -2,26 +2,44 @@ import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole, useAthleteClient, useCheckinResponses } from '@/hooks/useUserRole';
+import { useAthleteSupportMaterials, useAthleteDietAppConfig } from '@/hooks/useSupportMaterials';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PersonStanding, LogOut, User, Calendar, FileText, ClipboardList, ArrowLeft, Eye, Lock, ClipboardCheck, BarChart3, Settings } from 'lucide-react';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { PersonStanding, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Settings, BookOpen, Utensils, TrendingUp, FileText, Youtube } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { EvolutionCharts } from '@/components/athlete/EvolutionCharts';
 import { ChangePasswordForm } from '@/components/athlete/ChangePasswordForm';
 
+// YouTube embed helper
+function getYouTubeEmbedUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    let videoId = urlObj.searchParams.get('v');
+    if (!videoId && urlObj.hostname === 'youtu.be') {
+      videoId = urlObj.pathname.slice(1);
+    }
+    return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AthleteDashboard() {
   const navigate = useNavigate();
   const { user, signOut, loading: authLoading } = useAuth();
   const { isAdmin, isLoading: roleLoading } = useUserRole();
-  const { data: client, isLoading: clientLoading, refetch: refetchClient } = useAthleteClient();
+  const { data: client, isLoading: clientLoading } = useAthleteClient();
   const { data: checkinResponses = [], isLoading: responsesLoading } = useCheckinResponses(client?.id);
+  const { data: dietConfig } = useAthleteDietAppConfig();
+  const { data: onboardingMaterials = [] } = useAthleteSupportMaterials('onboarding');
+  const { data: supportMaterials = [] } = useAthleteSupportMaterials('material_suporte');
   
   const [showCharts, setShowCharts] = useState(false);
-  const [activeTab, setActiveTab] = useState('plan');
+  const [activeTab, setActiveTab] = useState('onboarding');
 
   const handleSignOut = async () => {
     await signOut();
@@ -41,8 +59,8 @@ export default function AthleteDashboard() {
 
   if (authLoading || clientLoading || roleLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[hsl(43,74%,49%)]"></div>
       </div>
     );
   }
@@ -51,32 +69,24 @@ export default function AthleteDashboard() {
     return <Navigate to="/auth" replace />;
   }
 
-  // If admin is viewing, show demo/preview mode
+  const serviceTypeLabel = {
+    nutrition: 'Nutrição',
+    training: 'Treinamento',
+    both: 'Nutrição + Treinamento',
+  }[client?.service_type || 'both'];
+
+  // Admin preview mode
   if (isAdmin && !client) {
-    const demoClient = {
-      name: 'Atleta Demonstração',
-      is_active: true,
-      plan_type: 'Premium',
-      plan_duration: 'monthly',
-      service_type: 'both',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      has_checkin: true,
-      checkin_frequency: 'weekly',
-      has_consultations: true,
-      consultation_frequency: 'monthly',
-    };
-    
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-black text-white">
         {/* Admin Preview Banner */}
-        <div className="bg-destructive text-destructive-foreground py-2 px-4 flex items-center justify-center gap-2">
+        <div className="bg-[hsl(43,74%,49%)] text-black py-2 px-4 flex items-center justify-center gap-2">
           <Eye className="h-4 w-4" />
           <span className="text-sm font-medium">Modo Visualização - Esta é uma prévia da área do atleta</span>
           <Button 
             variant="secondary" 
             size="sm" 
-            className="ml-4 h-7"
+            className="ml-4 h-7 bg-black text-white hover:bg-gray-800"
             onClick={handleBackToAdmin}
           >
             <ArrowLeft className="h-3 w-3 mr-1" />
@@ -85,109 +95,33 @@ export default function AthleteDashboard() {
         </div>
         
         {/* Header */}
-        <header className="border-b border-border bg-card">
+        <header className="border-b border-gray-800 bg-black">
           <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-                <PersonStanding className="h-5 w-5 text-primary-foreground" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(43,74%,49%)]">
+                <PersonStanding className="h-5 w-5 text-black" />
               </div>
               <div>
-                <h1 className="text-lg font-bold">RF Assessoria</h1>
-                <p className="text-xs text-muted-foreground">Esportiva</p>
+                <h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">RF Assessoria</h1>
+                <p className="text-xs text-gray-400">Esportiva</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium">{demoClient.name}</p>
-                <p className="text-xs text-muted-foreground">atleta@exemplo.com</p>
+                <p className="text-sm font-medium text-white">Atleta Demo</p>
+                <p className="text-xs text-gray-400">atleta@exemplo.com</p>
               </div>
             </div>
           </div>
         </header>
 
-        {/* Main Content - Demo */}
         <main className="max-w-4xl mx-auto px-4 py-8">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-1">Olá, {demoClient.name.split(' ')[0]}!</h2>
-            <p className="text-muted-foreground">Bem-vindo à sua área de atleta</p>
+            <h2 className="text-2xl font-bold text-white mb-1">Olá, Atleta!</h2>
+            <p className="text-gray-400">Bem-vindo à sua área de membros</p>
           </div>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="plan" className="gap-2">
-                <User className="h-4 w-4" />
-                Meu Plano
-              </TabsTrigger>
-              <TabsTrigger value="checkins" className="gap-2">
-                <ClipboardList className="h-4 w-4" />
-                Histórico de Checkins
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="plan" className="space-y-6">
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Status do Plano</CardTitle>
-                    <Badge variant="default">Ativo</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Tipo de Plano</p>
-                      <p className="font-medium">Premium</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Duração</p>
-                      <p className="font-medium">Mensal</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Tipo de Serviço</p>
-                      <p className="font-medium">Nutrição + Treinamento</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Dias Restantes</p>
-                      <p className="font-medium">90 dias</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Período do Plano</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4">
-                    <Calendar className="h-8 w-8 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Início - Término</p>
-                      <p className="font-medium">
-                        {format(new Date(), 'dd/MM/yyyy', { locale: ptBR })} - {format(new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), 'dd/MM/yyyy', { locale: ptBR })}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="checkins" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Seus Checkins</CardTitle>
-                  <CardDescription>Histórico de formulários preenchidos</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8 text-muted-foreground">
-                    <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Nenhum checkin realizado ainda.</p>
-                    <p className="text-sm">Os checkins aparecerão aqui quando o atleta responder.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          
+          <p className="text-gray-400 text-center py-12">Prévia do dashboard do atleta</p>
         </main>
       </div>
     );
@@ -195,13 +129,13 @@ export default function AthleteDashboard() {
 
   if (!client) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <PersonStanding className="h-16 w-16 text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Conta não vinculada</h1>
-        <p className="text-muted-foreground text-center mb-6">
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
+        <PersonStanding className="h-16 w-16 text-gray-400 mb-4" />
+        <h1 className="text-2xl font-bold text-white mb-2">Conta não vinculada</h1>
+        <p className="text-gray-400 text-center mb-6">
           Seu email não está vinculado a nenhum atleta cadastrado. Entre em contato com seu assessor.
         </p>
-        <Button onClick={handleSignOut} variant="outline">
+        <Button onClick={handleSignOut} variant="outline" className="border-gray-700 text-white hover:bg-gray-800">
           Sair
         </Button>
       </div>
@@ -211,25 +145,25 @@ export default function AthleteDashboard() {
   // Show blocked content if anamnese is pending
   if (isPendingAnamnese) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-black text-white">
         {/* Header */}
-        <header className="border-b border-border bg-card">
+        <header className="border-b border-gray-800 bg-black">
           <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-                <PersonStanding className="h-5 w-5 text-primary-foreground" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(43,74%,49%)]">
+                <PersonStanding className="h-5 w-5 text-black" />
               </div>
               <div>
-                <h1 className="text-lg font-bold">RF Assessoria</h1>
-                <p className="text-xs text-muted-foreground">Esportiva</p>
+                <h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">RF Assessoria</h1>
+                <p className="text-xs text-gray-400">Esportiva</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium">{client.name}</p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
+                <p className="text-sm font-medium text-white">{client.name}</p>
+                <p className="text-xs text-gray-400">{user?.email}</p>
               </div>
-              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+              <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-white hover:bg-gray-800">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
@@ -241,66 +175,66 @@ export default function AthleteDashboard() {
           <div className="text-center mb-8">
             <div className="flex justify-center mb-6">
               <div className="relative">
-                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-amber-500/10 border-2 border-amber-500/30">
-                  <Lock className="h-12 w-12 text-amber-500" />
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[hsl(43,74%,49%)]/10 border-2 border-[hsl(43,74%,49%)]/30">
+                  <Lock className="h-12 w-12 text-[hsl(43,74%,49%)]" />
                 </div>
               </div>
             </div>
-            <h2 className="text-2xl font-bold mb-2">Área Bloqueada</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">
+            <h2 className="text-2xl font-bold text-white mb-2">Área Bloqueada</h2>
+            <p className="text-gray-400 max-w-md mx-auto">
               Para liberar o acesso completo à sua área de atleta e iniciar seu acompanhamento, 
               você precisa preencher a anamnese inicial obrigatória.
             </p>
           </div>
 
-          <Alert className="mb-8 border-amber-500/50 bg-amber-500/10">
-            <ClipboardCheck className="h-4 w-4 text-amber-500" />
-            <AlertTitle className="text-amber-500">Anamnese Obrigatória</AlertTitle>
-            <AlertDescription>
+          <Alert className="mb-8 border-[hsl(43,74%,49%)]/50 bg-[hsl(43,74%,49%)]/10">
+            <ClipboardCheck className="h-4 w-4 text-[hsl(43,74%,49%)]" />
+            <AlertTitle className="text-[hsl(43,74%,49%)]">Anamnese Obrigatória</AlertTitle>
+            <AlertDescription className="text-gray-300">
               A anamnese é fundamental para conhecermos seu perfil, histórico e objetivos. 
               Com base nas suas respostas, montaremos um plano personalizado para você.
             </AlertDescription>
           </Alert>
 
-          <Card className="border-primary/30 bg-primary/5">
+          <Card className="border-[hsl(43,74%,49%)]/30 bg-gray-900">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-white">
+                <ClipboardCheck className="h-5 w-5 text-[hsl(43,74%,49%)]" />
                 O que você vai preencher:
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <ul className="space-y-2 text-sm text-gray-300">
                 <li className="flex items-center gap-2">
-                  <span className="text-primary">✓</span> Dados pessoais e rotina
+                  <span className="text-[hsl(43,74%,49%)]">✓</span> Dados pessoais e rotina
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-primary">✓</span> Histórico de corrida e objetivos
+                  <span className="text-[hsl(43,74%,49%)]">✓</span> Histórico de corrida e objetivos
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-primary">✓</span> Peso, altura e medidas
+                  <span className="text-[hsl(43,74%,49%)]">✓</span> Peso, altura e medidas
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-primary">✓</span> Sono, estresse e histórico de dietas
+                  <span className="text-[hsl(43,74%,49%)]">✓</span> Sono, estresse e histórico de dietas
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-primary">✓</span> Suplementação e sensibilidade intestinal
+                  <span className="text-[hsl(43,74%,49%)]">✓</span> Suplementação e sensibilidade intestinal
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-primary">✓</span> Restrições alimentares
+                  <span className="text-[hsl(43,74%,49%)]">✓</span> Restrições alimentares
                 </li>
                 <li className="flex items-center gap-2">
-                  <span className="text-primary">✓</span> Rotina alimentar detalhada por refeição
+                  <span className="text-[hsl(43,74%,49%)]">✓</span> Rotina alimentar detalhada por refeição
                 </li>
               </ul>
-              <p className="text-xs text-muted-foreground mt-4">
+              <p className="text-xs text-gray-400 mt-4">
                 ⏱️ Tempo estimado: 15-20 minutos
               </p>
             </CardContent>
           </Card>
 
           <div className="mt-8 flex justify-center">
-            <Button size="lg" onClick={handleFillAnamnese} className="gap-2 text-lg px-8 py-6">
+            <Button size="lg" onClick={handleFillAnamnese} className="gap-2 text-lg px-8 py-6 bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold">
               <ClipboardCheck className="h-5 w-5" />
               Preencher Anamnese Inicial
             </Button>
@@ -310,250 +244,252 @@ export default function AthleteDashboard() {
     );
   }
 
-  const daysRemaining = differenceInDays(parseISO(client.end_date), new Date());
-
-  const planDurationLabel = {
-    monthly: 'Mensal',
-    quarterly: 'Trimestral',
-    semiannual: 'Semestral',
-    annual: 'Anual',
-  }[client.plan_duration || 'monthly'];
-
-  const serviceTypeLabel = {
-    nutrition: 'Nutrição',
-    training: 'Treinamento',
-    both: 'Nutrição + Treinamento',
-  }[client.service_type || 'both'];
-
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-black text-white">
       {/* Header */}
-      <header className="border-b border-border bg-card">
+      <header className="border-b border-gray-800 bg-black sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-              <PersonStanding className="h-5 w-5 text-primary-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(43,74%,49%)]">
+              <PersonStanding className="h-5 w-5 text-black" />
             </div>
             <div>
-              <h1 className="text-lg font-bold">RF Assessoria</h1>
-              <p className="text-xs text-muted-foreground">Esportiva</p>
+              <h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">RF Assessoria</h1>
+              <p className="text-xs text-gray-400">Esportiva</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium">{client.name}</p>
-              <p className="text-xs text-muted-foreground">{user.email}</p>
+              <p className="text-sm font-medium text-white">{client.name}</p>
+              <p className="text-xs text-gray-400">{user.email}</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+            <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-white hover:bg-gray-800">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </header>
 
+      {/* Status Badge */}
+      <div className="bg-gray-900 border-b border-gray-800">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-400">Plano:</span>
+            <span className="text-sm font-medium text-white">{serviceTypeLabel}</span>
+          </div>
+          <Badge className={`${client.is_active ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'}`}>
+            {client.is_active ? 'Ativo' : 'Inativo'}
+          </Badge>
+        </div>
+      </div>
+
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-1">Olá, {client.name.split(' ')[0]}!</h2>
-          <p className="text-muted-foreground">Bem-vindo à sua área de atleta</p>
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-white mb-1">Olá, {client.name.split(' ')[0]}!</h2>
+          <p className="text-gray-400">Bem-vindo à sua área de membros</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="plan" className="gap-2">
-              <User className="h-4 w-4" />
-              Meu Plano
+          <TabsList className="grid w-full grid-cols-4 bg-gray-900 border border-gray-800 p-1">
+            <TabsTrigger value="onboarding" className="gap-2 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white">
+              <BookOpen className="h-4 w-4" />
+              <span className="hidden sm:inline">Onboarding</span>
             </TabsTrigger>
-            <TabsTrigger value="checkins" className="gap-2">
-              <ClipboardList className="h-4 w-4" />
-              Checkins
+            <TabsTrigger value="dieta" className="gap-2 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white">
+              <Utensils className="h-4 w-4" />
+              <span className="hidden sm:inline">Dieta</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
+            <TabsTrigger value="evolucao" className="gap-2 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white">
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Evolução</span>
+            </TabsTrigger>
+            <TabsTrigger value="config" className="gap-2 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white">
               <Settings className="h-4 w-4" />
-              Config
+              <span className="hidden sm:inline">Config</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="plan" className="space-y-6">
-            {/* Status Card */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Status do Plano</CardTitle>
-                  <Badge variant={client.is_active ? 'default' : 'destructive'}>
-                    {client.is_active ? 'Ativo' : 'Inativo'}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Tipo de Plano</p>
-                    <p className="font-medium capitalize">{client.plan_type}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Duração</p>
-                    <p className="font-medium">{planDurationLabel}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Tipo de Serviço</p>
-                    <p className="font-medium">{serviceTypeLabel}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Dias Restantes</p>
-                    <p className={`font-medium ${daysRemaining < 30 ? 'text-amber-500' : ''}`}>
-                      {daysRemaining > 0 ? `${daysRemaining} dias` : 'Expirado'}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Plan Details */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Período do Plano
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Data de Início</p>
-                    <p className="font-medium">
-                      {format(parseISO(client.start_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Data de Término</p>
-                    <p className="font-medium">
-                      {format(parseISO(client.end_date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Checkin Info */}
-            {client.has_checkin && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Checkin
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Frequência</p>
-                    <p className="font-medium capitalize">
-                      {{
-                        daily: 'Diário',
-                        weekly: 'Semanal',
-                        biweekly: 'Quinzenal',
-                        monthly: 'Mensal',
-                        bimonthly: 'Bimestral',
-                        quarterly: 'Trimestral',
-                      }[client.checkin_frequency || 'weekly']}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Consultations Info */}
-            {client.has_consultations && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Consultas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Total de Consultas</p>
-                      <p className="font-medium">{client.consultation_count || 0}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Frequência</p>
-                      <p className="font-medium capitalize">
-                        {{
-                          once: 'Única',
-                          monthly: 'Mensal',
-                          six_weeks: 'A cada 6 semanas',
-                        }[client.consultation_frequency || 'monthly']}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="checkins" className="space-y-4">
-            {/* Evolution Charts Toggle */}
-            <div className="flex justify-end">
-              <Button
-                variant={showCharts ? "default" : "outline"}
-                onClick={() => setShowCharts(!showCharts)}
-                className="gap-2"
-              >
-                <BarChart3 className="h-4 w-4" />
-                {showCharts ? 'Ocultar Gráficos' : 'Gerar Gráficos de Evolução'}
-              </Button>
-            </div>
-
-            {/* Evolution Charts */}
-            {showCharts && checkinResponses.length > 0 && (
-              <EvolutionCharts checkinResponses={checkinResponses} />
-            )}
-
-            {/* Checkin List */}
-            {responsesLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : checkinResponses.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Nenhum checkin realizado</h3>
-                  <p className="text-muted-foreground">
-                    Quando você preencher formulários de checkin, eles aparecerão aqui
-                  </p>
+          {/* Onboarding Tab */}
+          <TabsContent value="onboarding" className="space-y-4">
+            {onboardingMaterials.length === 0 ? (
+              <Card className="bg-gray-900 border-gray-800">
+                <CardContent className="py-12 text-center">
+                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Conteúdo de onboarding em breve...</p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {checkinResponses.map((response: any) => (
-                  <Card key={response.id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">
-                          {response.checkin_forms?.title || 'Checkin'}
-                        </CardTitle>
-                        <Badge variant="outline">
-                          {format(new Date(response.submitted_at), "dd/MM/yyyy", { locale: ptBR })}
-                        </Badge>
+              onboardingMaterials.map((material) => (
+                <Card key={material.id} className="bg-gray-900 border-gray-800">
+                  <CardHeader>
+                    <CardTitle className="text-white">{material.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {material.content_type === 'text' ? (
+                      <p className="text-gray-300 whitespace-pre-wrap">{material.content}</p>
+                    ) : (
+                      <div className="aspect-video rounded-lg overflow-hidden">
+                        <iframe
+                          src={getYouTubeEmbedUrl(material.youtube_url || '') || ''}
+                          className="w-full h-full"
+                          allowFullScreen
+                        />
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        Enviado às {format(new Date(response.submitted_at), "HH:mm", { locale: ptBR })}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
             )}
           </TabsContent>
 
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="space-y-4">
-            <ChangePasswordForm />
+          {/* Dieta Tab */}
+          <TabsContent value="dieta" className="space-y-4">
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-white">
+                  <Utensils className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                  Como baixar o app
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-300 whitespace-pre-wrap">
+                  {dietConfig?.app_download_instructions || 'Instruções em breve...'}
+                </p>
+              </CardContent>
+            </Card>
+
+            {dietConfig?.app_code && (
+              <Card className="bg-gray-900 border-gray-800 border-[hsl(43,74%,49%)]/30">
+                <CardContent className="py-6 text-center">
+                  <p className="text-sm text-gray-400 mb-2">Seu código de acesso</p>
+                  <p className="text-3xl font-bold text-[hsl(43,74%,49%)] font-mono tracking-wider">
+                    {dietConfig.app_code}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {dietConfig?.support_instructions && (
+              <Card className="bg-gray-900 border-gray-800">
+                <CardHeader>
+                  <CardTitle className="text-white">Suporte com o Nutri</CardTitle>
+                  <CardDescription className="text-gray-400">Como usar o Daily do app</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-300 whitespace-pre-wrap">{dietConfig.support_instructions}</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Evolução Tab */}
+          <TabsContent value="evolucao" className="space-y-6">
+            {/* Charts Section */}
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-white">Gráficos de Evolução</CardTitle>
+                    <CardDescription className="text-gray-400">Acompanhe seu progresso ao longo do tempo</CardDescription>
+                  </div>
+                  <Button 
+                    onClick={() => setShowCharts(!showCharts)}
+                    className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-semibold"
+                  >
+                    {showCharts ? 'Ocultar Gráficos' : 'Gerar Gráficos'}
+                  </Button>
+                </div>
+              </CardHeader>
+              {showCharts && (
+                <CardContent>
+                  <EvolutionCharts checkinResponses={checkinResponses} />
+                </CardContent>
+              )}
+            </Card>
+
+            {/* Checkin History */}
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white">Histórico de Check-ins</CardTitle>
+                <CardDescription className="text-gray-400">Seus formulários preenchidos e feedback do nutricionista</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {responsesLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[hsl(43,74%,49%)]"></div>
+                  </div>
+                ) : checkinResponses.length === 0 ? (
+                  <div className="text-center py-8">
+                    <TrendingUp className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                    <p className="text-gray-400">Nenhum check-in realizado ainda.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {checkinResponses.map((response: any) => (
+                      <div key={response.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-white">
+                            Check-in de {format(parseISO(response.submitted_at), "dd/MM/yyyy", { locale: ptBR })}
+                          </span>
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                            Enviado
+                          </Badge>
+                        </div>
+                        {response.responses?.peso && (
+                          <p className="text-sm text-gray-400">
+                            Peso registrado: <span className="text-white font-medium">{response.responses.peso} kg</span>
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Support Materials */}
+            {supportMaterials.length > 0 && (
+              <Card className="bg-gray-900 border-gray-800">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-white">
+                    <FileText className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                    Material de Suporte
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {supportMaterials.map((material) => (
+                    <div key={material.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
+                      <h4 className="font-medium text-white mb-2">{material.title}</h4>
+                      {material.content_type === 'text' ? (
+                        <p className="text-sm text-gray-300 whitespace-pre-wrap">{material.content}</p>
+                      ) : (
+                        <div className="aspect-video rounded-lg overflow-hidden">
+                          <iframe
+                            src={getYouTubeEmbedUrl(material.youtube_url || '') || ''}
+                            className="w-full h-full"
+                            allowFullScreen
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Config Tab */}
+          <TabsContent value="config" className="space-y-4">
+            <Card className="bg-gray-900 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white">Alterar Senha</CardTitle>
+                <CardDescription className="text-gray-400">Crie uma nova senha para sua conta</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChangePasswordForm />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>

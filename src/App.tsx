@@ -25,6 +25,7 @@ import AthleteHistory from "./pages/AthleteHistory";
 import CheckinReview from "./pages/CheckinReview";
 import SchedulingSettings from "./pages/SchedulingSettings";
 import PublicBooking from "./pages/PublicBooking";
+import ContentManager from "./pages/ContentManager";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -91,6 +92,7 @@ function AppRoutes() {
       <Route path="/financial" element={<ProtectedRoute adminOnly><Financial /></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute adminOnly><CalendarPage /></ProtectedRoute>} />
       <Route path="/scheduling" element={<ProtectedRoute adminOnly><SchedulingSettings /></ProtectedRoute>} />
+      <Route path="/content" element={<ProtectedRoute adminOnly><ContentManager /></ProtectedRoute>} />
       <Route path="/forms" element={<ProtectedRoute adminOnly><Forms /></ProtectedRoute>} />
       <Route path="/checkin" element={<ProtectedRoute adminOnly><Checkin /></ProtectedRoute>} />
       <Route path="/checkin/:formId" element={<ProtectedRoute adminOnly><CheckinFormBuilder /></ProtectedRoute>} />
