@@ -2,10 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
+// Extended category types for athlete area tabs
+type SupportMaterialCategory = 'onboarding' | 'dieta' | 'material_suporte' | 'dashboard' | 'checkins' | 'feedbacks' | 'materiais' | 'historico' | 'perfil';
+
 interface SupportMaterial {
   id: string;
   user_id: string;
-  category: 'onboarding' | 'dieta' | 'material_suporte';
+  category: SupportMaterialCategory;
   title: string | null;
   content: string | null;
   content_type: 'text' | 'youtube_video';
@@ -15,6 +18,8 @@ interface SupportMaterial {
   created_at: string;
   updated_at: string;
 }
+
+export type { SupportMaterial, SupportMaterialCategory };
 
 interface DietAppConfig {
   id: string;
@@ -90,7 +95,7 @@ export function useCreateSupportMaterial() {
 
   return useMutation({
     mutationFn: async (material: { 
-      category: 'onboarding' | 'dieta' | 'material_suporte';
+      category: SupportMaterialCategory;
       title?: string;
       content?: string | null;
       content_type: 'text' | 'youtube_video';

@@ -10,7 +10,7 @@ const navItems = [
   { to: '/financial', icon: Wallet, label: 'Financeiro' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendário' },
   { to: '/scheduling', icon: Clock, label: 'Agendamento' },
-  { to: '/content', icon: FileText, label: 'Conteúdo' },
+  { to: '/content', icon: FileText, label: 'Conteúdo Atleta' },
   { to: '/link-bio', icon: Link, label: 'Link da Bio' },
   { to: '/forms', icon: ClipboardList, label: 'Formulários' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
