@@ -37,7 +37,13 @@ export default function AthleteDashboard() {
   const { data: checkinResponses = [], isLoading: responsesLoading } = useCheckinResponses(client?.id);
   const { data: dietConfig } = useAthleteDietAppConfig();
   const { data: inicioMaterials = [] } = useAthleteSupportMaterials('inicio');
+  const { data: onboardingMaterials = [] } = useAthleteSupportMaterials('onboarding');
   const { data: supportMaterials = [] } = useAthleteSupportMaterials('materiais');
+  const { data: materialSuporte = [] } = useAthleteSupportMaterials('material_suporte');
+  
+  // Combine old and new category names for backwards compatibility
+  const allInicioMaterials = [...inicioMaterials, ...onboardingMaterials];
+  const allSupportMaterials = [...supportMaterials, ...materialSuporte];
   
   const [activeTab, setActiveTab] = useState('inicio');
 
@@ -100,8 +106,8 @@ export default function AthleteDashboard() {
               <Card className="bg-gray-900 border-gray-800">
                 <CardHeader><CardTitle className="text-white">Bem-vindo ao seu painel</CardTitle></CardHeader>
                 <CardContent>
-                  {inicioMaterials.length === 0 ? <p className="text-gray-400 text-center py-8">Nenhum conteúdo de boas-vindas configurado. Configure na aba "Conteúdo" → "Início".</p> : (
-                    <div className="space-y-4">{inicioMaterials.map((m) => (
+                  {allInicioMaterials.length === 0 ? <p className="text-gray-400 text-center py-8">Nenhum conteúdo de boas-vindas configurado. Configure na aba "Conteúdo" → "Início".</p> : (
+                    <div className="space-y-4">{allInicioMaterials.map((m) => (
                       <div key={m.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
                         <h4 className="font-medium text-white mb-2">{m.title}</h4>
                         {m.content_type === 'text' ? <p className="text-gray-300 text-sm whitespace-pre-wrap">{m.content}</p> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}
@@ -124,7 +130,7 @@ export default function AthleteDashboard() {
             </TabsContent>
 
             <TabsContent value="materiais">
-              {supportMaterials.length === 0 ? <Card className="bg-gray-900 border-gray-800"><CardContent className="py-12 text-center"><FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" /><p className="text-gray-400">Nenhum material configurado. Adicione na aba "Conteúdo" → "Materiais de Suporte".</p></CardContent></Card> : supportMaterials.map((m) => (
+              {allSupportMaterials.length === 0 ? <Card className="bg-gray-900 border-gray-800"><CardContent className="py-12 text-center"><FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" /><p className="text-gray-400">Nenhum material configurado. Adicione na aba "Conteúdo" → "Materiais de Suporte".</p></CardContent></Card> : allSupportMaterials.map((m) => (
                 <Card key={m.id} className="bg-gray-900 border-gray-800 mb-4"><CardHeader><CardTitle className="text-white">{m.title}</CardTitle></CardHeader><CardContent>{m.content_type === 'text' ? <p className="text-gray-300 whitespace-pre-wrap">{m.content}</p> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}</CardContent></Card>
               ))}
             </TabsContent>
@@ -217,8 +223,8 @@ export default function AthleteDashboard() {
             <Card className="bg-gray-900 border-gray-800">
               <CardHeader><CardTitle className="text-white">Bem-vindo ao seu painel</CardTitle></CardHeader>
               <CardContent>
-                {inicioMaterials.length === 0 ? <p className="text-gray-400 text-center py-8">Conteúdo de boas-vindas em breve...</p> : (
-                  <div className="space-y-4">{inicioMaterials.map((m) => (
+                {allInicioMaterials.length === 0 ? <p className="text-gray-400 text-center py-8">Conteúdo de boas-vindas em breve...</p> : (
+                  <div className="space-y-4">{allInicioMaterials.map((m) => (
                     <div key={m.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
                       <h4 className="font-medium text-white mb-2">{m.title}</h4>
                       {m.content_type === 'text' ? <p className="text-gray-300 text-sm whitespace-pre-wrap">{m.content}</p> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}
@@ -249,7 +255,7 @@ export default function AthleteDashboard() {
           </TabsContent>
 
           <TabsContent value="materiais">
-            {supportMaterials.length === 0 ? <Card className="bg-gray-900 border-gray-800"><CardContent className="py-12 text-center"><FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" /><p className="text-gray-400">Materiais em breve</p></CardContent></Card> : supportMaterials.map((m) => (
+            {allSupportMaterials.length === 0 ? <Card className="bg-gray-900 border-gray-800"><CardContent className="py-12 text-center"><FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" /><p className="text-gray-400">Materiais em breve</p></CardContent></Card> : allSupportMaterials.map((m) => (
               <Card key={m.id} className="bg-gray-900 border-gray-800 mb-4"><CardHeader><CardTitle className="text-white">{m.title}</CardTitle></CardHeader><CardContent>{m.content_type === 'text' ? <p className="text-gray-300 whitespace-pre-wrap">{m.content}</p> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}</CardContent></Card>
             ))}
           </TabsContent>
