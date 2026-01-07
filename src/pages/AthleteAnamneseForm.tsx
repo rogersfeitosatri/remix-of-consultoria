@@ -365,7 +365,7 @@ export default function AthleteAnamneseForm() {
         return;
       }
 
-      // Submit the anamnese response
+      // Submit the anamnese response (raw data)
       const { error: responseError } = await supabase
         .from('anamnese_responses')
         .insert([{
@@ -376,17 +376,124 @@ export default function AthleteAnamneseForm() {
 
       if (responseError) throw responseError;
 
-      // Update client status to "Anamnese Concluída"
+      // Create/Update structured athlete profile
+      const athleteProfileData = {
+        client_id: client.id,
+        // Dados Pessoais
+        full_name: formData.nome_completo,
+        birth_date: formData.data_nascimento || null,
+        gender: formData.genero,
+        phone: formData.telefone,
+        city_state: formData.cidade_estado,
+        // Rotina e Trabalho
+        profession: formData.profissao,
+        work_schedule: formData.horario_trabalho,
+        sedentary_work: formData.trabalho_sedentario,
+        hours_sitting: formData.horas_sentado,
+        // Histórico de Corrida
+        practices_running: formData.pratica_corrida,
+        running_time: formData.tempo_pratica,
+        weekly_frequency: formData.frequencia_semanal,
+        weekly_volume_km: formData.volume_semanal_km ? parseFloat(formData.volume_semanal_km) : null,
+        races_participated: formData.provas_participadas,
+        injury_history: formData.lesoes_historico,
+        // Objetivos
+        main_goal: formData.objetivo_principal,
+        secondary_goal: formData.objetivo_secundario,
+        specific_target: formData.meta_especifica,
+        target_deadline: formData.prazo_meta,
+        // Medidas
+        current_weight: formData.peso_atual ? parseFloat(formData.peso_atual) : null,
+        height: formData.altura ? parseFloat(formData.altura) : null,
+        ideal_weight: formData.peso_ideal ? parseFloat(formData.peso_ideal) : null,
+        max_weight: formData.maior_peso ? parseFloat(formData.maior_peso) : null,
+        min_adult_weight: formData.menor_peso_adulto ? parseFloat(formData.menor_peso_adulto) : null,
+        waist_circumference: formData.circunferencia_cintura ? parseFloat(formData.circunferencia_cintura) : null,
+        hip_circumference: formData.circunferencia_quadril ? parseFloat(formData.circunferencia_quadril) : null,
+        // Sono e Estresse
+        sleep_hours: formData.horas_sono,
+        sleep_quality: formData.qualidade_sono,
+        bedtime: formData.horario_dormir,
+        wake_time: formData.horario_acordar,
+        stress_level: formData.nivel_estresse,
+        stress_cause: formData.causa_estresse,
+        // Histórico de Dietas
+        previous_diets: formData.fez_dieta_antes,
+        diet_types: formData.dietas_anteriores,
+        diet_stop_reason: formData.motivo_parou_dieta,
+        nutritional_followup: formData.acompanhamento_nutricional,
+        // Suplementação
+        uses_supplements: formData.usa_suplementos,
+        current_supplements: formData.suplementos_atuais,
+        used_supplements_before: formData.ja_usou_suplementos,
+        past_supplements: formData.suplementos_passados,
+        // Intestinal
+        intestinal_function: formData.funcionamento_intestinal,
+        evacuation_frequency: formData.frequencia_evacuacao,
+        intestinal_problems: formData.problemas_intestinais,
+        intestinal_problems_other: formData.problemas_intestinais_outros,
+        // Restrições
+        food_allergies: formData.alergias_alimentares,
+        lactose_intolerance: formData.intolerancia_lactose,
+        gluten_intolerance: formData.intolerancia_gluten,
+        religious_restrictions: formData.restricao_religiosa,
+        disliked_foods: formData.alimentos_nao_gosta,
+        favorite_foods: formData.alimentos_favoritos,
+        // Rotina Alimentar Estruturada
+        meal_breakfast: formData.rotina_alimentar.cafe_da_manha,
+        meal_morning_snack: formData.rotina_alimentar.lanche_manha,
+        meal_morning_snack_enabled: formData.rotina_alimentar.lanche_manha_enabled,
+        meal_lunch: formData.rotina_alimentar.almoco,
+        meal_afternoon_snack: formData.rotina_alimentar.lanche_tarde,
+        meal_afternoon_snack_enabled: formData.rotina_alimentar.lanche_tarde_enabled,
+        meal_dinner: formData.rotina_alimentar.jantar,
+        meal_supper: formData.rotina_alimentar.ceia,
+        meal_supper_enabled: formData.rotina_alimentar.ceia_enabled,
+        weekend_changes: formData.rotina_alimentar.muda_fim_de_semana,
+        weekend_description: formData.rotina_alimentar.fim_de_semana_descricao,
+        // Metadados
+        anamnese_submitted_at: new Date().toISOString(),
+      };
+
+      // Check if profile exists, then upsert
+      const { data: existingProfile } = await supabase
+        .from('athlete_profiles')
+        .select('id')
+        .eq('client_id', client.id)
+        .maybeSingle();
+
+      if (existingProfile) {
+        // Update existing profile
+        const { error: profileError } = await supabase
+          .from('athlete_profiles')
+          .update(athleteProfileData as any)
+          .eq('client_id', client.id);
+
+        if (profileError) {
+          console.error('Error updating athlete profile:', profileError);
+        }
+      } else {
+        // Insert new profile
+        const { error: profileError } = await supabase
+          .from('athlete_profiles')
+          .insert([athleteProfileData as any]);
+
+        if (profileError) {
+          console.error('Error creating athlete profile:', profileError);
+        }
+      }
+
+      // Update client status to "Pronto para Análise IA"
       const { error: updateError } = await supabase
         .from('clients')
-        .update({ athlete_status: 'anamnese_completed' })
+        .update({ athlete_status: 'ready_for_ai_analysis' })
         .eq('id', client.id);
 
       if (updateError) throw updateError;
 
       toast({
         title: 'Anamnese enviada com sucesso!',
-        description: 'Seu acompanhamento será iniciado em breve.',
+        description: 'Seus dados foram salvos. Aguarde a análise.',
       });
 
       // Redirect to athlete dashboard
