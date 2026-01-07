@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_analyses: {
+        Row: {
+          alerts: string[] | null
+          athlete_profile_id: string | null
+          caloric_deficit: Json
+          client_id: string
+          created_at: string
+          diagnosis: string
+          energy_expenditure: Json
+          id: string
+          macronutrients: Json
+          model_used: string | null
+          raw_response: string | null
+          updated_at: string
+        }
+        Insert: {
+          alerts?: string[] | null
+          athlete_profile_id?: string | null
+          caloric_deficit: Json
+          client_id: string
+          created_at?: string
+          diagnosis: string
+          energy_expenditure: Json
+          id?: string
+          macronutrients: Json
+          model_used?: string | null
+          raw_response?: string | null
+          updated_at?: string
+        }
+        Update: {
+          alerts?: string[] | null
+          athlete_profile_id?: string | null
+          caloric_deficit?: Json
+          client_id?: string
+          created_at?: string
+          diagnosis?: string
+          energy_expenditure?: Json
+          id?: string
+          macronutrients?: Json
+          model_used?: string | null
+          raw_response?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_analyses_athlete_profile_id_fkey"
+            columns: ["athlete_profile_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_analyses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       anamnese_forms: {
         Row: {
           created_at: string

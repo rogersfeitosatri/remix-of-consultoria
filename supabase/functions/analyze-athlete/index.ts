@@ -1,0 +1,291 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!openAIApiKey) {
+      throw new Error('OPENAI_API_KEY is not configured');
+    }
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase configuration is missing');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { clientId } = await req.json();
+
+    if (!clientId) {
+      throw new Error('clientId is required');
+    }
+
+    console.log('Analyzing athlete for client:', clientId);
+
+    // Fetch athlete profile
+    const { data: profile, error: profileError } = await supabase
+      .from('athlete_profiles')
+      .select('*')
+      .eq('client_id', clientId)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+      throw new Error('Failed to fetch athlete profile');
+    }
+
+    if (!profile) {
+      throw new Error('Athlete profile not found');
+    }
+
+    // Fetch client data
+    const { data: client, error: clientError } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', clientId)
+      .single();
+
+    if (clientError) {
+      console.error('Error fetching client:', clientError);
+      throw new Error('Failed to fetch client data');
+    }
+
+    console.log('Profile fetched successfully for:', profile.full_name);
+
+    // Build the prompt for ChatGPT
+    const prompt = buildAnalysisPrompt(profile, client);
+
+    console.log('Sending request to OpenAI...');
+
+    // Call OpenAI API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `Você é um nutricionista esportivo especializado em corredores. 
+Analise os dados do atleta e forneça uma análise estruturada em JSON com os seguintes campos:
+- diagnosis: string com diagnóstico detalhado da situação atual do atleta
+- energy_expenditure: objeto com { bmr: number (TMB), tdee: number (GET), training_expenditure: number (gasto treino), formula_used: string }
+- caloric_deficit: objeto com { recommended_deficit: number (kcal), target_calories: number, deficit_percentage: number, timeline_weeks: number }
+- macronutrients: objeto com { protein_g_kg: number, carbs_g_kg: number, fat_g_kg: number, protein_total: number, carbs_total: number, fat_total: number }
+- alerts: array de strings com alertas importantes e recomendações
+
+Responda APENAS com o JSON válido, sem markdown ou texto adicional.`
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content;
+
+    console.log('OpenAI response received');
+
+    // Parse the AI response
+    let analysisData;
+    try {
+      analysisData = JSON.parse(aiResponse);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', aiResponse);
+      throw new Error('Failed to parse AI analysis response');
+    }
+
+    // Check if analysis already exists for this client
+    const { data: existingAnalysis } = await supabase
+      .from('ai_analyses')
+      .select('id')
+      .eq('client_id', clientId)
+      .maybeSingle();
+
+    const analysisRecord = {
+      client_id: clientId,
+      athlete_profile_id: profile.id,
+      diagnosis: analysisData.diagnosis,
+      energy_expenditure: analysisData.energy_expenditure,
+      caloric_deficit: analysisData.caloric_deficit,
+      macronutrients: analysisData.macronutrients,
+      alerts: analysisData.alerts || [],
+      raw_response: aiResponse,
+      model_used: 'gpt-4o-mini',
+    };
+
+    let result;
+    if (existingAnalysis) {
+      // Update existing analysis
+      const { data: updated, error: updateError } = await supabase
+        .from('ai_analyses')
+        .update(analysisRecord)
+        .eq('id', existingAnalysis.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating analysis:', updateError);
+        throw new Error('Failed to update analysis');
+      }
+      result = updated;
+    } else {
+      // Insert new analysis
+      const { data: inserted, error: insertError } = await supabase
+        .from('ai_analyses')
+        .insert(analysisRecord)
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error inserting analysis:', insertError);
+        throw new Error('Failed to save analysis');
+      }
+      result = inserted;
+    }
+
+    // Update client status
+    await supabase
+      .from('clients')
+      .update({ athlete_status: 'analysis_complete' })
+      .eq('id', clientId);
+
+    console.log('Analysis saved successfully');
+
+    return new Response(JSON.stringify({ success: true, analysis: result }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Error in analyze-athlete function:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
+
+function buildAnalysisPrompt(profile: any, client: any): string {
+  const mealDescription = (meal: any) => {
+    if (!meal) return 'Não informado';
+    return `Horário: ${meal.time || 'N/I'}, Local: ${meal.location || 'N/I'}, Alimentos: ${meal.foods || 'N/I'}`;
+  };
+
+  return `
+## DADOS DO ATLETA CORREDOR
+
+### Dados Pessoais
+- Nome: ${profile.full_name || client.name}
+- Gênero: ${profile.gender || 'Não informado'}
+- Data de Nascimento: ${profile.birth_date || 'Não informada'}
+- Cidade/Estado: ${profile.city_state || 'Não informado'}
+- Profissão: ${profile.profession || 'Não informada'}
+
+### Medidas Corporais
+- Peso Atual: ${profile.current_weight || 'N/I'} kg
+- Altura: ${profile.height || 'N/I'} cm
+- Peso Ideal (desejado): ${profile.ideal_weight || 'N/I'} kg
+- Maior Peso: ${profile.max_weight || 'N/I'} kg
+- Menor Peso Adulto: ${profile.min_adult_weight || 'N/I'} kg
+- Circunferência Cintura: ${profile.waist_circumference || 'N/I'} cm
+- Circunferência Quadril: ${profile.hip_circumference || 'N/I'} cm
+
+### Histórico de Corrida
+- Pratica Corrida: ${profile.practices_running || 'N/I'}
+- Tempo de Prática: ${profile.running_time || 'N/I'}
+- Frequência Semanal: ${profile.weekly_frequency || 'N/I'}
+- Volume Semanal: ${profile.weekly_volume_km || 'N/I'} km
+- Provas Participadas: ${profile.races_participated || 'N/I'}
+- Histórico de Lesões: ${profile.injury_history || 'N/I'}
+
+### Objetivos
+- Objetivo Principal: ${profile.main_goal || 'N/I'}
+- Objetivo Secundário: ${profile.secondary_goal || 'N/I'}
+- Meta Específica: ${profile.specific_target || 'N/I'}
+- Prazo: ${profile.target_deadline || 'N/I'}
+
+### Rotina e Trabalho
+- Horário de Trabalho: ${profile.work_schedule || 'N/I'}
+- Trabalho Sedentário: ${profile.sedentary_work || 'N/I'}
+- Horas Sentado por Dia: ${profile.hours_sitting || 'N/I'}
+
+### Sono e Estresse
+- Horas de Sono: ${profile.sleep_hours || 'N/I'}
+- Qualidade do Sono: ${profile.sleep_quality || 'N/I'}
+- Horário de Dormir: ${profile.bedtime || 'N/I'}
+- Horário de Acordar: ${profile.wake_time || 'N/I'}
+- Nível de Estresse: ${profile.stress_level || 'N/I'}
+- Causa do Estresse: ${profile.stress_cause || 'N/I'}
+
+### Histórico de Dietas
+- Fez Dieta Antes: ${profile.previous_diets || 'N/I'}
+- Tipos de Dieta: ${profile.diet_types || 'N/I'}
+- Motivo de Parar: ${profile.diet_stop_reason || 'N/I'}
+- Acompanhamento Nutricional Atual: ${profile.nutritional_followup || 'N/I'}
+
+### Suplementação
+- Usa Suplementos: ${profile.uses_supplements || 'N/I'}
+- Suplementos Atuais: ${profile.current_supplements || 'N/I'}
+- Já Usou Suplementos: ${profile.used_supplements_before || 'N/I'}
+- Suplementos Passados: ${profile.past_supplements || 'N/I'}
+
+### Função Intestinal
+- Funcionamento Intestinal: ${profile.intestinal_function || 'N/I'}
+- Frequência de Evacuação: ${profile.evacuation_frequency || 'N/I'}
+- Problemas Intestinais: ${JSON.stringify(profile.intestinal_problems) || 'N/I'}
+
+### Restrições Alimentares
+- Alergias Alimentares: ${profile.food_allergies || 'N/I'}
+- Intolerância à Lactose: ${profile.lactose_intolerance || 'N/I'}
+- Intolerância ao Glúten: ${profile.gluten_intolerance || 'N/I'}
+- Restrições Religiosas: ${profile.religious_restrictions || 'N/I'}
+- Alimentos que Não Gosta: ${profile.disliked_foods || 'N/I'}
+- Alimentos Favoritos: ${profile.favorite_foods || 'N/I'}
+
+### Rotina Alimentar Atual
+- Café da Manhã: ${mealDescription(profile.meal_breakfast)}
+- Lanche da Manhã: ${profile.meal_morning_snack_enabled ? mealDescription(profile.meal_morning_snack) : 'Não faz'}
+- Almoço: ${mealDescription(profile.meal_lunch)}
+- Lanche da Tarde: ${profile.meal_afternoon_snack_enabled ? mealDescription(profile.meal_afternoon_snack) : 'Não faz'}
+- Jantar: ${mealDescription(profile.meal_dinner)}
+- Ceia: ${profile.meal_supper_enabled ? mealDescription(profile.meal_supper) : 'Não faz'}
+- Muda nos Finais de Semana: ${profile.weekend_changes || 'N/I'}
+- Descrição Fim de Semana: ${profile.weekend_description || 'N/I'}
+
+Por favor, analise esses dados e forneça:
+1. Diagnóstico completo da situação atual do atleta
+2. Estimativa de gasto energético (TMB, GET, gasto com treinos)
+3. Déficit calórico adequado para corredor (considerando performance e recuperação)
+4. Sugestão de macronutrientes em g/kg de peso corporal
+5. Alertas importantes e recomendações específicas
+`;
+}
