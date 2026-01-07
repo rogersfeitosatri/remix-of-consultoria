@@ -22,6 +22,7 @@ import LandingPage from "./pages/LandingPage";
 import Forms from "./pages/Forms";
 import AthleteAnalysis from "./pages/AthleteAnalysis";
 import AthleteHistory from "./pages/AthleteHistory";
+import CheckinReview from "./pages/CheckinReview";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -92,6 +93,7 @@ function AppRoutes() {
       <Route path="/anamnese/:formId" element={<ProtectedRoute adminOnly><AnamneseFormBuilder /></ProtectedRoute>} />
       <Route path="/clients/:clientId/analysis" element={<ProtectedRoute adminOnly><AthleteAnalysis /></ProtectedRoute>} />
       <Route path="/clients/:clientId/history" element={<ProtectedRoute adminOnly><AthleteHistory /></ProtectedRoute>} />
+      <Route path="/checkin-review/:responseId" element={<ProtectedRoute adminOnly><CheckinReview /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>

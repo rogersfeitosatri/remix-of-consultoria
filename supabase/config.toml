@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.analyze-athlete]
 verify_jwt = false
+
+[functions.analyze-checkin]
+verify_jwt = false
