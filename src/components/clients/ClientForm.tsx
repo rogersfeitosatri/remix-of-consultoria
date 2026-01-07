@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { X } from 'lucide-react';
 import { addMonths, addWeeks } from 'date-fns';
 
@@ -181,11 +182,10 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Telefone</Label>
-              <Input
+              <PhoneInput
                 id="phone"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="(00) 00000-0000"
+                onChange={(value) => setFormData({ ...formData, phone: value })}
               />
             </div>
             <div className="space-y-2">
