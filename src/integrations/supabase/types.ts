@@ -14,6 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
+      anamnese_forms: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      anamnese_questions: {
+        Row: {
+          comment_field_label: string | null
+          comment_field_required: boolean
+          created_at: string
+          form_id: string
+          has_comment_field: boolean
+          id: string
+          is_required: boolean
+          options: Json | null
+          order_index: number
+          question_text: string
+          question_type: string
+          scale_max: number | null
+          scale_min: number | null
+          section: string
+        }
+        Insert: {
+          comment_field_label?: string | null
+          comment_field_required?: boolean
+          created_at?: string
+          form_id: string
+          has_comment_field?: boolean
+          id?: string
+          is_required?: boolean
+          options?: Json | null
+          order_index?: number
+          question_text: string
+          question_type: string
+          scale_max?: number | null
+          scale_min?: number | null
+          section?: string
+        }
+        Update: {
+          comment_field_label?: string | null
+          comment_field_required?: boolean
+          created_at?: string
+          form_id?: string
+          has_comment_field?: boolean
+          id?: string
+          is_required?: boolean
+          options?: Json | null
+          order_index?: number
+          question_text?: string
+          question_type?: string
+          scale_max?: number | null
+          scale_min?: number | null
+          section?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anamnese_questions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "anamnese_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anamnese_responses: {
+        Row: {
+          ai_analysis: Json | null
+          ai_analyzed_at: string | null
+          client_id: string
+          form_id: string
+          id: string
+          responses: Json
+          submitted_at: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          ai_analyzed_at?: string | null
+          client_id: string
+          form_id: string
+          id?: string
+          responses: Json
+          submitted_at?: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          ai_analyzed_at?: string | null
+          client_id?: string
+          form_id?: string
+          id?: string
+          responses?: Json
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anamnese_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamnese_responses_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "anamnese_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checkin_forms: {
         Row: {
           created_at: string
@@ -144,6 +281,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          athlete_status: string | null
           athlete_user_id: string | null
           checkin_frequency: string | null
           consultation_count: number | null
@@ -170,6 +308,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          athlete_status?: string | null
           athlete_user_id?: string | null
           checkin_frequency?: string | null
           consultation_count?: number | null
@@ -196,6 +335,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          athlete_status?: string | null
           athlete_user_id?: string | null
           checkin_frequency?: string | null
           consultation_count?: number | null
@@ -263,6 +403,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      kiwify_purchases: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string | null
+          order_id: string | null
+          phone: string | null
+          product_id: string | null
+          product_name: string | null
+          purchase_date: string
+          status: string
+          webhook_data: Json | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name?: string | null
+          order_id?: string | null
+          phone?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          purchase_date?: string
+          status?: string
+          webhook_data?: Json | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string | null
+          order_id?: string | null
+          phone?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          purchase_date?: string
+          status?: string
+          webhook_data?: Json | null
+        }
+        Relationships: []
       }
       payments: {
         Row: {
