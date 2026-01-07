@@ -72,11 +72,11 @@ function AthleteRoute({ children, allowAdmin = false }: { children: React.ReactN
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/landing" element={<LandingPage />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
       <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
-      <Route path="/" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
       <Route path="/clients" element={<ProtectedRoute adminOnly><Clients /></ProtectedRoute>} />
       <Route path="/financial" element={<ProtectedRoute adminOnly><Financial /></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute adminOnly><CalendarPage /></ProtectedRoute>} />
