@@ -7,8 +7,8 @@ export interface AnamneseQuestion {
   form_id: string;
   section: string;
   question_text: string;
-  question_type: 'text_short' | 'text_medium' | 'text_long' | 'multiple_choice' | 'checkbox' | 'scale' | 'time' | 'meal';
-  options?: string[];
+  question_type: string;
+  options?: any;
   scale_min?: number;
   scale_max?: number;
   is_required: boolean;
@@ -50,13 +50,13 @@ export function useAnamneseForms() {
       if (!user?.id) return [];
       
       const { data, error } = await supabase
-        .from('anamnese_forms')
+        .from('anamnese_forms' as any)
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as AnamneseForm[];
+      return (data || []) as unknown as AnamneseForm[];
     },
     enabled: !!user?.id,
   });
@@ -70,7 +70,7 @@ export function useAnamneseFormWithQuestions(formId: string | undefined) {
       if (!formId) return null;
 
       const { data: form, error: formError } = await supabase
-        .from('anamnese_forms')
+        .from('anamnese_forms' as any)
         .select('*')
         .eq('id', formId)
         .single();
@@ -78,7 +78,7 @@ export function useAnamneseFormWithQuestions(formId: string | undefined) {
       if (formError) throw formError;
 
       const { data: questions, error: questionsError } = await supabase
-        .from('anamnese_questions')
+        .from('anamnese_questions' as any)
         .select('*')
         .eq('form_id', formId)
         .order('section')
@@ -87,8 +87,8 @@ export function useAnamneseFormWithQuestions(formId: string | undefined) {
       if (questionsError) throw questionsError;
 
       return {
-        form: form as AnamneseForm,
-        questions: questions as AnamneseQuestion[],
+        form: form as unknown as AnamneseForm,
+        questions: (questions || []) as unknown as AnamneseQuestion[],
       };
     },
     enabled: !!formId,
@@ -103,7 +103,7 @@ export function useAnamneseFormResponses(formId: string | undefined) {
       if (!formId) return [];
 
       const { data, error } = await supabase
-        .from('anamnese_responses')
+        .from('anamnese_responses' as any)
         .select(`
           *,
           clients (id, name, email)
@@ -112,7 +112,7 @@ export function useAnamneseFormResponses(formId: string | undefined) {
         .order('submitted_at', { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data || [];
     },
     enabled: !!formId,
   });
@@ -128,7 +128,7 @@ export function useCreateAnamneseForm() {
       if (!user?.id) throw new Error('Not authenticated');
 
       const { data: form, error } = await supabase
-        .from('anamnese_forms')
+        .from('anamnese_forms' as any)
         .insert({
           user_id: user.id,
           title: data.title,
@@ -138,7 +138,7 @@ export function useCreateAnamneseForm() {
         .single();
 
       if (error) throw error;
-      return form;
+      return form as unknown as AnamneseForm;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['anamnese-forms'] });
@@ -153,14 +153,14 @@ export function useUpdateAnamneseForm() {
   return useMutation({
     mutationFn: async ({ id, ...data }: { id: string; title?: string; description?: string | null; is_active?: boolean; is_required?: boolean }) => {
       const { data: form, error } = await supabase
-        .from('anamnese_forms')
+        .from('anamnese_forms' as any)
         .update(data)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return form;
+      return form as unknown as AnamneseForm;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['anamnese-forms'] });
@@ -176,7 +176,7 @@ export function useDeleteAnamneseForm() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('anamnese_forms')
+        .from('anamnese_forms' as any)
         .delete()
         .eq('id', id);
 
@@ -208,13 +208,13 @@ export function useAddAnamneseQuestion() {
       order_index?: number;
     }) => {
       const { data: question, error } = await supabase
-        .from('anamnese_questions')
+        .from('anamnese_questions' as any)
         .insert(data)
         .select()
         .single();
 
       if (error) throw error;
-      return question;
+      return question as unknown as AnamneseQuestion;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['anamnese-form', variables.form_id] });
@@ -229,14 +229,14 @@ export function useUpdateAnamneseQuestion() {
   return useMutation({
     mutationFn: async ({ id, form_id, ...data }: { id: string; form_id: string; [key: string]: any }) => {
       const { data: question, error } = await supabase
-        .from('anamnese_questions')
+        .from('anamnese_questions' as any)
         .update(data)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return { question, form_id };
+      return { question: question as unknown as AnamneseQuestion, form_id };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['anamnese-form', result.form_id] });
@@ -251,7 +251,7 @@ export function useDeleteAnamneseQuestion() {
   return useMutation({
     mutationFn: async ({ id, form_id }: { id: string; form_id: string }) => {
       const { error } = await supabase
-        .from('anamnese_questions')
+        .from('anamnese_questions' as any)
         .delete()
         .eq('id', id);
 
@@ -271,13 +271,13 @@ export function useSubmitAnamneseResponse() {
   return useMutation({
     mutationFn: async (data: { form_id: string; client_id: string; responses: Record<string, any> }) => {
       const { data: response, error } = await supabase
-        .from('anamnese_responses')
+        .from('anamnese_responses' as any)
         .insert(data)
         .select()
         .single();
 
       if (error) throw error;
-      return response;
+      return response as unknown as AnamneseResponse;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['anamnese-responses', variables.form_id] });

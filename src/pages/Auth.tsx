@@ -74,7 +74,7 @@ export default function Auth() {
       } else {
         // Signup mode - check if email is authorized (purchased via Kiwify)
         const { data: authorizedUser, error: checkError } = await supabase
-          .from('kiwify_purchases')
+          .from('kiwify_purchases' as any)
           .select('email')
           .eq('email', formData.email.toLowerCase().trim())
           .maybeSingle();
