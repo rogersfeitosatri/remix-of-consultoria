@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ScheduledCheckinsOverview } from '@/components/admin/ScheduledCheckinsOverview';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
@@ -814,6 +815,9 @@ export default function Settings() {
             </p>
           </CardContent>
         </Card>
+
+        {/* Scheduled Checkins Overview */}
+        <ScheduledCheckinsOverview />
 
         {/* Full Backup Card */}
         <Card className="border-border bg-card border-primary/30">
