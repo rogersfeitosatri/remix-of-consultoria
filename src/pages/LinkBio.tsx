@@ -24,7 +24,7 @@ export default function LinkBio() {
             <img 
               src={rogersProfile} 
               alt="Rogers Feitosa" 
-              className="w-full h-full object-cover object-top scale-150"
+              className="w-full h-[200%] object-cover object-[center_15%]"
             />
           </div>
         </div>
