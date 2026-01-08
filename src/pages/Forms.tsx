@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck } from 'lucide-react';
+import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library } from 'lucide-react';
 import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm } from '@/hooks/useCheckinForms';
 import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm } from '@/hooks/useAnamneseForms';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +34,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PendingReviewsList } from '@/components/forms/PendingReviewsList';
 import { PendingAnamneseList } from '@/components/forms/PendingAnamneseList';
 import { ScheduledCheckinsSection } from '@/components/forms/ScheduledCheckinsSection';
+import { QuestionBankSection } from '@/components/forms/QuestionBankSection';
 
 export default function Forms() {
   const navigate = useNavigate();
@@ -142,24 +143,33 @@ export default function Forms() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 max-w-lg">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
             <TabsTrigger value="checkin" className="gap-2">
               <ClipboardList className="h-4 w-4" />
-              Checkin
+              <span className="hidden sm:inline">Checkin</span>
             </TabsTrigger>
             <TabsTrigger value="agendados" className="gap-2">
               <CalendarCheck className="h-4 w-4" />
-              Agendados
+              <span className="hidden sm:inline">Agendados</span>
             </TabsTrigger>
             <TabsTrigger value="anamnese" className="gap-2">
               <FileText className="h-4 w-4" />
-              Anamnese
+              <span className="hidden sm:inline">Anamnese</span>
+            </TabsTrigger>
+            <TabsTrigger value="banco" className="gap-2">
+              <Library className="h-4 w-4" />
+              <span className="hidden sm:inline">Perguntas</span>
             </TabsTrigger>
           </TabsList>
 
           {/* Scheduled Checkins Tab */}
           <TabsContent value="agendados" className="space-y-6 mt-6">
             <ScheduledCheckinsSection />
+          </TabsContent>
+
+          {/* Question Bank Tab */}
+          <TabsContent value="banco" className="space-y-6 mt-6">
+            <QuestionBankSection />
           </TabsContent>
 
           {/* Checkin Forms */}
