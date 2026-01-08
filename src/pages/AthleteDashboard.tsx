@@ -82,7 +82,7 @@ export default function AthleteDashboard() {
           <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]">
-                <img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-full object-cover object-top scale-150" />
+                <img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-[200%] object-cover object-[center_15%]" />
               </div>
               <div>
                 <h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1>
@@ -167,7 +167,7 @@ export default function AthleteDashboard() {
         <header className="border-b border-gray-800 bg-black">
           <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]"><img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-full object-cover object-top scale-150" /></div>
+              <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]"><img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-[200%] object-cover object-[center_15%]" /></div>
               <div><h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1><p className="text-xs text-gray-400">Nutrição e Treinamento</p></div>
             </div>
             <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-white hover:bg-gray-800"><LogOut className="h-4 w-4" /></Button>
@@ -191,7 +191,7 @@ export default function AthleteDashboard() {
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <AthleteSidebar activeTab={activeTab} onTabChange={setActiveTab} clientName={client.name} userEmail={user.email || ''} onSignOut={handleSignOut} />
-            <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]"><img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-full object-cover object-top scale-150" /></div>
+            <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]"><img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-[200%] object-cover object-[center_15%]" /></div>
             <div><h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1><p className="text-xs text-gray-400">Nutrição e Treinamento</p></div>
           </div>
           <div className="hidden sm:flex items-center gap-4">
