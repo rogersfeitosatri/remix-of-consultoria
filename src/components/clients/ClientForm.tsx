@@ -22,6 +22,7 @@ const PLAN_LABELS = {
 };
 
 const PLAN_DURATION_LABELS = {
+  six_weeks: '6 Semanas',
   monthly: 'Mensal',
   quarterly: 'Trimestral',
   semiannual: 'Semestral',
@@ -71,7 +72,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     phone: client?.phone || '',
     service_type: client?.service_type || 'nutrition' as 'nutrition' | 'training' | 'both',
     plan_type: client?.plan_type || 'consultoria' as 'consultoria' | 'premium',
-    plan_duration: client?.plan_duration || 'monthly' as 'monthly' | 'quarterly' | 'semiannual' | 'annual',
+    plan_duration: client?.plan_duration || 'monthly' as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual',
     has_checkin: client?.has_checkin ?? true,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly',
     start_date: client?.start_date || new Date().toISOString().split('T')[0],
@@ -96,6 +97,9 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       let endDate: Date;
       
       switch (formData.plan_duration) {
+        case 'six_weeks':
+          endDate = addWeeks(startDate, 6);
+          break;
         case 'monthly':
           endDate = addMonths(startDate, 1);
           break;
@@ -270,7 +274,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               <Label>Duração do Plano</Label>
               <Select
                 value={formData.plan_duration}
-                onValueChange={(v) => setFormData({ ...formData, plan_duration: v as 'monthly' | 'quarterly' | 'semiannual' | 'annual' })}
+                onValueChange={(v) => setFormData({ ...formData, plan_duration: v as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual' })}
               >
                 <SelectTrigger>
                   <SelectValue />

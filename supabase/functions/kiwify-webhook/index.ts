@@ -112,21 +112,12 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
   const temporaryPassword = '123456';
   const athleteUser = await createAthleteUser(supabase, purchaseData.email, temporaryPassword);
 
-  // Determine plan details based on product price/name
-  // R$97 plan = 6 weeks duration
+  // All Kiwify plans are 6 weeks duration
   const productPrice = purchaseData.amount || 97;
-  const is97Plan = productPrice <= 100; // R$97 plan
   
   const startDate = new Date();
   const endDate = new Date();
-  
-  if (is97Plan) {
-    // 6 weeks plan for R$97
-    endDate.setDate(endDate.getDate() + 42); // 6 weeks = 42 days
-  } else {
-    // Default 1 month plan for other prices
-    endDate.setMonth(endDate.getMonth() + 1);
-  }
+  endDate.setDate(endDate.getDate() + 42); // 6 weeks = 42 days
 
   // Determine payment type from Kiwify data
   const paymentMethod = purchaseData.payment_method?.toLowerCase() || '';
@@ -138,8 +129,8 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
     email: purchaseData.email,
     phone: purchaseData.phone,
     service_type: 'nutrition', // Default to nutrition
-    plan_type: 'consultoria', // Default plan type
-    plan_duration: is97Plan ? 'six_weeks' : 'monthly',
+    plan_type: 'consultoria', // Kiwify plans are always consultoria
+    plan_duration: 'six_weeks', // Kiwify plans are always 6 weeks
     start_date: startDate.toISOString().split('T')[0],
     end_date: endDate.toISOString().split('T')[0],
     monthly_value: productPrice,
@@ -147,7 +138,9 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
     payment_date: startDate.toISOString().split('T')[0],
     is_active: true,
     has_checkin: true,
-    checkin_frequency: 'weekly',
+    checkin_frequency: 'biweekly', // Kiwify plans have biweekly checkin
+    has_consultations: false, // Kiwify plans have no consultations
+    consultation_count: 0,
     athlete_status: 'pending_anamnese',
     registration_source: 'kiwify',
     athlete_user_id: athleteUser?.id || null,
@@ -189,7 +182,7 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
       newClient.id,
       clientData.start_date,
       clientData.end_date,
-      'weekly' // Default weekly for Kiwify clients
+      'biweekly' // Biweekly checkin for Kiwify clients
     );
 
     if (checkinSchedules.length > 0) {
