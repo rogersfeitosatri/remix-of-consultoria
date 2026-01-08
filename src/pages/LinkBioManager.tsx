@@ -8,9 +8,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useLinkBioItems, useCreateLinkBioItem, useUpdateLinkBioItem, useDeleteLinkBioItem, LinkBioItem } from '@/hooks/useLinkBio';
-import { Plus, Edit, Trash2, ExternalLink, Link as LinkIcon, Loader2, Eye, GripVertical } from 'lucide-react';
+import { Plus, Edit, Trash2, ExternalLink, Link as LinkIcon, Loader2, Eye, GripVertical, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import { ImageUploadDialog } from '@/components/linkbio/ImageUploadDialog';
 
 export default function LinkBioManager() {
   const { data: items = [], isLoading } = useLinkBioItems();
@@ -20,6 +21,7 @@ export default function LinkBioManager() {
 
   const [editingItem, setEditingItem] = useState<LinkBioItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -175,14 +177,52 @@ export default function LinkBioManager() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="image_url">URL da Imagem (opcional)</Label>
-                    <Input
-                      id="image_url"
-                      value={formData.image_url}
-                      onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                      placeholder="https://... (imagem quadrada)"
-                    />
+                    <Label>Imagem (opcional)</Label>
+                    {formData.image_url ? (
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src={formData.image_url} 
+                          alt="Preview" 
+                          className="w-16 h-16 rounded-lg object-cover"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsImageDialogOpen(true)}
+                          >
+                            Trocar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setFormData({ ...formData, image_url: '' })}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full gap-2"
+                        onClick={() => setIsImageDialogOpen(true)}
+                      >
+                        <Upload className="h-4 w-4" />
+                        Fazer upload de imagem
+                      </Button>
+                    )}
                   </div>
+                  
+                  <ImageUploadDialog
+                    open={isImageDialogOpen}
+                    onOpenChange={setIsImageDialogOpen}
+                    onImageUploaded={(url) => setFormData({ ...formData, image_url: url })}
+                    currentImageUrl={formData.image_url}
+                  />
                   
                   <div className="space-y-2">
                     <Label htmlFor="order_index">Ordem</Label>
