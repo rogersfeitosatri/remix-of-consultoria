@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 // Extended category types for athlete area tabs
-type SupportMaterialCategory = 'onboarding' | 'dieta' | 'material_suporte' | 'dashboard' | 'checkins' | 'feedbacks' | 'materiais' | 'historico' | 'perfil';
+type SupportMaterialCategory = 'onboarding' | 'dieta' | 'material_suporte' | 'dashboard' | 'checkins' | 'feedbacks' | 'materiais' | 'historico' | 'perfil' | 'inicio' | 'desafio42' | 'controle';
 
 interface SupportMaterial {
   id: string;
