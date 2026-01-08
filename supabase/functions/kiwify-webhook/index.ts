@@ -327,8 +327,8 @@ Deno.serve(async (req) => {
       order_id: order.order_id || payload.order_id || payload.id,
       status: eventType === 'order_approved' || eventType === 'approved' ? 'approved' : eventType,
       purchase_date: order.created_at || payload.created_at || new Date().toISOString(),
-      amount: parseFloat(productValue) || 97,
-      payment_method: paymentMethod,
+      amount: parseFloat(productValue) || 97, // Used for client creation, not stored in kiwify_purchases
+      payment_method: paymentMethod, // Used for client creation, not stored in kiwify_purchases
       webhook_data: payload,
     };
 
@@ -342,6 +342,19 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Prepare data for kiwify_purchases table (without amount and payment_method which don't exist in the table)
+    const purchaseRecordData = {
+      email: purchaseData.email,
+      name: purchaseData.name,
+      phone: purchaseData.phone,
+      product_id: purchaseData.product_id,
+      product_name: purchaseData.product_name,
+      order_id: purchaseData.order_id,
+      status: purchaseData.status,
+      purchase_date: purchaseData.purchase_date,
+      webhook_data: purchaseData.webhook_data,
+    };
 
     // Check if purchase already exists (by order_id)
     if (purchaseData.order_id) {
@@ -379,7 +392,7 @@ Deno.serve(async (req) => {
     // Insert new purchase
     const { data: insertedPurchase, error: insertError } = await supabase
       .from('kiwify_purchases')
-      .insert(purchaseData)
+      .insert(purchaseRecordData)
       .select()
       .single();
 
