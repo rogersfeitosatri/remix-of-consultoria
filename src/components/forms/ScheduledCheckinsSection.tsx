@@ -1,18 +1,26 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { useScheduledCheckins } from '@/hooks/useScheduledCheckins';
+import { useScheduledCheckins, useUpdateScheduledCheckin } from '@/hooks/useScheduledCheckins';
 import { useClients } from '@/hooks/useClients';
+import { useCheckinForms } from '@/hooks/useCheckinForms';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, Calendar, ClipboardCheck, ChevronDown, ChevronRight, User } from 'lucide-react';
+import { Loader2, Calendar, ClipboardCheck, ChevronDown, ChevronRight, User, Send, Check, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function ScheduledCheckinsSection() {
   const { data: checkins = [], isLoading: checkinsLoading } = useScheduledCheckins();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
+  const { data: forms = [] } = useCheckinForms();
+  const updateCheckin = useUpdateScheduledCheckin();
+  const { toast } = useToast();
   const [openClients, setOpenClients] = useState<Set<string>>(new Set());
+  const [sendingCheckins, setSendingCheckins] = useState<Set<string>>(new Set());
 
   const toggleClient = (clientId: string) => {
     setOpenClients(prev => {
@@ -24,6 +32,114 @@ export function ScheduledCheckinsSection() {
       }
       return newSet;
     });
+  };
+
+  const getClient = (clientId: string) => {
+    return clients.find(c => c.id === clientId);
+  };
+
+  const getActiveForm = () => {
+    return forms.find(f => f.is_active);
+  };
+
+  const handleSendCheckin = async (checkinId: string, clientId: string) => {
+    const client = getClient(clientId);
+    const activeForm = getActiveForm();
+
+    if (!client) {
+      toast({
+        title: 'Erro',
+        description: 'Cliente não encontrado.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!client.phone) {
+      toast({
+        title: 'Erro',
+        description: 'O cliente não possui telefone cadastrado.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSendingCheckins(prev => new Set(prev).add(checkinId));
+
+    try {
+      // Generate checkin form link
+      const baseUrl = window.location.origin;
+      const formLink = activeForm 
+        ? `${baseUrl}/form/${activeForm.id}?client=${clientId}`
+        : `${baseUrl}/form?client=${clientId}`;
+
+      const message = `📋 *Checkin Semanal*
+
+Olá, ${client.name}! 👋
+
+É hora do seu checkin! Por favor, preencha o formulário para que possamos acompanhar seu progresso.
+
+🔗 *Acesse aqui:* ${formLink}
+
+Após preencher, aguarde o feedback da nossa equipe.
+
+💪 Continue firme na jornada!`;
+
+      const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+        body: {
+          clientId: clientId,
+          message: message,
+        },
+      });
+
+      if (error) throw error;
+
+      // Update checkin status to sent
+      await updateCheckin.mutateAsync({
+        id: checkinId,
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+      });
+
+      toast({
+        title: 'Checkin enviado!',
+        description: `Mensagem enviada para ${client.name} via WhatsApp.`,
+      });
+    } catch (error: any) {
+      console.error('Error sending checkin:', error);
+      toast({
+        title: 'Erro ao enviar',
+        description: error.message || 'Não foi possível enviar o checkin.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingCheckins(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(checkinId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleMarkAsSent = async (checkinId: string) => {
+    try {
+      await updateCheckin.mutateAsync({
+        id: checkinId,
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+      });
+
+      toast({
+        title: 'Marcado como enviado',
+        description: 'O checkin foi marcado como enviado.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar o status.',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (checkinsLoading || clientsLoading) {
@@ -56,11 +172,6 @@ export function ScheduledCheckinsSection() {
     return acc;
   }, {} as Record<string, typeof checkins>);
 
-  // Get client helper
-  const getClient = (clientId: string) => {
-    return clients.find(c => c.id === clientId);
-  };
-
   // Filter clients with pending checkins
   const clientsWithPendingCheckins = Object.entries(checkinsByClient)
     .filter(([_, clientCheckins]) => clientCheckins.some(c => c.status === 'pending'))
@@ -85,7 +196,7 @@ export function ScheduledCheckinsSection() {
           <ClipboardCheck className="h-5 w-5" />
           Check-ins Agendados
         </CardTitle>
-        <CardDescription className="flex items-center gap-4 mt-2">
+        <CardDescription className="flex flex-wrap items-center gap-4 mt-2">
           <span>Visualize os check-ins programados para envio via WhatsApp</span>
           {overdueCount > 0 && (
             <Badge variant="destructive">{overdueCount} atrasado{overdueCount > 1 ? 's' : ''}</Badge>
@@ -160,33 +271,63 @@ export function ScheduledCheckinsSection() {
                           const checkinDate = parseISO(checkin.scheduled_send_date);
                           const isOverdue = isBefore(checkinDate, today);
                           const isUpcoming = isAfter(checkinDate, today) && isBefore(checkinDate, next7Days);
+                          const isSending = sendingCheckins.has(checkin.id);
 
                           return (
                             <div
                               key={checkin.id}
                               className={cn(
-                                "flex items-center justify-between p-2 rounded-md border text-sm",
+                                "flex items-center justify-between p-2 rounded-md border text-sm gap-2",
                                 isOverdue ? "border-destructive/30 bg-destructive/5" : 
                                 isUpcoming ? "border-primary/30 bg-primary/5" : "bg-muted/30"
                               )}
                             >
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-3 w-3 text-muted-foreground" />
-                                <span>
-                                  {format(checkinDate, "EEEE, dd/MM/yyyy", { locale: ptBR })}
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                <span className="truncate">
+                                  {format(checkinDate, "EEE, dd/MM", { locale: ptBR })}
                                 </span>
                                 {checkin.scheduled_send_time && (
-                                  <span className="text-muted-foreground">
-                                    às {checkin.scheduled_send_time.substring(0, 5)}
+                                  <span className="text-muted-foreground text-xs">
+                                    {checkin.scheduled_send_time.substring(0, 5)}
                                   </span>
                                 )}
                               </div>
-                              <Badge 
-                                variant={isOverdue ? "destructive" : isUpcoming ? "default" : "secondary"}
-                                className="text-xs"
-                              >
-                                {isOverdue ? "Atrasado" : isUpcoming ? "Em breve" : "Pendente"}
-                              </Badge>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMarkAsSent(checkin.id);
+                                  }}
+                                  disabled={isSending}
+                                  title="Marcar como enviado"
+                                >
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={isOverdue ? "destructive" : "default"}
+                                  className="h-7 px-2 text-xs gap-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSendCheckin(checkin.id, checkin.client_id);
+                                  }}
+                                  disabled={isSending}
+                                  title="Enviar via WhatsApp"
+                                >
+                                  {isSending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <MessageCircle className="h-3 w-3" />
+                                      Enviar
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
                             </div>
                           );
                         })}
