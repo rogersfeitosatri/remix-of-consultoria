@@ -175,19 +175,18 @@ async function createClientFromPurchase(supabase: any, purchaseData: any) {
     console.error('Error creating payment:', paymentError);
   }
 
-  // Generate scheduled checkins
+  // Generate scheduled checkins (exactly 2 for Kiwify, with 15-day rule)
   try {
-    const checkinSchedules = generateCheckinSchedules(
+    const checkinSchedules = generateKiwifyCheckinSchedules(
       adminUserId,
       newClient.id,
       clientData.start_date,
-      clientData.end_date,
-      'biweekly' // Biweekly checkin for Kiwify clients
+      clientData.end_date
     );
 
     if (checkinSchedules.length > 0) {
       await supabase.from('scheduled_checkins').insert(checkinSchedules);
-      console.log(`Created ${checkinSchedules.length} scheduled checkins for client:`, newClient.id);
+      console.log(`Created ${checkinSchedules.length} scheduled checkins for Kiwify client:`, newClient.id);
     }
   } catch (checkinError) {
     console.error('Error creating scheduled checkins:', checkinError);
@@ -224,40 +223,33 @@ function calculateFirstCheckinMonday(startDate: Date): Date {
   return firstMonday;
 }
 
-// Generate scheduled checkins based on client's plan
-function generateCheckinSchedules(
+// Generate scheduled checkins for Kiwify plans: exactly 2 checkins
+// Rule: Last checkin must be at least 15 days before plan end, no checkin within 14 days of plan end
+function generateKiwifyCheckinSchedules(
   userId: string,
   clientId: string,
   startDate: string,
-  endDate: string,
-  checkinFrequency: string
+  endDate: string
 ): { client_id: string; user_id: string; form_id: null; scheduled_send_date: string; scheduled_send_time: string; status: string; sent_at: null; response_id: null; notes: null }[] {
   const schedules: any[] = [];
   
   const planStart = new Date(startDate);
   const planEnd = new Date(endDate);
   
-  // Calculate first valid Monday
-  let currentMonday = calculateFirstCheckinMonday(planStart);
+  // Calculate first valid Monday (at least 6 days from start)
+  let firstMonday = calculateFirstCheckinMonday(planStart);
   
-  // Frequency in weeks
-  const frequencyWeeks: Record<string, number> = {
-    daily: 1, // Still send on Mondays only
-    weekly: 1,
-    biweekly: 2,
-    monthly: 4,
-    bimonthly: 8,
-    quarterly: 12,
-  };
+  // Calculate the cutoff date: 15 days before plan end (no checkin within 14 days of end)
+  const cutoffDate = new Date(planEnd);
+  cutoffDate.setDate(cutoffDate.getDate() - 14);
   
-  const weeksBetween = frequencyWeeks[checkinFrequency] || 1;
-  
-  while (currentMonday <= planEnd) {
+  // First checkin
+  if (firstMonday <= cutoffDate) {
     schedules.push({
       client_id: clientId,
       user_id: userId,
       form_id: null,
-      scheduled_send_date: currentMonday.toISOString().split('T')[0],
+      scheduled_send_date: firstMonday.toISOString().split('T')[0],
       scheduled_send_time: '07:00:00',
       status: 'pending',
       sent_at: null,
@@ -265,9 +257,26 @@ function generateCheckinSchedules(
       notes: null,
     });
     
-    // Move to next scheduled Monday
-    currentMonday.setDate(currentMonday.getDate() + weeksBetween * 7);
+    // Second checkin: 2 weeks after first (biweekly), but must be at least 15 days before end
+    const secondMonday = new Date(firstMonday);
+    secondMonday.setDate(secondMonday.getDate() + 14); // 2 weeks later
+    
+    if (secondMonday <= cutoffDate) {
+      schedules.push({
+        client_id: clientId,
+        user_id: userId,
+        form_id: null,
+        scheduled_send_date: secondMonday.toISOString().split('T')[0],
+        scheduled_send_time: '07:00:00',
+        status: 'pending',
+        sent_at: null,
+        response_id: null,
+        notes: null,
+      });
+    }
   }
+  
+  console.log(`Generated ${schedules.length} checkins for Kiwify client. Plan: ${startDate} to ${endDate}, Cutoff: ${cutoffDate.toISOString().split('T')[0]}`);
   
   return schedules;
 }
