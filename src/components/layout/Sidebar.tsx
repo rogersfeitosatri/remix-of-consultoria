@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, PersonStanding, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText, Link } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, PersonStanding, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText, Link, Library } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ const navItems = [
   { to: '/content', icon: FileText, label: 'Conteúdo Atleta' },
   { to: '/link-bio', icon: Link, label: 'Link da Bio' },
   { to: '/forms', icon: ClipboardList, label: 'Formulários' },
+  { to: '/question-bank', icon: Library, label: 'Banco de Perguntas' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
 ];
 

@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, ChevronRight, CheckCircle, User } from 'lucide-react';
+import { FileText, ChevronRight, CheckCircle, User, Trash2, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +10,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface PendingAnamneseClient {
   id: string;
@@ -23,6 +34,8 @@ export function PendingAnamneseList() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<PendingAnamneseClient | null>(null);
 
   // Fetch clients with pending anamnese status
   const { data: pendingClients = [], isLoading } = useQuery({
@@ -76,6 +89,50 @@ export function PendingAnamneseList() {
       toast.error('Erro ao atualizar status');
     },
   });
+
+  const deleteClient = useMutation({
+    mutationFn: async (clientId: string) => {
+      // First delete related anamnese responses if any
+      await supabase
+        .from('anamnese_responses')
+        .delete()
+        .eq('client_id', clientId);
+      
+      // Delete athlete profile if exists
+      await supabase
+        .from('athlete_profiles')
+        .delete()
+        .eq('client_id', clientId);
+      
+      // Delete the client
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending_anamnese_clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success('Atleta excluído com sucesso!');
+      setDeleteDialogOpen(false);
+      setClientToDelete(null);
+    },
+    onError: () => {
+      toast.error('Erro ao excluir atleta');
+    },
+  });
+
+  const handleDeleteClick = (client: PendingAnamneseClient) => {
+    setClientToDelete(client);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (clientToDelete) {
+      deleteClient.mutate(clientToDelete.id);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -163,12 +220,36 @@ export function PendingAnamneseList() {
                           className="h-8 w-8"
                           onClick={(e) => {
                             e.stopPropagation();
+                            navigate(`/clients/${client.id}`);
+                          }}
+                          title="Editar atleta"
+                        >
+                          <Edit className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             markAsReviewed.mutate(client.id);
                           }}
                           disabled={markAsReviewed.isPending}
                           title="Aprovar e ativar atleta"
                         >
                           <CheckCircle className="h-4 w-4 text-green-500" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(client);
+                          }}
+                          title="Excluir atleta"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                         <ChevronRight 
                           className="h-4 w-4 text-muted-foreground cursor-pointer" 
@@ -204,9 +285,35 @@ export function PendingAnamneseList() {
                           </p>
                         </div>
                       </div>
-                      <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
-                        Pendente
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+                          Pendente
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/clients/${client.id}`);
+                          }}
+                          title="Editar atleta"
+                        >
+                          <Edit className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(client);
+                          }}
+                          title="Excluir atleta"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -215,6 +322,27 @@ export function PendingAnamneseList() {
           </div>
         )}
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá excluir permanentemente o atleta "{clientToDelete?.name}" e todos os dados associados (anamnese, perfil). Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

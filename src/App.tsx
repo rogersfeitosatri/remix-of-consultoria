@@ -28,6 +28,7 @@ import PublicBooking from "./pages/PublicBooking";
 import ContentManager from "./pages/ContentManager";
 import LinkBio from "./pages/LinkBio";
 import LinkBioManager from "./pages/LinkBioManager";
+import QuestionBank from "./pages/QuestionBank";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -99,6 +100,7 @@ function AppRoutes() {
       <Route path="/content" element={<ProtectedRoute adminOnly><ContentManager /></ProtectedRoute>} />
       <Route path="/link-bio" element={<ProtectedRoute adminOnly><LinkBioManager /></ProtectedRoute>} />
       <Route path="/forms" element={<ProtectedRoute adminOnly><Forms /></ProtectedRoute>} />
+      <Route path="/question-bank" element={<ProtectedRoute adminOnly><QuestionBank /></ProtectedRoute>} />
       <Route path="/checkin" element={<ProtectedRoute adminOnly><Checkin /></ProtectedRoute>} />
       <Route path="/checkin/:formId" element={<ProtectedRoute adminOnly><CheckinFormBuilder /></ProtectedRoute>} />
       <Route path="/anamnese/:formId" element={<ProtectedRoute adminOnly><AnamneseFormBuilder /></ProtectedRoute>} />
