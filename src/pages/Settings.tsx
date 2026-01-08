@@ -2,8 +2,9 @@ import { useState, useRef } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useClients, usePayments, useAddClient, Client } from '@/hooks/useClients';
-import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle } from 'lucide-react';
+import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -545,408 +546,446 @@ export default function Settings() {
           </p>
         </div>
 
-        {/* Export Card */}
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5 text-primary" />
-              Exportar Dados do CRM
-            </CardTitle>
-            <CardDescription>
-              Exporte uma lista completa de todos os atletas cadastrados com suas informações
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg bg-muted/50 p-4">
-              <h4 className="font-medium text-foreground mb-2">Campos incluídos na exportação:</h4>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Nome Completo do Atleta
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  E-mail
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Telefone
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Último Valor Pago
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Tipo de Pagamento
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Data do Último Pagamento
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Tipo de Plano
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Data de Início do Plano
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Data de Término do Plano
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Frequência de Check-in
-                </li>
-              </ul>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button 
-                onClick={handleExportCSV} 
-                disabled={isExporting || clients.length === 0}
-                className="gap-2"
-                variant="outline"
-              >
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                Exportar CSV
-              </Button>
-              <Button 
-                onClick={handleExportXLSX} 
-                disabled={isExporting || clients.length === 0}
-                className="gap-2"
-              >
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileSpreadsheet className="h-4 w-4" />
-                )}
-                Exportar Excel (.xlsx)
-              </Button>
-            </div>
-
-            {clients.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                Nenhum atleta cadastrado para exportar.
-              </p>
-            )}
-
-            {clients.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Total de {clients.length} atleta{clients.length !== 1 ? 's' : ''} será{clients.length !== 1 ? 'ão' : ''} exportado{clients.length !== 1 ? 's' : ''}.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Template Download Card */}
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileDown className="h-5 w-5 text-primary" />
-              Planilha Modelo para Importação
-            </CardTitle>
-            <CardDescription>
-              Baixe uma planilha modelo Excel para preencher e importar dados de atletas
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg bg-muted/50 p-4">
-              <h4 className="font-medium text-foreground mb-2">Campos incluídos no modelo:</h4>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Nome Completo
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  E-mail
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Telefone
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Valor Pago (R$)
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Tipo de Pagamento
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Data de Pagamento
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Tipo de Serviço
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Tipo de Plano
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Duração do Plano
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Possui Check-in
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Frequência Check-in
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Data de Início
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Data de Término
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Possui Consultas
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Qtd. de Consultas
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Periodicidade Consultas
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Data da 1ª Consulta
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Atleta Ativo
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Observações
-                </li>
-              </ul>
-            </div>
-
-            <Button 
-              onClick={handleDownloadTemplate} 
-              className="gap-2"
-              variant="outline"
-            >
-              <FileDown className="h-4 w-4" />
-              Baixar Planilha Modelo (.xlsx)
-            </Button>
-
-            <p className="text-sm text-muted-foreground">
-              A planilha inclui uma aba com instruções detalhadas de preenchimento.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Import Athletes Card */}
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-primary" />
-              Importar Atletas
-            </CardTitle>
-            <CardDescription>
-              Importe atletas em massa usando a planilha modelo preenchida
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg bg-muted/50 p-4">
-              <h4 className="font-medium text-foreground mb-2">Como importar:</h4>
-              <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                <li>Baixe a planilha modelo acima</li>
-                <li>Preencha os dados dos atletas seguindo as instruções</li>
-                <li>Salve o arquivo e faça o upload abaixo</li>
-              </ol>
-            </div>
-
-            {importErrors.length > 0 && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <div className="font-medium mb-2">Erros encontrados na planilha:</div>
-                  <ul className="list-disc list-inside space-y-1 text-sm max-h-40 overflow-y-auto">
-                    {importErrors.map((error, index) => (
-                      <li key={index}>{error}</li>
-                    ))}
+        {/* Accordion for all sections */}
+        <Accordion type="single" collapsible className="space-y-4">
+          {/* Export Card */}
+          <AccordionItem value="export" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <FileSpreadsheet className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Exportar Dados do CRM</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Exporte uma lista completa de todos os atletas cadastrados
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <div className="space-y-4">
+                <div className="rounded-lg bg-muted/50 p-4">
+                  <h4 className="font-medium text-foreground mb-2">Campos incluídos na exportação:</h4>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Nome Completo do Atleta
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      E-mail
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Telefone
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Último Valor Pago
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Tipo de Pagamento
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Data do Último Pagamento
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Tipo de Plano
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Data de Início do Plano
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Data de Término do Plano
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Frequência de Check-in
+                    </li>
                   </ul>
-                </AlertDescription>
-              </Alert>
-            )}
+                </div>
 
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImportFile}
-              accept=".xlsx,.xls"
-              className="hidden"
-            />
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button 
+                    onClick={handleExportCSV} 
+                    disabled={isExporting || clients.length === 0}
+                    className="gap-2"
+                    variant="outline"
+                  >
+                    {isExporting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    Exportar CSV
+                  </Button>
+                  <Button 
+                    onClick={handleExportXLSX} 
+                    disabled={isExporting || clients.length === 0}
+                    className="gap-2"
+                  >
+                    {isExporting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileSpreadsheet className="h-4 w-4" />
+                    )}
+                    Exportar Excel (.xlsx)
+                  </Button>
+                </div>
 
-            <Button 
-              onClick={() => fileInputRef.current?.click()} 
-              disabled={isImporting}
-              className="gap-2"
-            >
-              {isImporting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-              {isImporting ? 'Importando...' : 'Selecionar Planilha para Importar'}
-            </Button>
+                {clients.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum atleta cadastrado para exportar.
+                  </p>
+                )}
 
-            <p className="text-sm text-muted-foreground">
-              Formatos aceitos: .xlsx, .xls
-            </p>
-          </CardContent>
-        </Card>
+                {clients.length > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Total de {clients.length} atleta{clients.length !== 1 ? 's' : ''} será{clients.length !== 1 ? 'ão' : ''} exportado{clients.length !== 1 ? 's' : ''}.
+                  </p>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
 
-        {/* Scheduled Checkins Overview */}
-        <ScheduledCheckinsOverview />
+          {/* Template Download */}
+          <AccordionItem value="template" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <FileDown className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Planilha Modelo para Importação</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Baixe uma planilha modelo Excel para preencher e importar dados de atletas
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <div className="space-y-4">
+                <div className="rounded-lg bg-muted/50 p-4">
+                  <h4 className="font-medium text-foreground mb-2">Campos incluídos no modelo:</h4>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Nome Completo
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      E-mail
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Telefone
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Valor Pago (R$)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Tipo de Pagamento
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Data de Pagamento
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Tipo de Serviço
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Tipo de Plano
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Duração do Plano
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Possui Check-in
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Frequência Check-in
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Data de Início
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Data de Término
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Possui Consultas
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Qtd. de Consultas
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Periodicidade Consultas
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Data da 1ª Consulta
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Atleta Ativo
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Observações
+                    </li>
+                  </ul>
+                </div>
 
-        {/* Full Backup Card */}
-        <Card className="border-border bg-card border-primary/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileDown className="h-5 w-5 text-primary" />
-              Backup Completo do Sistema
-            </CardTitle>
-            <CardDescription>
-              Exporte todos os dados do sistema para backup (atletas, checkins, agendamentos, formulários, etc.)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg bg-muted/50 p-4">
-              <h4 className="font-medium text-foreground mb-2">Dados incluídos no backup:</h4>
-              <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Atletas
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Pagamentos
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Perfis de Atleta
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Check-ins
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Anamneses
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Agendamentos
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Consultas
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Materiais de Suporte
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-success" />
-                  Contas a Pagar
-                </li>
-              </ul>
-            </div>
+                <Button 
+                  onClick={handleDownloadTemplate} 
+                  className="gap-2"
+                  variant="outline"
+                >
+                  <FileDown className="h-4 w-4" />
+                  Baixar Planilha Modelo (.xlsx)
+                </Button>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button 
-                onClick={async () => {
-                  try {
-                    const { exportFullBackup } = await import('@/hooks/useBackup');
-                    await exportFullBackup();
-                    toast.success('Backup exportado com sucesso!');
-                  } catch (error) {
-                    toast.error('Erro ao exportar backup');
-                    console.error(error);
-                  }
-                }}
-                className="gap-2"
-              >
-                <FileDown className="h-4 w-4" />
-                Baixar Backup Completo
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                <p className="text-sm text-muted-foreground">
+                  A planilha inclui uma aba com instruções detalhadas de preenchimento.
+                </p>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
 
-        {/* Restore Backup Card */}
-        <Card className="border-border bg-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-primary" />
-              Restaurar Backup
-            </CardTitle>
-            <CardDescription>
-              Restaure dados a partir de um arquivo de backup (.xlsx)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Atenção:</strong> Esta função irá adicionar novos registros ao sistema. 
-                Dados existentes não serão sobrescritos. Use com cuidado.
-              </AlertDescription>
-            </Alert>
+          {/* Import Athletes */}
+          <AccordionItem value="import" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <Upload className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Importar Atletas</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Importe atletas em massa usando a planilha modelo preenchida
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <div className="space-y-4">
+                <div className="rounded-lg bg-muted/50 p-4">
+                  <h4 className="font-medium text-foreground mb-2">Como importar:</h4>
+                  <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                    <li>Baixe a planilha modelo acima</li>
+                    <li>Preencha os dados dos atletas seguindo as instruções</li>
+                    <li>Salve o arquivo e faça o upload abaixo</li>
+                  </ol>
+                </div>
 
-            <input
-              type="file"
-              id="backup-file-input"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                
-                try {
-                  const { importFullBackup } = await import('@/hooks/useBackup');
-                  const results = await importFullBackup(file);
-                  const totalImported = results.reduce((sum, r) => sum + r.count, 0);
-                  toast.success(`Backup restaurado! ${totalImported} registros importados.`);
-                } catch (error) {
-                  toast.error('Erro ao restaurar backup');
-                  console.error(error);
-                } finally {
-                  e.target.value = '';
-                }
-              }}
-              accept=".xlsx"
-              className="hidden"
-            />
+                {importErrors.length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <div className="font-medium mb-2">Erros encontrados na planilha:</div>
+                      <ul className="list-disc list-inside space-y-1 text-sm max-h-40 overflow-y-auto">
+                        {importErrors.map((error, index) => (
+                          <li key={index}>{error}</li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-            <Button 
-              variant="outline"
-              onClick={() => document.getElementById('backup-file-input')?.click()}
-              className="gap-2"
-            >
-              <Upload className="h-4 w-4" />
-              Selecionar Arquivo de Backup
-            </Button>
-          </CardContent>
-        </Card>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImportFile}
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                />
+
+                <Button 
+                  onClick={() => fileInputRef.current?.click()} 
+                  disabled={isImporting}
+                  className="gap-2"
+                >
+                  {isImporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4" />
+                  )}
+                  {isImporting ? 'Importando...' : 'Selecionar Planilha para Importar'}
+                </Button>
+
+                <p className="text-sm text-muted-foreground">
+                  Formatos aceitos: .xlsx, .xls
+                </p>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Scheduled Checkins Overview */}
+          <AccordionItem value="checkins" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <CalendarCheck className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Check-ins Agendados</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Visualize os check-ins agendados e pendentes dos atletas
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <ScheduledCheckinsOverview />
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Full Backup Card */}
+          <AccordionItem value="backup" className="border border-primary/30 rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <FileDown className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Backup Completo do Sistema</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Exporte todos os dados do sistema para backup
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <div className="space-y-4">
+                <div className="rounded-lg bg-muted/50 p-4">
+                  <h4 className="font-medium text-foreground mb-2">Dados incluídos no backup:</h4>
+                  <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Atletas
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Pagamentos
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Perfis de Atleta
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Check-ins
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Anamneses
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Agendamentos
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Consultas
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Materiais de Suporte
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-success" />
+                      Contas a Pagar
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button 
+                    onClick={async () => {
+                      try {
+                        const { exportFullBackup } = await import('@/hooks/useBackup');
+                        await exportFullBackup();
+                        toast.success('Backup exportado com sucesso!');
+                      } catch (error) {
+                        toast.error('Erro ao exportar backup');
+                        console.error(error);
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Baixar Backup Completo
+                  </Button>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Restore Backup Card */}
+          <AccordionItem value="restore" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <Upload className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Restaurar Backup</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Restaure dados a partir de um arquivo de backup (.xlsx)
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <div className="space-y-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Atenção:</strong> Esta função irá adicionar novos registros ao sistema. 
+                    Dados existentes não serão sobrescritos. Use com cuidado.
+                  </AlertDescription>
+                </Alert>
+
+                <input
+                  type="file"
+                  id="backup-file-input"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    
+                    try {
+                      const { importFullBackup } = await import('@/hooks/useBackup');
+                      const results = await importFullBackup(file);
+                      const totalImported = results.reduce((sum, r) => sum + r.count, 0);
+                      toast.success(`Backup restaurado! ${totalImported} registros importados.`);
+                    } catch (error) {
+                      toast.error('Erro ao restaurar backup');
+                      console.error(error);
+                    } finally {
+                      e.target.value = '';
+                    }
+                  }}
+                  accept=".xlsx"
+                  className="hidden"
+                />
+
+                <Button 
+                  variant="outline"
+                  onClick={() => document.getElementById('backup-file-input')?.click()}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Selecionar Arquivo de Backup
+                </Button>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </Layout>
   );
