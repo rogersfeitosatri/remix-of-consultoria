@@ -302,6 +302,23 @@ export default function SchedulingSettings() {
                     Use apenas letras minúsculas, números e hífens
                   </p>
                 </div>
+                
+                {settings?.booking_link_slug && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/30">
+                    <Check className="h-4 w-4 text-primary" />
+                    <p className="text-sm text-foreground">
+                      <span className="font-medium">Link salvo:</span>{' '}
+                      <a 
+                        href={`${window.location.origin}/agendar/${settings.booking_link_slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        {window.location.origin}/agendar/{settings.booking_link_slug}
+                      </a>
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
