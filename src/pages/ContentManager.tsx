@@ -33,12 +33,12 @@ import {
   type SupportMaterialCategory,
 } from '@/hooks/useSupportMaterials';
 import {
-  useChallengeActivities,
-  useCreateChallengeActivity,
-  useUpdateChallengeActivity,
-  useDeleteChallengeActivity,
-} from '@/hooks/useChallengeActivities';
-import { Home, Utensils, History, FileText, Target, Calendar, Plus, Trash2, Edit, Loader2, Youtube, FileText as TextIcon, GripVertical } from 'lucide-react';
+  useChallengeActivitiesAdmin,
+  useUpdateActivity,
+  useCreateDefaultActivities,
+} from '@/hooks/useChallenge42';
+import { useAuth } from '@/hooks/useAuth';
+import { Home, Utensils, History, FileText, Target, Calendar, Plus, Trash2, Edit, Loader2, Youtube, FileText as TextIcon, GripVertical, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 6 módulos conforme especificado
@@ -52,22 +52,23 @@ const CATEGORIES = [
 ];
 
 export default function ContentManager() {
+  const { user } = useAuth();
   const { data: materials = [], isLoading: materialsLoading } = useSupportMaterials();
   const { data: dietConfig, isLoading: configLoading } = useDietAppConfig();
-  const { data: challengeActivities = [], isLoading: activitiesLoading } = useChallengeActivities();
+  const { data: challengeActivities = [], isLoading: activitiesLoading } = useChallengeActivitiesAdmin();
   const createMaterial = useCreateSupportMaterial();
   const updateMaterial = useUpdateSupportMaterial();
   const deleteMaterial = useDeleteSupportMaterial();
   const saveDietConfig = useSaveDietAppConfig();
-  const createActivity = useCreateChallengeActivity();
-  const updateActivity = useUpdateChallengeActivity();
-  const deleteActivity = useDeleteChallengeActivity();
+  const updateActivity = useUpdateActivity();
+  const createDefaultActivities = useCreateDefaultActivities();
 
   const [activeTab, setActiveTab] = useState('inicio');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<any>(null);
   const [isActivityDialogOpen, setIsActivityDialogOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<any>(null);
+  const [requiredDays, setRequiredDays] = useState(7);
   
   // Form state for materials
   const [title, setTitle] = useState('');
@@ -152,15 +153,10 @@ export default function ContentManager() {
         await updateActivity.mutateAsync({ 
           id: editingActivity.id, 
           title: activityTitle, 
-          description: activityDescription 
+          description: activityDescription,
+          required_days: requiredDays,
         });
         toast.success('Atividade atualizada!');
-      } else {
-        await createActivity.mutateAsync({ 
-          title: activityTitle, 
-          description: activityDescription 
-        });
-        toast.success('Atividade criada!');
       }
       setIsActivityDialogOpen(false);
     } catch (error: any) {
@@ -177,12 +173,13 @@ export default function ContentManager() {
     }
   };
 
-  const handleDeleteActivity = async (id: string) => {
+  const handleCreateDefaultActivities = async () => {
+    if (!user?.id) return;
     try {
-      await deleteActivity.mutateAsync(id);
-      toast.success('Atividade removida!');
+      await createDefaultActivities.mutateAsync(user.id);
+      toast.success('Atividades padrão criadas!');
     } catch (error) {
-      toast.error('Erro ao remover');
+      toast.error('Erro ao criar atividades');
     }
   };
 
@@ -464,54 +461,68 @@ export default function ContentManager() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg">Desafio 42 — Adesão à Dieta</CardTitle>
-                    <CardDescription>Configure as 6 atividades comportamentais que o atleta marcará semanalmente</CardDescription>
+                    <CardTitle className="text-lg">Desafio 42 — Atividades Semanais</CardTitle>
+                    <CardDescription>Configure as 6 atividades semanais. Cada semana tem 1 atividade que o atleta marca por dia.</CardDescription>
                   </div>
-                  <Dialog open={isActivityDialogOpen} onOpenChange={setIsActivityDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="gap-2" onClick={() => handleOpenActivityDialog()}>
-                        <Plus className="h-4 w-4" />
-                        Adicionar Atividade
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{editingActivity ? 'Editar Atividade' : 'Nova Atividade'}</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label>Título da Atividade</Label>
-                          <Input value={activityTitle} onChange={(e) => setActivityTitle(e.target.value)} placeholder="Ex: Beber 2L de água por dia" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Descrição (opcional)</Label>
-                          <Textarea value={activityDescription} onChange={(e) => setActivityDescription(e.target.value)} placeholder="Detalhes sobre como realizar a atividade..." rows={3} />
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsActivityDialogOpen(false)}>Cancelar</Button>
-                        <Button onClick={handleSaveActivity} disabled={createActivity.isPending || updateActivity.isPending}>Salvar</Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                  {challengeActivities.length === 0 && (
+                    <Button 
+                      size="sm" 
+                      className="gap-2" 
+                      onClick={handleCreateDefaultActivities}
+                      disabled={createDefaultActivities.isPending}
+                    >
+                      {createDefaultActivities.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Wand2 className="h-4 w-4" />
+                      )}
+                      Criar Atividades Padrão
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
                 {challengeActivities.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">Nenhuma atividade cadastrada. Adicione até 6 atividades comportamentais.</p>
+                  <div className="text-center py-8">
+                    <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground mb-4">
+                      Nenhuma atividade configurada. Clique em "Criar Atividades Padrão" para gerar 6 semanas de atividades.
+                    </p>
+                  </div>
                 ) : (
                   <div className="space-y-3">
-                    {challengeActivities.map((activity, index) => (
+                    {challengeActivities.slice(0, 6).map((activity, index) => (
                       <div key={activity.id} className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium">{index + 1}</span>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold">
+                          S{index + 1}
+                        </span>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm">{activity.title}</p>
-                          {activity.description && <p className="text-xs text-muted-foreground truncate">{activity.description}</p>}
+                          {activity.description && (
+                            <p className="text-xs text-muted-foreground truncate">{activity.description}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Dias necessários: {activity.required_days || 7}/7
+                          </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Switch checked={activity.is_active} onCheckedChange={(checked) => handleToggleActivityActive(activity.id, checked)} />
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenActivityDialog(activity)}><Edit className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteActivity(activity.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                          <Switch 
+                            checked={activity.is_active} 
+                            onCheckedChange={(checked) => handleToggleActivityActive(activity.id, checked)} 
+                          />
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => {
+                              setEditingActivity(activity);
+                              setActivityTitle(activity.title);
+                              setActivityDescription(activity.description || '');
+                              setRequiredDays(activity.required_days || 7);
+                              setIsActivityDialogOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -519,6 +530,57 @@ export default function ContentManager() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Activity Edit Dialog */}
+            <Dialog open={isActivityDialogOpen} onOpenChange={setIsActivityDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar Atividade da Semana</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Título da Atividade</Label>
+                    <Input 
+                      value={activityTitle} 
+                      onChange={(e) => setActivityTitle(e.target.value)} 
+                      placeholder="Ex: Hidratação - Beber 2L de água" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descrição</Label>
+                    <Textarea 
+                      value={activityDescription} 
+                      onChange={(e) => setActivityDescription(e.target.value)} 
+                      placeholder="Detalhes sobre como realizar a atividade..." 
+                      rows={3} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Dias necessários para completar (de 7)</Label>
+                    <Select 
+                      value={String(requiredDays)} 
+                      onValueChange={(v) => setRequiredDays(Number(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[5, 6, 7].map(n => (
+                          <SelectItem key={n} value={String(n)}>{n} de 7 dias</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsActivityDialogOpen(false)}>Cancelar</Button>
+                  <Button onClick={handleSaveActivity} disabled={updateActivity.isPending}>
+                    {updateActivity.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Salvar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* ======== ABA CONTROLE DIÁRIO ======== */}

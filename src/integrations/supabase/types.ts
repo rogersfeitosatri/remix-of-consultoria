@@ -268,6 +268,44 @@ export type Database = {
           },
         ]
       }
+      athlete_challenge_progress: {
+        Row: {
+          client_id: string
+          completed_weeks: number[] | null
+          created_at: string
+          current_week: number
+          id: string
+          started_at: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          completed_weeks?: number[] | null
+          created_at?: string
+          current_week?: number
+          id?: string
+          started_at?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          completed_weeks?: number[] | null
+          created_at?: string
+          current_week?: number
+          id?: string
+          started_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_challenge_progress_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_profiles: {
         Row: {
           anamnese_submitted_at: string | null
@@ -489,7 +527,9 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          is_default: boolean | null
           order_index: number | null
+          required_days: number | null
           title: string
           updated_at: string
           user_id: string
@@ -499,7 +539,9 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_default?: boolean | null
           order_index?: number | null
+          required_days?: number | null
           title: string
           updated_at?: string
           user_id: string
@@ -509,12 +551,52 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_default?: boolean | null
           order_index?: number | null
+          required_days?: number | null
           title?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      challenge_daily_marks: {
+        Row: {
+          client_id: string
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string
+          day_of_week: number
+          id: string
+          week_number: number
+        }
+        Insert: {
+          client_id: string
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          day_of_week: number
+          id?: string
+          week_number: number
+        }
+        Update: {
+          client_id?: string
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_daily_marks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       challenge_weekly_marks: {
         Row: {
