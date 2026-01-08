@@ -13,7 +13,7 @@ import { ptBR } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { EvolutionCharts } from '@/components/athlete/EvolutionCharts';
 import { AthleteSidebar } from '@/components/athlete/AthleteSidebar';
-import { Challenge42Section } from '@/components/athlete/Challenge42Section';
+import { Challenge42SectionNew } from '@/components/athlete/Challenge42SectionNew';
 import { DailyControlSection } from '@/components/athlete/DailyControlSection';
 import { LinkifiedText } from '@/lib/linkify';
 
@@ -137,7 +137,7 @@ export default function AthleteDashboard() {
             </TabsContent>
 
             <TabsContent value="desafio42">
-              <Challenge42Section clientId={null} isPreview />
+              <Challenge42SectionNew clientId="" isPreview />
             </TabsContent>
 
             <TabsContent value="controle">
@@ -261,7 +261,7 @@ export default function AthleteDashboard() {
             ))}
           </TabsContent>
 
-          <TabsContent value="desafio42"><Challenge42Section clientId={client.id} /></TabsContent>
+          <TabsContent value="desafio42"><Challenge42SectionNew clientId={client.id} isPreview={isAdmin} /></TabsContent>
           <TabsContent value="controle"><DailyControlSection clientId={client.id} /></TabsContent>
         </Tabs>
       </main>
