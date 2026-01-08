@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, FileText, Edit, Trash2, Copy } from 'lucide-react';
+import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck } from 'lucide-react';
 import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm } from '@/hooks/useCheckinForms';
 import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm } from '@/hooks/useAnamneseForms';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +33,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PendingReviewsList } from '@/components/forms/PendingReviewsList';
 import { PendingAnamneseList } from '@/components/forms/PendingAnamneseList';
+import { ScheduledCheckinsSection } from '@/components/forms/ScheduledCheckinsSection';
 
 export default function Forms() {
   const navigate = useNavigate();
@@ -141,16 +142,25 @@ export default function Forms() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsList className="grid w-full grid-cols-3 max-w-lg">
             <TabsTrigger value="checkin" className="gap-2">
               <ClipboardList className="h-4 w-4" />
               Checkin
+            </TabsTrigger>
+            <TabsTrigger value="agendados" className="gap-2">
+              <CalendarCheck className="h-4 w-4" />
+              Agendados
             </TabsTrigger>
             <TabsTrigger value="anamnese" className="gap-2">
               <FileText className="h-4 w-4" />
               Anamnese
             </TabsTrigger>
           </TabsList>
+
+          {/* Scheduled Checkins Tab */}
+          <TabsContent value="agendados" className="space-y-6 mt-6">
+            <ScheduledCheckinsSection />
+          </TabsContent>
 
           {/* Checkin Forms */}
           <TabsContent value="checkin" className="space-y-6 mt-6">
