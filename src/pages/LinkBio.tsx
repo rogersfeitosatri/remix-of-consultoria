@@ -1,7 +1,8 @@
-import { ExternalLink, PersonStanding } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { usePublicLinkBioItems } from '@/hooks/useLinkBio';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import rogersProfile from '@/assets/rogers-profile.jpg';
 
 export default function LinkBio() {
   const { data: items = [], isLoading } = usePublicLinkBioItems();
@@ -19,12 +20,16 @@ export default function LinkBio() {
       {/* Header */}
       <header className="pt-8 pb-6 text-center">
         <div className="flex justify-center mb-4">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[hsl(43,74%,49%)]">
-            <PersonStanding className="h-10 w-10 text-black" />
+          <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-[hsl(43,74%,49%)]">
+            <img 
+              src={rogersProfile} 
+              alt="Rogers Feitosa" 
+              className="w-full h-full object-cover object-top scale-150"
+            />
           </div>
         </div>
-        <h1 className="text-2xl font-bold text-[hsl(43,74%,49%)]">RF Assessoria</h1>
-        <p className="text-gray-400 text-sm">Esportiva</p>
+        <h1 className="text-xl font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1>
+        <p className="text-gray-400 text-sm">Nutrição e Treinamento</p>
       </header>
 
       {/* Links */}
@@ -76,7 +81,7 @@ export default function LinkBio() {
 
       {/* Footer */}
       <footer className="py-6 text-center text-gray-500 text-sm">
-        <p>© 2026 RF Assessoria. Todos os direitos reservados.</p>
+        <p>© 2026 Rogers Feitosa. Todos os direitos reservados.</p>
       </footer>
     </div>
   );
