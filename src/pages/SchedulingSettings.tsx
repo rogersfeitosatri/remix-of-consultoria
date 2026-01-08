@@ -62,8 +62,9 @@ export default function SchedulingSettings() {
   const deleteBlock = useDeleteSchedulingBlock();
 
   const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [startTime, setStartTime] = useState('08:00');
-  const [endTime, setEndTime] = useState('18:00');
+  const [workingPeriods, setWorkingPeriods] = useState<Array<{ start: string; end: string }>>([
+    { start: '08:00', end: '18:00' }
+  ]);
   const [slotDuration, setSlotDuration] = useState(60);
   const [slug, setSlug] = useState('');
   const [copied, setCopied] = useState(false);
@@ -78,8 +79,14 @@ export default function SchedulingSettings() {
   useEffect(() => {
     if (settings) {
       setWorkingDays(settings.working_days);
-      setStartTime(settings.working_hours_start?.substring(0, 5) || '08:00');
-      setEndTime(settings.working_hours_end?.substring(0, 5) || '18:00');
+      // Parse working_hours_start and working_hours_end - supports multiple periods separated by comma
+      const startParts = (settings.working_hours_start || '08:00:00').split(',').map(s => s.substring(0, 5));
+      const endParts = (settings.working_hours_end || '18:00:00').split(',').map(s => s.substring(0, 5));
+      const periods = startParts.map((start, idx) => ({
+        start,
+        end: endParts[idx] || '18:00'
+      }));
+      setWorkingPeriods(periods.length > 0 ? periods : [{ start: '08:00', end: '18:00' }]);
       setSlotDuration(settings.slot_duration_minutes);
       setSlug(settings.booking_link_slug || '');
     }
@@ -87,10 +94,14 @@ export default function SchedulingSettings() {
 
   const handleSave = async () => {
     try {
+      // Join multiple periods with comma
+      const starts = workingPeriods.map(p => p.start + ':00').join(',');
+      const ends = workingPeriods.map(p => p.end + ':00').join(',');
+      
       await saveSettings.mutateAsync({
         working_days: workingDays,
-        working_hours_start: startTime + ':00',
-        working_hours_end: endTime + ':00',
+        working_hours_start: starts,
+        working_hours_end: ends,
         slot_duration_minutes: slotDuration,
         booking_link_slug: slug || null,
       });
@@ -98,6 +109,22 @@ export default function SchedulingSettings() {
     } catch (error: any) {
       toast.error(error.message || 'Erro ao salvar');
     }
+  };
+
+  const addWorkingPeriod = () => {
+    setWorkingPeriods([...workingPeriods, { start: '14:00', end: '18:00' }]);
+  };
+
+  const removeWorkingPeriod = (index: number) => {
+    if (workingPeriods.length > 1) {
+      setWorkingPeriods(workingPeriods.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateWorkingPeriod = (index: number, field: 'start' | 'end', value: string) => {
+    const updated = [...workingPeriods];
+    updated[index][field] = value;
+    setWorkingPeriods(updated);
   };
 
   const handleAddBlock = async () => {
@@ -217,37 +244,64 @@ export default function SchedulingSettings() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Horário de Atendimento</CardTitle>
-                <CardDescription>Defina o horário de início e fim do seu expediente</CardDescription>
+                <CardDescription>Defina os turnos de atendimento (ex: manhã e tarde)</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label>Início</Label>
-                    <Select value={startTime} onValueChange={setStartTime}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TIME_OPTIONS.map(time => (
-                          <SelectItem key={time} value={time}>{time}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              <CardContent className="space-y-4">
+                {workingPeriods.map((period, index) => (
+                  <div key={index} className="flex items-end gap-3 p-4 rounded-lg border bg-muted/30">
+                    <div className="flex-1 grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Início {workingPeriods.length > 1 ? `(Turno ${index + 1})` : ''}</Label>
+                        <Select value={period.start} onValueChange={(v) => updateWorkingPeriod(index, 'start', v)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.map(time => (
+                              <SelectItem key={time} value={time}>{time}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Término</Label>
+                        <Select value={period.end} onValueChange={(v) => updateWorkingPeriod(index, 'end', v)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIME_OPTIONS.map(time => (
+                              <SelectItem key={time} value={time}>{time}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {workingPeriods.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => removeWorkingPeriod(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label>Término</Label>
-                    <Select value={endTime} onValueChange={setEndTime}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TIME_OPTIONS.map(time => (
-                          <SelectItem key={time} value={time}>{time}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
+                ))}
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={addWorkingPeriod}
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar outro turno
+                </Button>
+
+                <div className="pt-4 border-t">
+                  <div className="space-y-2 max-w-xs">
                     <Label>Duração do Slot</Label>
                     <Select value={slotDuration.toString()} onValueChange={(v) => setSlotDuration(Number(v))}>
                       <SelectTrigger>
