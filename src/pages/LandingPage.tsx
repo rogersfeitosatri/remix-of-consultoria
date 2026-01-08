@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Check, ArrowRight, Gift, Timer, Calendar, MessageCircle, ClipboardCheck, Zap } from "lucide-react";
+import { Check, ArrowRight, Gift, Timer, Calendar, MessageCircle, ClipboardCheck, Zap, Scale } from "lucide-react";
 import { Link } from "react-router-dom";
 import runnerHero from "@/assets/runner-hero.jpg";
 import runner2 from "@/assets/runner-2.jpg";
@@ -33,7 +33,7 @@ export default function LandingPage() {
               </div>
               
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-6 text-white">
-                Acompanhamento Nutricional de 6 Semanas para Corredores
+                Acompanhamento Nutricional para Corredores
               </h1>
               
               <h2 className="text-lg md:text-xl text-gray-400 mb-8">
@@ -185,7 +185,7 @@ export default function LandingPage() {
             </h2>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto">
             <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 md:p-8 rounded-2xl border-2 border-[hsl(43,74%,49%)]/50">
               <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-black text-sm font-bold px-3 py-1 rounded-full mb-4">
                 <Zap className="w-4 h-4" />
@@ -205,6 +205,17 @@ export default function LandingPage() {
               <h3 className="text-lg md:text-xl font-bold text-white mb-3">Atividades comportamentais semanais</h3>
               <p className="text-gray-400 text-sm md:text-base">
                 Receba um desafio prático por semana para ajudá-lo a construir hábitos e melhorar a adesão à dieta. Você precisa dar check diário no sistema para acompanhar sua evolução e garantir que o emagrecimento seja duradouro.
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 md:p-8 rounded-2xl border-2 border-[hsl(43,74%,49%)]/50">
+              <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-black text-sm font-bold px-3 py-1 rounded-full mb-4">
+                <Scale className="w-4 h-4" />
+                BÔNUS 3
+              </div>
+              <h3 className="text-lg md:text-xl font-bold text-white mb-3">Habit Tracker diário</h3>
+              <p className="text-gray-400 text-sm md:text-base">
+                Registre diariamente seu peso e medida de circunferência de cintura. Acompanhe sua evolução com gráficos e tenha controle total sobre seu progresso durante todo o acompanhamento.
               </p>
             </div>
           </div>
