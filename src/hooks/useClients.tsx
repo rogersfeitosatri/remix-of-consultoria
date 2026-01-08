@@ -165,18 +165,19 @@ function generateConsultationSchedules(
   firstConsultationDate: string,
   consultationFrequency: 'once' | 'monthly' | 'six_weeks',
   planDuration: 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
-  endDate: string
+  endDate: string,
+  consultationCount: number // Use the registered consultation count
 ): Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] {
   const schedules: Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] = [];
   const firstDate = parseISO(firstConsultationDate);
   const planEndDate = parseISO(endDate);
 
   console.debug(
-    `[Automação Consultas] Iniciando ciclo de automação para client_id=${clientId} | frequência=${consultationFrequency} | duração=${planDuration} | término=${format(planEndDate, 'yyyy-MM-dd')} | 1ª consulta=${format(firstDate, 'yyyy-MM-dd')}`
+    `[Automação Consultas] Iniciando ciclo de automação para client_id=${clientId} | frequência=${consultationFrequency} | duração=${planDuration} | término=${format(planEndDate, 'yyyy-MM-dd')} | 1ª consulta=${format(firstDate, 'yyyy-MM-dd')} | total_consultas=${consultationCount}`
   );
 
   // If only one consultation or no recurring frequency, just add the first one
-  if (consultationFrequency === 'once') {
+  if (consultationFrequency === 'once' || consultationCount <= 1) {
     schedules.push({
       client_id: clientId,
       user_id: userId,
@@ -198,13 +199,11 @@ function generateConsultationSchedules(
     status: 'pending',
   });
 
-  // Loop de criação de tarefas de envio de link, até ultrapassar o término do plano
+  // Loop de criação de tarefas de envio de link, respeitando consultation_count
   let currentConsultationDate = firstDate;
-  let loop = 0;
+  let consultationsCreated = 1; // First consultation already added
 
-  while (true) {
-    loop += 1;
-
+  while (consultationsCreated < consultationCount) {
     // Fim do intervalo (1 mês ou 6 semanas) a partir da consulta base
     let intervalEndDate: Date;
     if (consultationFrequency === 'monthly') {
@@ -217,7 +216,7 @@ function generateConsultationSchedules(
     const sendLinkDate = getFirstMondayAfter(intervalEndDate);
 
     console.debug(
-      `[Automação Consultas] Loop ${loop}: base=${format(currentConsultationDate, 'yyyy-MM-dd')} | fim_intervalo=${format(intervalEndDate, 'yyyy-MM-dd')} | próxima_tarefa=${format(sendLinkDate, 'yyyy-MM-dd')}`
+      `[Automação Consultas] Consulta ${consultationsCreated + 1}/${consultationCount}: base=${format(currentConsultationDate, 'yyyy-MM-dd')} | fim_intervalo=${format(intervalEndDate, 'yyyy-MM-dd')} | próxima_tarefa=${format(sendLinkDate, 'yyyy-MM-dd')}`
     );
 
     // Condição de parada: se a próxima tarefa ultrapassa o término do plano
@@ -237,6 +236,7 @@ function generateConsultationSchedules(
       status: 'pending',
     });
 
+    consultationsCreated++;
     // Próximo ciclo parte do fim do intervalo atual
     currentConsultationDate = intervalEndDate;
   }
@@ -290,7 +290,8 @@ export function useAddClient() {
           client.first_consultation_date,
           client.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
           client.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
-          client.end_date
+          client.end_date,
+          client.consultation_count || 1
         );
 
         if (schedules.length > 0) {
@@ -392,7 +393,8 @@ export function useUpdateClient() {
             updatedClient.first_consultation_date,
             updatedClient.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
             updatedClient.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
-            updatedClient.end_date
+            updatedClient.end_date,
+            updatedClient.consultation_count || 1
           );
 
           if (schedules.length > 0) {
