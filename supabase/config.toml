@@ -14,3 +14,15 @@ verify_jwt = false
 
 [functions.send-booking-link]
 verify_jwt = false
+
+[functions.create-calendar-event]
+verify_jwt = false
+
+[functions.cancel-calendar-event]
+verify_jwt = false
+
+[functions.reschedule-appointment]
+verify_jwt = false
+
+[functions.send-consultation-reminder]
+verify_jwt = false
