@@ -26,6 +26,7 @@ import AthleteHistory from "./pages/AthleteHistory";
 import CheckinReview from "./pages/CheckinReview";
 import SchedulingSettings from "./pages/SchedulingSettings";
 import PublicBooking from "./pages/PublicBooking";
+import PublicBookingConsult from "./pages/PublicBookingConsult";
 import ContentManager from "./pages/ContentManager";
 import LinkBio from "./pages/LinkBio";
 import LinkBioManager from "./pages/LinkBioManager";
@@ -92,6 +93,7 @@ function AppRoutes() {
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
       <Route path="/anamnese-form/:formId" element={<PublicAnamneseForm />} />
       <Route path="/agendar/:slug" element={<PublicBooking />} />
+      <Route path="/booking/:token" element={<PublicBookingConsult />} />
       <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
       <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
       <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />

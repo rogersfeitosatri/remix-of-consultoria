@@ -218,10 +218,15 @@ export type Database = {
           client_id: string
           consultation_schedule_id: string | null
           created_at: string
+          created_by: string | null
           duration_minutes: number
+          google_calendar_event_id: string | null
+          google_meet_link: string | null
           id: string
           notes: string | null
+          notes_admin: string | null
           status: string
+          timezone: string | null
           updated_at: string
           user_id: string
         }
@@ -231,10 +236,15 @@ export type Database = {
           client_id: string
           consultation_schedule_id?: string | null
           created_at?: string
+          created_by?: string | null
           duration_minutes?: number
+          google_calendar_event_id?: string | null
+          google_meet_link?: string | null
           id?: string
           notes?: string | null
+          notes_admin?: string | null
           status?: string
+          timezone?: string | null
           updated_at?: string
           user_id: string
         }
@@ -244,10 +254,15 @@ export type Database = {
           client_id?: string
           consultation_schedule_id?: string | null
           created_at?: string
+          created_by?: string | null
           duration_minutes?: number
+          google_calendar_event_id?: string | null
+          google_meet_link?: string | null
           id?: string
           notes?: string | null
+          notes_admin?: string | null
           status?: string
+          timezone?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -516,6 +531,86 @@ export type Database = {
             foreignKeyName: "athlete_profiles_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      availability_rules: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_enabled: boolean
+          slot_minutes: number
+          start_time: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_enabled?: boolean
+          slot_minutes?: number
+          start_time: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_enabled?: boolean
+          slot_minutes?: number
+          start_time?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      booking_links: {
+        Row: {
+          active: boolean
+          client_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          last_sent_at: string | null
+          token: string
+          updated_at: string
+          usage_count: number
+        }
+        Insert: {
+          active?: boolean
+          client_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_sent_at?: string | null
+          token?: string
+          updated_at?: string
+          usage_count?: number
+        }
+        Update: {
+          active?: boolean
+          client_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_sent_at?: string | null
+          token?: string
+          updated_at?: string
+          usage_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
@@ -909,6 +1004,7 @@ export type Database = {
           email: string | null
           end_date: string
           first_consultation_date: string | null
+          has_agenda_access: boolean | null
           has_checkin: boolean
           has_consultations: boolean | null
           id: string
@@ -937,6 +1033,7 @@ export type Database = {
           email?: string | null
           end_date: string
           first_consultation_date?: string | null
+          has_agenda_access?: boolean | null
           has_checkin?: boolean
           has_consultations?: boolean | null
           id?: string
@@ -965,6 +1062,7 @@ export type Database = {
           email?: string | null
           end_date?: string
           first_consultation_date?: string | null
+          has_agenda_access?: boolean | null
           has_checkin?: boolean
           has_consultations?: boolean | null
           id?: string
@@ -984,6 +1082,124 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      consult_automation_settings: {
+        Row: {
+          created_at: string
+          id: string
+          is_enabled: boolean
+          message_template_booking: string | null
+          message_template_confirmation: string | null
+          send_day_of_week: number
+          send_time: string
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          message_template_booking?: string | null
+          message_template_confirmation?: string | null
+          send_day_of_week?: number
+          send_time?: string
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          message_template_booking?: string | null
+          message_template_confirmation?: string | null
+          send_day_of_week?: number
+          send_time?: string
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      consult_invite_logs: {
+        Row: {
+          channel: string
+          client_id: string
+          error_message: string | null
+          id: string
+          message_type: string
+          metadata: Json | null
+          sent_at: string
+          status: string
+        }
+        Insert: {
+          channel?: string
+          client_id: string
+          error_message?: string | null
+          id?: string
+          message_type?: string
+          metadata?: Json | null
+          sent_at?: string
+          status?: string
+        }
+        Update: {
+          channel?: string
+          client_id?: string
+          error_message?: string | null
+          id?: string
+          message_type?: string
+          metadata?: Json | null
+          sent_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consult_invite_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consultation_schedule_rules: {
+        Row: {
+          cadence_weeks: number
+          client_id: string
+          created_at: string
+          is_enabled: boolean
+          last_appointment_at: string | null
+          next_invite_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          cadence_weeks?: number
+          client_id: string
+          created_at?: string
+          is_enabled?: boolean
+          last_appointment_at?: string | null
+          next_invite_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cadence_weeks?: number
+          client_id?: string
+          created_at?: string
+          is_enabled?: boolean
+          last_appointment_at?: string | null
+          next_invite_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consultation_schedule_rules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       consultation_schedules: {
         Row: {
@@ -1175,6 +1391,42 @@ export type Database = {
           notes?: string | null
           paid_at?: string | null
           status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      google_calendar_connections: {
+        Row: {
+          calendar_id: string | null
+          created_at: string
+          id: string
+          is_connected: boolean
+          last_sync_at: string | null
+          service_account_email: string | null
+          service_account_key_encrypted: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_id?: string | null
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          last_sync_at?: string | null
+          service_account_email?: string | null
+          service_account_key_encrypted?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calendar_id?: string | null
+          created_at?: string
+          id?: string
+          is_connected?: boolean
+          last_sync_at?: string | null
+          service_account_email?: string | null
+          service_account_key_encrypted?: string | null
           updated_at?: string
           user_id?: string
         }
