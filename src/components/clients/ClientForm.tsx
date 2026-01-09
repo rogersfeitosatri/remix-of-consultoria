@@ -40,6 +40,7 @@ const CHECKIN_LABELS = {
   daily: 'Diário',
   weekly: 'Semanal',
   biweekly: 'Quinzenal',
+  three_weeks: '3 Semanas',
   monthly: 'Mensal',
   bimonthly: 'Bimestral',
   quarterly: 'Trimestral',
@@ -74,7 +75,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     plan_type: client?.plan_type || 'consultoria' as 'consultoria' | 'premium',
     plan_duration: client?.plan_duration || 'monthly' as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual',
     has_checkin: client?.has_checkin ?? true,
-    checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly',
+    checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly',
     start_date: client?.start_date || new Date().toISOString().split('T')[0],
     end_date: client?.end_date || '',
     monthly_value: client?.monthly_value || 0,
@@ -132,6 +133,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       setFormData(prev => ({ ...prev, has_consultations: false }));
     }
   }, [formData.plan_type]);
+
+  // Set checkin frequency to 3 weeks when plan is six_weeks (Emagrecimento para Corredores)
+  useEffect(() => {
+    if (formData.plan_duration === 'six_weeks' && !client) {
+      setFormData(prev => ({ ...prev, checkin_frequency: 'three_weeks' }));
+    }
+  }, [formData.plan_duration, client]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
