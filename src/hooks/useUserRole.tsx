@@ -112,3 +112,23 @@ export function useCheckinResponses(clientId: string | undefined) {
     enabled: !!clientId,
   });
 }
+
+// Hook to get checkin questions for a specific form
+export function useCheckinQuestions(formId: string | undefined) {
+  return useQuery({
+    queryKey: ['checkin_questions', formId],
+    queryFn: async () => {
+      if (!formId) return [];
+
+      const { data, error } = await supabase
+        .from('checkin_questions')
+        .select('*')
+        .eq('form_id', formId)
+        .order('order_index', { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!formId,
+  });
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useUserRole, useAthleteClient, useCheckinResponses } from '@/hooks/useUserRole';
+import { useUserRole, useAthleteClient, useCheckinResponses, useCheckinQuestions } from '@/hooks/useUserRole';
 import { useAthleteSupportMaterials, useAthleteDietAppConfig } from '@/hooks/useSupportMaterials';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { EvolutionCharts } from '@/components/athlete/EvolutionCharts';
+import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
 import { AthleteSidebar } from '@/components/athlete/AthleteSidebar';
 import { Challenge42SectionNew } from '@/components/athlete/Challenge42SectionNew';
 import { DailyControlSection } from '@/components/athlete/DailyControlSection';
@@ -37,6 +38,8 @@ export default function AthleteDashboard() {
   const { isAdmin, isLoading: roleLoading } = useUserRole();
   const { data: client, isLoading: clientLoading } = useAthleteClient();
   const { data: checkinResponses = [], isLoading: responsesLoading } = useCheckinResponses(client?.id);
+  const firstFormId = checkinResponses[0]?.form_id;
+  const { data: checkinQuestions = [] } = useCheckinQuestions(firstFormId);
   const { data: dietConfig } = useAthleteDietAppConfig();
   const { data: inicioMaterials = [] } = useAthleteSupportMaterials('inicio');
   const { data: onboardingMaterials = [] } = useAthleteSupportMaterials('onboarding');
@@ -253,7 +256,11 @@ export default function AthleteDashboard() {
                 ))}</div>
               )}
             </CardContent></Card>
-            {checkinResponses.length > 0 && <Card className="bg-gray-900 border-gray-800 mt-4"><CardHeader><CardTitle className="text-white">Gráficos</CardTitle></CardHeader><CardContent><EvolutionCharts checkinResponses={checkinResponses} /></CardContent></Card>}
+            {checkinResponses.length > 0 && (
+              <div className="mt-4">
+                <CheckinEvolutionCharts responses={checkinResponses} questions={checkinQuestions} />
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="materiais">
