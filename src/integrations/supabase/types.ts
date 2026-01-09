@@ -1004,6 +1004,7 @@ export type Database = {
           consultation_count: number | null
           consultation_frequency: string | null
           created_at: string
+          eligible_for_booking: boolean
           email: string | null
           end_date: string
           first_consultation_date: string | null
@@ -1033,6 +1034,7 @@ export type Database = {
           consultation_count?: number | null
           consultation_frequency?: string | null
           created_at?: string
+          eligible_for_booking?: boolean
           email?: string | null
           end_date: string
           first_consultation_date?: string | null
@@ -1062,6 +1064,7 @@ export type Database = {
           consultation_count?: number | null
           consultation_frequency?: string | null
           created_at?: string
+          eligible_for_booking?: boolean
           email?: string | null
           end_date?: string
           first_consultation_date?: string | null
@@ -1744,6 +1747,7 @@ export type Database = {
       scheduling_settings: {
         Row: {
           booking_link_slug: string | null
+          buffer_minutes: number
           created_at: string
           id: string
           slot_duration_minutes: number
@@ -1755,6 +1759,7 @@ export type Database = {
         }
         Insert: {
           booking_link_slug?: string | null
+          buffer_minutes?: number
           created_at?: string
           id?: string
           slot_duration_minutes?: number
@@ -1766,6 +1771,7 @@ export type Database = {
         }
         Update: {
           booking_link_slug?: string | null
+          buffer_minutes?: number
           created_at?: string
           id?: string
           slot_duration_minutes?: number
