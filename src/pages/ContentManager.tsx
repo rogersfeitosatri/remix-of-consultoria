@@ -37,8 +37,12 @@ import {
   useUpdateActivity,
   useCreateDefaultActivities,
 } from '@/hooks/useChallenge42';
+import {
+  useChallengeActivities,
+  useReorderChallengeActivities,
+} from '@/hooks/useChallengeActivities';
 import { useAuth } from '@/hooks/useAuth';
-import { Home, Utensils, History, FileText, Target, Calendar, Plus, Trash2, Edit, Loader2, Youtube, FileText as TextIcon, GripVertical, Wand2 } from 'lucide-react';
+import { Home, Utensils, History, FileText, Target, Calendar, Plus, Trash2, Edit, Loader2, Youtube, FileText as TextIcon, GripVertical, Wand2, ChevronUp, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 6 módulos conforme especificado
@@ -56,12 +60,14 @@ export default function ContentManager() {
   const { data: materials = [], isLoading: materialsLoading } = useSupportMaterials();
   const { data: dietConfig, isLoading: configLoading } = useDietAppConfig();
   const { data: challengeActivities = [], isLoading: activitiesLoading } = useChallengeActivitiesAdmin();
+  const { data: orderedActivities = [] } = useChallengeActivities();
   const createMaterial = useCreateSupportMaterial();
   const updateMaterial = useUpdateSupportMaterial();
   const deleteMaterial = useDeleteSupportMaterial();
   const saveDietConfig = useSaveDietAppConfig();
   const updateActivity = useUpdateActivity();
   const createDefaultActivities = useCreateDefaultActivities();
+  const reorderActivities = useReorderChallengeActivities();
 
   const [activeTab, setActiveTab] = useState('inicio');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -198,6 +204,28 @@ export default function ContentManager() {
       toast.success(isActive ? 'Atividade ativada' : 'Atividade desativada');
     } catch (error) {
       toast.error('Erro ao atualizar');
+    }
+  };
+
+  // Move activity up or down
+  const handleMoveActivity = async (index: number, direction: 'up' | 'down') => {
+    const activities = [...challengeActivities].slice(0, 6);
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === activities.length - 1) return;
+
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    // Swap order_index values
+    const updates = [
+      { id: activities[index].id, order_index: activities[swapIndex].order_index ?? swapIndex },
+      { id: activities[swapIndex].id, order_index: activities[index].order_index ?? index },
+    ];
+
+    try {
+      await reorderActivities.mutateAsync({ activities: updates });
+      toast.success('Ordem atualizada!');
+    } catch (error) {
+      toast.error('Erro ao reordenar');
     }
   };
 
@@ -493,11 +521,34 @@ export default function ContentManager() {
                   <div className="space-y-3">
                     {challengeActivities.slice(0, 6).map((activity, index) => (
                       <div key={activity.id} className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold">
+                        {/* Reorder buttons */}
+                        <div className="flex flex-col gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleMoveActivity(index, 'up')}
+                            disabled={index === 0 || reorderActivities.isPending}
+                            title="Mover para cima"
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleMoveActivity(index, 'down')}
+                            disabled={index === Math.min(challengeActivities.length, 6) - 1 || reorderActivities.isPending}
+                            title="Mover para baixo"
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-foreground">
                           S{index + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">{activity.title}</p>
+                          <p className="font-medium text-sm text-foreground">{activity.title}</p>
                           {activity.description && (
                             <p className="text-xs text-muted-foreground truncate">{activity.description}</p>
                           )}

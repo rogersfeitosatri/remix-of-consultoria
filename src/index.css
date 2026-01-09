@@ -143,6 +143,53 @@
   }
 }
 
+/* ============================================
+   ADMIN AREA - Global Contrast Fix
+   Ensures all text/icons are readable on dark bg
+   ============================================ */
+.dark {
+  /* Buttons in admin - ensure text is visible */
+  & button:not([class*="bg-"]):not([class*="text-"]) {
+    @apply text-foreground;
+  }
+  
+  /* Ghost/outline buttons should have visible text */
+  & [data-variant="ghost"],
+  & [data-variant="outline"] {
+    @apply text-foreground;
+  }
+}
+
+/* Admin layout specific overrides */
+.dark main {
+  /* All SVG icons in admin should be visible */
+  & svg:not([class*="text-"]) {
+    @apply text-foreground;
+  }
+  
+  /* Ensure link text is visible */
+  & a:not([class*="text-"]) {
+    @apply text-foreground hover:text-primary;
+  }
+  
+  /* Badge/chip text visibility */
+  & [class*="badge"]:not([class*="text-"]),
+  & [class*="chip"]:not([class*="text-"]) {
+    @apply text-foreground;
+  }
+  
+  /* Table text visibility */
+  & table td:not([class*="text-"]),
+  & table th:not([class*="text-"]) {
+    @apply text-foreground;
+  }
+  
+  /* Form labels visibility */
+  & label:not([class*="text-"]) {
+    @apply text-foreground;
+  }
+}
+
 #lovable-badge {
   display:none !important;
 }
