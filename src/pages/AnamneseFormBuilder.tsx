@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -34,7 +36,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, Trash2, GripVertical, Save, Eye, Copy, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, GripVertical, Save, Eye, Copy, Settings, Library, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   useAnamneseFormWithQuestions,
@@ -44,6 +46,7 @@ import {
   useDeleteAnamneseQuestion,
   AnamneseQuestion,
 } from '@/hooks/useAnamneseForms';
+import { useQuestionTemplates, QUESTION_CATEGORIES, type QuestionTemplate } from '@/hooks/useQuestionBank';
 
 const questionTypes = [
   { value: 'text', label: 'Texto Curto' },
@@ -62,6 +65,7 @@ export default function AnamneseFormBuilder() {
   const { toast } = useToast();
 
   const { data: formData, isLoading } = useAnamneseFormWithQuestions(formId);
+  const { data: questionTemplates = [], isLoading: isLoadingTemplates } = useQuestionTemplates('anamnese');
   const updateForm = useUpdateAnamneseForm();
   const addQuestion = useAddAnamneseQuestion();
   const updateQuestion = useUpdateAnamneseQuestion();
@@ -69,6 +73,8 @@ export default function AnamneseFormBuilder() {
 
   const [showQuestionDialog, setShowQuestionDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showBankDialog, setShowBankDialog] = useState(false);
+  const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const [editingQuestion, setEditingQuestion] = useState<AnamneseQuestion | null>(null);
   const [questionData, setQuestionData] = useState({
     question_text: '',
@@ -249,6 +255,65 @@ export default function AnamneseFormBuilder() {
     }
   };
 
+  const handleImportFromBank = async () => {
+    if (selectedTemplates.length === 0) {
+      toast({ title: 'Selecione pelo menos uma pergunta', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const currentQuestionsCount = formData?.questions?.length || 0;
+      
+      for (let i = 0; i < selectedTemplates.length; i++) {
+        const templateId = selectedTemplates[i];
+        const template = questionTemplates.find(t => t.id === templateId);
+        if (!template) continue;
+
+        // Map question types
+        const typeMap: Record<string, string> = {
+          'multiple_choice': 'select',
+          'checkbox': 'multiselect',
+          'text': 'text',
+          'textarea': 'textarea',
+          'scale': 'scale',
+        };
+
+        await addQuestion.mutateAsync({
+          form_id: formId!,
+          question_text: template.question_text,
+          question_type: typeMap[template.question_type] || 'text',
+          section: template.category ? QUESTION_CATEGORIES.find(c => c.value === template.category)?.label || 'Geral' : 'Geral',
+          is_required: template.is_required,
+          has_comment_field: template.has_comment_field,
+          comment_field_required: template.comment_field_required || false,
+          comment_field_label: template.comment_field_label || 'Comentário adicional',
+          options: template.options || null,
+          scale_min: template.scale_min,
+          scale_max: template.scale_max,
+          order_index: currentQuestionsCount + i,
+        });
+      }
+
+      toast({ title: `${selectedTemplates.length} pergunta(s) importada(s) com sucesso!` });
+      setSelectedTemplates([]);
+      setShowBankDialog(false);
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível importar as perguntas.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const toggleTemplateSelection = (templateId: string) => {
+    setSelectedTemplates(prev => 
+      prev.includes(templateId) 
+        ? prev.filter(id => id !== templateId)
+        : [...prev, templateId]
+    );
+  };
+
   const copyFormLink = () => {
     const link = `${window.location.origin}/anamnese-form/${formId}`;
     navigator.clipboard.writeText(link);
@@ -305,7 +370,7 @@ export default function AnamneseFormBuilder() {
               )}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={copyFormLink} className="gap-2">
               <Copy className="h-4 w-4" />
               Copiar Link
@@ -313,6 +378,10 @@ export default function AnamneseFormBuilder() {
             <Button variant="outline" size="sm" onClick={() => setShowSettingsDialog(true)} className="gap-2">
               <Settings className="h-4 w-4" />
               Configurações
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => { setSelectedTemplates([]); setShowBankDialog(true); }} className="gap-2">
+              <Library className="h-4 w-4" />
+              Importar do Banco
             </Button>
             <Button size="sm" onClick={() => handleOpenQuestionDialog()} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -613,6 +682,93 @@ export default function AnamneseFormBuilder() {
             <Button onClick={handleSaveSettings} disabled={updateForm.isPending}>
               Salvar Configurações
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import from Bank Dialog */}
+      <Dialog open={showBankDialog} onOpenChange={setShowBankDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Library className="h-5 w-5" />
+              Importar do Banco de Perguntas
+            </DialogTitle>
+            <DialogDescription>
+              Selecione as perguntas que deseja adicionar ao formulário. As perguntas serão copiadas e a exclusão do formulário não afeta o banco.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="h-[400px] pr-4">
+            {isLoadingTemplates ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : questionTemplates.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Library className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p>Nenhuma pergunta no banco de perguntas.</p>
+                <p className="text-sm mt-1">Acesse o Banco de Perguntas para criar perguntas reutilizáveis.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {QUESTION_CATEGORIES.map(cat => {
+                  const catTemplates = questionTemplates.filter(t => t.category === cat.value);
+                  if (catTemplates.length === 0) return null;
+                  
+                  return (
+                    <div key={cat.value} className="space-y-2">
+                      <h4 className="font-medium text-sm text-muted-foreground">{cat.label}</h4>
+                      {catTemplates.map(template => (
+                        <div
+                          key={template.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            selectedTemplates.includes(template.id) 
+                              ? 'border-primary bg-primary/5' 
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                          onClick={() => toggleTemplateSelection(template.id)}
+                        >
+                          <Checkbox
+                            checked={selectedTemplates.includes(template.id)}
+                            onCheckedChange={() => toggleTemplateSelection(template.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{template.question_text}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              <Badge variant="outline" className="text-xs">
+                                {template.question_type}
+                              </Badge>
+                              {template.is_required && (
+                                <Badge variant="secondary" className="text-xs">Obrigatória</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+
+          <DialogFooter className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              {selectedTemplates.length} pergunta(s) selecionada(s)
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowBankDialog(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleImportFromBank} 
+                disabled={selectedTemplates.length === 0 || addQuestion.isPending}
+              >
+                {addQuestion.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Importar Selecionadas
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
