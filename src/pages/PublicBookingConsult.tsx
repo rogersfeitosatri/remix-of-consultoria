@@ -23,7 +23,15 @@ export default function PublicBookingConsult() {
   
   const { data: bookingLink, isLoading: linkLoading, error: linkError } = useBookingLinkByToken(token);
   const adminUserId = bookingLink?.client?.user_id;
-  const { data: availabilityRules = [] } = useAvailabilityRulesByAdmin(adminUserId);
+  const { data: availabilityRules = [], isLoading: rulesLoading, error: rulesError } = useAvailabilityRulesByAdmin(adminUserId);
+  
+  // Debug logs
+  console.log('[PublicBookingConsult] token:', token);
+  console.log('[PublicBookingConsult] bookingLink:', bookingLink);
+  console.log('[PublicBookingConsult] adminUserId:', adminUserId);
+  console.log('[PublicBookingConsult] availabilityRules:', availabilityRules);
+  console.log('[PublicBookingConsult] rulesLoading:', rulesLoading, 'rulesError:', rulesError);
+  console.log('[PublicBookingConsult] linkError:', linkError);
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
