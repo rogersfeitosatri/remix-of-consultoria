@@ -1,14 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Calendar as CalendarIcon, Clock, CheckCircle2, Video, AlertCircle } from 'lucide-react';
+import { Loader2, Calendar as CalendarIcon, Clock, CheckCircle2, Video, AlertCircle, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useBookingLinkByToken, useAvailabilityRulesByAdmin } from '@/hooks/useConsultations';
+import { useAvailabilityRulesByAdmin } from '@/hooks/useConsultations';
 import { toast } from 'sonner';
-import { format, addDays, parse, isBefore, startOfDay, isAfter, setHours, setMinutes } from 'date-fns';
+import { format, addDays, parse, isBefore, startOfDay, setHours, setMinutes, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import rogersProfile from '@/assets/rogers-profile.jpg';
 
@@ -17,21 +18,39 @@ interface TimeSlot {
   available: boolean;
 }
 
+interface BookingContext {
+  booking_link_id: string;
+  client_id: string;
+  client_name: string;
+  admin_user_id: string;
+  usage_count: number;
+}
+
+interface SchedulingSettings {
+  id: string;
+  user_id: string;
+  slot_duration_minutes: number;
+  buffer_minutes: number;
+  working_days: number[];
+}
+
 export default function PublicBookingConsult() {
   const { token } = useParams<{ token: string }>();
-  const navigate = useNavigate();
   
-  const { data: bookingLink, isLoading: linkLoading, error: linkError } = useBookingLinkByToken(token);
-  const adminUserId = bookingLink?.client?.user_id;
-  const { data: availabilityRules = [], isLoading: rulesLoading, error: rulesError } = useAvailabilityRulesByAdmin(adminUserId);
+  // Email verification state
+  const [emailInput, setEmailInput] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
   
-  // Debug logs
-  console.log('[PublicBookingConsult] token:', token);
-  console.log('[PublicBookingConsult] bookingLink:', bookingLink);
-  console.log('[PublicBookingConsult] adminUserId:', adminUserId);
-  console.log('[PublicBookingConsult] availabilityRules:', availabilityRules);
-  console.log('[PublicBookingConsult] rulesLoading:', rulesLoading, 'rulesError:', rulesError);
-  console.log('[PublicBookingConsult] linkError:', linkError);
+  // Booking context after verification
+  const [bookingContext, setBookingContext] = useState<BookingContext | null>(null);
+  const [clientEmail, setClientEmail] = useState<string | null>(null);
+  const [settings, setSettings] = useState<SchedulingSettings | null>(null);
+  
+  // Availability rules
+  const adminUserId = bookingContext?.admin_user_id;
+  const { data: availabilityRules = [], isLoading: rulesLoading } = useAvailabilityRulesByAdmin(adminUserId);
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -39,6 +58,29 @@ export default function PublicBookingConsult() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [confirmationData, setConfirmationData] = useState<{ date: string; time: string; meetLink?: string } | null>(null);
+
+  // Fetch scheduling settings when we have admin user id
+  useEffect(() => {
+    const fetchSettings = async () => {
+      if (!adminUserId) return;
+      
+      const { data } = await supabase
+        .from('scheduling_settings')
+        .select('id, user_id, slot_duration_minutes, buffer_minutes, working_days')
+        .eq('user_id', adminUserId)
+        .maybeSingle();
+      
+      if (data) {
+        setSettings({
+          ...data,
+          working_days: Array.isArray(data.working_days) ? data.working_days : JSON.parse(data.working_days as string),
+          buffer_minutes: data.buffer_minutes || 0,
+        });
+      }
+    };
+    
+    fetchSettings();
+  }, [adminUserId]);
 
   // Fetch existing appointments to check availability
   useEffect(() => {
@@ -58,17 +100,78 @@ export default function PublicBookingConsult() {
     fetchAppointments();
   }, [adminUserId]);
 
+  // Handle email verification
+  const handleEmailVerification = async () => {
+    if (!emailInput.trim()) {
+      toast.error('Digite seu e-mail');
+      return;
+    }
+    
+    setIsVerifying(true);
+    setVerificationError(null);
+    
+    try {
+      // 1. Validate booking link via RPC
+      const { data: contextData, error: contextError } = await supabase
+        .rpc('get_public_booking_context', { p_token: token });
+      
+      if (contextError || !contextData || contextData.length === 0) {
+        setVerificationError('Link inválido ou expirado.');
+        setIsVerifying(false);
+        return;
+      }
+      
+      const ctx = contextData[0] as BookingContext;
+      
+      // 2. Validate that client email matches
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('id, email, name, eligible_for_booking, is_active')
+        .eq('id', ctx.client_id)
+        .maybeSingle();
+      
+      if (clientError || !clientData) {
+        setVerificationError('Erro ao verificar acesso. Tente novamente.');
+        setIsVerifying(false);
+        return;
+      }
+      
+      // Check if email matches
+      if (clientData.email?.toLowerCase() !== emailInput.toLowerCase().trim()) {
+        setVerificationError('E-mail não autorizado. Verifique se digitou corretamente.');
+        setIsVerifying(false);
+        return;
+      }
+      
+      // Check if client is eligible
+      if (!clientData.eligible_for_booking && !clientData.is_active) {
+        setVerificationError('Acesso não autorizado. Entre em contato com o suporte.');
+        setIsVerifying(false);
+        return;
+      }
+      
+      // Success - set context
+      setBookingContext(ctx);
+      setClientEmail(clientData.email);
+      setIsVerified(true);
+      
+    } catch (error) {
+      console.error('Verification error:', error);
+      setVerificationError('Erro ao verificar acesso. Tente novamente.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   // Calculate available dates based on availability rules
   const availableDates = useMemo(() => {
     const dates: Date[] = [];
     const today = startOfDay(new Date());
     
-    // Check next 60 days
     for (let i = 1; i <= 60; i++) {
       const date = addDays(today, i);
       const dayOfWeek = date.getDay();
       
-      // Check if there's an availability rule for this day
       const hasRule = availabilityRules.some(rule => rule.day_of_week === dayOfWeek);
       if (hasRule) {
         dates.push(date);
@@ -78,9 +181,9 @@ export default function PublicBookingConsult() {
     return dates;
   }, [availabilityRules]);
 
-  // Calculate available time slots for selected date
+  // Calculate available time slots for selected date (with buffer support)
   const availableSlots = useMemo(() => {
-    if (!selectedDate) return [];
+    if (!selectedDate || !settings) return [];
     
     const dayOfWeek = selectedDate.getDay();
     const rulesForDay = availabilityRules.filter(r => r.day_of_week === dayOfWeek);
@@ -88,10 +191,13 @@ export default function PublicBookingConsult() {
     const slots: TimeSlot[] = [];
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     
+    // Calculate slot step (duration + buffer)
+    const slotStep = settings.slot_duration_minutes + settings.buffer_minutes;
+    
     rulesForDay.forEach(rule => {
       const [startHour, startMin] = rule.start_time.split(':').map(Number);
       const [endHour, endMin] = rule.end_time.split(':').map(Number);
-      const slotMinutes = rule.slot_minutes;
+      const slotMinutes = rule.slot_minutes || slotStep;
       
       let current = setMinutes(setHours(selectedDate, startHour), startMin);
       const end = setMinutes(setHours(selectedDate, endHour), endMin);
@@ -111,36 +217,32 @@ export default function PublicBookingConsult() {
           return slotTime >= aptStart && slotTime < aptEnd;
         });
         
-        // Check if slot is in the past
+        // Check if slot is in the past (for today)
         const slotDateTime = parse(timeStr, 'HH:mm', selectedDate);
-        const isPast = isBefore(slotDateTime, new Date());
+        const isPast = isSameDay(selectedDate, new Date()) && isBefore(slotDateTime, new Date());
         
         slots.push({
           time: timeStr,
           available: !isBooked && !isPast,
         });
         
-        current = new Date(current.getTime() + slotMinutes * 60000);
+        // Use slot step (duration + buffer) for next slot
+        current = new Date(current.getTime() + slotStep * 60000);
       }
     });
     
     return slots.sort((a, b) => a.time.localeCompare(b.time));
-  }, [selectedDate, availabilityRules, existingAppointments]);
+  }, [selectedDate, availabilityRules, existingAppointments, settings]);
 
   const handleConfirm = async () => {
-    if (!selectedDate || !selectedTime || !bookingLink) return;
+    if (!selectedDate || !selectedTime || !bookingContext || !settings) return;
     
     setIsSubmitting(true);
     
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      // Get slot duration from availability rules
-      const dayOfWeek = selectedDate.getDay();
-      const rule = availabilityRules.find(r => r.day_of_week === dayOfWeek);
-      const duration = rule?.slot_minutes || 60;
-      
-      // Create appointment via secure RPC (handles insert + usage count)
+      // Create appointment via secure RPC
       const { data: appointmentData, error: appointmentError } = await supabase
         .rpc('create_public_booking_appointment', {
           p_token: token,
@@ -151,9 +253,6 @@ export default function PublicBookingConsult() {
       if (appointmentError) throw appointmentError;
       
       const appointment = { id: appointmentData?.[0]?.appointment_id || appointmentData };
-
-      // Update consultation schedule rules (public can't write, but edge fn or after-auth could handle; skip for now)
-      // This would require a SECURITY DEFINER function too if needed
 
       // Try to create Google Calendar event
       let meetLink = null;
@@ -177,7 +276,7 @@ export default function PublicBookingConsult() {
 
         await supabase.functions.invoke('send-whatsapp', {
           body: {
-            clientId: bookingLink.client_id,
+            clientId: bookingContext.client_id,
             message,
           },
         });
@@ -187,7 +286,7 @@ export default function PublicBookingConsult() {
 
       // Log the confirmation
       await supabase.from('consult_invite_logs').insert({
-        client_id: bookingLink.client_id,
+        client_id: bookingContext.client_id,
         channel: 'system',
         status: 'confirmed',
         message_type: 'booking_confirmation',
@@ -209,7 +308,78 @@ export default function PublicBookingConsult() {
     }
   };
 
-  if (linkLoading) {
+  // Not verified yet - show email gate
+  if (!isVerified) {
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <header className="border-b border-gray-800 bg-black">
+          <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]">
+              <img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-[200%] object-cover object-[center_15%]" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1>
+              <p className="text-xs text-gray-400">Nutrição e Treinamento</p>
+            </div>
+          </div>
+        </header>
+
+        <main className="max-w-md mx-auto px-4 py-12">
+          <Card className="bg-gray-900 border-gray-800">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-[hsl(43,74%,49%)]/10 flex items-center justify-center mb-4">
+                <Mail className="h-6 w-6 text-[hsl(43,74%,49%)]" />
+              </div>
+              <CardTitle className="text-white text-xl">Confirme seu acesso</CardTitle>
+              <CardDescription className="text-gray-400">
+                Digite seu e-mail para verificar seu acesso ao agendamento
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-gray-300">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleEmailVerification()}
+                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
+                  disabled={isVerifying}
+                />
+              </div>
+              
+              {verificationError && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                  <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-400">{verificationError}</p>
+                </div>
+              )}
+              
+              <Button
+                onClick={handleEmailVerification}
+                disabled={isVerifying || !emailInput.trim()}
+                className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold"
+              >
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Verificando...
+                  </>
+                ) : (
+                  'Confirmar'
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  // Loading availability rules
+  if (rulesLoading || !settings) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-[hsl(43,74%,49%)]" />
@@ -217,18 +387,7 @@ export default function PublicBookingConsult() {
     );
   }
 
-  if (linkError || !bookingLink) {
-    return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
-        <AlertCircle className="h-16 w-16 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Link inválido</h1>
-        <p className="text-gray-400 text-center">
-          Este link de agendamento não existe ou expirou.
-        </p>
-      </div>
-    );
-  }
-
+  // Confirmed - show success
   if (isConfirmed && confirmationData) {
     return (
       <div className="min-h-screen bg-black text-white">
@@ -289,9 +448,9 @@ export default function PublicBookingConsult() {
     );
   }
 
+  // Booking form
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
       <header className="border-b border-gray-800 bg-black">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]">
@@ -308,12 +467,11 @@ export default function PublicBookingConsult() {
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-white mb-1">Agendar Consulta</h2>
           <p className="text-gray-400">
-            Olá, <span className="text-[hsl(43,74%,49%)]">{bookingLink.client.name}</span>! Escolha o melhor horário para sua consulta.
+            Olá, <span className="text-[hsl(43,74%,49%)]">{bookingContext?.client_name}</span>! Escolha o melhor horário para sua consulta.
           </p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Calendar */}
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
@@ -341,7 +499,6 @@ export default function PublicBookingConsult() {
             </CardContent>
           </Card>
 
-          {/* Time Slots */}
           <Card className="bg-gray-900 border-gray-800">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
@@ -387,7 +544,6 @@ export default function PublicBookingConsult() {
           </Card>
         </div>
 
-        {/* Confirm Button */}
         {selectedDate && selectedTime && (
           <div className="mt-6">
             <Card className="bg-gray-900 border-[hsl(43,74%,49%)]/30 border-2">

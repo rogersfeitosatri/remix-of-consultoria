@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,8 @@ import {
 import { TimeBlocksManager } from '@/components/scheduling/TimeBlocksManager';
 import { ConsultAutomationPanel } from '@/components/scheduling/ConsultAutomationPanel';
 import { GoogleCalendarSettings } from '@/components/scheduling/GoogleCalendarSettings';
-import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban, Settings, Video } from 'lucide-react';
+import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog';
+import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban, Settings, Video, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -56,6 +58,7 @@ const TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => {
 }).flat();
 
 export default function SchedulingSettings() {
+  const queryClient = useQueryClient();
   const { data: settings, isLoading: settingsLoading } = useSchedulingSettings();
   const { data: blocks = [], isLoading: blocksLoading } = useSchedulingBlocks();
   const { data: appointments = [] } = useAppointments();
@@ -67,6 +70,7 @@ export default function SchedulingSettings() {
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('18:00');
   const [slotDuration, setSlotDuration] = useState(60);
+  const [bufferMinutes, setBufferMinutes] = useState(0);
   const [slug, setSlug] = useState('');
   const [copied, setCopied] = useState(false);
   
@@ -76,6 +80,7 @@ export default function SchedulingSettings() {
   const [blockStartTime, setBlockStartTime] = useState('08:00');
   const [blockEndTime, setBlockEndTime] = useState('18:00');
   const [blockReason, setBlockReason] = useState('');
+  const [isManualBookingOpen, setIsManualBookingOpen] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -83,6 +88,7 @@ export default function SchedulingSettings() {
       setStartTime(settings.working_hours_start?.substring(0, 5) || '08:00');
       setEndTime(settings.working_hours_end?.substring(0, 5) || '18:00');
       setSlotDuration(settings.slot_duration_minutes);
+      setBufferMinutes((settings as any).buffer_minutes || 0);
       setSlug(settings.booking_link_slug || '');
     }
   }, [settings]);
@@ -94,8 +100,9 @@ export default function SchedulingSettings() {
         working_hours_start: startTime + ':00',
         working_hours_end: endTime + ':00',
         slot_duration_minutes: slotDuration,
+        buffer_minutes: bufferMinutes,
         booking_link_slug: slug || null,
-      });
+      } as any);
       toast.success('Configurações salvas!');
     } catch (error: any) {
       toast.error(error.message || 'Erro ao salvar');
@@ -258,7 +265,7 @@ export default function SchedulingSettings() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Duração do Slot</Label>
+                    <Label>Duração da Consulta</Label>
                     <Select value={slotDuration.toString()} onValueChange={(v) => setSlotDuration(Number(v))}>
                       <SelectTrigger>
                         <SelectValue />
@@ -271,6 +278,24 @@ export default function SchedulingSettings() {
                         <SelectItem value="120">2 horas</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Intervalo entre Consultas</Label>
+                    <Select value={bufferMinutes.toString()} onValueChange={(v) => setBufferMinutes(Number(v))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Sem intervalo</SelectItem>
+                        <SelectItem value="5">5 minutos</SelectItem>
+                        <SelectItem value="10">10 minutos</SelectItem>
+                        <SelectItem value="15">15 minutos</SelectItem>
+                        <SelectItem value="30">30 minutos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Ex: Consulta 30min + Intervalo 15min = slots a cada 45min
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -491,10 +516,18 @@ export default function SchedulingSettings() {
           <TabsContent value="appointments" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Consultas Agendadas</CardTitle>
-                <CardDescription>
-                  Visualize todos os agendamentos confirmados pelos atletas
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Consultas Agendadas</CardTitle>
+                    <CardDescription>
+                      Visualize todos os agendamentos confirmados
+                    </CardDescription>
+                  </div>
+                  <Button onClick={() => setIsManualBookingOpen(true)} className="gap-2">
+                    <UserPlus className="h-4 w-4" />
+                    Agendar Manualmente
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {appointments.length === 0 ? (
@@ -544,6 +577,14 @@ export default function SchedulingSettings() {
             <GoogleCalendarSettings />
           </TabsContent>
         </Tabs>
+        
+        <ManualBookingDialog 
+          open={isManualBookingOpen} 
+          onOpenChange={setIsManualBookingOpen}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['appointments'] });
+          }}
+        />
       </div>
     </Layout>
   );
