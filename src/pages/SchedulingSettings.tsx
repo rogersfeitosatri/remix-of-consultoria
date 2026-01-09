@@ -33,7 +33,9 @@ import {
   useAppointments,
 } from '@/hooks/useScheduling';
 import { TimeBlocksManager } from '@/components/scheduling/TimeBlocksManager';
-import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban } from 'lucide-react';
+import { ConsultAutomationPanel } from '@/components/scheduling/ConsultAutomationPanel';
+import { GoogleCalendarSettings } from '@/components/scheduling/GoogleCalendarSettings';
+import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban, Settings, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -171,7 +173,7 @@ export default function SchedulingSettings() {
         </div>
 
         <Tabs defaultValue="settings" className="space-y-6">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="settings" className="gap-2">
               <Clock className="h-4 w-4" />
               Configurações
@@ -183,6 +185,14 @@ export default function SchedulingSettings() {
             <TabsTrigger value="appointments" className="gap-2">
               <CalendarIcon className="h-4 w-4" />
               Agendamentos
+            </TabsTrigger>
+            <TabsTrigger value="automation" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Automação
+            </TabsTrigger>
+            <TabsTrigger value="google" className="gap-2">
+              <Video className="h-4 w-4" />
+              Google Calendar
             </TabsTrigger>
           </TabsList>
 
@@ -524,6 +534,14 @@ export default function SchedulingSettings() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="automation">
+            <ConsultAutomationPanel />
+          </TabsContent>
+
+          <TabsContent value="google">
+            <GoogleCalendarSettings />
           </TabsContent>
         </Tabs>
       </div>
