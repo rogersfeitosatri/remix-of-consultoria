@@ -4,13 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, AlertCircle, FileText, User } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, Clock, AlertCircle, FileText, User, TrendingUp } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { useScheduledCheckinsForClient, ScheduledCheckin } from '@/hooks/useScheduledCheckins';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, isBefore, isAfter, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
 
 interface CheckinResponse {
   id: string;
@@ -51,6 +52,25 @@ export default function AthleteHistory() {
       return data as CheckinResponse[];
     },
     enabled: !!clientId,
+  });
+
+  // Fetch questions from the first form to use in evolution charts
+  const firstFormId = checkinResponses[0]?.form_id;
+  const { data: checkinQuestions = [] } = useQuery({
+    queryKey: ['checkin_questions', firstFormId],
+    queryFn: async () => {
+      if (!firstFormId) return [];
+      
+      const { data, error } = await supabase
+        .from('checkin_questions')
+        .select('*')
+        .eq('form_id', firstFormId)
+        .order('order_index', { ascending: true });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!firstFormId,
   });
 
   const isLoading = loadingScheduled || loadingResponses;
@@ -155,8 +175,12 @@ export default function AthleteHistory() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="responses" className="space-y-4">
-          <TabsList>
+        <Tabs defaultValue="evolution" className="space-y-4">
+          <TabsList className="flex-wrap h-auto">
+            <TabsTrigger value="evolution" className="gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Evolução
+            </TabsTrigger>
             <TabsTrigger value="responses" className="gap-2">
               <CheckCircle2 className="h-4 w-4" />
               Respondidos ({checkinResponses.length})
@@ -170,6 +194,14 @@ export default function AthleteHistory() {
               Pendentes ({pastScheduled.length})
             </TabsTrigger>
           </TabsList>
+
+          {/* Evolution Charts Tab */}
+          <TabsContent value="evolution" className="space-y-4">
+            <CheckinEvolutionCharts 
+              responses={checkinResponses} 
+              questions={checkinQuestions} 
+            />
+          </TabsContent>
 
           {/* Responses Tab */}
           <TabsContent value="responses" className="space-y-4">

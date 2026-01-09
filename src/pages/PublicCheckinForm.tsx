@@ -28,6 +28,13 @@ interface Question {
   comment_field_type: 'short' | 'medium' | null;
 }
 
+// Patterns to identify conditional questions about long training
+const LONG_TRAINING_TRIGGER_PATTERN = /realizou.*treino.*longo|treino.*longo.*semana/i;
+const LONG_TRAINING_DEPENDENT_PATTERNS = [
+  /como.*sentiu.*treino.*longo/i,
+  /suplementação.*treino/i,
+];
+
 interface Form {
   id: string;
   title: string;
@@ -49,6 +56,34 @@ export default function PublicCheckinForm() {
   const [athleteEmail, setAthleteEmail] = useState('');
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
+
+  // Find the trigger question for long training
+  const longTrainingTriggerQuestion = questions.find(q => 
+    LONG_TRAINING_TRIGGER_PATTERN.test(q.question_text)
+  );
+
+  // Check if user answered "Sim" to long training question
+  const didLongTraining = longTrainingTriggerQuestion 
+    ? answers[longTrainingTriggerQuestion.id] === 'Sim'
+    : true; // Default to show if trigger question not found
+
+  // Function to check if a question should be visible
+  const isQuestionVisible = (question: Question): boolean => {
+    // Check if this is a dependent question (about long training details)
+    const isDependentQuestion = LONG_TRAINING_DEPENDENT_PATTERNS.some(pattern => 
+      pattern.test(question.question_text)
+    );
+    
+    // If it's a dependent question, only show if user did long training
+    if (isDependentQuestion) {
+      return didLongTraining;
+    }
+    
+    return true;
+  };
+
+  // Get visible questions for rendering
+  const visibleQuestions = questions.filter(isQuestionVisible);
 
   useEffect(() => {
     const fetchForm = async () => {
@@ -137,8 +172,8 @@ export default function PublicCheckinForm() {
       return;
     }
 
-    // Validate required questions
-    for (const question of questions) {
+    // Validate required questions (only visible ones)
+    for (const question of visibleQuestions) {
       if (question.is_required) {
         const answer = answers[question.id];
         if (!answer || (Array.isArray(answer) && answer.length === 0)) {
@@ -311,7 +346,7 @@ export default function PublicCheckinForm() {
 
           {/* Questions */}
           <div className="space-y-4">
-            {questions.map((question, index) => (
+            {visibleQuestions.map((question, index) => (
               <Card key={question.id}>
                 <CardContent className="pt-6">
                   <div className="space-y-4">
