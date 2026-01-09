@@ -258,3 +258,69 @@ export function useSubmitCheckinResponse() {
     },
   });
 }
+
+export function useCreateDefaultCheckinForm() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Fetch question templates for checkin section
+      const { data: templates, error: templatesError } = await supabase
+        .from('question_templates')
+        .select('*')
+        .eq('section', 'checkin')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+
+      if (templatesError) throw templatesError;
+      if (!templates || templates.length === 0) {
+        throw new Error('Nenhuma pergunta encontrada no banco de perguntas para a seção de checkin');
+      }
+
+      // Create the form
+      const { data: form, error: formError } = await supabase
+        .from('checkin_forms')
+        .insert({
+          title: 'Check-in Nutricional Semanal',
+          description: 'Formulário padrão com 15 perguntas do banco de perguntas para acompanhamento semanal do atleta.',
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (formError) throw formError;
+
+      // Map templates to questions
+      const questions = templates.map((template: any, index: number) => ({
+        form_id: form.id,
+        question_text: template.question_text,
+        question_type: template.question_type === 'short_text' ? 'short_text' : 
+                       template.question_type === 'long_text' ? 'long_text' :
+                       template.question_type,
+        options: template.options,
+        scale_min: template.scale_min || 1,
+        scale_max: template.scale_max || 10,
+        is_required: template.is_required,
+        order_index: index,
+        has_comment_field: template.has_comment_field || false,
+        comment_field_label: template.comment_field_label,
+        comment_field_required: template.comment_field_required || false,
+      }));
+
+      // Insert all questions
+      const { error: questionsError } = await supabase
+        .from('checkin_questions')
+        .insert(questions);
+
+      if (questionsError) throw questionsError;
+
+      return form as CheckinForm;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checkin_forms'] });
+    },
+  });
+}

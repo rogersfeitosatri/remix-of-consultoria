@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library } from 'lucide-react';
-import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm } from '@/hooks/useCheckinForms';
+import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library, Sparkles } from 'lucide-react';
+import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm, useCreateDefaultCheckinForm } from '@/hooks/useCheckinForms';
 import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm } from '@/hooks/useAnamneseForms';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -47,6 +47,7 @@ export default function Forms() {
   const { data: checkinForms = [], isLoading: checkinLoading } = useCheckinForms();
   const deleteCheckinForm = useDeleteCheckinForm();
   const createCheckinForm = useCreateCheckinForm();
+  const createDefaultCheckinForm = useCreateDefaultCheckinForm();
 
   // Anamnese forms
   const { data: anamneseForms = [], isLoading: anamneseLoading } = useAnamneseForms();
@@ -123,6 +124,23 @@ export default function Forms() {
     toast({ title: 'Link copiado para a área de transferência!' });
   };
 
+  const handleCreateDefaultForm = async () => {
+    try {
+      const form = await createDefaultCheckinForm.mutateAsync();
+      toast({ 
+        title: 'Formulário padrão criado!',
+        description: 'O formulário com as 15 perguntas do banco foi criado com sucesso.',
+      });
+      navigate(`/checkin/${form.id}`);
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível criar o formulário padrão.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -133,13 +151,26 @@ export default function Forms() {
               Gerencie seus formulários de checkin e anamnese
             </p>
           </div>
-          <Button 
-            onClick={() => setShowNewFormDialog(true)}
-            className="gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Novo Formulário
-          </Button>
+          <div className="flex gap-2">
+            {activeTab === 'checkin' && (
+              <Button 
+                onClick={handleCreateDefaultForm}
+                variant="outline"
+                className="gap-2"
+                disabled={createDefaultCheckinForm.isPending}
+              >
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline">Criar Padrão</span>
+              </Button>
+            )}
+            <Button 
+              onClick={() => setShowNewFormDialog(true)}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Formulário
+            </Button>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
