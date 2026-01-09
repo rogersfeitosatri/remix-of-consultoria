@@ -61,6 +61,7 @@ export function generateCheckinSchedules(
     daily: 0, // Special case - still send on Mondays
     weekly: 1,
     biweekly: 2,
+    three_weeks: 3,
     monthly: 4,
     bimonthly: 8,
     quarterly: 12,

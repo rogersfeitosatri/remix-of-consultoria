@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Check, ArrowRight, Gift, Timer, Calendar, MessageCircle, ClipboardCheck, Zap, Scale } from "lucide-react";
+import { Check, ArrowRight, Gift, Timer, Calendar, MessageCircle, ClipboardCheck, Zap, Scale, Quote } from "lucide-react";
 import { Link } from "react-router-dom";
 import runnerHero from "@/assets/runner-hero.jpg";
 import runner2 from "@/assets/runner-2.jpg";
@@ -33,7 +33,7 @@ export default function LandingPage() {
               </div>
               
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-6 text-white">
-                Acompanhamento Nutricional para Corredores
+                Emagrecimento e Definição para Corredores
               </h1>
               
               <h2 className="text-lg md:text-xl text-gray-400 mb-8">
@@ -129,8 +129,8 @@ export default function LandingPage() {
                   <Calendar className="w-5 h-5 md:w-6 md:h-6 text-black" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base md:text-lg text-white">Check-up a cada 15 dias para ajustes</h3>
-                  <p className="text-gray-400 text-sm md:text-base">A cada 15 dias, você preenche um check-up para avaliarmos peso, medidas e suas sensações. É o momento de solicitar ajustes no seu plano.</p>
+                  <h3 className="font-bold text-base md:text-lg text-white">Check-up a cada 3 semanas para ajustes</h3>
+                  <p className="text-gray-400 text-sm md:text-base">A cada 3 semanas, você preenche um check-up para avaliarmos peso, medidas e suas sensações. É o momento de solicitar ajustes no seu plano.</p>
                 </div>
               </div>
               
@@ -161,7 +161,7 @@ export default function LandingPage() {
               { step: "1", title: "Inscrição", desc: "Clique no botão e garanta sua vaga." },
               { step: "2", title: "Diagnóstico", desc: "Preencha o formulário de diagnóstico detalhado sobre sua rotina e treinos." },
               { step: "3", title: "Recebimento", desc: "Em até 48h úteis, seu plano alimentar personalizado estará disponível no app." },
-              { step: "4", title: "Acompanhamento", desc: "A cada 15 dias, faça seu check-up e receba os ajustes necessários." },
+              { step: "4", title: "Acompanhamento", desc: "A cada 3 semanas, faça seu check-up e receba os ajustes necessários." },
             ].map((item, index) => (
               <div key={index} className="text-center">
                 <div className="w-12 h-12 md:w-16 md:h-16 bg-[hsl(43,74%,49%)] text-black rounded-full flex items-center justify-center text-xl md:text-2xl font-bold mx-auto mb-3 md:mb-4">
@@ -216,6 +216,132 @@ export default function LandingPage() {
               <h3 className="text-lg md:text-xl font-bold text-white mb-3">Habit Tracker diário</h3>
               <p className="text-gray-400 text-sm md:text-base">
                 Registre diariamente seu peso e medida de circunferência de cintura. Acompanhe sua evolução com gráficos e tenha controle total sobre seu progresso durante todo o acompanhamento.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Depoimentos */}
+      <section className="py-16 md:py-20 bg-gray-950">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-center gap-3 mb-10 md:mb-12">
+            <Quote className="w-6 h-6 md:w-8 md:h-8 text-[hsl(43,74%,49%)]" />
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
+              O que dizem os atletas
+            </h2>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            {/* Depoimento 1 - Caique */}
+            <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 rounded-2xl border border-gray-800">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-[hsl(43,74%,49%)] rounded-full flex items-center justify-center text-black font-bold">
+                  C
+                </div>
+                <div>
+                  <p className="font-semibold text-white">Caique Moura</p>
+                  <p className="text-xs text-gray-500">Corredor</p>
+                </div>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                "Rogers, peso continua baixando mesmo com o aumento do carbo kkk"
+              </p>
+              <p className="text-[hsl(43,74%,49%)] font-bold mt-3">66.2 kg</p>
+            </div>
+
+            {/* Depoimento 2 - Fábio */}
+            <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 rounded-2xl border border-gray-800">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-[hsl(43,74%,49%)] rounded-full flex items-center justify-center text-black font-bold">
+                  F
+                </div>
+                <div>
+                  <p className="font-semibold text-white">Fábio Saba</p>
+                  <p className="text-xs text-gray-500">Corredor</p>
+                </div>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                "Perdi pouco mais de 3 kg em menos de 20 dias. A dieta e os treinos estão evoluindo bem!"
+              </p>
+              <div className="flex gap-4 mt-3 text-center">
+                <div>
+                  <p className="text-[hsl(43,74%,49%)] font-bold">-3.4 kg</p>
+                  <p className="text-xs text-gray-500">Peso</p>
+                </div>
+                <div>
+                  <p className="text-[hsl(43,74%,49%)] font-bold">-1.1</p>
+                  <p className="text-xs text-gray-500">IMC</p>
+                </div>
+                <div>
+                  <p className="text-[hsl(43,74%,49%)] font-bold">-1.7%</p>
+                  <p className="text-xs text-gray-500">Gordura</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Depoimento 3 - Flavia */}
+            <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 rounded-2xl border border-gray-800">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-[hsl(43,74%,49%)] rounded-full flex items-center justify-center text-black font-bold">
+                  F
+                </div>
+                <div>
+                  <p className="font-semibold text-white">Flavia</p>
+                  <p className="text-xs text-gray-500">Corredora</p>
+                </div>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                "1 mês o melhor plano seguido até hoje. 5 kilos perdido!"
+              </p>
+              <p className="text-[hsl(43,74%,49%)] font-bold mt-3">-5 kg em 1 mês</p>
+            </div>
+
+            {/* Depoimento 4 */}
+            <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 rounded-2xl border border-gray-800">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-[hsl(43,74%,49%)] rounded-full flex items-center justify-center text-black font-bold">
+                  A
+                </div>
+                <div>
+                  <p className="font-semibold text-white">Atleta</p>
+                  <p className="text-xs text-gray-500">Corredor</p>
+                </div>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                "Bom dia, alegria!!!! Pensa num pinto no lixo!! Sou eu... Feliz demais... Melhor treino dos últimos tempos... Corri bem... Terminei voando!! 😎 Melhor estratégia até agora..."
+              </p>
+            </div>
+
+            {/* Depoimento 5 */}
+            <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 rounded-2xl border border-gray-800">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-[hsl(43,74%,49%)] rounded-full flex items-center justify-center text-black font-bold">
+                  A
+                </div>
+                <div>
+                  <p className="font-semibold text-white">Atleta</p>
+                  <p className="text-xs text-gray-500">Corredor</p>
+                </div>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                "MEU NUTRIIIIIII MELHOR QUE O PLANEJADO VOCÊ É O CARA! Zero desconforto! Tomei 9 geis, do jeito que você planejou, encaixadooooo! Corrida progressiva. Que estreeeeiaaaaa!"
+              </p>
+            </div>
+
+            {/* Depoimento 6 */}
+            <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 rounded-2xl border border-gray-800">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-[hsl(43,74%,49%)] rounded-full flex items-center justify-center text-black font-bold">
+                  A
+                </div>
+                <div>
+                  <p className="font-semibold text-white">Atleta</p>
+                  <p className="text-xs text-gray-500">Corredor</p>
+                </div>
+              </div>
+              <p className="text-gray-300 text-sm leading-relaxed">
+                "Sensação absurda no treino de hoje.. Fiz do jeito que combinamos ontem. Força e energia lá em cima! Com aquelas alterações que fizemos e utilizando o carbo da Z2. Tenho tido sensações muito melhores!"
               </p>
             </div>
           </div>
