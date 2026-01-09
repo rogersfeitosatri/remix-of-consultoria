@@ -34,7 +34,7 @@ export default function LandingPage() {
               </div>
               
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold leading-tight mb-6 text-white">
-                Emagrecimento e Definição para Corredores
+                Desafio +Leve + Pace - 6 semanas para correr mais forte e mais leve.
               </h1>
               
               <h2 className="text-lg md:text-xl text-gray-400 mb-8">
@@ -91,7 +91,7 @@ export default function LandingPage() {
       <section className="py-16 md:py-20 bg-black">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-center mb-3 md:mb-4 text-white">
-            Desafio +Leve +Pace - 6 semanas pra correr mais forte e mais leve
+            6 semanas pra correr mais forte e mais leve
           </h2>
           <p className="text-lg md:text-xl text-[hsl(43,74%,49%)] text-center mb-10 md:mb-12">O que está incluso</p>
           

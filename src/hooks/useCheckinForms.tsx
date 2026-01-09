@@ -284,8 +284,8 @@ export function useCreateDefaultCheckinForm() {
       const { data: form, error: formError } = await supabase
         .from('checkin_forms')
         .insert({
-          title: 'Check-in Nutricional Semanal',
-          description: 'Formulário padrão com 15 perguntas do banco de perguntas para acompanhamento semanal do atleta.',
+          title: 'Check-in Nutricional',
+          description: 'Formulário padrão com perguntas do banco de perguntas para acompanhamento do atleta.',
           user_id: user.id,
         })
         .select()
@@ -295,7 +295,7 @@ export function useCreateDefaultCheckinForm() {
 
       // Map templates to questions
       const questions = templates.map((template: any, index: number) => ({
-        form_id: form.id,
+        form_id: (form as any).id,
         question_text: template.question_text,
         question_type: template.question_type === 'short_text' ? 'short_text' : 
                        template.question_type === 'long_text' ? 'long_text' :
@@ -317,7 +317,7 @@ export function useCreateDefaultCheckinForm() {
 
       if (questionsError) throw questionsError;
 
-      return form as CheckinForm;
+      return form as unknown as CheckinForm;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checkin_forms'] });
