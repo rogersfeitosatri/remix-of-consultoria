@@ -225,6 +225,7 @@ export type Database = {
           id: string
           notes: string | null
           notes_admin: string | null
+          reminder_sent_at: string | null
           status: string
           timezone: string | null
           updated_at: string
@@ -243,6 +244,7 @@ export type Database = {
           id?: string
           notes?: string | null
           notes_admin?: string | null
+          reminder_sent_at?: string | null
           status?: string
           timezone?: string | null
           updated_at?: string
@@ -261,6 +263,7 @@ export type Database = {
           id?: string
           notes?: string | null
           notes_admin?: string | null
+          reminder_sent_at?: string | null
           status?: string
           timezone?: string | null
           updated_at?: string
