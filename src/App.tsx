@@ -89,6 +89,7 @@ function AppRoutes() {
       <Route path="/bio" element={<LinkBio />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
+      <Route path="/anamnese-form/:formId" element={<AthleteAnamneseForm />} />
       <Route path="/agendar/:slug" element={<PublicBooking />} />
       <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
       <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteAnamneseForm /></AthleteRoute>} />
