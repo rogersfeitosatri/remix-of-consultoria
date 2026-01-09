@@ -65,7 +65,7 @@ export default function LandingPage() {
       <section className="py-16 md:py-20 bg-gray-950">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-center mb-10 md:mb-12 text-white">
-            Este acompanhamento é para você, corredor(a), que:
+            O Desafio +Leve +Pace é para você, corredor(a), que:
           </h2>
           
           <div className="grid md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
@@ -91,7 +91,7 @@ export default function LandingPage() {
       <section className="py-16 md:py-20 bg-black">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-center mb-3 md:mb-4 text-white">
-            Sua transformação em 6 semanas
+            Desafio +Leve +Pace - 6 semanas pra correr mais forte e mais leve
           </h2>
           <p className="text-lg md:text-xl text-[hsl(43,74%,49%)] text-center mb-10 md:mb-12">O que está incluso</p>
           
@@ -121,7 +121,7 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-base md:text-lg text-white">Entrega rápida</h3>
-                  <p className="text-gray-400 text-sm md:text-base">Seu plano é entregue em até 48 horas úteis após o preenchimento do formulário de diagnóstico.</p>
+                  <p className="text-gray-400 text-sm md:text-base">Seu plano é entregue em até 72 horas úteis após o preenchimento do formulário de diagnóstico.</p>
                 </div>
               </div>
               
@@ -164,7 +164,7 @@ export default function LandingPage() {
             {[
               { step: "1", title: "Inscrição", desc: "Clique no botão e garanta sua vaga." },
               { step: "2", title: "Diagnóstico", desc: "Preencha o formulário de diagnóstico detalhado sobre sua rotina e treinos." },
-              { step: "3", title: "Recebimento", desc: "Em até 48h úteis, seu plano alimentar personalizado estará disponível no app." },
+              { step: "3", title: "Recebimento", desc: "Em até 72h úteis, seu plano alimentar personalizado estará disponível no app." },
               { step: "4", title: "Acompanhamento", desc: "A cada 3 semanas, faça seu check-up e receba os ajustes necessários." },
             ].map((item, index) => (
               <div key={index} className="text-center">
