@@ -16,7 +16,7 @@ import AnamneseFormBuilder from "./pages/AnamneseFormBuilder";
 import PublicCheckinForm from "./pages/PublicCheckinForm";
 import PublicAnamneseForm from "./pages/PublicAnamneseForm";
 import AthleteDashboard from "./pages/AthleteDashboard";
-import AthleteAnamneseForm from "./pages/AthleteAnamneseForm";
+import AthleteDynamicAnamneseForm from "./pages/AthleteDynamicAnamneseForm";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
@@ -93,7 +93,7 @@ function AppRoutes() {
       <Route path="/anamnese-form/:formId" element={<PublicAnamneseForm />} />
       <Route path="/agendar/:slug" element={<PublicBooking />} />
       <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
-      <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteAnamneseForm /></AthleteRoute>} />
+      <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
       <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
       <Route path="/clients" element={<ProtectedRoute adminOnly><Clients /></ProtectedRoute>} />
       <Route path="/financial" element={<ProtectedRoute adminOnly><Financial /></ProtectedRoute>} />
