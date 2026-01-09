@@ -1880,6 +1880,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_public_booking_appointment: {
+        Args: { p_date: string; p_time: string; p_token: string }
+        Returns: {
+          appointment_id: string
+        }[]
+      }
+      get_public_booking_context: {
+        Args: { p_token: string }
+        Returns: {
+          admin_user_id: string
+          booking_link_id: string
+          client_id: string
+          client_name: string
+          usage_count: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

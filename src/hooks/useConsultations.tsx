@@ -93,41 +93,46 @@ export function useBookingLinks() {
   });
 }
 
+// Interface for safe public booking context (returned by RPC)
+interface PublicBookingContext {
+  booking_link_id: string;
+  client_id: string;
+  client_name: string;
+  admin_user_id: string;
+  usage_count: number;
+}
+
 export function useBookingLinkByToken(token: string | undefined) {
   return useQuery({
     queryKey: ['booking-link-token', token],
     queryFn: async () => {
       if (!token) return null;
 
-      console.log('[useBookingLinkByToken] Fetching with token:', token);
+      console.log('[useBookingLinkByToken] Fetching with token via RPC:', token);
       
-      // First, fetch the booking link
-      const { data: bookingLink, error: linkError } = await supabase
-        .from('booking_links')
-        .select('*')
-        .eq('token', token)
-        .eq('active', true)
-        .single();
+      // Use secure RPC to fetch booking context (avoids RLS issues)
+      const { data, error } = await supabase
+        .rpc('get_public_booking_context', { p_token: token });
 
-      console.log('[useBookingLinkByToken] Booking link result:', { bookingLink, linkError });
+      console.log('[useBookingLinkByToken] RPC result:', { data, error });
       
-      if (linkError) throw linkError;
-      if (!bookingLink) return null;
-
-      // Then, fetch the client separately
-      const { data: client, error: clientError } = await supabase
-        .from('clients')
-        .select('id, name, email, phone, user_id')
-        .eq('id', bookingLink.client_id)
-        .single();
-
-      console.log('[useBookingLinkByToken] Client result:', { client, clientError });
+      if (error) throw error;
+      if (!data || data.length === 0) return null;
       
-      if (clientError) throw clientError;
+      const ctx = data[0] as PublicBookingContext;
       
+      // Return in expected format
       return {
-        ...bookingLink,
-        client,
+        id: ctx.booking_link_id,
+        client_id: ctx.client_id,
+        token,
+        usage_count: ctx.usage_count,
+        active: true,
+        client: {
+          id: ctx.client_id,
+          name: ctx.client_name,
+          user_id: ctx.admin_user_id,
+        },
       };
     },
     enabled: !!token,
