@@ -99,18 +99,36 @@ export function useBookingLinkByToken(token: string | undefined) {
     queryFn: async () => {
       if (!token) return null;
 
-      const { data, error } = await supabase
+      console.log('[useBookingLinkByToken] Fetching with token:', token);
+      
+      // First, fetch the booking link
+      const { data: bookingLink, error: linkError } = await supabase
         .from('booking_links')
-        .select(`
-          *,
-          client:clients(id, name, email, phone, user_id)
-        `)
+        .select('*')
         .eq('token', token)
         .eq('active', true)
         .single();
 
-      if (error) throw error;
-      return data;
+      console.log('[useBookingLinkByToken] Booking link result:', { bookingLink, linkError });
+      
+      if (linkError) throw linkError;
+      if (!bookingLink) return null;
+
+      // Then, fetch the client separately
+      const { data: client, error: clientError } = await supabase
+        .from('clients')
+        .select('id, name, email, phone, user_id')
+        .eq('id', bookingLink.client_id)
+        .single();
+
+      console.log('[useBookingLinkByToken] Client result:', { client, clientError });
+      
+      if (clientError) throw clientError;
+      
+      return {
+        ...bookingLink,
+        client,
+      };
     },
     enabled: !!token,
   });
