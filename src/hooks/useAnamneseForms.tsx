@@ -264,6 +264,49 @@ export function useDeleteAnamneseQuestion() {
   });
 }
 
+// Reorder questions (update order_index for multiple questions)
+export function useReorderAnamneseQuestions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ form_id, updates }: { form_id: string; updates: { id: string; order_index: number; section?: string }[] }) => {
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('anamnese_questions' as any)
+          .update({ order_index: update.order_index, ...(update.section && { section: update.section }) })
+          .eq('id', update.id);
+
+        if (error) throw error;
+      }
+      return { form_id };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['anamnese-form', result.form_id] });
+    },
+  });
+}
+
+// Rename section (update section name for all questions in that section)
+export function useRenameAnamneseSection() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ form_id, old_section, new_section }: { form_id: string; old_section: string; new_section: string }) => {
+      const { error } = await supabase
+        .from('anamnese_questions' as any)
+        .update({ section: new_section })
+        .eq('form_id', form_id)
+        .eq('section', old_section);
+
+      if (error) throw error;
+      return { form_id };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['anamnese-form', result.form_id] });
+    },
+  });
+}
+
 // Submit anamnese response
 export function useSubmitAnamneseResponse() {
   const queryClient = useQueryClient();
