@@ -284,3 +284,71 @@ export function useSubmitAnamneseResponse() {
     },
   });
 }
+
+// Create default anamnese form with question templates
+export function useCreateDefaultAnamneseForm() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error('Not authenticated');
+
+      // Fetch question templates for anamnese section
+      const { data: templates, error: templatesError } = await supabase
+        .from('question_templates')
+        .select('*')
+        .eq('section', 'anamnese')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+
+      if (templatesError) throw templatesError;
+      if (!templates || templates.length === 0) {
+        throw new Error('Nenhuma pergunta encontrada no banco de perguntas para a seção de anamnese');
+      }
+
+      // Create the form
+      const { data: form, error: formError } = await supabase
+        .from('anamnese_forms')
+        .insert({
+          title: 'Anamnese Nutricional',
+          description: 'Formulário padrão de anamnese para avaliação nutricional completa do atleta.',
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (formError) throw formError;
+
+      // Map templates to questions
+      const questions = templates.map((template: any, index: number) => ({
+        form_id: (form as any).id,
+        section: template.category || 'geral',
+        question_text: template.question_text,
+        question_type: template.question_type === 'text' ? 'short_text' : 
+                       template.question_type === 'textarea' ? 'long_text' :
+                       template.question_type,
+        options: template.options,
+        scale_min: template.scale_min || 1,
+        scale_max: template.scale_max || 10,
+        is_required: template.is_required,
+        order_index: index,
+        has_comment_field: template.has_comment_field || false,
+        comment_field_label: template.comment_field_label,
+        comment_field_required: template.comment_field_required || false,
+      }));
+
+      // Insert all questions
+      const { error: questionsError } = await supabase
+        .from('anamnese_questions')
+        .insert(questions);
+
+      if (questionsError) throw questionsError;
+
+      return form as unknown as AnamneseForm;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['anamnese-forms'] });
+    },
+  });
+}

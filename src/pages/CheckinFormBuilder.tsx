@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, GripVertical, Trash2, Copy, ExternalLink, Eye, FileText, X } from 'lucide-react';
+import { ArrowLeft, Plus, GripVertical, Trash2, Copy, ExternalLink, Eye, FileText, X, Edit } from 'lucide-react';
 import { useCheckinFormWithQuestions, useUpdateCheckinForm, useAddCheckinQuestion, useUpdateCheckinQuestion, useDeleteCheckinQuestion, useCheckinFormResponses, type QuestionType } from '@/hooks/useCheckinForms';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -53,6 +53,21 @@ export default function CheckinFormBuilder() {
 
   const [editingTitle, setEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState('');
+  
+  const [isEditQuestionOpen, setIsEditQuestionOpen] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<{
+    id: string;
+    question_text: string;
+    question_type: QuestionType;
+    options: string[];
+    scale_min: number;
+    scale_max: number;
+    is_required: boolean;
+    has_comment_field: boolean;
+    comment_field_label: string;
+    comment_field_required: boolean;
+    comment_field_type: 'short' | 'medium';
+  } | null>(null);
 
   if (isLoading) {
     return (
@@ -184,6 +199,81 @@ export default function CheckinFormBuilder() {
     }));
   };
 
+  const openEditQuestion = (question: any) => {
+    setEditingQuestion({
+      id: question.id,
+      question_text: question.question_text,
+      question_type: question.question_type,
+      options: question.options || [''],
+      scale_min: question.scale_min || 1,
+      scale_max: question.scale_max || 10,
+      is_required: question.is_required,
+      has_comment_field: question.has_comment_field || false,
+      comment_field_label: question.comment_field_label || 'Se quiser explicar melhor, comente aqui',
+      comment_field_required: question.comment_field_required || false,
+      comment_field_type: question.comment_field_type || 'short',
+    });
+    setIsEditQuestionOpen(true);
+  };
+
+  const handleUpdateQuestionFull = async () => {
+    if (!editingQuestion) return;
+    if (!editingQuestion.question_text.trim()) {
+      toast.error('Texto da pergunta é obrigatório');
+      return;
+    }
+
+    try {
+      await updateQuestion.mutateAsync({
+        id: editingQuestion.id,
+        form_id: form.id,
+        question_text: editingQuestion.question_text,
+        question_type: editingQuestion.question_type,
+        options: ['multiple_choice', 'checkbox'].includes(editingQuestion.question_type)
+          ? editingQuestion.options.filter(o => o.trim())
+          : null,
+        scale_min: editingQuestion.scale_min,
+        scale_max: editingQuestion.scale_max,
+        is_required: editingQuestion.is_required,
+        has_comment_field: ['multiple_choice', 'checkbox', 'scale'].includes(editingQuestion.question_type) 
+          ? editingQuestion.has_comment_field 
+          : false,
+        comment_field_label: editingQuestion.has_comment_field ? editingQuestion.comment_field_label : null,
+        comment_field_required: editingQuestion.has_comment_field ? editingQuestion.comment_field_required : false,
+        comment_field_type: editingQuestion.has_comment_field ? editingQuestion.comment_field_type : null,
+      });
+      toast.success('Pergunta atualizada!');
+      setIsEditQuestionOpen(false);
+      setEditingQuestion(null);
+    } catch (error) {
+      toast.error('Erro ao atualizar pergunta');
+    }
+  };
+
+  const addEditOption = () => {
+    if (!editingQuestion) return;
+    setEditingQuestion(prev => prev ? ({
+      ...prev,
+      options: [...prev.options, ''],
+    }) : null);
+  };
+
+  const updateEditOption = (index: number, value: string) => {
+    if (!editingQuestion) return;
+    setEditingQuestion(prev => prev ? ({
+      ...prev,
+      options: prev.options.map((o, i) => (i === index ? value : o)),
+    }) : null);
+  };
+
+  const removeEditOption = (index: number) => {
+    if (!editingQuestion) return;
+    setEditingQuestion(prev => prev ? ({
+      ...prev,
+      options: prev.options.filter((_, i) => i !== index),
+    }) : null);
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -292,6 +382,9 @@ export default function CheckinFormBuilder() {
                                   onCheckedChange={() => handleToggleRequired(question.id, question.is_required)}
                                 />
                               </div>
+                              <Button variant="ghost" size="sm" onClick={() => openEditQuestion(question)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
@@ -518,6 +611,170 @@ export default function CheckinFormBuilder() {
                   </Button>
                   <Button onClick={handleAddQuestion} disabled={addQuestion.isPending}>
                     Adicionar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Edit Question Dialog */}
+            <Dialog open={isEditQuestionOpen} onOpenChange={setIsEditQuestionOpen}>
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Editar Pergunta</DialogTitle>
+                  <DialogDescription>
+                    Altere os detalhes da pergunta
+                  </DialogDescription>
+                </DialogHeader>
+                {editingQuestion && (
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Texto da Pergunta</Label>
+                      <Textarea
+                        value={editingQuestion.question_text}
+                        onChange={(e) => setEditingQuestion(prev => prev ? ({ ...prev, question_text: e.target.value }) : null)}
+                        placeholder="Digite sua pergunta..."
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Tipo de Resposta</Label>
+                      <Select
+                        value={editingQuestion.question_type}
+                        onValueChange={(value: QuestionType) => setEditingQuestion(prev => prev ? ({ ...prev, question_type: value }) : null)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="short_text">Texto Curto</SelectItem>
+                          <SelectItem value="long_text">Texto Longo</SelectItem>
+                          <SelectItem value="multiple_choice">Múltipla Escolha (única)</SelectItem>
+                          <SelectItem value="checkbox">Caixas de Seleção (múltiplas)</SelectItem>
+                          <SelectItem value="scale">Escala Numérica</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {['multiple_choice', 'checkbox'].includes(editingQuestion.question_type) && (
+                      <div className="space-y-2">
+                        <Label>Opções</Label>
+                        <div className="space-y-2">
+                          {editingQuestion.options.map((option, index) => (
+                            <div key={index} className="flex gap-2">
+                              <Input
+                                value={option}
+                                onChange={(e) => updateEditOption(index, e.target.value)}
+                                placeholder={`Opção ${index + 1}`}
+                              />
+                              {editingQuestion.options.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeEditOption(index)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                          <Button type="button" variant="outline" size="sm" onClick={addEditOption} className="w-full">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Adicionar Opção
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {editingQuestion.question_type === 'scale' && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Valor Mínimo</Label>
+                          <Input
+                            type="number"
+                            value={editingQuestion.scale_min}
+                            onChange={(e) => setEditingQuestion(prev => prev ? ({ ...prev, scale_min: parseInt(e.target.value) || 0 }) : null)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Valor Máximo</Label>
+                          <Input
+                            type="number"
+                            value={editingQuestion.scale_max}
+                            onChange={(e) => setEditingQuestion(prev => prev ? ({ ...prev, scale_max: parseInt(e.target.value) || 10 }) : null)}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="edit_required"
+                        checked={editingQuestion.is_required}
+                        onCheckedChange={(checked) => setEditingQuestion(prev => prev ? ({ ...prev, is_required: checked }) : null)}
+                      />
+                      <Label htmlFor="edit_required">Pergunta obrigatória</Label>
+                    </div>
+
+                    {['multiple_choice', 'checkbox', 'scale'].includes(editingQuestion.question_type) && (
+                      <div className="space-y-4 border-t pt-4 mt-4">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="edit_has_comment_field"
+                            checked={editingQuestion.has_comment_field}
+                            onCheckedChange={(checked) => setEditingQuestion(prev => prev ? ({ ...prev, has_comment_field: checked }) : null)}
+                          />
+                          <Label htmlFor="edit_has_comment_field">Adicionar campo anexo de comentário</Label>
+                        </div>
+
+                        {editingQuestion.has_comment_field && (
+                          <div className="space-y-4 pl-4 border-l-2 border-primary/20">
+                            <div className="space-y-2">
+                              <Label>Título do campo</Label>
+                              <Input
+                                value={editingQuestion.comment_field_label}
+                                onChange={(e) => setEditingQuestion(prev => prev ? ({ ...prev, comment_field_label: e.target.value }) : null)}
+                                placeholder="Se quiser explicar melhor, comente aqui"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Tipo de resposta</Label>
+                              <Select
+                                value={editingQuestion.comment_field_type}
+                                onValueChange={(value: 'short' | 'medium') => setEditingQuestion(prev => prev ? ({ ...prev, comment_field_type: value }) : null)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="short">Texto curto (1 linha)</SelectItem>
+                                  <SelectItem value="medium">Texto médio (3 linhas)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                id="edit_comment_field_required"
+                                checked={editingQuestion.comment_field_required}
+                                onCheckedChange={(checked) => setEditingQuestion(prev => prev ? ({ ...prev, comment_field_required: checked }) : null)}
+                              />
+                              <Label htmlFor="edit_comment_field_required">Campo de comentário obrigatório</Label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setIsEditQuestionOpen(false); setEditingQuestion(null); }}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleUpdateQuestionFull} disabled={updateQuestion.isPending}>
+                    Salvar
                   </Button>
                 </DialogFooter>
               </DialogContent>

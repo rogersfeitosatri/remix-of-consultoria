@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library, Sparkles } from 'lucide-react';
 import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm, useCreateDefaultCheckinForm } from '@/hooks/useCheckinForms';
-import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm } from '@/hooks/useAnamneseForms';
+import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm, useCreateDefaultAnamneseForm } from '@/hooks/useAnamneseForms';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -53,6 +53,7 @@ export default function Forms() {
   const { data: anamneseForms = [], isLoading: anamneseLoading } = useAnamneseForms();
   const deleteAnamneseForm = useDeleteAnamneseForm();
   const createAnamneseForm = useCreateAnamneseForm();
+  const createDefaultAnamneseForm = useCreateDefaultAnamneseForm();
 
   const handleCreateForm = async () => {
     if (!newFormData.title.trim()) {
@@ -129,13 +130,30 @@ export default function Forms() {
       const form = await createDefaultCheckinForm.mutateAsync();
       toast({ 
         title: 'Formulário padrão criado!',
-        description: 'O formulário com as 15 perguntas do banco foi criado com sucesso.',
+        description: 'O formulário com as perguntas do banco foi criado com sucesso.',
       });
       navigate(`/checkin/${form.id}`);
     } catch (error: any) {
       toast({
         title: 'Erro',
         description: error.message || 'Não foi possível criar o formulário padrão.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCreateDefaultAnamneseForm = async () => {
+    try {
+      const form = await createDefaultAnamneseForm.mutateAsync();
+      toast({ 
+        title: 'Formulário padrão criado!',
+        description: 'A anamnese com as perguntas do banco foi criada com sucesso.',
+      });
+      navigate(`/anamnese/${form.id}`);
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível criar a anamnese padrão.',
         variant: 'destructive',
       });
     }
@@ -158,6 +176,17 @@ export default function Forms() {
                 variant="outline"
                 className="gap-2"
                 disabled={createDefaultCheckinForm.isPending}
+              >
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline">Criar Padrão</span>
+              </Button>
+            )}
+            {activeTab === 'anamnese' && (
+              <Button 
+                onClick={handleCreateDefaultAnamneseForm}
+                variant="outline"
+                className="gap-2"
+                disabled={createDefaultAnamneseForm.isPending}
               >
                 <Sparkles className="h-4 w-4" />
                 <span className="hidden sm:inline">Criar Padrão</span>

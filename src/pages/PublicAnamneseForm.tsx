@@ -321,7 +321,7 @@ export default function PublicAnamneseForm() {
                       </div>
                     </div>
 
-                    {question.question_type === 'short_text' && (
+                    {(question.question_type === 'short_text' || question.question_type === 'text') && (
                       <Input
                         value={answers[question.id] || ''}
                         onChange={(e) => handleAnswerChange(question.id, e.target.value)}
@@ -329,7 +329,7 @@ export default function PublicAnamneseForm() {
                       />
                     )}
 
-                    {question.question_type === 'long_text' && (
+                    {(question.question_type === 'long_text' || question.question_type === 'textarea') && (
                       <Textarea
                         value={answers[question.id] || ''}
                         onChange={(e) => handleAnswerChange(question.id, e.target.value)}
