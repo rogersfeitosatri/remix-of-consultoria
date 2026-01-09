@@ -54,10 +54,10 @@ export default function TestimonialsCarousel() {
           </h2>
         </div>
         
-        <div className="relative max-w-sm mx-auto flex justify-center">
+        <div className="relative w-full max-w-xs sm:max-w-sm mx-auto flex flex-col items-center">
           {/* Main Carousel Container with Fade */}
-          <div className="relative overflow-hidden rounded-xl bg-gray-900 p-3">
-            <div className="relative aspect-[9/16] max-h-[400px] flex items-center justify-center rounded-lg border border-gray-600/50 bg-gray-800/50 p-2">
+          <div className="relative overflow-hidden rounded-xl bg-gray-900 p-2 sm:p-3 w-full">
+            <div className="relative aspect-[9/16] w-full max-h-[350px] sm:max-h-[400px] flex items-center justify-center rounded-lg border border-gray-600/50 bg-gray-800/50 p-2">
               {testimonialImages.map((img, index) => (
                 <div 
                   key={index} 
@@ -79,7 +79,7 @@ export default function TestimonialsCarousel() {
           <Button
             variant="outline"
             size="icon"
-            className="absolute left-1 md:-left-12 top-1/2 -translate-y-1/2 bg-black/80 border-[hsl(43,74%,49%)]/50 hover:bg-[hsl(43,74%,49%)] hover:text-black text-white rounded-full h-8 w-8 md:h-10 md:w-10"
+            className="absolute left-0 sm:-left-4 md:-left-12 top-1/2 -translate-y-1/2 bg-black/80 border-[hsl(43,74%,49%)]/50 hover:bg-[hsl(43,74%,49%)] hover:text-black text-white rounded-full h-8 w-8 md:h-10 md:w-10 z-20"
             onClick={() => handleManualNav('prev')}
           >
             <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
@@ -87,7 +87,7 @@ export default function TestimonialsCarousel() {
           <Button
             variant="outline"
             size="icon"
-            className="absolute right-1 md:-right-12 top-1/2 -translate-y-1/2 bg-black/80 border-[hsl(43,74%,49%)]/50 hover:bg-[hsl(43,74%,49%)] hover:text-black text-white rounded-full h-8 w-8 md:h-10 md:w-10"
+            className="absolute right-0 sm:-right-4 md:-right-12 top-1/2 -translate-y-1/2 bg-black/80 border-[hsl(43,74%,49%)]/50 hover:bg-[hsl(43,74%,49%)] hover:text-black text-white rounded-full h-8 w-8 md:h-10 md:w-10 z-20"
             onClick={() => handleManualNav('next')}
           >
             <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
