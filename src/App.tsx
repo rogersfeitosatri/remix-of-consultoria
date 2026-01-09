@@ -14,6 +14,7 @@ import Checkin from "./pages/Checkin";
 import CheckinFormBuilder from "./pages/CheckinFormBuilder";
 import AnamneseFormBuilder from "./pages/AnamneseFormBuilder";
 import PublicCheckinForm from "./pages/PublicCheckinForm";
+import PublicAnamneseForm from "./pages/PublicAnamneseForm";
 import AthleteDashboard from "./pages/AthleteDashboard";
 import AthleteAnamneseForm from "./pages/AthleteAnamneseForm";
 import Auth from "./pages/Auth";
@@ -89,7 +90,7 @@ function AppRoutes() {
       <Route path="/bio" element={<LinkBio />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
-      <Route path="/anamnese-form/:formId" element={<AthleteAnamneseForm />} />
+      <Route path="/anamnese-form/:formId" element={<PublicAnamneseForm />} />
       <Route path="/agendar/:slug" element={<PublicBooking />} />
       <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
       <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteAnamneseForm /></AthleteRoute>} />
