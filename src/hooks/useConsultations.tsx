@@ -257,6 +257,36 @@ export function useAvailabilityRulesByAdmin(adminUserId: string | undefined) {
     queryFn: async () => {
       if (!adminUserId) return [];
 
+      // First try to get from scheduling_time_blocks (new system)
+      const { data: settings } = await supabase
+        .from('scheduling_settings')
+        .select('id, slot_duration_minutes')
+        .eq('user_id', adminUserId)
+        .maybeSingle();
+
+      if (settings) {
+        const { data: timeBlocks, error: blocksError } = await supabase
+          .from('scheduling_time_blocks')
+          .select('*')
+          .eq('settings_id', settings.id)
+          .order('day_of_week')
+          .order('start_time');
+
+        if (!blocksError && timeBlocks && timeBlocks.length > 0) {
+          // Convert time blocks to availability rules format
+          return timeBlocks.map(block => ({
+            id: block.id,
+            user_id: adminUserId,
+            day_of_week: block.day_of_week,
+            start_time: block.start_time,
+            end_time: block.end_time,
+            slot_minutes: settings.slot_duration_minutes || 30,
+            is_enabled: true,
+          })) as AvailabilityRule[];
+        }
+      }
+
+      // Fallback to old availability_rules table
       const { data, error } = await supabase
         .from('availability_rules')
         .select('*')
