@@ -234,7 +234,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                         size="sm"
                         onClick={() => handleSendCheckinManually(client)}
                         disabled={sendingCheckin === client.id}
-                        className="gap-1 text-xs"
+                        className="gap-1 text-xs text-primary hover:text-primary"
                         title="Enviar Check-in via WhatsApp"
                       >
                         <MessageCircle className="h-3 w-3" />
@@ -245,7 +245,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                         size="sm"
                         onClick={() => handleSendBookingManually(client)}
                         disabled={sendingBooking === client.id}
-                        className="gap-1 text-xs"
+                        className="gap-1 text-xs text-primary hover:text-primary"
                         title="Enviar Link de Consulta via WhatsApp"
                       >
                         <CalendarCheck className="h-3 w-3" />
@@ -257,7 +257,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                     variant="outline"
                     size="icon"
                     onClick={() => navigate(`/clients/${client.id}/history`)}
-                    className="h-9 w-9"
+                    className="h-9 w-9 text-primary hover:text-primary"
                     title="Histórico de Check-ins"
                   >
                     <History className="h-4 w-4" />
@@ -266,7 +266,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                     variant="outline"
                     size="icon"
                     onClick={() => navigate(`/clients/${client.id}/analysis`)}
-                    className="h-9 w-9"
+                    className="h-9 w-9 text-primary hover:text-primary"
                     title="Análise IA"
                   >
                     <Brain className="h-4 w-4" />
@@ -275,7 +275,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                     variant="outline"
                     size="icon"
                     onClick={() => onEdit(client)}
-                    className="h-9 w-9"
+                    className="h-9 w-9 text-primary hover:text-primary"
                   >
                     <Edit2 className="h-4 w-4" />
                   </Button>
