@@ -41,36 +41,34 @@ export default function TestimonialsCarousel() {
     setIsAutoPlaying(false);
     if (direction === 'prev') prevSlide();
     else nextSlide();
-    // Resume auto-play after 10 seconds of inactivity
     setTimeout(() => setIsAutoPlaying(true), 10000);
   };
 
   return (
-    <section className="py-16 md:py-20 bg-gray-950">
+    <section className="py-12 md:py-16 bg-gray-950">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-center gap-3 mb-10 md:mb-12">
-          <Quote className="w-6 h-6 md:w-8 md:h-8 text-[hsl(43,74%,49%)]" />
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white">
+        <div className="flex items-center justify-center gap-3 mb-8 md:mb-10">
+          <Quote className="w-5 h-5 md:w-6 md:h-6 text-[hsl(43,74%,49%)]" />
+          <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-white">
             O que dizem os atletas
           </h2>
         </div>
         
-        <div className="relative max-w-4xl mx-auto">
-          {/* Main Carousel Container */}
-          <div className="relative overflow-hidden rounded-2xl border-2 border-[hsl(43,74%,49%)]/30">
-            <div 
-              className="flex transition-transform duration-500 ease-out"
-              style={{ transform: `translateX(-${currentIndex * 100}%)` }}
-            >
+        <div className="relative max-w-sm mx-auto">
+          {/* Main Carousel Container with Fade */}
+          <div className="relative overflow-hidden rounded-xl border border-[hsl(43,74%,49%)]/30 bg-gray-900">
+            <div className="relative aspect-[9/16] max-h-[400px]">
               {testimonialImages.map((img, index) => (
                 <div 
                   key={index} 
-                  className="min-w-full flex-shrink-0"
+                  className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${
+                    index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                  }`}
                 >
                   <img
                     src={img}
                     alt={`Depoimento de atleta ${index + 1}`}
-                    className="w-full h-auto object-contain max-h-[600px] mx-auto"
+                    className="w-full h-full object-contain"
                   />
                 </div>
               ))}
@@ -81,28 +79,28 @@ export default function TestimonialsCarousel() {
           <Button
             variant="outline"
             size="icon"
-            className="absolute left-2 md:-left-14 top-1/2 -translate-y-1/2 bg-black/80 border-[hsl(43,74%,49%)]/50 hover:bg-[hsl(43,74%,49%)] hover:text-black text-white rounded-full h-10 w-10 md:h-12 md:w-12"
+            className="absolute left-1 md:-left-12 top-1/2 -translate-y-1/2 bg-black/80 border-[hsl(43,74%,49%)]/50 hover:bg-[hsl(43,74%,49%)] hover:text-black text-white rounded-full h-8 w-8 md:h-10 md:w-10"
             onClick={() => handleManualNav('prev')}
           >
-            <ChevronLeft className="h-5 w-5 md:h-6 md:w-6" />
+            <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
           </Button>
           <Button
             variant="outline"
             size="icon"
-            className="absolute right-2 md:-right-14 top-1/2 -translate-y-1/2 bg-black/80 border-[hsl(43,74%,49%)]/50 hover:bg-[hsl(43,74%,49%)] hover:text-black text-white rounded-full h-10 w-10 md:h-12 md:w-12"
+            className="absolute right-1 md:-right-12 top-1/2 -translate-y-1/2 bg-black/80 border-[hsl(43,74%,49%)]/50 hover:bg-[hsl(43,74%,49%)] hover:text-black text-white rounded-full h-8 w-8 md:h-10 md:w-10"
             onClick={() => handleManualNav('next')}
           >
-            <ChevronRight className="h-5 w-5 md:h-6 md:w-6" />
+            <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
           </Button>
 
           {/* Dots Indicator */}
-          <div className="flex justify-center gap-2 mt-6">
+          <div className="flex justify-center gap-1.5 mt-4">
             {testimonialImages.map((_, index) => (
               <button
                 key={index}
-                className={`w-2 h-2 md:w-3 md:h-3 rounded-full transition-all duration-300 ${
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${
                   index === currentIndex 
-                    ? 'bg-[hsl(43,74%,49%)] w-6 md:w-8' 
+                    ? 'bg-[hsl(43,74%,49%)] w-5' 
                     : 'bg-gray-600 hover:bg-gray-500'
                 }`}
                 onClick={() => {

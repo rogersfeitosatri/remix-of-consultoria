@@ -149,6 +149,9 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Depoimentos - Carrossel */}
+      <TestimonialsCarousel />
+
       {/* Como Funciona */}
       <section className="py-16 md:py-20 bg-gray-950">
         <div className="container mx-auto px-4">
@@ -223,8 +226,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Depoimentos - Carrossel */}
-      <TestimonialsCarousel />
 
       {/* CTA Final */}
       <section className="py-16 md:py-20 bg-gradient-to-b from-gray-950 to-black">
