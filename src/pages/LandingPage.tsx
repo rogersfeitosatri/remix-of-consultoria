@@ -5,7 +5,7 @@ import runnerHero from "@/assets/runner-hero.jpg";
 import runner2 from "@/assets/runner-2.jpg";
 import TestimonialsCarousel from "@/components/landing/TestimonialsCarousel";
 
-const KIWIFY_LINK = "#"; // TODO: Replace with actual Kiwify link
+const KIWIFY_LINK = "https://pay.kiwify.com.br/v64Pmhk";
 
 export default function LandingPage() {
   return (

@@ -91,6 +91,32 @@ export function useUpdateChallengeActivity() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['challenge-activities'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-challenge-activities'] });
+    },
+  });
+}
+
+// Reorder activities (Admin) - move up or down
+export function useReorderChallengeActivities() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ activities }: { activities: { id: string; order_index: number }[] }) => {
+      // Update all activities with new order_index
+      const updates = activities.map(({ id, order_index }) =>
+        supabase
+          .from('challenge_activities')
+          .update({ order_index, updated_at: new Date().toISOString() })
+          .eq('id', id)
+      );
+      
+      const results = await Promise.all(updates);
+      const error = results.find(r => r.error)?.error;
+      if (error) throw error;
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['challenge-activities'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-challenge-activities'] });
     },
   });
 }
