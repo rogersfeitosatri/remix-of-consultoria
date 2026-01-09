@@ -1,0 +1,543 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
+
+// Types
+export interface BookingLink {
+  id: string;
+  client_id: string;
+  active: boolean;
+  token: string;
+  created_at: string;
+  updated_at: string;
+  last_sent_at: string | null;
+  usage_count: number;
+  expires_at: string | null;
+  client?: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+}
+
+export interface ConsultationScheduleRule {
+  client_id: string;
+  cadence_weeks: number;
+  next_invite_date: string | null;
+  is_enabled: boolean;
+  last_appointment_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConsultAutomationSettings {
+  id: string;
+  user_id: string;
+  send_day_of_week: number;
+  send_time: string;
+  timezone: string;
+  message_template_booking: string;
+  message_template_confirmation: string;
+  is_enabled: boolean;
+}
+
+export interface AvailabilityRule {
+  id: string;
+  user_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  slot_minutes: number;
+  is_enabled: boolean;
+}
+
+export interface GoogleCalendarConnection {
+  id: string;
+  user_id: string;
+  calendar_id: string | null;
+  service_account_email: string | null;
+  service_account_key_encrypted: string | null;
+  is_connected: boolean;
+  last_sync_at: string | null;
+}
+
+export interface ConsultInviteLog {
+  id: string;
+  client_id: string;
+  sent_at: string;
+  channel: string;
+  status: string;
+  message_type: string;
+  error_message: string | null;
+}
+
+// Hook: Booking Links
+export function useBookingLinks() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['booking-links', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('booking_links')
+        .select(`
+          *,
+          client:clients(name, email, phone)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data as (BookingLink & { client: { name: string; email: string; phone: string } })[];
+    },
+    enabled: !!user,
+  });
+}
+
+export function useBookingLinkByToken(token: string | undefined) {
+  return useQuery({
+    queryKey: ['booking-link-token', token],
+    queryFn: async () => {
+      if (!token) return null;
+
+      const { data, error } = await supabase
+        .from('booking_links')
+        .select(`
+          *,
+          client:clients(id, name, email, phone, user_id)
+        `)
+        .eq('token', token)
+        .eq('active', true)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!token,
+  });
+}
+
+export function useCreateBookingLink() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (clientId: string) => {
+      const { data, error } = await supabase
+        .from('booking_links')
+        .insert({ client_id: clientId })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['booking-links'] });
+    },
+  });
+}
+
+export function useToggleBookingLink() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const { error } = await supabase
+        .from('booking_links')
+        .update({ active })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['booking-links'] });
+    },
+  });
+}
+
+// Hook: Consultation Schedule Rules
+export function useConsultationRules() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['consultation-rules', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('consultation_schedule_rules')
+        .select(`
+          *,
+          client:clients(name, email, plan_type, has_agenda_access)
+        `);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+}
+
+export function useUpsertConsultationRule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: Partial<ConsultationScheduleRule> & { client_id: string }) => {
+      const { error } = await supabase
+        .from('consultation_schedule_rules')
+        .upsert(data, { onConflict: 'client_id' });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultation-rules'] });
+    },
+  });
+}
+
+// Hook: Automation Settings
+export function useConsultAutomationSettings() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['consult-automation-settings', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('consult_automation_settings')
+        .select('*')
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data as ConsultAutomationSettings | null;
+    },
+    enabled: !!user,
+  });
+}
+
+export function useSaveConsultAutomationSettings() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: Partial<ConsultAutomationSettings>) => {
+      const { error } = await supabase
+        .from('consult_automation_settings')
+        .upsert({ ...data, user_id: user?.id }, { onConflict: 'user_id' });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consult-automation-settings'] });
+    },
+  });
+}
+
+// Hook: Availability Rules
+export function useAvailabilityRules() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['availability-rules', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('availability_rules')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('day_of_week')
+        .order('start_time');
+
+      if (error) throw error;
+      return data as AvailabilityRule[];
+    },
+    enabled: !!user,
+  });
+}
+
+export function useAvailabilityRulesByAdmin(adminUserId: string | undefined) {
+  return useQuery({
+    queryKey: ['availability-rules-admin', adminUserId],
+    queryFn: async () => {
+      if (!adminUserId) return [];
+
+      const { data, error } = await supabase
+        .from('availability_rules')
+        .select('*')
+        .eq('user_id', adminUserId)
+        .eq('is_enabled', true)
+        .order('day_of_week')
+        .order('start_time');
+
+      if (error) throw error;
+      return data as AvailabilityRule[];
+    },
+    enabled: !!adminUserId,
+  });
+}
+
+export function useSaveAvailabilityRule() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: Omit<AvailabilityRule, 'id' | 'user_id'> & { id?: string }) => {
+      if (data.id) {
+        const { error } = await supabase
+          .from('availability_rules')
+          .update(data)
+          .eq('id', data.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('availability_rules')
+          .insert({ ...data, user_id: user?.id });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['availability-rules'] });
+    },
+  });
+}
+
+export function useDeleteAvailabilityRule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('availability_rules')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['availability-rules'] });
+    },
+  });
+}
+
+// Hook: Google Calendar Connection
+export function useGoogleCalendarConnection() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['google-calendar-connection', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('google_calendar_connections')
+        .select('*')
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data as GoogleCalendarConnection | null;
+    },
+    enabled: !!user,
+  });
+}
+
+export function useSaveGoogleCalendarConnection() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: Partial<GoogleCalendarConnection>) => {
+      const { error } = await supabase
+        .from('google_calendar_connections')
+        .upsert({ ...data, user_id: user?.id }, { onConflict: 'user_id' });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['google-calendar-connection'] });
+    },
+  });
+}
+
+// Hook: Consult Invite Logs
+export function useConsultInviteLogs(clientId?: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['consult-invite-logs', clientId, user?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from('consult_invite_logs')
+        .select('*')
+        .order('sent_at', { ascending: false })
+        .limit(50);
+
+      if (clientId) {
+        query = query.eq('client_id', clientId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as ConsultInviteLog[];
+    },
+    enabled: !!user,
+  });
+}
+
+// Hook: Premium Clients (with agenda access)
+export function usePremiumClients() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['premium-clients', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select(`
+          *,
+          booking_link:booking_links(id, token, active, last_sent_at),
+          consultation_rule:consultation_schedule_rules(*)
+        `)
+        .or('plan_type.eq.premium,has_agenda_access.eq.true')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+}
+
+// Hook: Appointments with Google Calendar info
+export function useConsultationAppointments() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['consultation-appointments', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          client:clients(name, email, phone)
+        `)
+        .order('appointment_date', { ascending: true })
+        .order('appointment_time', { ascending: true });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+}
+
+export function useCreateAppointmentWithMeet() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      client_id: string;
+      appointment_date: string;
+      appointment_time: string;
+      duration_minutes: number;
+      notes?: string;
+      user_id: string;
+    }) => {
+      // Create the appointment
+      const { data: appointment, error } = await supabase
+        .from('appointments')
+        .insert({
+          ...data,
+          status: 'confirmed',
+          timezone: 'America/Fortaleza',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Call edge function to create Google Calendar event
+      try {
+        const { data: meetData } = await supabase.functions.invoke('create-calendar-event', {
+          body: { appointmentId: appointment.id },
+        });
+
+        if (meetData?.google_meet_link) {
+          // Update appointment with Meet link
+          await supabase
+            .from('appointments')
+            .update({
+              google_meet_link: meetData.google_meet_link,
+              google_calendar_event_id: meetData.event_id,
+            })
+            .eq('id', appointment.id);
+        }
+      } catch (calendarError) {
+        console.error('Failed to create Google Calendar event:', calendarError);
+        // Don't fail the appointment creation if calendar fails
+      }
+
+      return appointment;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultation-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
+  });
+}
+
+export function useCancelAppointment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', appointmentId);
+
+      if (error) throw error;
+
+      // TODO: Cancel Google Calendar event via edge function
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultation-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
+  });
+}
+
+// Hook: Send booking invite
+export function useSendBookingInvite() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ clientId, bookingToken }: { clientId: string; bookingToken: string }) => {
+      const bookingUrl = `${window.location.origin}/booking/${bookingToken}`;
+
+      const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+        body: {
+          clientId,
+          message: `Olá! Hora de agendar sua consulta. Escolha seu melhor horário aqui: ${bookingUrl}`,
+        },
+      });
+
+      if (error) throw error;
+
+      // Log the invite
+      await supabase.from('consult_invite_logs').insert({
+        client_id: clientId,
+        channel: 'whatsapp',
+        status: 'sent',
+        message_type: 'booking_invite',
+      });
+
+      // Update booking link last_sent_at
+      await supabase
+        .from('booking_links')
+        .update({ last_sent_at: new Date().toISOString() })
+        .eq('token', bookingToken);
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['booking-links'] });
+      queryClient.invalidateQueries({ queryKey: ['consult-invite-logs'] });
+    },
+  });
+}
