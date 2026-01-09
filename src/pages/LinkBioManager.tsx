@@ -128,7 +128,7 @@ export default function LinkBioManager() {
           </div>
           <div className="flex gap-2">
             <Link to="/bio" target="_blank">
-              <Button variant="outline" size="sm" className="gap-2">
+              <Button variant="outline" size="sm" className="gap-2 text-white hover:text-white">
                 <Eye className="h-4 w-4" />
                 Visualizar
               </Button>

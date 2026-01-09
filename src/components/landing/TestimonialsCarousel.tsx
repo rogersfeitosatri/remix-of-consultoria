@@ -54,21 +54,21 @@ export default function TestimonialsCarousel() {
           </h2>
         </div>
         
-        <div className="relative max-w-sm mx-auto">
+        <div className="relative max-w-sm mx-auto flex justify-center">
           {/* Main Carousel Container with Fade */}
-          <div className="relative overflow-hidden rounded-xl border border-[hsl(43,74%,49%)]/30 bg-gray-900">
-            <div className="relative aspect-[9/16] max-h-[400px]">
+          <div className="relative overflow-hidden rounded-xl bg-gray-900 p-3">
+            <div className="relative aspect-[9/16] max-h-[400px] flex items-center justify-center rounded-lg border border-gray-600/50 bg-gray-800/50 p-2">
               {testimonialImages.map((img, index) => (
                 <div 
                   key={index} 
-                  className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${
+                  className={`absolute inset-2 flex items-center justify-center transition-opacity duration-500 ease-in-out ${
                     index === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
                   }`}
                 >
                   <img
                     src={img}
                     alt={`Depoimento de atleta ${index + 1}`}
-                    className="w-full h-full object-contain"
+                    className="max-w-full max-h-full object-contain rounded-md"
                   />
                 </div>
               ))}
