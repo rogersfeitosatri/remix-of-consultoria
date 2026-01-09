@@ -485,19 +485,84 @@ export function useCancelAppointment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (appointmentId: string) => {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: 'cancelled' })
-        .eq('id', appointmentId);
+    mutationFn: async ({ 
+      appointmentId, 
+      notifyClient = true, 
+      reason 
+    }: { 
+      appointmentId: string; 
+      notifyClient?: boolean; 
+      reason?: string;
+    }) => {
+      const { data, error } = await supabase.functions.invoke('cancel-calendar-event', {
+        body: { appointmentId, notifyClient, reason },
+      });
 
       if (error) throw error;
-
-      // TODO: Cancel Google Calendar event via edge function
+      if (!data?.success) throw new Error(data?.error || 'Erro ao cancelar');
+      
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultation-appointments'] });
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
+  });
+}
+
+export function useRescheduleAppointment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      appointmentId, 
+      newDate, 
+      newTime, 
+      notifyClient = true 
+    }: { 
+      appointmentId: string; 
+      newDate: string; 
+      newTime: string; 
+      notifyClient?: boolean;
+    }) => {
+      const { data, error } = await supabase.functions.invoke('reschedule-appointment', {
+        body: { appointmentId, newDate, newTime, notifyClient },
+      });
+
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Erro ao remarcar');
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['consultation-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    },
+  });
+}
+
+export function useCheckCancellationAllowed() {
+  return useMutation({
+    mutationFn: async (appointmentId: string) => {
+      const { data: appointment, error } = await supabase
+        .from('appointments')
+        .select('appointment_date, appointment_time')
+        .eq('id', appointmentId)
+        .single();
+
+      if (error) throw error;
+
+      const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
+      const now = new Date();
+      const hoursUntil = (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+      return {
+        allowed: hoursUntil >= 24,
+        hoursRemaining: Math.round(hoursUntil),
+        message: hoursUntil < 24 
+          ? `Não é possível cancelar/remarcar com menos de 24h de antecedência. Faltam ${Math.round(hoursUntil)} horas.`
+          : 'Permitido cancelar/remarcar',
+      };
     },
   });
 }
