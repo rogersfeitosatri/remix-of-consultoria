@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, AlertCircle, FileText, User, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, Clock, AlertCircle, FileText, User, TrendingUp, CalendarCheck } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { useScheduledCheckinsForClient, ScheduledCheckin } from '@/hooks/useScheduledCheckins';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, isBefore, isAfter, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
+import { PremiumClientDetails } from '@/components/admin/PremiumClientDetails';
 
 interface CheckinResponse {
   id: string;
@@ -143,6 +144,11 @@ export default function AthleteHistory() {
             {client.is_active ? 'Ativo' : 'Inativo'}
           </Badge>
         </div>
+
+        {/* Premium Client Details - Only shown for clients with agenda access */}
+        {(client.has_agenda_access || client.plan_type === 'premium') && (
+          <PremiumClientDetails clientId={client.id} clientName={client.name} />
+        )}
 
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-3">

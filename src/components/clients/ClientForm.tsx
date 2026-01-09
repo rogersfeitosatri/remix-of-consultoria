@@ -75,6 +75,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     plan_type: client?.plan_type || 'consultoria' as 'consultoria' | 'premium',
     plan_duration: client?.plan_duration || 'monthly' as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual',
     has_checkin: client?.has_checkin ?? true,
+    has_agenda_access: client?.has_agenda_access ?? false,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly',
     start_date: client?.start_date || new Date().toISOString().split('T')[0],
     end_date: client?.end_date || '',
@@ -125,12 +126,12 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     }
   }, [formData.start_date, formData.plan_duration]);
 
-  // Set has_consultations based on plan type
+  // Set has_consultations and has_agenda_access based on plan type
   useEffect(() => {
     if (formData.plan_type === 'premium') {
-      setFormData(prev => ({ ...prev, has_consultations: true }));
+      setFormData(prev => ({ ...prev, has_consultations: true, has_agenda_access: true }));
     } else {
-      setFormData(prev => ({ ...prev, has_consultations: false }));
+      setFormData(prev => ({ ...prev, has_consultations: false, has_agenda_access: false }));
     }
   }, [formData.plan_type]);
 
