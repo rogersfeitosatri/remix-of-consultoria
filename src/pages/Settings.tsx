@@ -424,6 +424,7 @@ export default function Settings() {
         notes: String(row['Observações'] || '').trim() || null,
         athlete_status: 'active' as const,
         registration_source: 'manual' as const,
+        has_agenda_access: planType === 'premium',
       },
       errors: [],
     };
