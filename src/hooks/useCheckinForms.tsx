@@ -238,6 +238,28 @@ export function useDeleteCheckinQuestion() {
   });
 }
 
+// Reorder questions (update order_index for multiple questions)
+export function useReorderCheckinQuestions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ form_id, updates }: { form_id: string; updates: { id: string; order_index: number }[] }) => {
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('checkin_questions')
+          .update({ order_index: update.order_index })
+          .eq('id', update.id);
+
+        if (error) throw error;
+      }
+      return { form_id };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['checkin_form', result.form_id] });
+    },
+  });
+}
+
 export function useSubmitCheckinResponse() {
   const queryClient = useQueryClient();
 

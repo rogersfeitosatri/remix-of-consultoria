@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +13,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Plus, GripVertical, Trash2, Copy, ExternalLink, Eye, FileText, X, Edit } from 'lucide-react';
-import { useCheckinFormWithQuestions, useUpdateCheckinForm, useAddCheckinQuestion, useUpdateCheckinQuestion, useDeleteCheckinQuestion, useCheckinFormResponses, type QuestionType } from '@/hooks/useCheckinForms';
+import { useCheckinFormWithQuestions, useUpdateCheckinForm, useAddCheckinQuestion, useUpdateCheckinQuestion, useDeleteCheckinQuestion, useCheckinFormResponses, useReorderCheckinQuestions, type QuestionType, type CheckinQuestion } from '@/hooks/useCheckinForms';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const questionTypeLabels: Record<QuestionType, string> = {
   short_text: 'Texto Curto',
@@ -26,6 +43,136 @@ const questionTypeLabels: Record<QuestionType, string> = {
   checkbox: 'Caixas de Seleção',
   scale: 'Escala Numérica',
 };
+
+// Sortable Question Card component
+function SortableCheckinQuestion({
+  question,
+  index,
+  onEdit,
+  onDelete,
+  onToggleRequired,
+}: {
+  question: CheckinQuestion;
+  index: number;
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggleRequired: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 1,
+  };
+
+  return (
+    <Card ref={setNodeRef} style={style} className={isDragging ? 'shadow-lg' : ''}>
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div
+            {...attributes}
+            {...listeners}
+            className="flex items-center gap-2 text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
+          >
+            <GripVertical className="h-5 w-5" />
+            <span className="font-medium">{index + 1}.</span>
+          </div>
+          <div className="flex-1 space-y-2">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-medium">{question.question_text}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="text-xs">
+                    {questionTypeLabels[question.question_type]}
+                  </Badge>
+                  {question.is_required && (
+                    <Badge variant="secondary" className="text-xs">Obrigatória</Badge>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor={`required-${question.id}`} className="text-xs text-muted-foreground">
+                    Obrigatória
+                  </Label>
+                  <Switch
+                    id={`required-${question.id}`}
+                    checked={question.is_required}
+                    onCheckedChange={onToggleRequired}
+                  />
+                </div>
+                <Button variant="ghost" size="sm" onClick={onEdit}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir Pergunta?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={onDelete}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+            {question.question_type === 'scale' && (
+              <p className="text-sm text-muted-foreground">
+                Escala: {question.scale_min} a {question.scale_max}
+              </p>
+            )}
+            {question.options && question.options.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {(question.options as string[]).map((option, i) => (
+                  <Badge key={i} variant="outline" className="text-xs">
+                    {option}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {question.has_comment_field && (
+              <div className="mt-2 p-2 bg-muted/50 rounded-md">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <span className="font-medium">Campo anexo:</span>
+                  {question.comment_field_label}
+                  {question.comment_field_required && (
+                    <Badge variant="secondary" className="text-xs ml-1">Obrigatório</Badge>
+                  )}
+                  <Badge variant="outline" className="text-xs ml-1">
+                    {question.comment_field_type === 'short' ? 'Texto curto' : 'Texto médio'}
+                  </Badge>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function CheckinFormBuilder() {
   const { formId } = useParams<{ formId: string }>();
@@ -36,6 +183,7 @@ export default function CheckinFormBuilder() {
   const addQuestion = useAddCheckinQuestion();
   const updateQuestion = useUpdateCheckinQuestion();
   const deleteQuestion = useDeleteCheckinQuestion();
+  const reorderQuestions = useReorderCheckinQuestions();
 
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
   const [newQuestion, setNewQuestion] = useState({
@@ -69,6 +217,25 @@ export default function CheckinFormBuilder() {
     comment_field_type: 'short' | 'medium';
   } | null>(null);
 
+  const [localQuestions, setLocalQuestions] = useState<CheckinQuestion[]>([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  useEffect(() => {
+    if (data?.questions) {
+      setLocalQuestions(data.questions);
+    }
+  }, [data?.questions]);
+
   if (isLoading) {
     return (
       <Layout>
@@ -92,7 +259,8 @@ export default function CheckinFormBuilder() {
     );
   }
 
-  const { form, questions } = data;
+  const { form } = data;
+  const questions = localQuestions;
 
   const handleUpdateTitle = async () => {
     if (!editTitle.trim()) return;
@@ -199,7 +367,7 @@ export default function CheckinFormBuilder() {
     }));
   };
 
-  const openEditQuestion = (question: any) => {
+  const openEditQuestion = (question: CheckinQuestion) => {
     setEditingQuestion({
       id: question.id,
       question_text: question.question_text,
@@ -272,6 +440,38 @@ export default function CheckinFormBuilder() {
       ...prev,
       options: prev.options.filter((_, i) => i !== index),
     }) : null);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = localQuestions.findIndex(q => q.id === active.id);
+    const newIndex = localQuestions.findIndex(q => q.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newQuestions = arrayMove(localQuestions, oldIndex, newIndex);
+    setLocalQuestions(newQuestions);
+
+    // Update order_index for all affected questions
+    const updates = newQuestions.map((q, index) => ({
+      id: q.id,
+      order_index: index,
+    }));
+
+    try {
+      await reorderQuestions.mutateAsync({
+        form_id: form.id,
+        updates,
+      });
+      toast.success('Ordem atualizada!');
+    } catch (error) {
+      // Revert on error
+      setLocalQuestions(data?.questions || []);
+      toast.error('Erro ao reordenar perguntas');
+    }
   };
 
   return (
@@ -349,102 +549,29 @@ export default function CheckinFormBuilder() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {questions.map((question, index) => (
-                  <Card key={question.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <GripVertical className="h-5 w-5" />
-                          <span className="font-medium">{index + 1}.</span>
-                        </div>
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <p className="font-medium">{question.question_text}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="outline" className="text-xs">
-                                  {questionTypeLabels[question.question_type]}
-                                </Badge>
-                                {question.is_required && (
-                                  <Badge variant="secondary" className="text-xs">Obrigatória</Badge>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-2">
-                                <Label htmlFor={`required-${question.id}`} className="text-xs text-muted-foreground">
-                                  Obrigatória
-                                </Label>
-                                <Switch
-                                  id={`required-${question.id}`}
-                                  checked={question.is_required}
-                                  onCheckedChange={() => handleToggleRequired(question.id, question.is_required)}
-                                />
-                              </div>
-                              <Button variant="ghost" size="sm" onClick={() => openEditQuestion(question)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Excluir Pergunta?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Esta ação não pode ser desfeita.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteQuestion(question.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Excluir
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </div>
-                          {question.question_type === 'scale' && (
-                            <p className="text-sm text-muted-foreground">
-                              Escala: {question.scale_min} a {question.scale_max}
-                            </p>
-                          )}
-                          {question.options && question.options.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {(question.options as string[]).map((option, i) => (
-                                <Badge key={i} variant="outline" className="text-xs">
-                                  {option}
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                          {question.has_comment_field && (
-                            <div className="mt-2 p-2 bg-muted/50 rounded-md">
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                <span className="font-medium">Campo anexo:</span>
-                                {question.comment_field_label}
-                                {question.comment_field_required && (
-                                  <Badge variant="secondary" className="text-xs ml-1">Obrigatório</Badge>
-                                )}
-                                <Badge variant="outline" className="text-xs ml-1">
-                                  {question.comment_field_type === 'short' ? 'Texto curto' : 'Texto médio'}
-                                </Badge>
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={questions.map(q => q.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {questions.map((question, index) => (
+                      <SortableCheckinQuestion
+                        key={question.id}
+                        question={question}
+                        index={index}
+                        onEdit={() => openEditQuestion(question)}
+                        onDelete={() => handleDeleteQuestion(question.id)}
+                        onToggleRequired={() => handleToggleRequired(question.id, question.is_required)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             )}
 
             {/* Add Question Button */}
@@ -811,7 +938,6 @@ export default function CheckinFormBuilder() {
                       <div className="space-y-3">
                         {questions.map((question) => {
                           const responseData = response.responses[question.id];
-                          // Handle both old format (direct value) and new format (object with answer/comment)
                           const answer = responseData?.answer !== undefined ? responseData.answer : responseData;
                           const comment = responseData?.comment;
                           return (

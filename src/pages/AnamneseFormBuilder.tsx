@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, Trash2, GripVertical, Save, Eye, Copy, Settings, Library, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, GripVertical, Save, Eye, Copy, Settings, Library, Loader2, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   useAnamneseFormWithQuestions,
@@ -44,9 +44,28 @@ import {
   useAddAnamneseQuestion,
   useUpdateAnamneseQuestion,
   useDeleteAnamneseQuestion,
+  useReorderAnamneseQuestions,
+  useRenameAnamneseSection,
   AnamneseQuestion,
 } from '@/hooks/useAnamneseForms';
 import { useQuestionTemplates, QUESTION_CATEGORIES, type QuestionTemplate } from '@/hooks/useQuestionBank';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { SortableQuestionCard } from '@/components/forms/SortableQuestionCard';
+import { EditableSectionHeader } from '@/components/forms/SortableSectionHeader';
 
 const questionTypes = [
   { value: 'text', label: 'Texto Curto' },
@@ -70,6 +89,8 @@ export default function AnamneseFormBuilder() {
   const addQuestion = useAddAnamneseQuestion();
   const updateQuestion = useUpdateAnamneseQuestion();
   const deleteQuestion = useDeleteAnamneseQuestion();
+  const reorderQuestions = useReorderAnamneseQuestions();
+  const renameSection = useRenameAnamneseSection();
 
   const [showQuestionDialog, setShowQuestionDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
@@ -95,6 +116,18 @@ export default function AnamneseFormBuilder() {
     is_active: true,
     is_required: true,
   });
+  const [localQuestions, setLocalQuestions] = useState<AnamneseQuestion[]>([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     if (formData?.form) {
@@ -106,6 +139,12 @@ export default function AnamneseFormBuilder() {
       });
     }
   }, [formData?.form]);
+
+  useEffect(() => {
+    if (formData?.questions) {
+      setLocalQuestions(formData.questions);
+    }
+  }, [formData?.questions]);
 
   const resetQuestionData = () => {
     setQuestionData({
@@ -133,7 +172,7 @@ export default function AnamneseFormBuilder() {
         section: question.section,
         is_required: question.is_required,
         has_comment_field: question.has_comment_field,
-        comment_field_required: question.comment_field_required,
+        comment_field_required: question.comment_field_required || false,
         comment_field_label: question.comment_field_label || 'Comentário adicional',
         options: question.options || [],
         scale_min: question.scale_min || 1,
@@ -269,7 +308,6 @@ export default function AnamneseFormBuilder() {
         const template = questionTemplates.find(t => t.id === templateId);
         if (!template) continue;
 
-        // Map question types
         const typeMap: Record<string, string> = {
           'multiple_choice': 'select',
           'checkbox': 'multiselect',
@@ -320,6 +358,59 @@ export default function AnamneseFormBuilder() {
     toast({ title: 'Link copiado!' });
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = localQuestions.findIndex(q => q.id === active.id);
+    const newIndex = localQuestions.findIndex(q => q.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newQuestions = arrayMove(localQuestions, oldIndex, newIndex);
+    setLocalQuestions(newQuestions);
+
+    // Update order_index for all affected questions
+    const updates = newQuestions.map((q, index) => ({
+      id: q.id,
+      order_index: index,
+    }));
+
+    try {
+      await reorderQuestions.mutateAsync({
+        form_id: formId!,
+        updates,
+      });
+      toast({ title: 'Ordem atualizada!' });
+    } catch (error) {
+      // Revert on error
+      setLocalQuestions(formData?.questions || []);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível reordenar as perguntas.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRenameSection = async (oldSection: string, newSection: string) => {
+    try {
+      await renameSection.mutateAsync({
+        form_id: formId!,
+        old_section: oldSection,
+        new_section: newSection,
+      });
+      toast({ title: 'Seção renomeada!' });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível renomear a seção.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -343,7 +434,7 @@ export default function AnamneseFormBuilder() {
     );
   }
 
-  const questions = formData.questions || [];
+  const questions = localQuestions;
   const sections = [...new Set(questions.map(q => q.section))];
 
   return (
@@ -402,77 +493,46 @@ export default function AnamneseFormBuilder() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
-            {sections.map(section => (
-              <div key={section}>
-                <h3 className="text-lg font-semibold mb-3 text-primary">{section}</h3>
-                <div className="space-y-3">
-                  {questions
-                    .filter(q => q.section === section)
-                    .sort((a, b) => a.order_index - b.order_index)
-                    .map((question, index) => (
-                      <Card key={question.id} className="hover:border-primary/50 transition-colors">
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 mt-1 text-muted-foreground">
-                              <GripVertical className="h-5 w-5" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <p className="font-medium">{question.question_text}</p>
-                                  <div className="flex flex-wrap gap-2 mt-2">
-                                    <Badge variant="outline">
-                                      {questionTypes.find(t => t.value === question.question_type)?.label}
-                                    </Badge>
-                                    {question.is_required && (
-                                      <Badge variant="secondary">Obrigatória</Badge>
-                                    )}
-                                    {question.has_comment_field && (
-                                      <Badge variant="secondary">Com comentário</Badge>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleOpenQuestionDialog(question)}
-                                  >
-                                    <Settings className="h-4 w-4" />
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="text-destructive">
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Excluir pergunta?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Esta ação não pode ser desfeita.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteQuestion(question.id)}>
-                                          Excluir
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="space-y-6">
+              {sections.map(section => {
+                const sectionQuestions = questions
+                  .filter(q => q.section === section)
+                  .sort((a, b) => a.order_index - b.order_index);
+
+                return (
+                  <div key={section} className="group">
+                    <EditableSectionHeader
+                      section={section}
+                      onRename={handleRenameSection}
+                    />
+                    <SortableContext
+                      items={sectionQuestions.map(q => q.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-3">
+                        {sectionQuestions.map((question, index) => (
+                          <SortableQuestionCard
+                            key={question.id}
+                            id={question.id}
+                            question={question}
+                            index={index}
+                            typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
+                            onEdit={() => handleOpenQuestionDialog(question)}
+                            onDelete={() => handleDeleteQuestion(question.id)}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </div>
+                );
+              })}
+            </div>
+          </DndContext>
         )}
       </div>
 
@@ -561,7 +621,7 @@ export default function AnamneseFormBuilder() {
               </div>
             )}
 
-            {/* Scale options */}
+            {/* Scale settings */}
             {questionData.question_type === 'scale' && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -569,7 +629,7 @@ export default function AnamneseFormBuilder() {
                   <Input
                     type="number"
                     value={questionData.scale_min}
-                    onChange={(e) => setQuestionData({ ...questionData, scale_min: parseInt(e.target.value) })}
+                    onChange={(e) => setQuestionData({ ...questionData, scale_min: Number(e.target.value) })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -577,49 +637,50 @@ export default function AnamneseFormBuilder() {
                   <Input
                     type="number"
                     value={questionData.scale_max}
-                    onChange={(e) => setQuestionData({ ...questionData, scale_max: parseInt(e.target.value) })}
+                    onChange={(e) => setQuestionData({ ...questionData, scale_max: Number(e.target.value) })}
                   />
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-between">
-              <Label>Resposta Obrigatória</Label>
-              <Switch
-                checked={questionData.is_required}
-                onCheckedChange={(checked) => setQuestionData({ ...questionData, is_required: checked })}
-              />
-            </div>
-
-            <div className="space-y-3 p-4 rounded-lg bg-muted/50">
-              <div className="flex items-center justify-between">
-                <Label>Campo de Comentário Adicional</Label>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
                 <Switch
+                  id="is_required"
+                  checked={questionData.is_required}
+                  onCheckedChange={(checked) => setQuestionData({ ...questionData, is_required: checked })}
+                />
+                <Label htmlFor="is_required">Obrigatória</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="has_comment"
                   checked={questionData.has_comment_field}
                   onCheckedChange={(checked) => setQuestionData({ ...questionData, has_comment_field: checked })}
                 />
+                <Label htmlFor="has_comment">Campo de comentário</Label>
               </div>
-
-              {questionData.has_comment_field && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Rótulo do Campo</Label>
-                    <Input
-                      value={questionData.comment_field_label}
-                      onChange={(e) => setQuestionData({ ...questionData, comment_field_label: e.target.value })}
-                      placeholder="Ex: Explique melhor..."
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Comentário Obrigatório</Label>
-                    <Switch
-                      checked={questionData.comment_field_required}
-                      onCheckedChange={(checked) => setQuestionData({ ...questionData, comment_field_required: checked })}
-                    />
-                  </div>
-                </>
-              )}
             </div>
+
+            {questionData.has_comment_field && (
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-2">
+                  <Label>Label do comentário</Label>
+                  <Input
+                    value={questionData.comment_field_label}
+                    onChange={(e) => setQuestionData({ ...questionData, comment_field_label: e.target.value })}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="comment_required"
+                    checked={questionData.comment_field_required}
+                    onCheckedChange={(checked) => setQuestionData({ ...questionData, comment_field_required: checked })}
+                  />
+                  <Label htmlFor="comment_required">Comentário obrigatório</Label>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -627,7 +688,8 @@ export default function AnamneseFormBuilder() {
               Cancelar
             </Button>
             <Button onClick={handleSaveQuestion} disabled={addQuestion.isPending || updateQuestion.isPending}>
-              {editingQuestion ? 'Salvar Alterações' : 'Adicionar Pergunta'}
+              {(addQuestion.isPending || updateQuestion.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {editingQuestion ? 'Salvar' : 'Adicionar'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -638,11 +700,14 @@ export default function AnamneseFormBuilder() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Configurações do Formulário</DialogTitle>
+            <DialogDescription>
+              Configure os detalhes do formulário de anamnese
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Título</Label>
+              <Label>Título *</Label>
               <Input
                 value={formSettings.title}
                 onChange={(e) => setFormSettings({ ...formSettings, title: e.target.value })}
@@ -658,20 +723,23 @@ export default function AnamneseFormBuilder() {
               />
             </div>
 
-            <div className="flex items-center justify-between">
-              <Label>Formulário Ativo</Label>
-              <Switch
-                checked={formSettings.is_active}
-                onCheckedChange={(checked) => setFormSettings({ ...formSettings, is_active: checked })}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Label>Obrigatório para Novos Atletas</Label>
-              <Switch
-                checked={formSettings.is_required}
-                onCheckedChange={(checked) => setFormSettings({ ...formSettings, is_required: checked })}
-              />
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="is_active"
+                  checked={formSettings.is_active}
+                  onCheckedChange={(checked) => setFormSettings({ ...formSettings, is_active: checked })}
+                />
+                <Label htmlFor="is_active">Ativo</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="is_required_form"
+                  checked={formSettings.is_required}
+                  onCheckedChange={(checked) => setFormSettings({ ...formSettings, is_required: checked })}
+                />
+                <Label htmlFor="is_required_form">Obrigatório para novos clientes</Label>
+              </div>
             </div>
           </div>
 
@@ -680,94 +748,88 @@ export default function AnamneseFormBuilder() {
               Cancelar
             </Button>
             <Button onClick={handleSaveSettings} disabled={updateForm.isPending}>
-              Salvar Configurações
+              {updateForm.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Import from Bank Dialog */}
+      {/* Bank Import Dialog */}
       <Dialog open={showBankDialog} onOpenChange={setShowBankDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh]">
+        <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Library className="h-5 w-5" />
-              Importar do Banco de Perguntas
-            </DialogTitle>
+            <DialogTitle>Importar do Banco de Perguntas</DialogTitle>
             <DialogDescription>
-              Selecione as perguntas que deseja adicionar ao formulário. As perguntas serão copiadas e a exclusão do formulário não afeta o banco.
+              Selecione as perguntas que deseja adicionar ao formulário
             </DialogDescription>
           </DialogHeader>
 
           <ScrollArea className="h-[400px] pr-4">
             {isLoadingTemplates ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <Loader2 className="h-6 w-6 animate-spin" />
               </div>
             ) : questionTemplates.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Library className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                <p>Nenhuma pergunta no banco de perguntas.</p>
-                <p className="text-sm mt-1">Acesse o Banco de Perguntas para criar perguntas reutilizáveis.</p>
-              </div>
+              <p className="text-center text-muted-foreground py-8">
+                Nenhuma pergunta disponível no banco.
+              </p>
             ) : (
               <div className="space-y-3">
-                {QUESTION_CATEGORIES.map(cat => {
-                  const catTemplates = questionTemplates.filter(t => t.category === cat.value);
-                  if (catTemplates.length === 0) return null;
-                  
-                  return (
-                    <div key={cat.value} className="space-y-2">
-                      <h4 className="font-medium text-sm text-muted-foreground">{cat.label}</h4>
-                      {catTemplates.map(template => (
-                        <div
-                          key={template.id}
-                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                            selectedTemplates.includes(template.id) 
-                              ? 'border-primary bg-primary/5' 
-                              : 'border-border hover:border-primary/50'
-                          }`}
-                          onClick={() => toggleTemplateSelection(template.id)}
-                        >
-                          <Checkbox
-                            checked={selectedTemplates.includes(template.id)}
-                            onCheckedChange={() => toggleTemplateSelection(template.id)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">{template.question_text}</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              <Badge variant="outline" className="text-xs">
-                                {template.question_type}
+                {questionTemplates.map(template => (
+                  <Card
+                    key={template.id}
+                    className={`cursor-pointer transition-colors ${
+                      selectedTemplates.includes(template.id)
+                        ? 'border-primary bg-primary/5'
+                        : 'hover:border-muted-foreground/50'
+                    }`}
+                    onClick={() => toggleTemplateSelection(template.id)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={selectedTemplates.includes(template.id)}
+                          onCheckedChange={() => toggleTemplateSelection(template.id)}
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{template.question_text}</p>
+                          <div className="flex gap-2 mt-2">
+                            <Badge variant="outline" className="text-xs">
+                              {template.question_type}
+                            </Badge>
+                            {template.category && (
+                              <Badge variant="secondary" className="text-xs">
+                                {QUESTION_CATEGORIES.find(c => c.value === template.category)?.label}
                               </Badge>
-                              {template.is_required && (
-                                <Badge variant="secondary" className="text-xs">Obrigatória</Badge>
-                              )}
-                            </div>
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  );
-                })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </ScrollArea>
 
-          <DialogFooter className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              {selectedTemplates.length} pergunta(s) selecionada(s)
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowBankDialog(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleImportFromBank} 
-                disabled={selectedTemplates.length === 0 || addQuestion.isPending}
-              >
-                {addQuestion.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Importar Selecionadas
-              </Button>
+          <DialogFooter>
+            <div className="flex items-center justify-between w-full">
+              <span className="text-sm text-muted-foreground">
+                {selectedTemplates.length} pergunta(s) selecionada(s)
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowBankDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleImportFromBank}
+                  disabled={selectedTemplates.length === 0 || addQuestion.isPending}
+                >
+                  {addQuestion.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Importar Selecionadas
+                </Button>
+              </div>
             </div>
           </DialogFooter>
         </DialogContent>
