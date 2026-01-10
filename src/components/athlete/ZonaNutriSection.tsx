@@ -30,7 +30,25 @@ export function ZonaNutriSection({ hasAccess }: ZonaNutriSectionProps) {
 
       if (error) {
         console.error('SSO error:', error);
-        toast.error('Erro ao acessar Zona Nutri. Tente novamente.');
+        // Try to parse error context if available
+        const errorContext = error.context;
+        if (errorContext) {
+          try {
+            const parsed = typeof errorContext === 'string' ? JSON.parse(errorContext) : errorContext;
+            toast.error(`Falha no SSO (step: ${parsed.step || 'unknown'}): ${parsed.error || 'Erro desconhecido'}`);
+          } catch {
+            toast.error('Erro ao acessar Zona Nutri. Tente novamente.');
+          }
+        } else {
+          toast.error('Erro ao acessar Zona Nutri. Tente novamente.');
+        }
+        return;
+      }
+
+      // Check if response contains an error (edge function returned error as JSON)
+      if (data?.error) {
+        console.error('SSO response error:', data);
+        toast.error(`Falha no SSO (step: ${data.step || 'unknown'}): ${data.error}`);
         return;
       }
 
