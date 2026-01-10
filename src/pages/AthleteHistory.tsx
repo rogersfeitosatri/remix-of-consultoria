@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, AlertCircle, FileText, User, TrendingUp, CalendarCheck } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, Clock, AlertCircle, FileText, User, TrendingUp, CalendarCheck, ClipboardCheck } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { useScheduledCheckinsForClient, ScheduledCheckin } from '@/hooks/useScheduledCheckins';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +13,7 @@ import { format, parseISO, isBefore, isAfter, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
 import { PremiumClientDetails } from '@/components/admin/PremiumClientDetails';
+import { AnamneseResponseSection } from '@/components/admin/AnamneseResponseSection';
 
 interface CheckinResponse {
   id: string;
@@ -179,6 +180,9 @@ export default function AthleteHistory() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Anamnese Section */}
+        <AnamneseResponseSection clientId={client.id} clientName={client.name} />
 
         {/* Tabs */}
         <Tabs defaultValue="evolution" className="space-y-4">

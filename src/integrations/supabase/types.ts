@@ -1173,28 +1173,43 @@ export type Database = {
         Row: {
           cadence_weeks: number
           client_id: string
+          consultations_completed: number | null
           created_at: string
+          first_consultation_at: string | null
           is_enabled: boolean
           last_appointment_at: string | null
+          last_link_sent_at: string | null
           next_invite_date: string | null
+          next_link_send_date: string | null
+          next_link_send_time: string | null
           updated_at: string
         }
         Insert: {
           cadence_weeks?: number
           client_id: string
+          consultations_completed?: number | null
           created_at?: string
+          first_consultation_at?: string | null
           is_enabled?: boolean
           last_appointment_at?: string | null
+          last_link_sent_at?: string | null
           next_invite_date?: string | null
+          next_link_send_date?: string | null
+          next_link_send_time?: string | null
           updated_at?: string
         }
         Update: {
           cadence_weeks?: number
           client_id?: string
+          consultations_completed?: number | null
           created_at?: string
+          first_consultation_at?: string | null
           is_enabled?: boolean
           last_appointment_at?: string | null
+          last_link_sent_at?: string | null
           next_invite_date?: string | null
+          next_link_send_date?: string | null
+          next_link_send_time?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1886,10 +1901,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_next_booking_send_date: {
+        Args: { p_cadence_weeks: number; p_last_appointment_at: string }
+        Returns: string
+      }
       create_public_booking_appointment: {
         Args: { p_date: string; p_time: string; p_token: string }
         Returns: {
           appointment_id: string
+        }[]
+      }
+      get_pending_booking_invites: {
+        Args: never
+        Returns: {
+          admin_user_id: string
+          cadence_weeks: number
+          client_id: string
+          client_name: string
+          client_phone: string
         }[]
       }
       get_public_booking_context: {

@@ -62,10 +62,42 @@ Deno.serve(async (req) => {
       throw new Error('Failed to fetch client data');
     }
 
+    // Fetch anamnese responses (dynamic form)
+    const { data: anamneseResponses, error: anamneseError } = await supabase
+      .from('anamnese_responses')
+      .select(`
+        *,
+        anamnese_forms!inner (
+          title,
+          user_id
+        )
+      `)
+      .eq('client_id', clientId)
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (anamneseError) {
+      console.error('Error fetching anamnese:', anamneseError);
+    }
+
+    // Fetch anamnese questions if we have responses
+    let anamneseQuestions: any[] = [];
+    if (anamneseResponses?.form_id) {
+      const { data: questions } = await supabase
+        .from('anamnese_questions')
+        .select('id, question_text, section')
+        .eq('form_id', anamneseResponses.form_id)
+        .order('order_index', { ascending: true });
+      
+      anamneseQuestions = questions || [];
+    }
+
     console.log('Profile fetched successfully for:', profile.full_name);
+    console.log('Anamnese responses found:', !!anamneseResponses);
 
     // Build the prompt for ChatGPT
-    const prompt = buildAnalysisPrompt(profile, client);
+    const prompt = buildAnalysisPrompt(profile, client, anamneseResponses, anamneseQuestions);
 
     console.log('Sending request to OpenAI...');
 
@@ -192,11 +224,48 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`
   }
 });
 
-function buildAnalysisPrompt(profile: any, client: any): string {
+function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, anamneseQuestions: any[]): string {
   const mealDescription = (meal: any) => {
     if (!meal) return 'Não informado';
     return `Horário: ${meal.time || 'N/I'}, Local: ${meal.location || 'N/I'}, Alimentos: ${meal.foods || 'N/I'}`;
   };
+
+  // Build anamnese section from dynamic form responses
+  let anamneseSection = '';
+  if (anamneseResponses?.responses && anamneseQuestions.length > 0) {
+    anamneseSection = `
+### Respostas da Anamnese Dinâmica
+`;
+    const responses = anamneseResponses.responses;
+    const groupedBySection: Record<string, string[]> = {};
+    
+    for (const question of anamneseQuestions) {
+      const response = responses[question.id];
+      if (response) {
+        const section = question.section || 'Geral';
+        if (!groupedBySection[section]) {
+          groupedBySection[section] = [];
+        }
+        
+        let answerText = '';
+        if (typeof response === 'object' && response.answer !== undefined) {
+          const answer = response.answer;
+          answerText = Array.isArray(answer) ? answer.join(', ') : String(answer);
+          if (response.comment) {
+            answerText += ` (Comentário: ${response.comment})`;
+          }
+        } else {
+          answerText = Array.isArray(response) ? response.join(', ') : String(response);
+        }
+        
+        groupedBySection[section].push(`- ${question.question_text}: ${answerText || 'Não respondido'}`);
+      }
+    }
+    
+    for (const [section, answers] of Object.entries(groupedBySection)) {
+      anamneseSection += `\n**${section}**\n${answers.join('\n')}\n`;
+    }
+  }
 
   return `
 ## DADOS DO ATLETA CORREDOR
@@ -278,9 +347,9 @@ function buildAnalysisPrompt(profile: any, client: any): string {
 - Ceia: ${profile.meal_supper_enabled ? mealDescription(profile.meal_supper) : 'Não faz'}
 - Muda nos Finais de Semana: ${profile.weekend_changes || 'N/I'}
 - Descrição Fim de Semana: ${profile.weekend_description || 'N/I'}
-
+${anamneseSection}
 Por favor, analise esses dados e forneça:
-1. Diagnóstico completo da situação atual do atleta
+1. Diagnóstico completo da situação atual do atleta (pontos de atenção, objetivos, possíveis riscos ou limitações)
 2. Estimativa de gasto energético (TMB, GET, gasto com treinos)
 3. Déficit calórico adequado para corredor (considerando performance e recuperação)
 4. Sugestão de macronutrientes em g/kg de peso corporal
