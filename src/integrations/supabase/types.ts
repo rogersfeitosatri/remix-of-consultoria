@@ -1886,19 +1886,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_public_booking_appointment:
-        | {
-            Args: { p_date: string; p_time: string; p_token: string }
-            Returns: {
-              appointment_id: string
-            }[]
-          }
-        | {
-            Args: { p_date: string; p_time: string; p_token: string }
-            Returns: {
-              appointment_id: string
-            }[]
-          }
+      create_public_booking_appointment: {
+        Args: { p_date: string; p_time: string; p_token: string }
+        Returns: {
+          appointment_id: string
+        }[]
+      }
       get_public_booking_context: {
         Args: { p_token: string }
         Returns: {
