@@ -242,7 +242,16 @@ export default function ContentManager() {
     }
   };
 
-  const filteredMaterials = materials.filter(m => m.category === activeTab);
+  // Handle backwards compatibility: 'materiais' tab should also show 'material_suporte' category
+  const filteredMaterials = materials.filter(m => {
+    if (activeTab === 'materiais') {
+      return m.category === 'materiais' || m.category === 'material_suporte';
+    }
+    if (activeTab === 'inicio') {
+      return m.category === 'inicio' || m.category === 'onboarding';
+    }
+    return m.category === activeTab;
+  });
   const isLoading = materialsLoading || configLoading || activitiesLoading;
 
   if (isLoading) {
