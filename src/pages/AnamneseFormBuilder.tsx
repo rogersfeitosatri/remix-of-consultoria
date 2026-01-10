@@ -363,18 +363,27 @@ export default function AnamneseFormBuilder() {
 
     if (!over || active.id === over.id) return;
 
-    const oldIndex = localQuestions.findIndex(q => q.id === active.id);
-    const newIndex = localQuestions.findIndex(q => q.id === over.id);
+    // Find items in the flat list ordered by order_index
+    const sortedQuestions = [...localQuestions].sort((a, b) => a.order_index - b.order_index);
+    const oldIndex = sortedQuestions.findIndex(q => q.id === active.id);
+    const newIndex = sortedQuestions.findIndex(q => q.id === over.id);
 
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const newQuestions = arrayMove(localQuestions, oldIndex, newIndex);
-    setLocalQuestions(newQuestions);
+    const newQuestions = arrayMove(sortedQuestions, oldIndex, newIndex);
+    
+    // Update order_index for all questions
+    const updatedQuestions = newQuestions.map((q, index) => ({
+      ...q,
+      order_index: index,
+    }));
+    
+    setLocalQuestions(updatedQuestions);
 
     // Update order_index for all affected questions
-    const updates = newQuestions.map((q, index) => ({
+    const updates = updatedQuestions.map((q) => ({
       id: q.id,
-      order_index: index,
+      order_index: q.order_index,
     }));
 
     try {
@@ -434,8 +443,8 @@ export default function AnamneseFormBuilder() {
     );
   }
 
-  const questions = localQuestions;
-  const sections = [...new Set(questions.map(q => q.section))];
+  const sortedQuestions = [...localQuestions].sort((a, b) => a.order_index - b.order_index);
+  const sections = [...new Set(sortedQuestions.map(q => q.section))];
 
   return (
     <Layout>
@@ -482,7 +491,7 @@ export default function AnamneseFormBuilder() {
         </div>
 
         {/* Questions */}
-        {questions.length === 0 ? (
+        {sortedQuestions.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <p className="text-muted-foreground mb-4">Nenhuma pergunta adicionada ainda.</p>
@@ -498,22 +507,20 @@ export default function AnamneseFormBuilder() {
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
-            <div className="space-y-6">
-              {sections.map(section => {
-                const sectionQuestions = questions
-                  .filter(q => q.section === section)
-                  .sort((a, b) => a.order_index - b.order_index);
+            <SortableContext
+              items={sortedQuestions.map(q => q.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-6">
+                {sections.map(section => {
+                  const sectionQuestions = sortedQuestions.filter(q => q.section === section);
 
-                return (
-                  <div key={section} className="group">
-                    <EditableSectionHeader
-                      section={section}
-                      onRename={handleRenameSection}
-                    />
-                    <SortableContext
-                      items={sectionQuestions.map(q => q.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
+                  return (
+                    <div key={section} className="group">
+                      <EditableSectionHeader
+                        section={section}
+                        onRename={handleRenameSection}
+                      />
                       <div className="space-y-3">
                         {sectionQuestions.map((question, index) => (
                           <SortableQuestionCard
@@ -527,11 +534,11 @@ export default function AnamneseFormBuilder() {
                           />
                         ))}
                       </div>
-                    </SortableContext>
-                  </div>
-                );
-              })}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </SortableContext>
           </DndContext>
         )}
       </div>

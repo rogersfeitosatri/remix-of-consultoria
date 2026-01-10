@@ -81,7 +81,6 @@ export function useAnamneseFormWithQuestions(formId: string | undefined) {
         .from('anamnese_questions' as any)
         .select('*')
         .eq('form_id', formId)
-        .order('section')
         .order('order_index');
 
       if (questionsError) throw questionsError;
@@ -270,14 +269,18 @@ export function useReorderAnamneseQuestions() {
 
   return useMutation({
     mutationFn: async ({ form_id, updates }: { form_id: string; updates: { id: string; order_index: number; section?: string }[] }) => {
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('anamnese_questions' as any)
-          .update({ order_index: update.order_index, ...(update.section && { section: update.section }) })
-          .eq('id', update.id);
+      // Execute all updates in sequence to avoid race conditions
+      // Using Promise.all with individual updates
+      await Promise.all(
+        updates.map(async (update) => {
+          const { error } = await supabase
+            .from('anamnese_questions' as any)
+            .update({ order_index: update.order_index, ...(update.section && { section: update.section }) })
+            .eq('id', update.id);
 
-        if (error) throw error;
-      }
+          if (error) throw error;
+        })
+      );
       return { form_id };
     },
     onSuccess: (result) => {

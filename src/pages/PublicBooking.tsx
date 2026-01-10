@@ -151,7 +151,7 @@ export default function PublicBooking() {
 
     try {
       // Create appointment
-      await createAppointment.mutateAsync({
+      const result = await createAppointment.mutateAsync({
         user_id: settings.user_id,
         client_id: consultationSchedule.clients.id,
         consultation_schedule_id: consultationSchedule.id,
@@ -171,6 +171,33 @@ export default function PublicBooking() {
           scheduled_time: selectedTime + ':00',
         })
         .eq('id', consultationSchedule.id);
+
+      // Try to create Google Calendar event
+      try {
+        const { data: calendarResult, error: calendarError } = await supabase.functions.invoke('create-calendar-event', {
+          body: { appointmentId: result.id }
+        });
+        
+        if (calendarError) {
+          console.error('Error creating calendar event:', calendarError);
+        } else if (calendarResult?.meetLink) {
+          // Send WhatsApp with Meet link if available
+          const clientPhone = consultationSchedule.clients.phone;
+          if (clientPhone) {
+            const formattedDate = format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR });
+            const message = `✅ *Consulta Confirmada!*\n\n📅 ${formattedDate}\n⏰ ${selectedTime}\n\n🔗 *Link da reunião:*\n${calendarResult.meetLink}\n\nAté breve!`;
+            
+            await supabase.functions.invoke('send-whatsapp', {
+              body: {
+                clientId: consultationSchedule.clients.id,
+                message
+              }
+            });
+          }
+        }
+      } catch (calendarErr) {
+        console.error('Calendar creation error:', calendarErr);
+      }
 
       setConfirmed(true);
       toast.success('Consulta agendada com sucesso!');
