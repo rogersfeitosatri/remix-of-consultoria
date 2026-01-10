@@ -1909,6 +1909,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      validate_booking_email: {
+        Args: { p_email: string; p_token: string }
+        Returns: {
+          admin_user_id: string
+          client_id: string
+          client_name: string
+          error_message: string
+          valid: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "athlete"
