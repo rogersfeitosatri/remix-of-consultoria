@@ -111,48 +111,37 @@ export default function PublicBookingConsult() {
     setVerificationError(null);
     
     try {
-      // 1. Validate booking link via RPC
-      const { data: contextData, error: contextError } = await supabase
-        .rpc('get_public_booking_context', { p_token: token });
+      // Validate email using secure RPC function (bypasses RLS)
+      const { data, error } = await supabase
+        .rpc('validate_booking_email', { 
+          p_token: token,
+          p_email: emailInput.trim()
+        });
       
-      if (contextError || !contextData || contextData.length === 0) {
-        setVerificationError('Link inválido ou expirado.');
-        setIsVerifying(false);
-        return;
-      }
-      
-      const ctx = contextData[0] as BookingContext;
-      
-      // 2. Validate that client email matches
-      const { data: clientData, error: clientError } = await supabase
-        .from('clients')
-        .select('id, email, name, eligible_for_booking, is_active')
-        .eq('id', ctx.client_id)
-        .maybeSingle();
-      
-      if (clientError || !clientData) {
+      if (error) {
+        console.error('Validation RPC error:', error);
         setVerificationError('Erro ao verificar acesso. Tente novamente.');
         setIsVerifying(false);
         return;
       }
       
-      // Check if email matches
-      if (clientData.email?.toLowerCase() !== emailInput.toLowerCase().trim()) {
-        setVerificationError('E-mail não autorizado. Verifique se digitou corretamente.');
-        setIsVerifying(false);
-        return;
-      }
+      const result = data?.[0];
       
-      // Check if client is eligible
-      if (!clientData.eligible_for_booking && !clientData.is_active) {
-        setVerificationError('Acesso não autorizado. Entre em contato com o suporte.');
+      if (!result || !result.valid) {
+        setVerificationError(result?.error_message || 'Acesso não autorizado.');
         setIsVerifying(false);
         return;
       }
       
       // Success - set context
-      setBookingContext(ctx);
-      setClientEmail(clientData.email);
+      setBookingContext({
+        booking_link_id: '',
+        client_id: result.client_id,
+        client_name: result.client_name,
+        admin_user_id: result.admin_user_id,
+        usage_count: 0,
+      });
+      setClientEmail(emailInput.trim());
       setIsVerified(true);
       
     } catch (error) {
