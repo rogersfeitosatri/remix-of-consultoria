@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.send-consultation-reminder]
 verify_jwt = false
+
+[functions.process-scheduled-booking-links]
+verify_jwt = false
+
+[functions.create-athlete-auth]
+verify_jwt = false
