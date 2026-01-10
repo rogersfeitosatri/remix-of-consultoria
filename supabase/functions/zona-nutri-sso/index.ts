@@ -17,8 +17,16 @@ Deno.serve(async (req) => {
     const consultoriaAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     
     // Get Zona Nutri Supabase credentials from environment
-    const zonaNutriUrl = Deno.env.get('ZONA_NUTRI_SUPABASE_URL');
-    const zonaNutriServiceKey = Deno.env.get('ZONA_NUTRI_SERVICE_ROLE_KEY');
+    let zonaNutriUrl = Deno.env.get('ZONA_NUTRI_SUPABASE_URL') || '';
+    let zonaNutriServiceKey = Deno.env.get('ZONA_NUTRI_SERVICE_ROLE_KEY') || '';
+
+    // Clean up secrets in case they were saved with key name prefix (e.g., "KEY = value")
+    if (zonaNutriUrl.includes('=')) {
+      zonaNutriUrl = zonaNutriUrl.split('=').pop()?.trim() || '';
+    }
+    if (zonaNutriServiceKey.includes('=')) {
+      zonaNutriServiceKey = zonaNutriServiceKey.split('=').pop()?.trim() || '';
+    }
 
     // Validate env vars exist
     if (!zonaNutriUrl || zonaNutriUrl.trim() === '') {
@@ -137,7 +145,7 @@ Deno.serve(async (req) => {
     }
 
     // Generate magic link for Zona Nutri
-    const redirectUrl = 'https://zonanutri.lovable.app/app';
+    const redirectUrl = 'https://zonanutri.com/app';
     console.log(`Generating magic link with redirect to: ${redirectUrl}`);
     
     const { data: linkData, error: linkError } = await zonaNutriAdmin.auth.admin.generateLink({
