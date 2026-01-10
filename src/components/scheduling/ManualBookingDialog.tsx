@@ -197,26 +197,25 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
       
       if (appointmentError) throw appointmentError;
       
-      // Create Google Calendar event
+      // Create Google Calendar event with Meet
       let meetLink = null;
+      let meetStatus = 'pending';
       try {
         const { data: calendarData } = await supabase.functions.invoke('create-calendar-event', {
           body: { appointmentId: appointment.id },
         });
         meetLink = calendarData?.google_meet_link;
+        meetStatus = calendarData?.meet_status || 'pending';
       } catch (calendarError) {
         console.error('Calendar event creation failed:', calendarError);
+        meetStatus = 'failed';
       }
       
-      // Send WhatsApp if enabled
-      if (sendWhatsApp && selectedClient) {
+      // Only send WhatsApp if Meet was successfully created
+      if (sendWhatsApp && selectedClient && meetLink && meetStatus === 'created') {
         try {
           const formattedDate = format(selectedDate, "dd 'de' MMMM", { locale: ptBR });
-          let message = `✅ Consulta agendada!\n\n📅 Data: ${formattedDate}\n⏰ Horário: ${selectedTime}`;
-          if (meetLink) {
-            message += `\n\n🎥 Link da videochamada:\n${meetLink}`;
-          }
-          message += '\n\nAté lá!';
+          const message = `✅ Consulta agendada!\n\n📅 Data: ${formattedDate}\n⏰ Horário: ${selectedTime}\n\n🎥 Link da videochamada:\n${meetLink}\n\nAté lá!`;
 
           await supabase.functions.invoke('send-whatsapp', {
             body: {
@@ -224,12 +223,17 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
               message,
             },
           });
+          toast.success('Consulta agendada e WhatsApp enviado!');
         } catch (whatsappError) {
           console.error('WhatsApp send failed:', whatsappError);
+          toast.success('Consulta agendada! (WhatsApp falhou)');
         }
+      } else if (sendWhatsApp && meetStatus === 'failed') {
+        // Meet failed - warn admin to reprocess
+        toast.warning('Consulta agendada, mas Meet não foi gerado. Reprocesse na tela de detalhes.');
+      } else {
+        toast.success('Consulta agendada com sucesso!');
       }
-      
-      toast.success('Consulta agendada com sucesso!');
       onOpenChange(false);
       onSuccess?.();
       
