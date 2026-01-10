@@ -16,6 +16,7 @@ export interface Client {
   checkin_frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly' | null;
   has_checkin: boolean;
   has_agenda_access: boolean;
+  has_zona_nutri_access: boolean;
   start_date: string;
   end_date: string;
   monthly_value: number;

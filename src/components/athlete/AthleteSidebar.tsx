@@ -10,7 +10,8 @@ import {
   MessageSquare,
   FileText,
   History,
-  User
+  User,
+  Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,24 +23,44 @@ interface AthleteSidebarProps {
   onSignOut: () => void;
 }
 
-const menuItems = [
-  { id: 'dashboard', label: 'Início', icon: PersonStanding },
-  { id: 'dieta', label: 'Plano Alimentar', icon: Utensils },
-  { id: 'checkins', label: 'Check-ins', icon: ClipboardCheck },
-  { id: 'feedbacks', label: 'Feedbacks', icon: MessageSquare },
-  { id: 'materiais', label: 'Materiais', icon: FileText },
-  { id: 'historico', label: 'Histórico', icon: History },
-  { id: 'perfil', label: 'Perfil', icon: User },
-];
+interface AthleteSidebarProps {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  clientName: string;
+  userEmail: string;
+  onSignOut: () => void;
+  hasZonaNutriAccess?: boolean;
+}
+
+const getMenuItems = (hasZonaNutriAccess: boolean) => {
+  const items = [
+    { id: 'dashboard', label: 'Início', icon: PersonStanding },
+    { id: 'dieta', label: 'Plano Alimentar', icon: Utensils },
+    { id: 'checkins', label: 'Check-ins', icon: ClipboardCheck },
+    { id: 'feedbacks', label: 'Feedbacks', icon: MessageSquare },
+    { id: 'materiais', label: 'Materiais', icon: FileText },
+    { id: 'historico', label: 'Histórico', icon: History },
+  ];
+  
+  if (hasZonaNutriAccess) {
+    items.push({ id: 'zonanutri', label: 'Zona Nutri', icon: Zap });
+  }
+  
+  items.push({ id: 'perfil', label: 'Perfil', icon: User });
+  
+  return items;
+};
 
 export function AthleteSidebar({ 
   activeTab, 
   onTabChange, 
   clientName, 
   userEmail, 
-  onSignOut 
+  onSignOut,
+  hasZonaNutriAccess = false
 }: AthleteSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const menuItems = getMenuItems(hasZonaNutriAccess);
 
   const handleItemClick = (id: string) => {
     onTabChange(id);
