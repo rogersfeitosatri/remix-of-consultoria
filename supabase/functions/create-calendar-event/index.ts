@@ -145,57 +145,109 @@ Deno.serve(async (req) => {
     const endDate = new Date(startDate.getTime() + appointment.duration_minutes * 60000);
 
     const calendarId = calendarConnection.calendar_id || 'primary';
+    const timezone = 'America/Sao_Paulo';
     
-    const eventData = {
+    // NOTE: Google Meet creation via Service Account requires Domain-Wide Delegation
+    // in Google Workspace. Without it, we create the event without Meet and 
+    // the admin can add it manually or use OAuth user-based auth in the future.
+    
+    // First, try to create with conferenceData (Meet)
+    // If it fails with "Invalid conference type", fallback to event without Meet
+    const conferenceRequestId = crypto.randomUUID();
+    
+    const eventDataWithMeet = {
       summary: `Consulta - ${appointment.client.name}`,
-      description: `Consulta nutricional com ${appointment.client.name}${appointment.notes ? `\n\nObservações: ${appointment.notes}` : ''}`,
+      description: `Consulta nutricional com ${appointment.client.name}\nE-mail: ${appointment.client.email || 'N/A'}\nTelefone: ${appointment.client.phone || 'N/A'}${appointment.notes ? `\n\nObservações: ${appointment.notes}` : ''}`,
       start: {
         dateTime: startDate.toISOString(),
-        timeZone: appointment.timezone || 'America/Fortaleza',
+        timeZone: timezone,
       },
       end: {
         dateTime: endDate.toISOString(),
-        timeZone: appointment.timezone || 'America/Fortaleza',
+        timeZone: timezone,
       },
-      attendees: appointment.client.email ? [{ email: appointment.client.email }] : [],
       conferenceData: {
         createRequest: {
-          requestId: appointmentId,
+          requestId: conferenceRequestId,
           conferenceSolutionKey: { type: 'hangoutsMeet' },
         },
       },
       reminders: {
         useDefault: false,
         overrides: [
-          { method: 'email', minutes: 1440 }, // 24 hours
-          { method: 'popup', minutes: 60 },   // 1 hour
+          { method: 'popup', minutes: 1440 },
+          { method: 'popup', minutes: 60 },
         ],
       },
     };
-
-    const createEventResponse = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?conferenceDataVersion=1&sendUpdates=all`,
+    
+    const eventDataWithoutMeet = {
+      summary: `Consulta - ${appointment.client.name}`,
+      description: `Consulta nutricional com ${appointment.client.name}\nE-mail: ${appointment.client.email || 'N/A'}\nTelefone: ${appointment.client.phone || 'N/A'}${appointment.notes ? `\n\nObservações: ${appointment.notes}` : ''}\n\n⚠️ Link do Meet não gerado automaticamente - adicione manualmente se necessário.`,
+      start: {
+        dateTime: startDate.toISOString(),
+        timeZone: timezone,
+      },
+      end: {
+        dateTime: endDate.toISOString(),
+        timeZone: timezone,
+      },
+      reminders: {
+        useDefault: false,
+        overrides: [
+          { method: 'popup', minutes: 1440 },
+          { method: 'popup', minutes: 60 },
+        ],
+      },
+    };
+    
+    // Try with Meet first
+    let createEventResponse = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?conferenceDataVersion=1`,
       {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(eventData),
+        body: JSON.stringify(eventDataWithMeet),
       }
     );
 
-    const createdEvent = await createEventResponse.json();
-    console.log('Created event:', createdEvent.id);
-
+    let createdEvent = await createEventResponse.json();
+    let meetLink = null;
+    let meetCreationFailed = false;
+    
+    // If Meet creation failed (usually "Invalid conference type value"), fallback to event without Meet
     if (!createEventResponse.ok) {
-      console.error('Failed to create event:', createdEvent);
-      throw new Error(`Failed to create calendar event: ${createdEvent.error?.message || 'Unknown error'}`);
+      console.log('Meet creation failed, trying without Meet. Error:', createdEvent.error?.message);
+      meetCreationFailed = true;
+      
+      createEventResponse = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(eventDataWithoutMeet),
+        }
+      );
+      
+      createdEvent = await createEventResponse.json();
+      
+      if (!createEventResponse.ok) {
+        console.error('Failed to create event even without Meet:', createdEvent);
+        throw new Error(`Failed to create calendar event: ${createdEvent.error?.message || 'Unknown error'}`);
+      }
+    } else {
+      meetLink = createdEvent.conferenceData?.entryPoints?.find(
+        (ep: any) => ep.entryPointType === 'video'
+      )?.uri || createdEvent.hangoutLink;
     }
-
-    const meetLink = createdEvent.conferenceData?.entryPoints?.find(
-      (ep: any) => ep.entryPointType === 'video'
-    )?.uri || createdEvent.hangoutLink;
+    
+    console.log('Created event:', createdEvent.id, 'Meet link:', meetLink || 'N/A');
 
     // Update appointment with Google data
     await supabase
@@ -217,6 +269,10 @@ Deno.serve(async (req) => {
         success: true, 
         event_id: createdEvent.id,
         google_meet_link: meetLink,
+        meet_creation_failed: meetCreationFailed,
+        message: meetCreationFailed 
+          ? 'Evento criado no Google Calendar, mas o Meet não pôde ser gerado automaticamente. Adicione manualmente se necessário.'
+          : 'Evento e Meet criados com sucesso!',
       }),
       { 
         status: 200, 
