@@ -11,17 +11,18 @@ export function useAthleteFirstConsultStatus(clientId: string | undefined) {
     queryFn: async () => {
       if (!clientId) return null;
 
-      // Get client info including has_agenda_access
+      // Get client info including has_agenda_access and has_consultations
       const { data: client, error: clientError } = await supabase
         .from('clients')
-        .select('id, has_agenda_access, plan_type, user_id, start_date')
+        .select('id, has_agenda_access, has_consultations, plan_type, user_id, start_date')
         .eq('id', clientId)
         .single();
 
       if (clientError) throw clientError;
       
-      // If client doesn't have agenda access, no first consult card
-      if (!client?.has_agenda_access && client?.plan_type !== 'premium') {
+      // If client doesn't have agenda access or consultations, no first consult card
+      const hasConsultAccess = client?.has_agenda_access || client?.has_consultations || client?.plan_type === 'premium';
+      if (!hasConsultAccess) {
         return { showCard: false, reason: 'no_access' };
       }
 
