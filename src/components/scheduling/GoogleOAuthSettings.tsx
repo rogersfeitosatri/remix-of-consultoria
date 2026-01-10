@@ -70,17 +70,33 @@ export function GoogleOAuthSettings() {
         throw new Error(data?.error || error?.message || 'Erro ao iniciar conexão');
       }
 
-      // Open OAuth popup
-      const popup = window.open(
-        data.authUrl,
-        'google-oauth',
-        'width=500,height=600,scrollbars=yes'
-      );
+      // Open OAuth in a new tab (not popup) to avoid iframe blocking
+      // Using window.open without popup features opens a new tab
+      window.open(data.authUrl, '_blank');
+      
+      toast.info('Autorize no Google e volte para esta página. A conexão será detectada automaticamente.');
+      
+      // Set up polling to check if connection was established
+      const checkConnection = setInterval(async () => {
+        const { data: conn } = await supabase
+          .from('google_oauth_connections')
+          .select('access_token')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        if (conn?.access_token) {
+          clearInterval(checkConnection);
+          setIsConnecting(false);
+          queryClient.invalidateQueries({ queryKey: ['google-oauth-connection'] });
+          toast.success('Conexão com Google estabelecida!');
+        }
+      }, 2000);
 
-      if (!popup) {
-        toast.error('Popup bloqueado. Permita popups para este site.');
+      // Stop polling after 2 minutes
+      setTimeout(() => {
+        clearInterval(checkConnection);
         setIsConnecting(false);
-      }
+      }, 120000);
 
     } catch (error: any) {
       console.error('OAuth init error:', error);
