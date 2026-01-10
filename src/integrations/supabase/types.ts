@@ -1938,6 +1938,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      invoke_booking_links_processor: { Args: never; Returns: undefined }
       validate_booking_email: {
         Args: { p_email: string; p_token: string }
         Returns: {
