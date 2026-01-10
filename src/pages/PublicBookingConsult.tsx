@@ -281,6 +281,70 @@ export default function PublicBookingConsult() {
         message_type: 'booking_confirmation',
       });
 
+      // Automatically create consultation schedule rule based on client's plan
+      try {
+        // Fetch client details to determine plan
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('consultation_frequency, plan_duration, end_date, has_consultations')
+          .eq('id', bookingContext.client_id)
+          .maybeSingle();
+
+        if (clientData && clientData.has_consultations) {
+          // Determine cadence based on consultation_frequency or default to 4 weeks
+          let cadenceWeeks = 4; // Default: monthly
+          if (clientData.consultation_frequency === '6_weeks') {
+            cadenceWeeks = 6;
+          } else if (clientData.consultation_frequency === 'monthly' || clientData.consultation_frequency === '4_weeks') {
+            cadenceWeeks = 4;
+          }
+
+          // Calculate next invite date: Monday at 7h, cadenceWeeks after appointment
+          const appointmentDate = selectedDate;
+          const nextConsultDate = addDays(appointmentDate, cadenceWeeks * 7);
+          
+          // Find the next Monday before nextConsultDate for sending the invite
+          const nextMonday = addDays(nextConsultDate, -((nextConsultDate.getDay() + 6) % 7));
+          
+          // Upsert consultation schedule rule
+          await supabase
+            .from('consultation_schedule_rules')
+            .upsert({
+              client_id: bookingContext.client_id,
+              cadence_weeks: cadenceWeeks,
+              next_invite_date: format(nextMonday, 'yyyy-MM-dd'),
+              last_appointment_at: dateStr,
+              is_enabled: true,
+            }, { onConflict: 'client_id' });
+
+          console.log('Created consultation schedule rule:', {
+            cadenceWeeks,
+            nextInvite: format(nextMonday, 'yyyy-MM-dd'),
+          });
+        }
+      } catch (ruleError) {
+        console.error('Failed to create consultation rule:', ruleError);
+        // Don't fail the booking if rule creation fails
+      }
+
+      // Update client's first_consultation_date if not set
+      try {
+        const { data: clientInfo } = await supabase
+          .from('clients')
+          .select('first_consultation_date')
+          .eq('id', bookingContext.client_id)
+          .maybeSingle();
+        
+        if (clientInfo && !clientInfo.first_consultation_date) {
+          await supabase
+            .from('clients')
+            .update({ first_consultation_date: dateStr })
+            .eq('id', bookingContext.client_id);
+        }
+      } catch (updateError) {
+        console.error('Failed to update first consultation date:', updateError);
+      }
+
       setConfirmationData({
         date: format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR }),
         time: selectedTime,
