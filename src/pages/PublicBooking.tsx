@@ -172,7 +172,7 @@ export default function PublicBooking() {
         })
         .eq('id', consultationSchedule.id);
 
-      // Try to create Google Calendar event
+      // Try to create Google Calendar event with Meet
       try {
         const { data: calendarResult, error: calendarError } = await supabase.functions.invoke('create-calendar-event', {
           body: { appointmentId: result.id }
@@ -180,12 +180,17 @@ export default function PublicBooking() {
         
         if (calendarError) {
           console.error('Error creating calendar event:', calendarError);
-        } else if (calendarResult?.meetLink) {
-          // Send WhatsApp with Meet link if available
+        }
+        
+        const meetLink = calendarResult?.google_meet_link;
+        const meetStatus = calendarResult?.meet_status;
+        
+        // Only send WhatsApp if Meet was successfully created
+        if (meetLink && meetStatus === 'created') {
           const clientPhone = consultationSchedule.clients.phone;
           if (clientPhone) {
             const formattedDate = format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR });
-            const message = `✅ *Consulta Confirmada!*\n\n📅 ${formattedDate}\n⏰ ${selectedTime}\n\n🔗 *Link da reunião:*\n${calendarResult.meetLink}\n\nAté breve!`;
+            const message = `✅ *Consulta Confirmada!*\n\n📅 ${formattedDate}\n⏰ ${selectedTime}\n\n🔗 *Link da reunião:*\n${meetLink}\n\nAté breve!`;
             
             await supabase.functions.invoke('send-whatsapp', {
               body: {
@@ -194,6 +199,9 @@ export default function PublicBooking() {
               }
             });
           }
+        } else if (meetStatus === 'failed') {
+          // Meet failed - don't send WhatsApp, admin will be notified
+          console.log('Meet creation failed - WhatsApp not sent, admin will reprocess');
         }
       } catch (calendarErr) {
         console.error('Calendar creation error:', calendarErr);

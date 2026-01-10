@@ -223,6 +223,7 @@ export type Database = {
           google_calendar_event_id: string | null
           google_meet_link: string | null
           id: string
+          meet_status: string | null
           notes: string | null
           notes_admin: string | null
           reminder_sent_at: string | null
@@ -242,6 +243,7 @@ export type Database = {
           google_calendar_event_id?: string | null
           google_meet_link?: string | null
           id?: string
+          meet_status?: string | null
           notes?: string | null
           notes_admin?: string | null
           reminder_sent_at?: string | null
@@ -261,6 +263,7 @@ export type Database = {
           google_calendar_event_id?: string | null
           google_meet_link?: string | null
           id?: string
+          meet_status?: string | null
           notes?: string | null
           notes_admin?: string | null
           reminder_sent_at?: string | null
@@ -1448,6 +1451,39 @@ export type Database = {
           last_sync_at?: string | null
           service_account_email?: string | null
           service_account_key_encrypted?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      google_oauth_connections: {
+        Row: {
+          access_token: string | null
+          created_at: string
+          id: string
+          refresh_token: string | null
+          scope: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string
+          id?: string
+          refresh_token?: string | null
+          scope?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string
+          id?: string
+          refresh_token?: string | null
+          scope?: string | null
+          token_expires_at?: string | null
           updated_at?: string
           user_id?: string
         }

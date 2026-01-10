@@ -32,3 +32,12 @@ verify_jwt = false
 
 [functions.create-athlete-auth]
 verify_jwt = false
+
+[functions.google-oauth-init]
+verify_jwt = false
+
+[functions.google-oauth-callback]
+verify_jwt = false
+
+[functions.refresh-google-token]
+verify_jwt = false

@@ -36,6 +36,7 @@ import {
 import { TimeBlocksManager } from '@/components/scheduling/TimeBlocksManager';
 import { ConsultAutomationPanel } from '@/components/scheduling/ConsultAutomationPanel';
 import { GoogleCalendarSettings } from '@/components/scheduling/GoogleCalendarSettings';
+import { GoogleOAuthSettings } from '@/components/scheduling/GoogleOAuthSettings';
 import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog';
 import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban, Settings, Video, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -573,7 +574,8 @@ export default function SchedulingSettings() {
             <ConsultAutomationPanel />
           </TabsContent>
 
-          <TabsContent value="google">
+          <TabsContent value="google" className="space-y-6">
+            <GoogleOAuthSettings />
             <GoogleCalendarSettings />
           </TabsContent>
         </Tabs>
