@@ -81,12 +81,11 @@ export default function AthleteDynamicAnamneseForm() {
 
         setForm(formData);
 
-        // Fetch questions for this form
+        // Fetch questions for this form - order by order_index to respect admin's ordering
         const { data: questionsData, error: questionsError } = await supabase
           .from('anamnese_questions')
           .select('*')
           .eq('form_id', formData.id)
-          .order('section')
           .order('order_index', { ascending: true });
 
         if (questionsError) throw questionsError;
@@ -98,7 +97,7 @@ export default function AthleteDynamicAnamneseForm() {
         const initialAnswers: Record<string, any> = {};
         const initialComments: Record<string, string> = {};
         typedQuestions.forEach((q) => {
-          if (q.question_type === 'checkbox') {
+          if (q.question_type === 'checkbox' || q.question_type === 'multiselect') {
             initialAnswers[q.id] = [];
           } else if (q.question_type === 'scale') {
             initialAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
@@ -383,7 +382,7 @@ export default function AthleteDynamicAnamneseForm() {
                   />
                 )}
 
-                {question.question_type === 'multiple_choice' && question.options && (
+                {(question.question_type === 'multiple_choice' || question.question_type === 'select') && question.options && (
                   <RadioGroup
                     value={answers[question.id] || ''}
                     onValueChange={(value) => handleAnswerChange(question.id, value)}
@@ -399,7 +398,7 @@ export default function AthleteDynamicAnamneseForm() {
                   </RadioGroup>
                 )}
 
-                {question.question_type === 'checkbox' && question.options && (
+                {(question.question_type === 'checkbox' || question.question_type === 'multiselect') && question.options && (
                   <div className="space-y-2">
                     {(question.options as string[]).map((option, i) => (
                       <div key={i} className="flex items-center space-x-2">
