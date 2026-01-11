@@ -4,12 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useClients, usePayments, useAddClient, Client } from '@/hooks/useClients';
-import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck } from 'lucide-react';
+import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScheduledCheckinsOverview } from '@/components/admin/ScheduledCheckinsOverview';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { useAdminSettings, useSaveAdminSettings } from '@/hooks/useAdminSettings';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
@@ -35,6 +38,8 @@ const PAYMENT_TYPE_LABELS: Record<string, string> = {
 export default function Settings() {
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
+  const { data: adminSettings } = useAdminSettings();
+  const saveAdminSettings = useSaveAdminSettings();
   const addClient = useAddClient();
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -42,6 +47,15 @@ export default function Settings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isLoading = clientsLoading || paymentsLoading;
+
+  const handleToggleContinuationMode = async (enabled: boolean) => {
+    try {
+      await saveAdminSettings.mutateAsync({ enable_continuation_mode: enabled });
+      toast.success(enabled ? 'Modo de continuação ativado' : 'Modo de continuação desativado');
+    } catch (error) {
+      toast.error('Erro ao salvar configuração');
+    }
+  };
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';
@@ -425,6 +439,10 @@ export default function Settings() {
         athlete_status: 'active' as const,
         registration_source: 'manual' as const,
         has_agenda_access: planType === 'premium',
+        // Migration fields (default to new for imports)
+        onboarding_type: 'new' as const,
+        remaining_consultations: null,
+        last_consultation_at: null,
       },
       errors: [],
     };
@@ -924,6 +942,49 @@ export default function Settings() {
                     <FileDown className="h-4 w-4" />
                     Baixar Backup Completo
                   </Button>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Migration Mode Toggle */}
+          <AccordionItem value="migration" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <Users className="h-5 w-5 text-amber-500 shrink-0" />
+                <div>
+                  <div className="font-semibold">Modo de Migração</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Configuração temporária para atletas em continuação
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <div className="space-y-4">
+                <Alert className="border-amber-500/30 bg-amber-500/5">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  <AlertDescription>
+                    <strong>Funcionalidade temporária:</strong> Use para migrar atletas que já estavam em acompanhamento. 
+                    Quando desativado, a opção "Continuação" não aparece mais no cadastro.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <Label htmlFor="continuationMode" className="font-medium">
+                      Habilitar modo de continuação
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Permite cadastrar atletas como "Continuação (migração)" no formulário
+                    </p>
+                  </div>
+                  <Switch
+                    id="continuationMode"
+                    checked={adminSettings?.enable_continuation_mode ?? true}
+                    onCheckedChange={handleToggleContinuationMode}
+                    disabled={saveAdminSettings.isPending}
+                  />
                 </div>
               </div>
             </AccordionContent>

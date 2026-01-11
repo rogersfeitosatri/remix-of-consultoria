@@ -31,6 +31,10 @@ export interface Client {
   registration_source: 'manual' | 'kiwify';
   created_at: string;
   updated_at: string;
+  // Migration fields
+  onboarding_type: 'new' | 'continuation' | null;
+  remaining_consultations: number | null;
+  last_consultation_at: string | null;
 }
 
 export interface Payment {
@@ -245,6 +249,96 @@ function generateConsultationSchedules(
   return schedules;
 }
 
+// Generate consultation schedules for CONTINUATION (migration) clients
+// Only generates future consultations from today, respecting plan_end_at
+function generateContinuationConsultationSchedules(
+  userId: string,
+  clientId: string,
+  consultationFrequency: 'once' | 'monthly' | 'six_weeks',
+  endDate: string,
+  remainingConsultations: number
+): Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] {
+  const schedules: Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] = [];
+  const planEndDate = parseISO(endDate);
+  const today = new Date();
+  
+  // Get interval in weeks
+  const intervalWeeks = consultationFrequency === 'six_weeks' ? 6 : 4;
+  
+  // Calculate last allowed start date (plan_end_at - interval_weeks)
+  const lastAllowedStart = addWeeks(planEndDate, -intervalWeeks);
+  
+  console.debug(
+    `[Automação Consultas - Continuação] client_id=${clientId} | remaining=${remainingConsultations} | intervalo=${intervalWeeks} semanas | término=${format(planEndDate, 'yyyy-MM-dd')} | última_janela_permitida=${format(lastAllowedStart, 'yyyy-MM-dd')}`
+  );
+  
+  // Calculate total time available (from today to last allowed start)
+  const daysAvailable = differenceInDays(lastAllowedStart, today);
+  
+  if (daysAvailable <= 0 || remainingConsultations <= 0) {
+    console.debug('[Automação Consultas - Continuação] Sem tempo disponível para agendar consultas');
+    return schedules;
+  }
+  
+  // Calculate ideal spacing between consultations
+  const idealSpacingDays = intervalWeeks * 7;
+  const totalNeededDays = (remainingConsultations - 1) * idealSpacingDays;
+  
+  // If we have enough time, use ideal spacing; otherwise, compact
+  let actualSpacingDays = idealSpacingDays;
+  if (totalNeededDays > daysAvailable && remainingConsultations > 1) {
+    actualSpacingDays = Math.floor(daysAvailable / (remainingConsultations - 1));
+  }
+  
+  // First window starts on the next Monday from today
+  let currentWindowStart = nextMonday(today);
+  
+  for (let i = 0; i < remainingConsultations; i++) {
+    // Check if this window is still valid (before last allowed start)
+    if (currentWindowStart > lastAllowedStart) {
+      console.debug(`[Automação Consultas - Continuação] Parando: janela ${format(currentWindowStart, 'yyyy-MM-dd')} ultrapassa limite`);
+      break;
+    }
+    
+    // window_end = Sunday of the same week
+    const windowEnd = addDays(currentWindowStart, 6);
+    
+    // send_link_at = window_start (Monday 07:00 - handled by job)
+    const sendLinkDate = currentWindowStart;
+    
+    // scheduled_date = middle of the window or window start for reference
+    const scheduledDate = currentWindowStart;
+    
+    console.debug(
+      `[Automação Consultas - Continuação] Consulta ${i + 1}/${remainingConsultations}: window=${format(currentWindowStart, 'yyyy-MM-dd')} a ${format(windowEnd, 'yyyy-MM-dd')} | send_link=${format(sendLinkDate, 'yyyy-MM-dd')}`
+    );
+    
+    schedules.push({
+      client_id: clientId,
+      user_id: userId,
+      scheduled_date: format(scheduledDate, 'yyyy-MM-dd'),
+      send_link_date: format(sendLinkDate, 'yyyy-MM-dd'),
+      status: 'pending',
+    });
+    
+    // Move to next window
+    currentWindowStart = addDays(currentWindowStart, actualSpacingDays);
+    // Ensure it's a Monday
+    if (currentWindowStart.getDay() !== 1) {
+      currentWindowStart = nextMonday(currentWindowStart);
+    }
+  }
+  
+  return schedules;
+}
+
+// Helper function for date addition
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
 export function useAddClient() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -284,16 +378,31 @@ export function useAddClient() {
       if (paymentError) throw paymentError;
 
       // Generate consultation schedules if applicable
-      if (client.has_consultations && client.first_consultation_date && client.consultation_frequency) {
-        const schedules = generateConsultationSchedules(
-          user.id,
-          client.id,
-          client.first_consultation_date,
-          client.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
-          client.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
-          client.end_date,
-          client.consultation_count || 1
-        );
+      if (client.has_consultations && client.consultation_frequency) {
+        let schedules: Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] = [];
+        
+        // Check if this is a continuation (migration) client
+        if (client.onboarding_type === 'continuation' && client.remaining_consultations) {
+          // Generate only future consultations for continuation clients
+          schedules = generateContinuationConsultationSchedules(
+            user.id,
+            client.id,
+            client.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
+            client.end_date,
+            client.remaining_consultations
+          );
+        } else if (client.first_consultation_date) {
+          // Standard new client flow
+          schedules = generateConsultationSchedules(
+            user.id,
+            client.id,
+            client.first_consultation_date,
+            client.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
+            client.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
+            client.end_date,
+            client.consultation_count || 1
+          );
+        }
 
         if (schedules.length > 0) {
           const { error: schedulesError } = await supabase

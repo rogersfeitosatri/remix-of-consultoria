@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { PhoneInput } from '@/components/ui/phone-input';
-import { X } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 import { addMonths, addWeeks } from 'date-fns';
+import { useAdminSettings } from '@/hooks/useAdminSettings';
 
 const SERVICE_LABELS = {
   nutrition: 'Nutrição',
@@ -57,6 +58,11 @@ const PAYMENT_TYPE_LABELS = {
   card: 'Cartão',
 };
 
+const ONBOARDING_TYPE_LABELS = {
+  new: 'Novo (padrão)',
+  continuation: 'Continuação (migração)',
+};
+
 interface ClientFormProps {
   client?: Client;
   onSubmit: (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>, options?: { sendCredentials: boolean; skipAnamnese: boolean }) => void;
@@ -64,6 +70,7 @@ interface ClientFormProps {
 }
 
 export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
+  const { data: adminSettings } = useAdminSettings();
   const [sendCredentials, setSendCredentials] = useState(!client); // Apenas para novos cadastros
   const [skipAnamnese, setSkipAnamnese] = useState(false);
   
@@ -90,7 +97,18 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     payment_date: client?.payment_date || '',
     athlete_status: client?.athlete_status || 'pending_anamnese' as 'pending_anamnese' | 'active' | 'paused' | 'completed',
     registration_source: client?.registration_source || 'manual' as 'manual' | 'kiwify',
+    // Migration fields
+    onboarding_type: client?.onboarding_type || 'new' as 'new' | 'continuation',
+    remaining_consultations: client?.remaining_consultations || null as number | null,
+    last_consultation_at: client?.last_consultation_at || '' as string,
   });
+
+  // Calculate consultation_interval_weeks from consultation_frequency
+  const getConsultationIntervalWeeks = () => {
+    if (formData.consultation_frequency === 'monthly') return 4;
+    if (formData.consultation_frequency === 'six_weeks') return 6;
+    return 4; // default
+  };
 
   // Calculate end date based on plan duration - always auto-calculate when start_date or plan_duration changes
   useEffect(() => {
@@ -142,6 +160,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     }
   }, [formData.plan_duration, client]);
 
+  // Reset onboarding_type to 'new' if continuation mode is disabled
+  useEffect(() => {
+    if (!adminSettings?.enable_continuation_mode && formData.onboarding_type === 'continuation') {
+      setFormData(prev => ({ ...prev, onboarding_type: 'new', remaining_consultations: null, last_consultation_at: '' }));
+    }
+  }, [adminSettings?.enable_continuation_mode, formData.onboarding_type]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Se pular anamnese, definir status como ativo
@@ -154,9 +179,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       first_consultation_date: formData.first_consultation_date || null,
       notes: formData.notes || null,
       payment_date: formData.payment_date || null,
+      last_consultation_at: formData.last_consultation_at || null,
+      remaining_consultations: formData.onboarding_type === 'continuation' ? formData.remaining_consultations : null,
     };
     onSubmit(dataToSubmit as any, { sendCredentials, skipAnamnese });
   };
+
+  const showContinuationOption = adminSettings?.enable_continuation_mode && formData.has_consultations;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
@@ -301,43 +330,126 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
           {formData.has_consultations && (
             <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
               <h3 className="font-semibold text-foreground">Configuração de Consultas</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="consultationCount">Quantidade de Consultas</Label>
-                  <Input
-                    id="consultationCount"
-                    type="number"
-                    min="1"
-                    value={formData.consultation_count}
-                    onChange={(e) => setFormData({ ...formData, consultation_count: parseInt(e.target.value) || 1 })}
-                  />
+              
+              {/* Onboarding Type - Migration Mode */}
+              {showContinuationOption && (
+                <div className="space-y-4 p-3 border border-amber-500/30 rounded-lg bg-amber-500/5">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm font-medium text-amber-500">Tipo de entrada no sistema</span>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Tipo de Entrada</Label>
+                      <Select
+                        value={formData.onboarding_type}
+                        onValueChange={(v) => setFormData({ ...formData, onboarding_type: v as 'new' | 'continuation' })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(ONBOARDING_TYPE_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  {/* Continuation-specific fields */}
+                  {formData.onboarding_type === 'continuation' && (
+                    <div className="grid gap-4 sm:grid-cols-2 mt-3">
+                      <div className="space-y-2">
+                        <Label>Intervalo entre Consultas</Label>
+                        <Select
+                          value={formData.consultation_frequency || 'monthly'}
+                          onValueChange={(v) => setFormData({ ...formData, consultation_frequency: v as 'once' | 'monthly' | 'six_weeks' })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monthly">4 semanas</SelectItem>
+                            <SelectItem value="six_weeks">6 semanas</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Intervalo: {getConsultationIntervalWeeks()} semanas
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="remainingConsultations">Consultas Restantes *</Label>
+                        <Input
+                          id="remainingConsultations"
+                          type="number"
+                          min="1"
+                          value={formData.remaining_consultations || ''}
+                          onChange={(e) => setFormData({ ...formData, remaining_consultations: parseInt(e.target.value) || null })}
+                          placeholder="Ex: 3"
+                          required={formData.onboarding_type === 'continuation'}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Quantas consultas o atleta ainda tem direito
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastConsultationAt">Última Consulta (opcional)</Label>
+                        <Input
+                          id="lastConsultationAt"
+                          type="date"
+                          value={formData.last_consultation_at || ''}
+                          onChange={(e) => setFormData({ ...formData, last_consultation_at: e.target.value })}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Apenas para referência
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label>Periodicidade das Consultas</Label>
-                  <Select
-                    value={formData.consultation_frequency || 'monthly'}
-                    onValueChange={(v) => setFormData({ ...formData, consultation_frequency: v as 'once' | 'monthly' | 'six_weeks' })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(CONSULTATION_FREQUENCY_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              )}
+
+              {/* Standard consultation fields */}
+              {formData.onboarding_type === 'new' && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="consultationCount">Quantidade de Consultas</Label>
+                    <Input
+                      id="consultationCount"
+                      type="number"
+                      min="1"
+                      value={formData.consultation_count}
+                      onChange={(e) => setFormData({ ...formData, consultation_count: parseInt(e.target.value) || 1 })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Periodicidade das Consultas</Label>
+                    <Select
+                      value={formData.consultation_frequency || 'monthly'}
+                      onValueChange={(v) => setFormData({ ...formData, consultation_frequency: v as 'once' | 'monthly' | 'six_weeks' })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(CONSULTATION_FREQUENCY_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="firstConsultation">Data da 1ª Consulta</Label>
+                    <Input
+                      id="firstConsultation"
+                      type="date"
+                      value={formData.first_consultation_date}
+                      onChange={(e) => setFormData({ ...formData, first_consultation_date: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="firstConsultation">Data da 1ª Consulta</Label>
-                  <Input
-                    id="firstConsultation"
-                    type="date"
-                    value={formData.first_consultation_date}
-                    onChange={(e) => setFormData({ ...formData, first_consultation_date: e.target.value })}
-                  />
-                </div>
-              </div>
+              )}
             </div>
           )}
 
