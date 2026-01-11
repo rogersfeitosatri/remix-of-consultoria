@@ -267,8 +267,8 @@ function generateContinuationConsultationSchedules(
   const planEndDate = parseISO(endDate);
   const today = new Date();
   
-  // Get interval in weeks
-  const intervalWeeks = consultationFrequency === 'six_weeks' ? 6 : 4;
+  // Interval type
+  const intervalLabel = consultationFrequency === 'six_weeks' ? '6 semanas' : 'mensal';
   
   console.debug(
     `[Automação Consultas - Continuação] client_id=${clientId} | remaining=${remainingConsultations} | intervalo=${intervalWeeks} semanas | término=${format(planEndDate, 'yyyy-MM-dd')} | last_consultation_at=${lastConsultationAt || 'não informado'}`
@@ -286,29 +286,30 @@ function generateContinuationConsultationSchedules(
     let windowsCreated = 0;
 
     while (windowsCreated < remainingConsultations) {
-      // Calculate when the interval period ENDS (last day of the interval)
-      // For 4 weeks: lastConsult + 4 weeks = end of period
-      const intervalEndDate = addWeeks(currentBaseDate, intervalWeeks);
-      
+      // Calculate when the interval period ENDS
+      const intervalEndDate = consultationFrequency === 'six_weeks'
+        ? addWeeks(currentBaseDate, 6)
+        : addMonths(currentBaseDate, 1);
+
       // The Monday AFTER the interval ends is when we send the link
       const sendLinkMonday = nextMonday(intervalEndDate);
-      
+
       // The consultation window is the week of the sendLinkMonday
       const windowStart = sendLinkMonday;
       const windowEnd = endOfWeek(sendLinkMonday, { weekStartsOn: 1 });
-      
+
       // Stop if send link date is beyond plan end
       if (sendLinkMonday > planEndDate) {
         console.debug(`[Automação Consultas - Continuação] Parando: data de envio ${format(sendLinkMonday, 'yyyy-MM-dd')} ultrapassa término do plano`);
         break;
       }
-      
+
       // Only include future dates
       if (sendLinkMonday >= today) {
         console.debug(
           `[Automação Consultas - Continuação] Consulta ${windowsCreated + 1}/${remainingConsultations}: baseDate=${format(currentBaseDate, 'yyyy-MM-dd')} | intervalEnd=${format(intervalEndDate, 'yyyy-MM-dd')} | sendLink=${format(sendLinkMonday, 'yyyy-MM-dd')} | window=${format(windowStart, 'yyyy-MM-dd')} a ${format(windowEnd, 'yyyy-MM-dd')}`
         );
-        
+
         schedules.push({
           client_id: clientId,
           user_id: userId,
@@ -318,26 +319,28 @@ function generateContinuationConsultationSchedules(
           send_link_date: format(sendLinkMonday, 'yyyy-MM-dd'),
           status: 'pending',
         });
-        
+
         windowsCreated++;
       }
-      
+
       // Next cycle: the interval starts from the current intervalEndDate
       currentBaseDate = intervalEndDate;
     }
   } else {
     // Fallback: no last_consultation_at - use today as reference
-    // Calculate first send date as Monday after intervalWeeks from today
+    // Calculate first send date as Monday after one interval from today
     let currentBaseDate = today;
-    
+
     for (let i = 0; i < remainingConsultations; i++) {
-      const intervalEndDate = addWeeks(currentBaseDate, intervalWeeks);
+      const intervalEndDate = consultationFrequency === 'six_weeks'
+        ? addWeeks(currentBaseDate, 6)
+        : addMonths(currentBaseDate, 1);
       const sendLinkMonday = nextMonday(intervalEndDate);
-      
+
       if (sendLinkMonday > planEndDate) {
         break;
       }
-      
+
       schedules.push({
         client_id: clientId,
         user_id: userId,
@@ -345,7 +348,7 @@ function generateContinuationConsultationSchedules(
         send_link_date: format(sendLinkMonday, 'yyyy-MM-dd'),
         status: 'pending',
       });
-      
+
       currentBaseDate = intervalEndDate;
     }
   }
@@ -523,7 +526,7 @@ export function useUpdateClient() {
 
       if (consultationFieldsChanged && user) {
         const updatedClient = data as Client;
-        
+
         // Delete existing schedules for this client
         await supabase
           .from('consultation_schedules')
@@ -531,16 +534,32 @@ export function useUpdateClient() {
           .eq('client_id', id);
 
         // Regenerate if consultations are enabled
-        if (updatedClient.has_consultations && updatedClient.first_consultation_date && updatedClient.consultation_frequency) {
-          const schedules = generateConsultationSchedules(
-            user.id,
-            id,
-            updatedClient.first_consultation_date,
-            updatedClient.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
-            updatedClient.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
-            updatedClient.end_date,
-            updatedClient.consultation_count || 1
-          );
+        if (updatedClient.has_consultations && updatedClient.consultation_frequency) {
+          let schedules: Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] = [];
+
+          // Continuation clients
+          if (updatedClient.onboarding_type === 'continuation' && updatedClient.remaining_consultations) {
+            schedules = generateContinuationConsultationSchedules(
+              user.id,
+              id,
+              updatedClient.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
+              updatedClient.end_date,
+              updatedClient.remaining_consultations,
+              updatedClient.last_consultation_at
+            );
+          }
+          // New clients (standard flow)
+          else if (updatedClient.first_consultation_date) {
+            schedules = generateConsultationSchedules(
+              user.id,
+              id,
+              updatedClient.first_consultation_date,
+              updatedClient.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
+              updatedClient.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
+              updatedClient.end_date,
+              updatedClient.consultation_count || 1
+            );
+          }
 
           if (schedules.length > 0) {
             await supabase
