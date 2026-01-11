@@ -1,7 +1,5 @@
 import { ExternalLink } from 'lucide-react';
 import { usePublicLinkBioItems } from '@/hooks/useLinkBio';
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import rogersProfile from '@/assets/rogers-profile.jpg';
 
 export default function LinkBio() {
@@ -77,15 +75,6 @@ export default function LinkBio() {
             );
           })
         )}
-
-        {/* Login Button */}
-        <div className="pt-6">
-          <Link to="/auth">
-            <Button className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-semibold">
-              Área do Membro / Entrar
-            </Button>
-          </Link>
-        </div>
       </main>
 
       {/* Footer */}
