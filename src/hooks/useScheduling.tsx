@@ -167,6 +167,8 @@ export function useSaveSchedulingSettings() {
         .eq('user_id', user!.id)
         .maybeSingle();
 
+      let settingsId = existing?.id;
+
       if (existing) {
         const { error } = await supabase
           .from('scheduling_settings')
@@ -177,18 +179,52 @@ export function useSaveSchedulingSettings() {
           .eq('id', existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data: newSettings, error } = await supabase
           .from('scheduling_settings')
           .insert({
             user_id: user!.id,
             ...settings,
             working_days: JSON.stringify(settings.working_days),
-          });
+          })
+          .select('id')
+          .single();
         if (error) throw error;
+        settingsId = newSettings?.id;
+      }
+
+      // Remove time blocks for days that are no longer in working_days
+      if (settingsId && settings.working_days) {
+        const workingDays = settings.working_days;
+        
+        // Get all current time blocks
+        const { data: currentTimeBlocks } = await supabase
+          .from('scheduling_time_blocks')
+          .select('id, day_of_week')
+          .eq('settings_id', settingsId);
+        
+        if (currentTimeBlocks && currentTimeBlocks.length > 0) {
+          // Find time blocks that are on days no longer in working_days
+          const blocksToRemove = currentTimeBlocks.filter(
+            tb => !workingDays.includes(tb.day_of_week)
+          );
+          
+          if (blocksToRemove.length > 0) {
+            const idsToRemove = blocksToRemove.map(b => b.id);
+            const { error: deleteError } = await supabase
+              .from('scheduling_time_blocks')
+              .delete()
+              .in('id', idsToRemove);
+            
+            if (deleteError) {
+              console.error('Error removing orphan time blocks:', deleteError);
+            }
+          }
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scheduling_settings'] });
+      queryClient.invalidateQueries({ queryKey: ['time_blocks'] });
     },
   });
 }
