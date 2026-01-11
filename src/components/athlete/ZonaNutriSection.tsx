@@ -13,24 +13,33 @@ export function ZonaNutriSection({ hasAccess }: ZonaNutriSectionProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAccessZonaNutri = async () => {
+    // Abre a nova aba ANTES do await para evitar bloqueio de popup e não tirar o atleta da área de membros.
+    const popup = window.open('about:blank', '_blank', 'noopener,noreferrer');
+    if (!popup) {
+      toast.error('Seu navegador bloqueou o pop-up. Permita pop-ups e tente novamente.');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session) {
         toast.error('Sessão expirada. Faça login novamente.');
+        popup.close();
         return;
       }
 
       const { data, error } = await supabase.functions.invoke('zona-nutri-sso', {
         headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) {
         console.error('SSO error:', error);
-        // Try to parse error context if available
         const errorContext = error.context;
         if (errorContext) {
           try {
@@ -42,13 +51,14 @@ export function ZonaNutriSection({ hasAccess }: ZonaNutriSectionProps) {
         } else {
           toast.error('Erro ao acessar Zona Nutri. Tente novamente.');
         }
+        popup.close();
         return;
       }
 
-      // Check if response contains an error (edge function returned error as JSON)
       if (data?.error) {
         console.error('SSO response error:', data);
         toast.error(`Falha no SSO (step: ${data.step || 'unknown'}): ${data.error}`);
+        popup.close();
         return;
       }
 
@@ -63,23 +73,21 @@ export function ZonaNutriSection({ hasAccess }: ZonaNutriSectionProps) {
           hasCode,
           hasToken,
           urlPreview: rawUrl.substring(0, 80) + '...',
-          redirectToUsed: data.debug?.redirectToUsed
+          redirectToUsed: data.debug?.redirectToUsed,
+          method: data.debug?.method,
         });
 
         toast.success('Abrindo Zona Nutri...');
-
-        // Mantém o atleta na área de membros e abre o Zona Nutri em nova aba.
-        const opened = window.open(rawUrl, '_blank', 'noopener,noreferrer');
-        if (!opened) {
-          toast.error('Seu navegador bloqueou o pop-up. Permita pop-ups e tente novamente.');
-        }
+        popup.location.href = rawUrl;
       } else {
         console.error('[SSO DEBUG] URL não recebida:', data);
         toast.error('Não foi possível gerar o link de acesso.');
+        popup.close();
       }
     } catch (error) {
       console.error('Error accessing Zona Nutri:', error);
       toast.error('Erro inesperado. Tente novamente.');
+      popup.close();
     } finally {
       setIsLoading(false);
     }

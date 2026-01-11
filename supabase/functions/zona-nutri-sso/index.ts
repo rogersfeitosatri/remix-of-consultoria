@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     // Get Zona Nutri Supabase credentials from environment
     let zonaNutriUrl = Deno.env.get('ZONA_NUTRI_SUPABASE_URL') || '';
     const zonaNutriApiKey = Deno.env.get('ZONA_NUTRI_API_KEY') || '';
-
+    const zonaNutriServiceRoleKey = Deno.env.get('ZONA_NUTRI_SERVICE_ROLE_KEY') || '';
     // Clean up secrets in case they were saved with key name prefix
     if (zonaNutriUrl.includes('=')) {
       zonaNutriUrl = zonaNutriUrl.split('=').pop()?.trim() || '';
@@ -128,7 +128,65 @@ Deno.serve(async (req) => {
         ? user.user_metadata.full_name.trim()
         : (userEmail.split('@')[0] || 'Atleta');
 
-    // Call the Zona Nutri API to generate access token
+    // 1) Preferir SSO real via magic link (Supabase Auth do Zona Nutri) para NÃO cair na tela de login.
+    // Isso gera um link /auth/v1/verify que, após validar, redireciona para /app já autenticado.
+    const magicLinkRedirectTo = 'https://zonanutri.com/app';
+
+    if (zonaNutriServiceRoleKey && zonaNutriServiceRoleKey.trim() !== '') {
+      try {
+        console.log('Trying magic link SSO via Zona Nutri auth...');
+
+        const zonaNutriAdmin = createClient(zonaNutriUrl, zonaNutriServiceRoleKey, {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+          },
+        });
+
+        // Garante que o usuário exista no auth do Zona Nutri (se já existir, apenas ignora o erro).
+        const { error: createUserErr } = await zonaNutriAdmin.auth.admin.createUser({
+          email: userEmail,
+          email_confirm: true,
+          user_metadata: {
+            full_name: athleteName,
+          },
+        });
+
+        if (createUserErr) {
+          console.log('Zona Nutri createUser skipped:', createUserErr.message);
+        }
+
+        const { data: linkData, error: linkError } = await zonaNutriAdmin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: userEmail,
+          options: {
+            redirectTo: magicLinkRedirectTo,
+          },
+        });
+
+        const actionLink = linkData?.properties?.action_link;
+
+        if (!linkError && actionLink) {
+          console.log('Magic link generated. Redirecting via verify link.');
+          return new Response(
+            JSON.stringify({
+              url: actionLink,
+              debug: {
+                method: 'magiclink',
+                redirectToUsed: magicLinkRedirectTo,
+              },
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        console.error('Magic link generation failed:', linkError);
+      } catch (e) {
+        console.error('Magic link SSO failed (fallback to token link):', e);
+      }
+    }
+
+    // 2) Fallback: Call the Zona Nutri API to generate access token
     const generateUrl = new URL('functions/v1/generate-access-token', zonaNutriUrl).toString();
     console.log(`Calling Zona Nutri API generate-access-token for: ${userEmail} (${athleteName})`);
 
@@ -172,10 +230,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // A API retorna { access_token: "...", access_url: "..." }
-    const accessToken = apiData?.access_token;
-    const accessUrl = apiData?.access_url || apiData?.url;
-    
+    // A API pode retornar { token, access_url } ou { access_token, access_url }
+    const accessToken = apiData?.access_token || apiData?.token;
+    const accessUrl = apiData?.access_url || apiData?.url || (accessToken ? `https://zonanutri.com/app?token=${accessToken}` : undefined);
+
     console.log('Zona Nutri API returned:', { 
       hasAccessToken: !!accessToken, 
       accessUrl,
@@ -189,17 +247,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build the final URL for auto-login
-    // The Zona Nutri should have an endpoint that accepts the token and logs the user in
-    let finalUrl: string;
-    
-    if (accessToken) {
-      // Use the verify endpoint with the token for auto-login
-      finalUrl = `https://zonanutri.com/auth/verify?token=${accessToken}`;
-    } else {
-      // Use the access_url directly - may need adjustment based on Zona Nutri implementation
-      finalUrl = accessUrl;
-    }
+    // Build the final URL (fallback)
+    // Observação: este link pode depender de como o Zona Nutri implementa o SSO via token.
+    const finalUrl = accessUrl;
 
     console.log('Final redirect URL:', finalUrl);
 
