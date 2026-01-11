@@ -157,6 +157,7 @@ Deno.serve(async (req) => {
 
     const apiText = await apiResp.text();
     console.log('Zona Nutri API Response status:', apiResp.status);
+    console.log('Zona Nutri API Response body:', apiText);
 
     if (!apiResp.ok) {
       console.error('Zona Nutri API error:', apiText);
