@@ -7,17 +7,124 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useLinkBioItems, useCreateLinkBioItem, useUpdateLinkBioItem, useDeleteLinkBioItem, LinkBioItem } from '@/hooks/useLinkBio';
+import { useLinkBioItems, useCreateLinkBioItem, useUpdateLinkBioItem, useDeleteLinkBioItem, useReorderLinkBioItems, LinkBioItem } from '@/hooks/useLinkBio';
 import { Plus, Edit, Trash2, ExternalLink, Link as LinkIcon, Loader2, Eye, GripVertical, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { ImageUploadDialog } from '@/components/linkbio/ImageUploadDialog';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+interface SortableLinkItemProps {
+  item: LinkBioItem;
+  onEdit: (item: LinkBioItem) => void;
+  onDelete: (id: string) => void;
+  onToggleActive: (item: LinkBioItem) => void;
+}
+
+function SortableLinkItem({ item, onEdit, onDelete, onToggleActive }: SortableLinkItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-4 rounded-lg border ${
+        item.is_active ? 'bg-card' : 'bg-muted/50 opacity-60'
+      } ${isDragging ? 'shadow-lg ring-2 ring-primary' : ''}`}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing touch-none"
+      >
+        <GripVertical className="h-5 w-5 text-muted-foreground" />
+      </div>
+      
+      {item.image_url && (
+        <img 
+          src={item.image_url} 
+          alt={item.title}
+          className="w-12 h-12 rounded-lg object-cover"
+        />
+      )}
+      
+      <div className="flex-1 min-w-0">
+        <h3 className="font-medium truncate">{item.title}</h3>
+        {item.description && (
+          <p className="text-sm text-muted-foreground truncate">{item.description}</p>
+        )}
+        {item.link_url && (
+          <p className="text-xs text-primary truncate">{item.link_url}</p>
+        )}
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={item.is_active}
+          onCheckedChange={() => onToggleActive(item)}
+        />
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => onEdit(item)}
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="text-destructive hover:text-destructive"
+          onClick={() => onDelete(item.id)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+        {item.link_url && (
+          <a href={item.link_url.startsWith('http') ? item.link_url : `https://${item.link_url}`} target="_blank" rel="noopener noreferrer">
+            <Button size="icon" variant="ghost">
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function LinkBioManager() {
   const { data: items = [], isLoading } = useLinkBioItems();
   const createItem = useCreateLinkBioItem();
   const updateItem = useUpdateLinkBioItem();
   const deleteItem = useDeleteLinkBioItem();
+  const reorderItems = useReorderLinkBioItems();
 
   const [editingItem, setEditingItem] = useState<LinkBioItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -30,6 +137,41 @@ export default function LinkBioManager() {
     is_active: true,
     order_index: 0,
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = items.findIndex((item) => item.id === active.id);
+      const newIndex = items.findIndex((item) => item.id === over.id);
+
+      const newItems = arrayMove(items, oldIndex, newIndex);
+      
+      // Create the reorder updates
+      const updates = newItems.map((item, index) => ({
+        id: item.id,
+        order_index: index,
+      }));
+
+      try {
+        await reorderItems.mutateAsync(updates);
+        toast.success('Ordem atualizada!');
+      } catch (error) {
+        toast.error('Erro ao reordenar links');
+      }
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -224,16 +366,6 @@ export default function LinkBioManager() {
                     currentImageUrl={formData.image_url}
                   />
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="order_index">Ordem</Label>
-                    <Input
-                      id="order_index"
-                      type="number"
-                      value={formData.order_index}
-                      onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                  
                   <div className="flex items-center justify-between">
                     <Label htmlFor="is_active">Ativo</Label>
                     <Switch
@@ -288,7 +420,7 @@ export default function LinkBioManager() {
         <Card>
           <CardHeader>
             <CardTitle>Seus Links</CardTitle>
-            <CardDescription>Arraste para reordenar (em breve) ou edite cada item</CardDescription>
+            <CardDescription>Arraste para reordenar os links</CardDescription>
           </CardHeader>
           <CardContent>
             {items.length === 0 ? (
@@ -298,65 +430,28 @@ export default function LinkBioManager() {
                 <p className="text-sm">Clique em "Adicionar Link" para começar</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {items.map((item) => (
-                  <div 
-                    key={item.id} 
-                    className={`flex items-center gap-3 p-4 rounded-lg border ${
-                      item.is_active ? 'bg-card' : 'bg-muted/50 opacity-60'
-                    }`}
-                  >
-                    <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-                    
-                    {item.image_url && (
-                      <img 
-                        src={item.image_url} 
-                        alt={item.title}
-                        className="w-12 h-12 rounded-lg object-cover"
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={items.map(item => item.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {items.map((item) => (
+                      <SortableLinkItem
+                        key={item.id}
+                        item={item}
+                        onEdit={handleOpenDialog}
+                        onDelete={handleDelete}
+                        onToggleActive={handleToggleActive}
                       />
-                    )}
-                    
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium truncate">{item.title}</h3>
-                      {item.description && (
-                        <p className="text-sm text-muted-foreground truncate">{item.description}</p>
-                      )}
-                      {item.link_url && (
-                        <p className="text-xs text-primary truncate">{item.link_url}</p>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={item.is_active}
-                        onCheckedChange={() => handleToggleActive(item)}
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleOpenDialog(item)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      {item.link_url && (
-                        <a href={item.link_url} target="_blank" rel="noopener noreferrer">
-                          <Button size="icon" variant="ghost">
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </a>
-                      )}
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             )}
           </CardContent>
         </Card>
