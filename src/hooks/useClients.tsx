@@ -271,7 +271,7 @@ function generateContinuationConsultationSchedules(
   const intervalLabel = consultationFrequency === 'six_weeks' ? '6 semanas' : 'mensal';
   
   console.debug(
-    `[Automação Consultas - Continuação] client_id=${clientId} | remaining=${remainingConsultations} | intervalo=${intervalWeeks} semanas | término=${format(planEndDate, 'yyyy-MM-dd')} | last_consultation_at=${lastConsultationAt || 'não informado'}`
+    `[Automação Consultas - Continuação] client_id=${clientId} | remaining=${remainingConsultations} | intervalo=${intervalLabel} | término=${format(planEndDate, 'yyyy-MM-dd')} | last_consultation_at=${lastConsultationAt || 'não informado'}`
   );
   
   if (remainingConsultations <= 0) {
