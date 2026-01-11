@@ -21,6 +21,8 @@ import { DailyControlSection } from '@/components/athlete/DailyControlSection';
 import { FirstConsultCard } from '@/components/athlete/FirstConsultCard';
 import { NextConsultCard } from '@/components/athlete/NextConsultCard';
 import { NextConsultBanner } from '@/components/athlete/NextConsultBanner';
+import { MaterialPost } from '@/components/athlete/MaterialPost';
+import { FormattedText } from '@/lib/formatText';
 import { LinkifiedText } from '@/lib/linkify';
 import rogersProfile from '@/assets/rogers-profile.jpg';
 
@@ -130,7 +132,7 @@ export default function AthleteDashboard() {
                     <div className="space-y-4">{allInicioMaterials.map((m) => (
                       <div key={m.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
                         <h4 className="font-medium text-white mb-2">{m.title}</h4>
-                        {m.content_type === 'text' ? <p className="text-gray-300 text-sm whitespace-pre-wrap"><LinkifiedText text={m.content || ''} /></p> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}
+                        {m.content_type === 'text' ? <div className="text-gray-300 text-sm whitespace-pre-wrap"><FormattedText text={m.content || ''} /></div> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}
                       </div>
                     ))}</div>
                   )}
@@ -139,7 +141,7 @@ export default function AthleteDashboard() {
             </TabsContent>
 
             <TabsContent value="dieta">
-              <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Acesso à Dieta</CardTitle></CardHeader><CardContent>{dietConfig?.app_download_instructions ? <p className="text-gray-300 whitespace-pre-wrap"><LinkifiedText text={dietConfig.app_download_instructions} /></p> : <p className="text-gray-400 text-center py-8">Configure as instruções de acesso à dieta na aba "Conteúdo" → "Acesso à Dieta".</p>}</CardContent></Card>
+              <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Acesso à Dieta</CardTitle></CardHeader><CardContent>{dietConfig?.app_download_instructions ? <div className="text-gray-300 whitespace-pre-wrap"><FormattedText text={dietConfig.app_download_instructions} /></div> : <p className="text-gray-400 text-center py-8">Configure as instruções de acesso à dieta na aba "Conteúdo" → "Acesso à Dieta".</p>}</CardContent></Card>
               {dietConfig?.app_code && <Card className="bg-gray-900 border-gray-800 border-[hsl(43,74%,49%)]/30 mt-4"><CardContent className="py-6 text-center"><p className="text-sm text-gray-400 mb-2">Código do App</p><p className="text-3xl font-bold text-[hsl(43,74%,49%)] font-mono">{dietConfig.app_code}</p></CardContent></Card>}
             </TabsContent>
 
@@ -150,9 +152,27 @@ export default function AthleteDashboard() {
             </TabsContent>
 
             <TabsContent value="materiais">
-              {allSupportMaterials.length === 0 ? <Card className="bg-gray-900 border-gray-800"><CardContent className="py-12 text-center"><FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" /><p className="text-gray-400">Nenhum material configurado. Adicione na aba "Conteúdo" → "Materiais de Suporte".</p></CardContent></Card> : allSupportMaterials.map((m) => (
-                <Card key={m.id} className="bg-gray-900 border-gray-800 mb-4"><CardHeader><CardTitle className="text-white">{m.title}</CardTitle></CardHeader><CardContent>{m.content_type === 'text' ? <p className="text-gray-300 whitespace-pre-wrap"><LinkifiedText text={m.content || ''} /></p> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}</CardContent></Card>
-              ))}
+              {allSupportMaterials.length === 0 ? (
+                <Card className="bg-gray-900 border-gray-800">
+                  <CardContent className="py-12 text-center">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                    <p className="text-gray-400">Nenhum material configurado. Adicione na aba "Conteúdo" → "Materiais de Suporte".</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {allSupportMaterials.map((m) => (
+                    <MaterialPost
+                      key={m.id}
+                      id={m.id}
+                      title={m.title || 'Sem título'}
+                      content={m.content}
+                      contentType={m.content_type as 'text' | 'youtube_video'}
+                      youtubeUrl={m.youtube_url}
+                    />
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="desafio42">
@@ -315,9 +335,27 @@ export default function AthleteDashboard() {
           </TabsContent>
 
           <TabsContent value="materiais">
-            {allSupportMaterials.length === 0 ? <Card className="bg-gray-900 border-gray-800"><CardContent className="py-12 text-center"><FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" /><p className="text-gray-400">Materiais em breve</p></CardContent></Card> : allSupportMaterials.map((m) => (
-              <Card key={m.id} className="bg-gray-900 border-gray-800 mb-4"><CardHeader><CardTitle className="text-white">{m.title}</CardTitle></CardHeader><CardContent>{m.content_type === 'text' ? <p className="text-gray-300 whitespace-pre-wrap">{m.content}</p> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}</CardContent></Card>
-            ))}
+            {allSupportMaterials.length === 0 ? (
+              <Card className="bg-gray-900 border-gray-800">
+                <CardContent className="py-12 text-center">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-600" />
+                  <p className="text-gray-400">Materiais em breve</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {allSupportMaterials.map((m) => (
+                  <MaterialPost
+                    key={m.id}
+                    id={m.id}
+                    title={m.title || 'Sem título'}
+                    content={m.content}
+                    contentType={m.content_type as 'text' | 'youtube_video'}
+                    youtubeUrl={m.youtube_url}
+                  />
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="desafio42"><Challenge42SectionNew clientId={client.id} isPreview={isAdmin} /></TabsContent>
