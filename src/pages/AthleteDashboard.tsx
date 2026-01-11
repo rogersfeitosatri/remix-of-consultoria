@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole, useAthleteClient, useCheckinResponses, useCheckinQuestions } from '@/hooks/useUserRole';
 import { useAthleteSupportMaterials, useAthleteDietAppConfig } from '@/hooks/useSupportMaterials';
+import { useIsClientContinuation } from '@/hooks/useAthleteFirstConsult';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ import { AthleteSidebar } from '@/components/athlete/AthleteSidebar';
 import { Challenge42SectionNew } from '@/components/athlete/Challenge42SectionNew';
 import { DailyControlSection } from '@/components/athlete/DailyControlSection';
 import { FirstConsultCard } from '@/components/athlete/FirstConsultCard';
+import { NextConsultCard } from '@/components/athlete/NextConsultCard';
 import { LinkifiedText } from '@/lib/linkify';
 import rogersProfile from '@/assets/rogers-profile.jpg';
 
@@ -38,6 +40,7 @@ export default function AthleteDashboard() {
   const { user, signOut, loading: authLoading } = useAuth();
   const { isAdmin, isLoading: roleLoading } = useUserRole();
   const { data: client, isLoading: clientLoading } = useAthleteClient();
+  const { data: continuationStatus } = useIsClientContinuation(client?.id);
   const { data: checkinResponses = [], isLoading: responsesLoading } = useCheckinResponses(client?.id);
   const firstFormId = checkinResponses[0]?.form_id;
   const { data: checkinQuestions = [] } = useCheckinQuestions(firstFormId);
@@ -215,8 +218,12 @@ export default function AthleteDashboard() {
       <main className="max-w-4xl mx-auto px-4 py-6">
         <div className="mb-6"><h2 className="text-2xl font-bold text-white mb-1">Olá, {client.name.split(' ')[0]}!</h2><p className="text-gray-400">Bem-vindo à sua área de membros</p></div>
 
-        {/* Card de primeira consulta - aparece apenas para atletas com acesso a agenda e sem consulta confirmada */}
-        <FirstConsultCard clientId={client.id} />
+        {/* Card de consulta - mostra FirstConsultCard para novos, NextConsultCard para continuação */}
+        {continuationStatus?.isContinuation && continuationStatus?.hasConsultations ? (
+          <NextConsultCard clientId={client.id} />
+        ) : (
+          <FirstConsultCard clientId={client.id} />
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-6 bg-gray-900 border border-gray-800 p-1">

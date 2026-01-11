@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Client } from '@/hooks/useClients';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,9 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { PhoneInput } from '@/components/ui/phone-input';
-import { X, AlertCircle } from 'lucide-react';
-import { addMonths, addWeeks } from 'date-fns';
+import { X, AlertCircle, Calculator, Calendar, RefreshCw } from 'lucide-react';
+import { addMonths, addWeeks, parseISO, format, nextMonday, isSameMonth, startOfWeek, endOfWeek } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { useAdminSettings } from '@/hooks/useAdminSettings';
+
+interface CalculatedWindow {
+  windowStart: Date;
+  windowEnd: Date;
+  sendLinkAt: Date;
+}
 
 const SERVICE_LABELS = {
   nutrition: 'Nutrição',
@@ -103,11 +110,83 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     last_consultation_at: client?.last_consultation_at || '' as string,
   });
 
+  // Manual override toggle for remaining consultations
+  const [manualOverride, setManualOverride] = useState(false);
+
   // Calculate consultation_interval_weeks from consultation_frequency
   const getConsultationIntervalWeeks = () => {
     if (formData.consultation_frequency === 'monthly') return 4;
     if (formData.consultation_frequency === 'six_weeks') return 6;
     return 4; // default
+  };
+
+  // Calculate future consultation windows based on last_consultation_at, interval, and plan_end_at
+  const calculatedWindows = useMemo((): CalculatedWindow[] => {
+    if (formData.onboarding_type !== 'continuation' || !formData.last_consultation_at || !formData.end_date) {
+      return [];
+    }
+
+    const lastConsultation = parseISO(formData.last_consultation_at);
+    const planEndDate = parseISO(formData.end_date);
+    const intervalWeeks = getConsultationIntervalWeeks();
+    const today = new Date();
+
+    // last_allowed_start = plan_end_at - interval_weeks
+    const lastAllowedStart = addWeeks(planEndDate, -intervalWeeks);
+
+    const windows: CalculatedWindow[] = [];
+    let currentDue = addWeeks(lastConsultation, intervalWeeks);
+    let iteration = 1;
+    const maxIterations = 20; // Safety limit
+
+    while (iteration <= maxIterations) {
+      // window_start = Monday of the week containing due
+      const windowStart = startOfWeek(currentDue, { weekStartsOn: 1 });
+      
+      // Only include if window_start <= last_allowed_start AND window_start is in the future
+      if (windowStart > lastAllowedStart) {
+        break;
+      }
+      
+      if (windowStart >= today) {
+        const windowEnd = endOfWeek(currentDue, { weekStartsOn: 1 });
+        const sendLinkAt = windowStart; // Monday 07:00
+
+        windows.push({
+          windowStart,
+          windowEnd,
+          sendLinkAt,
+        });
+      }
+
+      currentDue = addWeeks(currentDue, intervalWeeks);
+      iteration++;
+    }
+
+    return windows;
+  }, [formData.last_consultation_at, formData.end_date, formData.consultation_frequency, formData.onboarding_type]);
+
+  // Auto-update remaining_consultations when calculated windows change (only if not manual override)
+  useEffect(() => {
+    if (formData.onboarding_type === 'continuation' && !manualOverride && calculatedWindows.length > 0) {
+      setFormData(prev => ({ ...prev, remaining_consultations: calculatedWindows.length }));
+    }
+  }, [calculatedWindows.length, formData.onboarding_type, manualOverride]);
+
+  // Format week range for display
+  const formatWeekRange = (windowStart: Date, windowEnd: Date) => {
+    if (isSameMonth(windowStart, windowEnd)) {
+      return `${format(windowStart, 'd', { locale: ptBR })} a ${format(windowEnd, 'd \'de\' MMMM', { locale: ptBR })}`;
+    }
+    return `${format(windowStart, 'd \'de\' MMM', { locale: ptBR })} a ${format(windowEnd, 'd \'de\' MMM', { locale: ptBR })}`;
+  };
+
+  // Recalculate button handler
+  const handleRecalculate = () => {
+    setManualOverride(false);
+    if (calculatedWindows.length > 0) {
+      setFormData(prev => ({ ...prev, remaining_consultations: calculatedWindows.length }));
+    }
   };
 
   // Calculate end date based on plan duration - always auto-calculate when start_date or plan_duration changes
@@ -359,52 +438,143 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                   
                   {/* Continuation-specific fields */}
                   {formData.onboarding_type === 'continuation' && (
-                    <div className="grid gap-4 sm:grid-cols-2 mt-3">
-                      <div className="space-y-2">
-                        <Label>Intervalo entre Consultas</Label>
-                        <Select
-                          value={formData.consultation_frequency || 'monthly'}
-                          onValueChange={(v) => setFormData({ ...formData, consultation_frequency: v as 'once' | 'monthly' | 'six_weeks' })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="monthly">4 semanas</SelectItem>
-                            <SelectItem value="six_weeks">6 semanas</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                          Intervalo: {getConsultationIntervalWeeks()} semanas
-                        </p>
+                    <div className="space-y-4 mt-3">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="lastConsultationAt">Última Consulta Realizada *</Label>
+                          <Input
+                            id="lastConsultationAt"
+                            type="date"
+                            value={formData.last_consultation_at || ''}
+                            onChange={(e) => setFormData({ ...formData, last_consultation_at: e.target.value })}
+                            required={formData.onboarding_type === 'continuation'}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Data da última consulta realizada (obrigatório)
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Intervalo entre Consultas *</Label>
+                          <Select
+                            value={formData.consultation_frequency || 'monthly'}
+                            onValueChange={(v) => setFormData({ ...formData, consultation_frequency: v as 'once' | 'monthly' | 'six_weeks' })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="monthly">4 semanas</SelectItem>
+                              <SelectItem value="six_weeks">6 semanas</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Intervalo: {getConsultationIntervalWeeks()} semanas
+                          </p>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="remainingConsultations">Consultas Restantes *</Label>
-                        <Input
-                          id="remainingConsultations"
-                          type="number"
-                          min="1"
-                          value={formData.remaining_consultations || ''}
-                          onChange={(e) => setFormData({ ...formData, remaining_consultations: parseInt(e.target.value) || null })}
-                          placeholder="Ex: 3"
-                          required={formData.onboarding_type === 'continuation'}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Quantas consultas o atleta ainda tem direito
-                        </p>
+
+                      {/* Remaining Consultations with manual override */}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor="remainingConsultations">
+                              Consultas Restantes {manualOverride ? '(manual)' : '(calculado)'}
+                            </Label>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                id="manualOverride"
+                                checked={manualOverride}
+                                onCheckedChange={(checked) => {
+                                  setManualOverride(checked);
+                                  if (!checked && calculatedWindows.length > 0) {
+                                    setFormData(prev => ({ ...prev, remaining_consultations: calculatedWindows.length }));
+                                  }
+                                }}
+                              />
+                              <Label htmlFor="manualOverride" className="text-xs cursor-pointer">
+                                Editar manualmente
+                              </Label>
+                            </div>
+                          </div>
+                          <Input
+                            id="remainingConsultations"
+                            type="number"
+                            min="1"
+                            value={formData.remaining_consultations || ''}
+                            onChange={(e) => {
+                              setManualOverride(true);
+                              setFormData({ ...formData, remaining_consultations: parseInt(e.target.value) || null });
+                            }}
+                            placeholder="Ex: 3"
+                            disabled={!manualOverride && calculatedWindows.length > 0}
+                            required={formData.onboarding_type === 'continuation'}
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRecalculate}
+                            disabled={!formData.last_consultation_at || !formData.end_date}
+                            className="gap-2"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Recalcular
+                          </Button>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lastConsultationAt">Última Consulta (opcional)</Label>
-                        <Input
-                          id="lastConsultationAt"
-                          type="date"
-                          value={formData.last_consultation_at || ''}
-                          onChange={(e) => setFormData({ ...formData, last_consultation_at: e.target.value })}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Apenas para referência
-                        </p>
-                      </div>
+
+                      {/* Preview Section - only show when we have calculated windows */}
+                      {formData.last_consultation_at && formData.end_date && (
+                        <div className="mt-4 p-4 border border-primary/30 rounded-lg bg-primary/5">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Calculator className="h-4 w-4 text-primary" />
+                            <span className="font-medium text-foreground">Prévia do Plano</span>
+                          </div>
+                          
+                          {calculatedWindows.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                              Nenhuma janela de consulta encontrada para os parâmetros informados. Verifique se o término do plano é posterior à última consulta.
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="text-muted-foreground">Consultas restantes estimadas:</span>
+                                <span className="font-bold text-primary">{calculatedWindows.length}</span>
+                              </div>
+
+                              <div className="space-y-2">
+                                <p className="text-sm text-muted-foreground font-medium">Próximas janelas previstas:</p>
+                                <div className="max-h-40 overflow-y-auto space-y-1">
+                                  {calculatedWindows.slice(0, manualOverride && formData.remaining_consultations ? formData.remaining_consultations : undefined).map((window, index) => (
+                                    <div 
+                                      key={index}
+                                      className="flex items-center justify-between text-sm p-2 rounded bg-background/50"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                                        <span className="font-medium">
+                                          Semana: {formatWeekRange(window.windowStart, window.windowEnd)}
+                                        </span>
+                                      </div>
+                                      <span className="text-xs text-muted-foreground">
+                                        Link: {format(window.sendLinkAt, "dd/MM 'às' 07:00", { locale: ptBR })}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {manualOverride && formData.remaining_consultations && formData.remaining_consultations < calculatedWindows.length && (
+                                <p className="text-xs text-amber-500">
+                                  ⚠️ Você definiu {formData.remaining_consultations} consultas manualmente (calculado: {calculatedWindows.length})
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
