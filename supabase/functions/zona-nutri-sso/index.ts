@@ -18,14 +18,11 @@ Deno.serve(async (req) => {
     
     // Get Zona Nutri Supabase credentials from environment
     let zonaNutriUrl = Deno.env.get('ZONA_NUTRI_SUPABASE_URL') || '';
-    let zonaNutriServiceKey = Deno.env.get('ZONA_NUTRI_SERVICE_ROLE_KEY') || '';
+    const zonaNutriApiKey = Deno.env.get('ZONA_NUTRI_API_KEY') || '';
 
-    // Clean up secrets in case they were saved with key name prefix (e.g., "KEY = value")
+    // Clean up secrets in case they were saved with key name prefix
     if (zonaNutriUrl.includes('=')) {
       zonaNutriUrl = zonaNutriUrl.split('=').pop()?.trim() || '';
-    }
-    if (zonaNutriServiceKey.includes('=')) {
-      zonaNutriServiceKey = zonaNutriServiceKey.split('=').pop()?.trim() || '';
     }
 
     // Validate env vars exist
@@ -37,10 +34,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!zonaNutriServiceKey || zonaNutriServiceKey.trim() === '') {
-      console.error('ZONA_NUTRI_SERVICE_ROLE_KEY is missing or empty');
+    if (!zonaNutriApiKey || zonaNutriApiKey.trim() === '') {
+      console.error('ZONA_NUTRI_API_KEY is missing or empty');
       return new Response(
-        JSON.stringify({ error: 'Configuração ZONA_NUTRI_SERVICE_ROLE_KEY ausente', step: 'env' }),
+        JSON.stringify({ error: 'Configuração ZONA_NUTRI_API_KEY ausente', step: 'env' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -60,6 +57,7 @@ Deno.serve(async (req) => {
     const zonaNutriProjectRef = zonaNutriUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || 'unknown';
     console.log('Zona Nutri URL configured:', zonaNutriUrl);
     console.log('Zona Nutri Project Ref:', zonaNutriProjectRef);
+
     // Get the authorization header from the request
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
@@ -124,138 +122,100 @@ Deno.serve(async (req) => {
 
     console.log(`User ${userEmail} has Zona Nutri access (premium: ${isPremium}, flag: ${clientData.has_zona_nutri_access})`);
 
-    // 1) Tenta gerar um magic-link (login automático) via service role do Zona Nutri
-    // Observação: isso é o único formato que o /auth/callback do Zona Nutri processa (code/hash).
-    const redirectUrl = 'https://zonanutri.com/auth/callback';
+    // Get athlete name for registration if needed
+    const athleteName =
+      (typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim())
+        ? user.user_metadata.full_name.trim()
+        : (userEmail.split('@')[0] || 'Atleta');
 
-    try {
-      const zonaNutriAdmin = createClient(zonaNutriUrl, zonaNutriServiceKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      });
+    // Call the Zona Nutri API to generate access token
+    const generateUrl = new URL('functions/v1/generate-access-token', zonaNutriUrl).toString();
+    console.log(`Calling Zona Nutri API generate-access-token for: ${userEmail} (${athleteName})`);
 
-      console.log(`Generating Zona Nutri magic link for: ${userEmail}`);
-
-      const { data: linkData, error: linkError } = await zonaNutriAdmin.auth.admin.generateLink({
-        type: 'magiclink',
+    const apiResp = await fetch(generateUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': zonaNutriApiKey,
+      },
+      body: JSON.stringify({
         email: userEmail,
-        options: { redirectTo: redirectUrl },
-      });
+        name: athleteName,
+        expires_in_days: 30,
+      }),
+    });
 
-      if (linkError) {
-        console.error('Error generating magic link:', linkError);
-        throw linkError;
-      }
+    const apiText = await apiResp.text();
+    console.log('Zona Nutri API Response status:', apiResp.status);
+    console.log('Zona Nutri API Response body:', apiText);
 
-      const actionLink = linkData?.properties?.action_link;
-      if (!actionLink) {
-        console.error('Magic link data missing action_link');
-        return new Response(
-          JSON.stringify({ error: 'Link de login automático não gerado', step: 'generateLink', debug: { redirectToUsed: redirectUrl } }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
+    if (!apiResp.ok) {
+      console.error('Zona Nutri API error:', apiText);
       return new Response(
         JSON.stringify({
-          url: actionLink,
-          debug: {
-            redirectToUsed: redirectUrl,
-            zonaNutriSupabaseUrlUsed: zonaNutriUrl,
-            zonaNutriProjectRefUsed: zonaNutriProjectRef,
-          },
+          error: 'Falha ao gerar link de acesso no Zona Nutri',
+          step: 'zonaNutriApi',
+          details: apiText,
+          status: apiResp.status,
         }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } catch (e) {
-      // 2) Fallback: gera apenas link/token de acesso (pode pedir login no web).
-      // Mantemos para não quebrar totalmente, mas o ideal é ajustar o service role.
-      console.warn('Falling back to generate-access-token API (magic link failed).');
-
-      const zonaNutriApiKey = Deno.env.get('ZONA_NUTRI_API_KEY');
-      if (!zonaNutriApiKey || zonaNutriApiKey.trim() === '') {
-        console.error('ZONA_NUTRI_API_KEY is missing or empty');
-        return new Response(
-          JSON.stringify({
-            error: 'Login automático indisponível (service role inválido) e API key ausente',
-            step: 'env',
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const athleteName =
-        (typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim())
-          ? user.user_metadata.full_name.trim()
-          : (userEmail.split('@')[0] || 'Atleta');
-
-      const generateUrl = new URL('functions/v1/generate-access-token', zonaNutriUrl).toString();
-      console.log(`Calling Zona Nutri API generate-access-token for: ${userEmail} (${athleteName})`);
-
-      const apiResp = await fetch(generateUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': zonaNutriApiKey,
-        },
-        body: JSON.stringify({
-          email: userEmail,
-          name: athleteName,
-          expires_in_days: 30,
-        }),
-      });
-
-      const apiText = await apiResp.text();
-      console.log('Zona Nutri API Response status:', apiResp.status);
-      console.log('Zona Nutri API Response body:', apiText);
-
-      if (!apiResp.ok) {
-        console.error('Zona Nutri API error:', apiText);
-        return new Response(
-          JSON.stringify({
-            error: 'Falha ao gerar link de acesso no Zona Nutri',
-            step: 'zonaNutriApi',
-            details: apiText,
-            status: apiResp.status,
-          }),
-          { status: apiResp.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      let apiData: any;
-      try {
-        apiData = JSON.parse(apiText);
-      } catch {
-        return new Response(
-          JSON.stringify({ error: 'Resposta inválida do Zona Nutri', step: 'zonaNutriApi', raw: apiText }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const accessUrl = apiData?.access_url || apiData?.url;
-      if (!accessUrl) {
-        return new Response(
-          JSON.stringify({ error: 'access_url não retornado pelo Zona Nutri', step: 'zonaNutriApi', raw: apiData }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({
-          url: accessUrl,
-          debug: {
-            warning: 'fallback_access_url',
-            redirectToUsed: redirectUrl,
-            zonaNutriSupabaseUrlUsed: zonaNutriUrl,
-            zonaNutriProjectRefUsed: zonaNutriProjectRef,
-            generateUrlUsed: generateUrl,
-          },
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: apiResp.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    let apiData: any;
+    try {
+      apiData = JSON.parse(apiText);
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Resposta inválida do Zona Nutri', step: 'zonaNutriApi', raw: apiText }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // A API retorna { access_token: "...", access_url: "..." }
+    const accessToken = apiData?.access_token;
+    const accessUrl = apiData?.access_url || apiData?.url;
+    
+    console.log('Zona Nutri API returned:', { 
+      hasAccessToken: !!accessToken, 
+      accessUrl,
+      allKeys: Object.keys(apiData || {})
+    });
+
+    if (!accessToken && !accessUrl) {
+      return new Response(
+        JSON.stringify({ error: 'Token de acesso não retornado pelo Zona Nutri', step: 'zonaNutriApi', raw: apiData }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Build the final URL for auto-login
+    // The Zona Nutri should have an endpoint that accepts the token and logs the user in
+    let finalUrl: string;
+    
+    if (accessToken) {
+      // Use the verify endpoint with the token for auto-login
+      finalUrl = `https://zonanutri.com/auth/verify?token=${accessToken}`;
+    } else {
+      // Use the access_url directly - may need adjustment based on Zona Nutri implementation
+      finalUrl = accessUrl;
+    }
+
+    console.log('Final redirect URL:', finalUrl);
+
+    return new Response(
+      JSON.stringify({
+        url: finalUrl,
+        debug: {
+          zonaNutriSupabaseUrlUsed: zonaNutriUrl,
+          zonaNutriProjectRefUsed: zonaNutriProjectRef,
+          generateUrlUsed: generateUrl,
+          hasAccessToken: !!accessToken,
+          accessUrlFromApi: accessUrl,
+        },
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
     console.error('Unexpected error:', error);
