@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
     }
 
     // Generate magic link for Zona Nutri
-    const redirectUrl = 'https://zonanutri.com/app';
+    const redirectUrl = 'https://zonanutri.lovable.app/auth/callback';
     console.log(`Generating magic link with redirect to: ${redirectUrl}`);
     
     const { data: linkData, error: linkError } = await zonaNutriAdmin.auth.admin.generateLink({
@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
     if (linkError) {
       console.error('Error generating magic link:', linkError);
       return new Response(
-        JSON.stringify({ error: 'Erro ao gerar link: ' + linkError.message, step: 'generateLink' }),
+        JSON.stringify({ error: 'Erro ao gerar link: ' + linkError.message, step: 'generateLink', debug: { redirectToUsed: redirectUrl } }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
     if (!linkData?.properties?.action_link) {
       console.error('Magic link data missing action_link');
       return new Response(
-        JSON.stringify({ error: 'Link de acesso não gerado', step: 'generateLink' }),
+        JSON.stringify({ error: 'Link de acesso não gerado', step: 'generateLink', debug: { redirectToUsed: redirectUrl } }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -226,7 +226,10 @@ Deno.serve(async (req) => {
     console.log(`Magic link generated successfully for: ${userEmail}`);
 
     return new Response(
-      JSON.stringify({ url: linkData.properties.action_link }),
+      JSON.stringify({ 
+        url: linkData.properties.action_link,
+        debug: { redirectToUsed: redirectUrl }
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
