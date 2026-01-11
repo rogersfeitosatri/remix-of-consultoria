@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, ArrowRight, Check, Timer } from 'lucide-react';
 import runnerHero from '@/assets/runner-hero.jpg';
 
-type AuthMode = 'login' | 'signup' | 'forgot-password';
+type AuthMode = 'login' | 'forgot-password';
 
 export default function Auth() {
   const { user, loading } = useAuth();
@@ -72,34 +72,6 @@ export default function Auth() {
             variant: 'destructive',
           });
         }
-      } else {
-        if (!formData.fullName.trim()) {
-          toast({
-            title: 'Nome obrigatório',
-            description: 'Por favor, informe seu nome completo.',
-            variant: 'destructive',
-          });
-          setIsSubmitting(false);
-          return;
-        }
-        
-        const { error } = await signUp(formData.email, formData.password, formData.fullName);
-        if (error) {
-          let message = 'Erro ao criar conta. Tente novamente.';
-          if (error.message.includes('already registered')) {
-            message = 'Este email já está cadastrado. Tente fazer login.';
-          }
-          toast({
-            title: 'Erro no cadastro',
-            description: message,
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Conta criada!',
-            description: 'Você já pode acessar sua conta.',
-          });
-        }
       }
     } catch (error) {
       toast({
@@ -115,7 +87,6 @@ export default function Auth() {
   const getTitle = () => {
     switch (mode) {
       case 'login': return 'Acesse sua conta';
-      case 'signup': return 'Cadastre-se';
       case 'forgot-password': return 'Recuperar senha';
     }
   };
@@ -123,7 +94,6 @@ export default function Auth() {
   const getSubtitle = () => {
     switch (mode) {
       case 'login': return 'Entre para acessar seu acompanhamento personalizado';
-      case 'signup': return 'Crie sua conta para começar sua transformação';
       case 'forgot-password': return 'Enviaremos um link para redefinir sua senha';
     }
   };
@@ -198,19 +168,6 @@ export default function Auth() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
-              {mode === 'signup' && (
-                <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-white">Nome Completo</Label>
-                  <Input
-                    id="fullName"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    placeholder="Seu nome completo"
-                    required={mode === 'signup'}
-                    className="h-12 bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-[hsl(43,74%,49%)] focus:ring-[hsl(43,74%,49%)]"
-                  />
-                </div>
-              )}
               
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-white">E-mail</Label>
@@ -248,8 +205,8 @@ export default function Auth() {
               >
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {mode === 'login' && 'Entrar'}
-                {mode === 'signup' && 'Criar Conta'}
                 {mode === 'forgot-password' && 'Enviar Email'}
+                {!isSubmitting && <ArrowRight className="ml-2 h-4 w-4" />}
                 {!isSubmitting && <ArrowRight className="ml-2 h-4 w-4" />}
               </Button>
             </form>
@@ -281,22 +238,6 @@ export default function Auth() {
               </div>
             )}
 
-            {/* Toggle login/signup */}
-            {mode !== 'forgot-password' && (
-              <div className="mt-8 pt-6 border-t border-gray-800 text-center">
-                <p className="text-gray-400 mb-3">
-                  {mode === 'login' ? 'Ainda não tem conta?' : 'Já tem conta?'}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-                  className="border-[hsl(43,74%,49%)]/50 text-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,49%)]/10 hover:text-[hsl(43,74%,49%)]"
-                >
-                  {mode === 'login' ? 'Cadastre-se' : 'Fazer Login'}
-                </Button>
-              </div>
-            )}
           </div>
         </div>
       </div>
