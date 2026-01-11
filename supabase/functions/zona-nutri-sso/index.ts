@@ -56,8 +56,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Extract project ref from URL for debug
+    const zonaNutriProjectRef = zonaNutriUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || 'unknown';
     console.log('Zona Nutri URL configured:', zonaNutriUrl);
-
+    console.log('Zona Nutri Project Ref:', zonaNutriProjectRef);
     // Get the authorization header from the request
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
@@ -223,12 +225,24 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Extrair project ref do action_link para confirmar issuer
+    const actionLink = linkData.properties.action_link;
+    const tokenIssuerRef = actionLink.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || 'unknown';
+
     console.log(`Magic link generated successfully for: ${userEmail}`);
+    console.log(`Token issuer ref: ${tokenIssuerRef}`);
 
     return new Response(
       JSON.stringify({ 
-        url: linkData.properties.action_link,
-        debug: { redirectToUsed: redirectUrl }
+        url: actionLink,
+        debug: { 
+          redirectToUsed: redirectUrl,
+          zonaNutriSupabaseUrlUsed: zonaNutriUrl,
+          zonaNutriProjectRefUsed: zonaNutriProjectRef,
+          tokenIssuerRefDetectado: tokenIssuerRef,
+          frontendZonaNutriSupabaseRefEsperado: 'hckwomxcqfvdzvsshqed',
+          match: tokenIssuerRef === 'hckwomxcqfvdzvsshqed'
+        }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
