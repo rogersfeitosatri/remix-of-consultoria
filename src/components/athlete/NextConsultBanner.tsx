@@ -72,6 +72,13 @@ export function NextConsultBanner({ clientId }: NextConsultBannerProps) {
         .eq('user_id', client.user_id)
         .maybeSingle();
 
+      // Get automation settings (send time)
+      const { data: automationSettings } = await supabase
+        .from('consult_automation_settings')
+        .select('send_time, timezone')
+        .eq('user_id', client.user_id)
+        .maybeSingle();
+
       const now = new Date();
       
       // Filter future schedules (where scheduled_date is in the future or current week)
@@ -101,6 +108,7 @@ export function NextConsultBanner({ clientId }: NextConsultBannerProps) {
         nextAppointment,
         nextPendingSchedule,
         isCalendarConnected: calendarConnection?.is_connected ?? false,
+        sendTime: (automationSettings?.send_time || '07:00:00').slice(0, 5),
       };
     },
     enabled: !!clientId,
