@@ -19,6 +19,7 @@ import { Challenge42SectionNew } from '@/components/athlete/Challenge42SectionNe
 import { DailyControlSection } from '@/components/athlete/DailyControlSection';
 import { FirstConsultCard } from '@/components/athlete/FirstConsultCard';
 import { NextConsultCard } from '@/components/athlete/NextConsultCard';
+import { NextConsultBanner } from '@/components/athlete/NextConsultBanner';
 import { LinkifiedText } from '@/lib/linkify';
 import rogersProfile from '@/assets/rogers-profile.jpg';
 
@@ -218,10 +219,16 @@ export default function AthleteDashboard() {
       <main className="max-w-4xl mx-auto px-4 py-6">
         <div className="mb-6"><h2 className="text-2xl font-bold text-white mb-1">Olá, {client.name.split(' ')[0]}!</h2><p className="text-gray-400">Bem-vindo à sua área de membros</p></div>
 
-        {/* Card de consulta - mostra FirstConsultCard para novos, NextConsultCard para continuação */}
-        {continuationStatus?.isContinuation && continuationStatus?.hasConsultations ? (
+        {/* Banner de próxima consulta - unificado para todos os atletas premium */}
+        <NextConsultBanner clientId={client.id} />
+
+        {/* Card de detalhes de consultas restantes - apenas para continuação */}
+        {continuationStatus?.isContinuation && continuationStatus?.hasConsultations && (
           <NextConsultCard clientId={client.id} />
-        ) : (
+        )}
+
+        {/* Card de 1ª consulta - apenas para novos clientes sem schedule */}
+        {!continuationStatus?.isContinuation && (
           <FirstConsultCard clientId={client.id} />
         )}
 
