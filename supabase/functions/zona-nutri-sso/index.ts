@@ -124,125 +124,79 @@ Deno.serve(async (req) => {
 
     console.log(`User ${userEmail} has Zona Nutri access (premium: ${isPremium}, flag: ${clientData.has_zona_nutri_access})`);
 
-    // Create Zona Nutri admin client with service role key
-    const zonaNutriAdmin = createClient(zonaNutriUrl, zonaNutriServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-
-    // Check if user exists in Zona Nutri
-    console.log('Listing users in Zona Nutri...');
-    const { data: existingUsers, error: listError } = await zonaNutriAdmin.auth.admin.listUsers();
-    
-    if (listError) {
-      console.error('Error listing Zona Nutri users:', listError);
+    // Gerar link de acesso via API do Zona Nutri (sem depender de privilégios de admin/auth)
+    const zonaNutriApiKey = Deno.env.get('ZONA_NUTRI_API_KEY');
+    if (!zonaNutriApiKey || zonaNutriApiKey.trim() === '') {
+      console.error('ZONA_NUTRI_API_KEY is missing or empty');
       return new Response(
-        JSON.stringify({ error: 'Erro ao verificar usuário no Zona Nutri: ' + listError.message, step: 'listUsers' }),
+        JSON.stringify({ error: 'Configuração ZONA_NUTRI_API_KEY ausente', step: 'env' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === userEmail.toLowerCase());
-    
-    let zonaNutriUserId: string;
+    const athleteName =
+      (typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim())
+        ? user.user_metadata.full_name.trim()
+        : (userEmail.split('@')[0] || 'Atleta');
 
-    if (!existingUser) {
-      // Create user in Zona Nutri
-      console.log(`Creating new user in Zona Nutri: ${userEmail}`);
-      const { data: newUser, error: createError } = await zonaNutriAdmin.auth.admin.createUser({
+    const generateUrl = new URL('functions/v1/generate-access-token', zonaNutriUrl).toString();
+    console.log(`Calling Zona Nutri API generate-access-token for: ${userEmail} (${athleteName})`);
+
+    const apiResp = await fetch(generateUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': zonaNutriApiKey,
+      },
+      body: JSON.stringify({
         email: userEmail,
-        email_confirm: true,
-        user_metadata: {
-          created_via: 'consultoria_sso',
-          source_user_id: user.id
-        }
-      });
-
-      if (createError) {
-        console.error('Error creating Zona Nutri user:', createError);
-        return new Response(
-          JSON.stringify({ error: 'Erro ao criar usuário: ' + createError.message, step: 'createUser' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      zonaNutriUserId = newUser.user.id;
-      console.log(`Created new user with ID: ${zonaNutriUserId}`);
-    } else {
-      zonaNutriUserId = existingUser.id;
-      console.log(`Found existing user with ID: ${zonaNutriUserId}`);
-    }
-
-    // Create/Update user_access record in Zona Nutri database
-    console.log(`Creating/updating user_access for user: ${zonaNutriUserId}`);
-    const { error: accessError } = await zonaNutriAdmin
-      .from('user_access')
-      .upsert({
-        user_id: zonaNutriUserId,
-        access_level: 'consultoria',
-        active: true,
-        source: 'consultoria',
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id'
-      });
-
-    if (accessError) {
-      console.error('Error creating/updating user_access:', accessError);
-      // Don't fail the SSO, just log the error - user can still access
-      console.warn('Continuing with SSO despite user_access error');
-    } else {
-      console.log(`Successfully created/updated user_access for user: ${zonaNutriUserId}`);
-    }
-
-    // Generate magic link for Zona Nutri
-    const redirectUrl = 'https://zonanutri.com/auth/callback';
-    console.log(`Generating magic link with redirect to: ${redirectUrl}`);
-    
-    const { data: linkData, error: linkError } = await zonaNutriAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: userEmail,
-      options: {
-        redirectTo: redirectUrl
-      }
+        name: athleteName,
+        expires_in_days: 30,
+      }),
     });
 
-    if (linkError) {
-      console.error('Error generating magic link:', linkError);
+    const apiText = await apiResp.text();
+    console.log('Zona Nutri API Response status:', apiResp.status);
+
+    if (!apiResp.ok) {
+      console.error('Zona Nutri API error:', apiText);
       return new Response(
-        JSON.stringify({ error: 'Erro ao gerar link: ' + linkError.message, step: 'generateLink', debug: { redirectToUsed: redirectUrl } }),
+        JSON.stringify({
+          error: 'Falha ao gerar link de acesso no Zona Nutri',
+          step: 'zonaNutriApi',
+          details: apiText,
+          status: apiResp.status,
+        }),
+        { status: apiResp.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    let apiData: any;
+    try {
+      apiData = JSON.parse(apiText);
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Resposta inválida do Zona Nutri', step: 'zonaNutriApi', raw: apiText }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!linkData?.properties?.action_link) {
-      console.error('Magic link data missing action_link');
+    const accessUrl = apiData?.access_url || apiData?.url;
+    if (!accessUrl) {
       return new Response(
-        JSON.stringify({ error: 'Link de acesso não gerado', step: 'generateLink', debug: { redirectToUsed: redirectUrl } }),
+        JSON.stringify({ error: 'access_url não retornado pelo Zona Nutri', step: 'zonaNutriApi', raw: apiData }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // Extrair project ref do action_link para confirmar issuer
-    const actionLink = linkData.properties.action_link;
-    const tokenIssuerRef = actionLink.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || 'unknown';
-
-    console.log(`Magic link generated successfully for: ${userEmail}`);
-    console.log(`Token issuer ref: ${tokenIssuerRef}`);
 
     return new Response(
-      JSON.stringify({ 
-        url: actionLink,
-        debug: { 
-          redirectToUsed: redirectUrl,
+      JSON.stringify({
+        url: accessUrl,
+        debug: {
           zonaNutriSupabaseUrlUsed: zonaNutriUrl,
           zonaNutriProjectRefUsed: zonaNutriProjectRef,
-          tokenIssuerRefDetectado: tokenIssuerRef,
-          frontendZonaNutriSupabaseRefEsperado: 'hckwomxcqfvdzvsshqed',
-          match: tokenIssuerRef === 'hckwomxcqfvdzvsshqed'
-        }
+          generateUrlUsed: generateUrl,
+        },
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
