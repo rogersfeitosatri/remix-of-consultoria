@@ -17,6 +17,7 @@ import { AthleteSidebar } from '@/components/athlete/AthleteSidebar';
 import { FirstConsultCard } from '@/components/athlete/FirstConsultCard';
 import { NextConsultCard } from '@/components/athlete/NextConsultCard';
 import { NextConsultBanner } from '@/components/athlete/NextConsultBanner';
+import { NextConsultInfo } from '@/components/athlete/NextConsultInfo';
 import { MaterialPost } from '@/components/athlete/MaterialPost';
 import { AthleteProfileSection } from '@/components/athlete/AthleteProfileSection';
 import { LinkifiedText } from '@/lib/linkify';
@@ -294,6 +295,9 @@ export default function AthleteDashboard() {
             <Card className="bg-gray-900 border-gray-800">
               <CardHeader><CardTitle className="text-white">Bem-vindo ao seu painel</CardTitle></CardHeader>
               <CardContent>
+                {/* Aviso informativo de próxima consulta */}
+                <NextConsultInfo clientId={client.id} />
+                
                 {allInicioMaterials.length === 0 ? <p className="text-gray-400 text-center py-8">Conteúdo de boas-vindas em breve...</p> : (
                   <div className="space-y-4">{allInicioMaterials.map((m) => (
                     <div key={m.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
