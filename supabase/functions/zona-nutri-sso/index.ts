@@ -93,6 +93,35 @@ Deno.serve(async (req) => {
 
     console.log(`Processing SSO for user: ${userEmail}`);
 
+    // Check if user has Zona Nutri access in Consultoria
+    const { data: clientData, error: clientError } = await consultoriaClient
+      .from('clients')
+      .select('id, has_zona_nutri_access, plan_type')
+      .eq('athlete_user_id', user.id)
+      .single();
+
+    if (clientError || !clientData) {
+      console.error('Client not found or error:', clientError);
+      return new Response(
+        JSON.stringify({ error: 'Cliente não encontrado na plataforma', step: 'clientLookup' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if client has Zona Nutri access (has_zona_nutri_access or Premium plan)
+    const isPremium = clientData.plan_type?.toLowerCase()?.includes('premium');
+    const hasAccess = clientData.has_zona_nutri_access === true || isPremium;
+
+    if (!hasAccess) {
+      console.log(`User ${userEmail} does not have Zona Nutri access`);
+      return new Response(
+        JSON.stringify({ error: 'Você não tem acesso ao Zona Nutri. Entre em contato com seu nutricionista.', step: 'accessDenied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`User ${userEmail} has Zona Nutri access (premium: ${isPremium}, flag: ${clientData.has_zona_nutri_access})`);
+
     // Create Zona Nutri admin client with service role key
     const zonaNutriAdmin = createClient(zonaNutriUrl, zonaNutriServiceKey, {
       auth: {
@@ -142,6 +171,28 @@ Deno.serve(async (req) => {
     } else {
       zonaNutriUserId = existingUser.id;
       console.log(`Found existing user with ID: ${zonaNutriUserId}`);
+    }
+
+    // Create/Update user_access record in Zona Nutri database
+    console.log(`Creating/updating user_access for user: ${zonaNutriUserId}`);
+    const { error: accessError } = await zonaNutriAdmin
+      .from('user_access')
+      .upsert({
+        user_id: zonaNutriUserId,
+        access_level: 'consultoria',
+        active: true,
+        source: 'consultoria',
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (accessError) {
+      console.error('Error creating/updating user_access:', accessError);
+      // Don't fail the SSO, just log the error - user can still access
+      console.warn('Continuing with SSO despite user_access error');
+    } else {
+      console.log(`Successfully created/updated user_access for user: ${zonaNutriUserId}`);
     }
 
     // Generate magic link for Zona Nutri
