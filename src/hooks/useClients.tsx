@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { addMonths, addWeeks, format, parseISO, differenceInDays, startOfMonth, endOfMonth, isWithinInterval, nextMonday } from 'date-fns';
+import { addMonths, addWeeks, format, parseISO, differenceInDays, startOfMonth, endOfMonth, isWithinInterval, nextMonday, startOfWeek, endOfWeek } from 'date-fns';
 import { generateCheckinSchedules } from './useScheduledCheckins';
 
 export interface Client {
@@ -250,13 +250,14 @@ function generateConsultationSchedules(
 }
 
 // Generate consultation schedules for CONTINUATION (migration) clients
-// Only generates future consultations from today, respecting plan_end_at
+// Uses last_consultation_at to calculate future windows based on interval
 function generateContinuationConsultationSchedules(
   userId: string,
   clientId: string,
   consultationFrequency: 'once' | 'monthly' | 'six_weeks',
   endDate: string,
-  remainingConsultations: number
+  remainingConsultations: number,
+  lastConsultationAt?: string | null
 ): Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] {
   const schedules: Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] = [];
   const planEndDate = parseISO(endDate);
@@ -269,63 +270,67 @@ function generateContinuationConsultationSchedules(
   const lastAllowedStart = addWeeks(planEndDate, -intervalWeeks);
   
   console.debug(
-    `[Automação Consultas - Continuação] client_id=${clientId} | remaining=${remainingConsultations} | intervalo=${intervalWeeks} semanas | término=${format(planEndDate, 'yyyy-MM-dd')} | última_janela_permitida=${format(lastAllowedStart, 'yyyy-MM-dd')}`
+    `[Automação Consultas - Continuação] client_id=${clientId} | remaining=${remainingConsultations} | intervalo=${intervalWeeks} semanas | término=${format(planEndDate, 'yyyy-MM-dd')} | última_janela_permitida=${format(lastAllowedStart, 'yyyy-MM-dd')} | last_consultation_at=${lastConsultationAt || 'não informado'}`
   );
   
-  // Calculate total time available (from today to last allowed start)
-  const daysAvailable = differenceInDays(lastAllowedStart, today);
-  
-  if (daysAvailable <= 0 || remainingConsultations <= 0) {
-    console.debug('[Automação Consultas - Continuação] Sem tempo disponível para agendar consultas');
+  if (remainingConsultations <= 0) {
+    console.debug('[Automação Consultas - Continuação] Sem consultas restantes');
     return schedules;
   }
-  
-  // Calculate ideal spacing between consultations
-  const idealSpacingDays = intervalWeeks * 7;
-  const totalNeededDays = (remainingConsultations - 1) * idealSpacingDays;
-  
-  // If we have enough time, use ideal spacing; otherwise, compact
-  let actualSpacingDays = idealSpacingDays;
-  if (totalNeededDays > daysAvailable && remainingConsultations > 1) {
-    actualSpacingDays = Math.floor(daysAvailable / (remainingConsultations - 1));
-  }
-  
-  // First window starts on the next Monday from today
-  let currentWindowStart = nextMonday(today);
-  
-  for (let i = 0; i < remainingConsultations; i++) {
-    // Check if this window is still valid (before last allowed start)
-    if (currentWindowStart > lastAllowedStart) {
-      console.debug(`[Automação Consultas - Continuação] Parando: janela ${format(currentWindowStart, 'yyyy-MM-dd')} ultrapassa limite`);
-      break;
+
+  // If we have last_consultation_at, calculate windows based on it
+  if (lastConsultationAt) {
+    const lastConsultation = parseISO(lastConsultationAt);
+    let currentDue = addWeeks(lastConsultation, intervalWeeks);
+    let windowsCreated = 0;
+
+    while (windowsCreated < remainingConsultations) {
+      const windowStart = startOfWeek(currentDue, { weekStartsOn: 1 });
+      
+      // Only include if window_start <= last_allowed_start AND in the future
+      if (windowStart > lastAllowedStart) {
+        console.debug(`[Automação Consultas - Continuação] Parando: janela ${format(windowStart, 'yyyy-MM-dd')} ultrapassa limite`);
+        break;
+      }
+      
+      if (windowStart >= today) {
+        const windowEnd = endOfWeek(currentDue, { weekStartsOn: 1 });
+        
+        console.debug(
+          `[Automação Consultas - Continuação] Consulta ${windowsCreated + 1}/${remainingConsultations}: window=${format(windowStart, 'yyyy-MM-dd')} a ${format(windowEnd, 'yyyy-MM-dd')}`
+        );
+        
+        schedules.push({
+          client_id: clientId,
+          user_id: userId,
+          scheduled_date: format(windowStart, 'yyyy-MM-dd'),
+          send_link_date: format(windowStart, 'yyyy-MM-dd'),
+          status: 'pending',
+        });
+        
+        windowsCreated++;
+      }
+      
+      currentDue = addWeeks(currentDue, intervalWeeks);
     }
+  } else {
+    // Fallback: start from next Monday
+    let currentWindowStart = nextMonday(today);
     
-    // window_end = Sunday of the same week
-    const windowEnd = addDays(currentWindowStart, 6);
-    
-    // send_link_at = window_start (Monday 07:00 - handled by job)
-    const sendLinkDate = currentWindowStart;
-    
-    // scheduled_date = middle of the window or window start for reference
-    const scheduledDate = currentWindowStart;
-    
-    console.debug(
-      `[Automação Consultas - Continuação] Consulta ${i + 1}/${remainingConsultations}: window=${format(currentWindowStart, 'yyyy-MM-dd')} a ${format(windowEnd, 'yyyy-MM-dd')} | send_link=${format(sendLinkDate, 'yyyy-MM-dd')}`
-    );
-    
-    schedules.push({
-      client_id: clientId,
-      user_id: userId,
-      scheduled_date: format(scheduledDate, 'yyyy-MM-dd'),
-      send_link_date: format(sendLinkDate, 'yyyy-MM-dd'),
-      status: 'pending',
-    });
-    
-    // Move to next window
-    currentWindowStart = addDays(currentWindowStart, actualSpacingDays);
-    // Ensure it's a Monday
-    if (currentWindowStart.getDay() !== 1) {
-      currentWindowStart = nextMonday(currentWindowStart);
+    for (let i = 0; i < remainingConsultations; i++) {
+      if (currentWindowStart > lastAllowedStart) {
+        break;
+      }
+      
+      schedules.push({
+        client_id: clientId,
+        user_id: userId,
+        scheduled_date: format(currentWindowStart, 'yyyy-MM-dd'),
+        send_link_date: format(currentWindowStart, 'yyyy-MM-dd'),
+        status: 'pending',
+      });
+      
+      currentWindowStart = addWeeks(currentWindowStart, intervalWeeks);
     }
   }
   
@@ -389,7 +394,8 @@ export function useAddClient() {
             client.id,
             client.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
             client.end_date,
-            client.remaining_consultations
+            client.remaining_consultations,
+            client.last_consultation_at
           );
         } else if (client.first_consultation_date) {
           // Standard new client flow

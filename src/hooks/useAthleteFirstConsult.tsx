@@ -4,6 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 /**
  * Hook to check if athlete has first consultation pending for their current plan
  * Returns the booking link if available
+ * 
+ * IMPORTANT: For "continuation" clients (migration), this hook should NOT show
+ * the "Agendar 1ª consulta" CTA - they should see NextConsultCard instead.
  */
 export function useAthleteFirstConsultStatus(clientId: string | undefined) {
   return useQuery({
@@ -11,10 +14,10 @@ export function useAthleteFirstConsultStatus(clientId: string | undefined) {
     queryFn: async () => {
       if (!clientId) return null;
 
-      // Get client info including has_agenda_access and has_consultations
+      // Get client info including has_agenda_access, has_consultations, and onboarding_type
       const { data: client, error: clientError } = await supabase
         .from('clients')
-        .select('id, has_agenda_access, has_consultations, plan_type, user_id, start_date')
+        .select('id, has_agenda_access, has_consultations, plan_type, user_id, start_date, onboarding_type')
         .eq('id', clientId)
         .single();
 
@@ -24,6 +27,16 @@ export function useAthleteFirstConsultStatus(clientId: string | undefined) {
       const hasConsultAccess = client?.has_agenda_access || client?.has_consultations || client?.plan_type === 'premium';
       if (!hasConsultAccess) {
         return { showCard: false, reason: 'no_access' };
+      }
+
+      // CRITICAL: If client is "continuation" (migration), NEVER show "Agendar 1ª consulta"
+      // They should see NextConsultCard instead
+      if (client?.onboarding_type === 'continuation') {
+        return { 
+          showCard: false, 
+          reason: 'continuation_client',
+          onboardingType: 'continuation'
+        };
       }
 
       // Check if there's any confirmed appointment for this client in the current plan cycle
@@ -86,6 +99,35 @@ export function useAthleteFirstConsultStatus(clientId: string | undefined) {
         showCard: true,
         bookingToken: bookingLink?.token,
         isCalendarConnected: calendarConnection?.is_connected ?? false,
+        onboardingType: client?.onboarding_type || 'new',
+      };
+    },
+    enabled: !!clientId,
+  });
+}
+
+/**
+ * Hook to check if a client is a "continuation" (migration) client
+ * Used to determine which card to show
+ */
+export function useIsClientContinuation(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['client-is-continuation', clientId],
+    queryFn: async () => {
+      if (!clientId) return { isContinuation: false, hasConsultations: false };
+
+      const { data, error } = await supabase
+        .from('clients')
+        .select('onboarding_type, has_consultations, has_agenda_access, plan_type')
+        .eq('id', clientId)
+        .single();
+
+      if (error) throw error;
+
+      const hasConsultAccess = data?.has_agenda_access || data?.has_consultations || data?.plan_type === 'premium';
+      return {
+        isContinuation: data?.onboarding_type === 'continuation',
+        hasConsultations: hasConsultAccess,
       };
     },
     enabled: !!clientId,
