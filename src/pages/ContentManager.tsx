@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { RichTextToolbar, applyTextFormat } from '@/components/ui/rich-text-toolbar';
 import {
   Dialog,
   DialogContent,
@@ -81,6 +82,29 @@ export default function ContentManager() {
   const [content, setContent] = useState('');
   const [contentType, setContentType] = useState<'text' | 'youtube_video'>('text');
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Handle rich text formatting
+  const handleFormat = (format: string, value?: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const { newText, newSelectionStart, newSelectionEnd } = applyTextFormat(
+      content,
+      textarea.selectionStart,
+      textarea.selectionEnd,
+      format,
+      value
+    );
+    
+    setContent(newText);
+    
+    // Restore focus and selection after state update
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(newSelectionStart, newSelectionEnd);
+    }, 0);
+  };
   
   // Form state for activities
   const [activityTitle, setActivityTitle] = useState('');
@@ -209,17 +233,24 @@ export default function ContentManager() {
 
   // Move activity up or down
   const handleMoveActivity = async (index: number, direction: 'up' | 'down') => {
+    // Create a copy of activities limited to first 6
     const activities = [...challengeActivities].slice(0, 6);
+    
+    // Validate bounds
     if (direction === 'up' && index === 0) return;
     if (direction === 'down' && index === activities.length - 1) return;
 
     const swapIndex = direction === 'up' ? index - 1 : index + 1;
     
-    // Swap order_index values
-    const updates = [
-      { id: activities[index].id, order_index: activities[swapIndex].order_index ?? swapIndex },
-      { id: activities[swapIndex].id, order_index: activities[index].order_index ?? index },
-    ];
+    // Swap items in array
+    const reordered = [...activities];
+    [reordered[index], reordered[swapIndex]] = [reordered[swapIndex], reordered[index]];
+    
+    // Create updates with new sequential order_index values
+    const updates = reordered.map((activity, idx) => ({
+      id: activity.id,
+      order_index: idx,
+    }));
 
     try {
       await reorderActivities.mutateAsync({ activities: updates });
@@ -324,7 +355,18 @@ export default function ContentManager() {
                         {contentType === 'text' ? (
                           <div className="space-y-2">
                             <Label>Conteúdo</Label>
-                            <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Digite o conteúdo..." rows={5} />
+                            <div className="border rounded-md">
+                              <RichTextToolbar onFormat={handleFormat} />
+                              <Textarea 
+                                ref={textareaRef}
+                                value={content} 
+                                onChange={(e) => setContent(e.target.value)} 
+                                placeholder="Digite o conteúdo... Selecione texto para formatar." 
+                                rows={5} 
+                                className="border-0 rounded-t-none focus-visible:ring-0"
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">Selecione o texto e use os botões acima para formatar.</p>
                           </div>
                         ) : (
                           <div className="space-y-2">
@@ -448,7 +490,18 @@ export default function ContentManager() {
                         {contentType === 'text' ? (
                           <div className="space-y-2">
                             <Label>Conteúdo</Label>
-                            <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Digite o conteúdo..." rows={5} />
+                            <div className="border rounded-md">
+                              <RichTextToolbar onFormat={handleFormat} />
+                              <Textarea 
+                                ref={textareaRef}
+                                value={content} 
+                                onChange={(e) => setContent(e.target.value)} 
+                                placeholder="Digite o conteúdo... Selecione texto para formatar." 
+                                rows={5} 
+                                className="border-0 rounded-t-none focus-visible:ring-0"
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">Selecione o texto e use os botões acima para formatar.</p>
                           </div>
                         ) : (
                           <div className="space-y-2">
@@ -670,7 +723,18 @@ export default function ContentManager() {
                         </div>
                         <div className="space-y-2">
                           <Label>Conteúdo</Label>
-                          <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Instruções detalhadas..." rows={5} />
+                          <div className="border rounded-md">
+                            <RichTextToolbar onFormat={handleFormat} />
+                            <Textarea 
+                              ref={textareaRef}
+                              value={content} 
+                              onChange={(e) => setContent(e.target.value)} 
+                              placeholder="Instruções detalhadas... Selecione texto para formatar." 
+                              rows={5} 
+                              className="border-0 rounded-t-none focus-visible:ring-0"
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">Selecione o texto e use os botões acima para formatar.</p>
                         </div>
                       </div>
                       <DialogFooter>
