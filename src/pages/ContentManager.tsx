@@ -8,6 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { RichTextToolbar, applyTextFormat } from '@/components/ui/rich-text-toolbar';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   Dialog,
   DialogContent,
@@ -43,10 +46,9 @@ import {
   useReorderChallengeActivities,
 } from '@/hooks/useChallengeActivities';
 import { useAuth } from '@/hooks/useAuth';
-import { Home, Utensils, History, FileText, Target, Calendar, Plus, Trash2, Edit, Loader2, Youtube, FileText as TextIcon, GripVertical, Wand2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Home, Utensils, History, FileText, Target, Calendar, Plus, Trash2, Edit, Loader2, Youtube, FileText as TextIcon, GripVertical, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// 6 módulos conforme especificado
 const CATEGORIES = [
   { value: 'inicio', label: 'Início', icon: Home, description: 'Texto de boas-vindas e orientações iniciais' },
   { value: 'dieta', label: 'Acesso à Dieta', icon: Utensils, description: 'Orientações de acesso ao app da dieta' },
@@ -55,6 +57,75 @@ const CATEGORIES = [
   { value: 'desafio42', label: 'Desafio 42', icon: Target, description: 'Atividades comportamentais semanais' },
   { value: 'controle', label: 'Controle Diário', icon: Calendar, description: 'Instruções do controle de peso/cintura' },
 ];
+
+// Sortable activity item component
+interface SortableActivityItemProps {
+  activity: any;
+  index: number;
+  onToggleActive: (id: string, isActive: boolean) => void;
+  onEdit: (activity: any) => void;
+}
+
+function SortableActivityItem({ activity, index, onToggleActive, onEdit }: SortableActivityItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: activity.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1 : 0,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30"
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-muted rounded"
+        title="Arraste para reordenar"
+      >
+        <GripVertical className="h-5 w-5 text-muted-foreground" />
+      </button>
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-foreground">
+        S{index + 1}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm text-foreground">{activity.title}</p>
+        {activity.description && (
+          <p className="text-xs text-muted-foreground truncate">{activity.description}</p>
+        )}
+        <p className="text-xs text-muted-foreground mt-1">
+          Dias necessários: {activity.required_days || 7}/7
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch 
+          checked={activity.is_active} 
+          onCheckedChange={(checked) => onToggleActive(activity.id, checked)} 
+        />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => onEdit(activity)}
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function ContentManager() {
   const { user } = useAuth();
@@ -231,20 +302,27 @@ export default function ContentManager() {
     }
   };
 
-  // Move activity up or down
-  const handleMoveActivity = async (index: number, direction: 'up' | 'down') => {
-    // Create a copy of activities limited to first 6
-    const activities = [...challengeActivities].slice(0, 6);
-    
-    // Validate bounds
-    if (direction === 'up' && index === 0) return;
-    if (direction === 'down' && index === activities.length - 1) return;
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+  // Handle drag end for activities
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
     
-    // Swap items in array
-    const reordered = [...activities];
-    [reordered[index], reordered[swapIndex]] = [reordered[swapIndex], reordered[index]];
+    if (!over || active.id === over.id) return;
+
+    const activitiesSlice = [...challengeActivities].slice(0, 6);
+    const oldIndex = activitiesSlice.findIndex(a => a.id === active.id);
+    const newIndex = activitiesSlice.findIndex(a => a.id === over.id);
+    
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(activitiesSlice, oldIndex, newIndex);
     
     // Create updates with new sequential order_index values
     const updates = reordered.map((activity, idx) => ({
@@ -258,6 +336,14 @@ export default function ContentManager() {
     } catch (error) {
       toast.error('Erro ao reordenar');
     }
+  };
+
+  const handleEditActivity = (activity: any) => {
+    setEditingActivity(activity);
+    setActivityTitle(activity.title);
+    setActivityDescription(activity.description || '');
+    setRequiredDays(activity.required_days || 7);
+    setIsActivityDialogOpen(true);
   };
 
   const handleSaveDietConfig = async () => {
@@ -580,66 +666,28 @@ export default function ContentManager() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {challengeActivities.slice(0, 6).map((activity, index) => (
-                      <div key={activity.id} className="flex items-center gap-3 p-4 rounded-lg border bg-muted/30">
-                        {/* Reorder buttons */}
-                        <div className="flex flex-col gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => handleMoveActivity(index, 'up')}
-                            disabled={index === 0 || reorderActivities.isPending}
-                            title="Mover para cima"
-                          >
-                            <ChevronUp className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => handleMoveActivity(index, 'down')}
-                            disabled={index === Math.min(challengeActivities.length, 6) - 1 || reorderActivities.isPending}
-                            title="Mover para baixo"
-                          >
-                            <ChevronDown className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-foreground">
-                          S{index + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm text-foreground">{activity.title}</p>
-                          {activity.description && (
-                            <p className="text-xs text-muted-foreground truncate">{activity.description}</p>
-                          )}
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Dias necessários: {activity.required_days || 7}/7
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Switch 
-                            checked={activity.is_active} 
-                            onCheckedChange={(checked) => handleToggleActivityActive(activity.id, checked)} 
+                  <DndContext 
+                    sensors={sensors} 
+                    collisionDetection={closestCenter} 
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext 
+                      items={challengeActivities.slice(0, 6).map(a => a.id)} 
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-3">
+                        {challengeActivities.slice(0, 6).map((activity, index) => (
+                          <SortableActivityItem
+                            key={activity.id}
+                            activity={activity}
+                            index={index}
+                            onToggleActive={handleToggleActivityActive}
+                            onEdit={handleEditActivity}
                           />
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => {
-                              setEditingActivity(activity);
-                              setActivityTitle(activity.title);
-                              setActivityDescription(activity.description || '');
-                              setRequiredDays(activity.required_days || 7);
-                              setIsActivityDialogOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                 )}
               </CardContent>
             </Card>
