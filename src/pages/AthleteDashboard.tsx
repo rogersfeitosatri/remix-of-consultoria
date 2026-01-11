@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Home, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Utensils, FileText, Target, Calendar, Zap } from 'lucide-react';
+import { Home, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Utensils, FileText, Target, Calendar } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -17,7 +17,6 @@ import { AthleteSidebar } from '@/components/athlete/AthleteSidebar';
 import { Challenge42SectionNew } from '@/components/athlete/Challenge42SectionNew';
 import { DailyControlSection } from '@/components/athlete/DailyControlSection';
 import { FirstConsultCard } from '@/components/athlete/FirstConsultCard';
-import { ZonaNutriSection } from '@/components/athlete/ZonaNutriSection';
 import { LinkifiedText } from '@/lib/linkify';
 import rogersProfile from '@/assets/rogers-profile.jpg';
 
@@ -59,7 +58,6 @@ export default function AthleteDashboard() {
   const handleFillAnamnese = () => { navigate('/athlete/anamnese'); };
 
   const isPendingAnamnese = client?.athlete_status === 'pending_anamnese';
-  const hasZonaNutriAccess = client?.has_zona_nutri_access === true || (client?.is_active && client?.plan_type === 'Premium');
 
   if (authLoading || clientLoading || roleLoading) {
     return (
@@ -196,7 +194,7 @@ export default function AthleteDashboard() {
       <header className="border-b border-gray-800 bg-black sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <AthleteSidebar activeTab={activeTab} onTabChange={setActiveTab} clientName={client.name} userEmail={user.email || ''} onSignOut={handleSignOut} hasZonaNutriAccess={hasZonaNutriAccess} />
+            <AthleteSidebar activeTab={activeTab} onTabChange={setActiveTab} clientName={client.name} userEmail={user.email || ''} onSignOut={handleSignOut} />
             <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]"><img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-[200%] object-cover object-[center_15%]" /></div>
             <div><h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1><p className="text-xs text-gray-400">Nutrição e Treinamento</p></div>
           </div>
@@ -221,16 +219,13 @@ export default function AthleteDashboard() {
         <FirstConsultCard clientId={client.id} />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`grid w-full ${hasZonaNutriAccess ? 'grid-cols-7' : 'grid-cols-6'} bg-gray-900 border border-gray-800 p-1`}>
+          <TabsList className="grid w-full grid-cols-6 bg-gray-900 border border-gray-800 p-1">
             <TabsTrigger value="inicio" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Home className="h-4 w-4" /><span className="hidden lg:inline">Início</span></TabsTrigger>
             <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Utensils className="h-4 w-4" /><span className="hidden lg:inline">Dieta</span></TabsTrigger>
             <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><ClipboardCheck className="h-4 w-4" /><span className="hidden lg:inline">Histórico</span></TabsTrigger>
             <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><FileText className="h-4 w-4" /><span className="hidden lg:inline">Materiais</span></TabsTrigger>
             <TabsTrigger value="desafio42" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Target className="h-4 w-4" /><span className="hidden lg:inline">Desafio 42</span></TabsTrigger>
             <TabsTrigger value="controle" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Calendar className="h-4 w-4" /><span className="hidden lg:inline">Controle</span></TabsTrigger>
-            {hasZonaNutriAccess && (
-              <TabsTrigger value="zonanutri" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Zap className="h-4 w-4" /><span className="hidden lg:inline">Zona Nutri</span></TabsTrigger>
-            )}
           </TabsList>
 
           <TabsContent value="inicio">
@@ -280,9 +275,6 @@ export default function AthleteDashboard() {
 
           <TabsContent value="desafio42"><Challenge42SectionNew clientId={client.id} isPreview={isAdmin} /></TabsContent>
           <TabsContent value="controle"><DailyControlSection clientId={client.id} /></TabsContent>
-          {hasZonaNutriAccess && (
-            <TabsContent value="zonanutri"><ZonaNutriSection hasAccess={hasZonaNutriAccess} /></TabsContent>
-          )}
         </Tabs>
       </main>
     </div>

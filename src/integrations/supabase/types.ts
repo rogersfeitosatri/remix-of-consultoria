@@ -1014,7 +1014,6 @@ export type Database = {
           has_agenda_access: boolean | null
           has_checkin: boolean
           has_consultations: boolean | null
-          has_zona_nutri_access: boolean | null
           id: string
           is_active: boolean
           monthly_value: number
@@ -1045,7 +1044,6 @@ export type Database = {
           has_agenda_access?: boolean | null
           has_checkin?: boolean
           has_consultations?: boolean | null
-          has_zona_nutri_access?: boolean | null
           id?: string
           is_active?: boolean
           monthly_value: number
@@ -1076,7 +1074,6 @@ export type Database = {
           has_agenda_access?: boolean | null
           has_checkin?: boolean
           has_consultations?: boolean | null
-          has_zona_nutri_access?: boolean | null
           id?: string
           is_active?: boolean
           monthly_value?: number

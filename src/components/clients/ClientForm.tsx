@@ -76,7 +76,6 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     plan_duration: client?.plan_duration || 'monthly' as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual',
     has_checkin: client?.has_checkin ?? true,
     has_agenda_access: client?.has_agenda_access ?? false,
-    has_zona_nutri_access: client?.has_zona_nutri_access ?? false,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly',
     start_date: client?.start_date || new Date().toISOString().split('T')[0],
     end_date: client?.end_date || '',
@@ -434,23 +433,6 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                 onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
               />
               <Label htmlFor="isActive">Atleta Ativo</Label>
-            </div>
-          </div>
-
-          {/* Acesso Zona Nutri */}
-          <div className="flex items-center gap-4 p-4 border border-border rounded-lg bg-muted/30">
-            <Switch
-              id="hasZonaNutriAccess"
-              checked={formData.has_zona_nutri_access}
-              onCheckedChange={(v) => setFormData({ ...formData, has_zona_nutri_access: v })}
-            />
-            <div>
-              <Label htmlFor="hasZonaNutriAccess" className="cursor-pointer">
-                Acesso ao Zona Nutri
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Libera acesso ao app de Estratégia de Géis
-              </p>
             </div>
           </div>
 

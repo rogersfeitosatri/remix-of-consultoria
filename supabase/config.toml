@@ -41,6 +41,3 @@ verify_jwt = false
 
 [functions.refresh-google-token]
 verify_jwt = false
-
-[functions.zona-nutri-sso]
-verify_jwt = false

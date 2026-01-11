@@ -425,7 +425,6 @@ export default function Settings() {
         athlete_status: 'active' as const,
         registration_source: 'manual' as const,
         has_agenda_access: planType === 'premium',
-        has_zona_nutri_access: false,
       },
       errors: [],
     };
