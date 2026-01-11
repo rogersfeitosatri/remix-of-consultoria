@@ -116,7 +116,7 @@ export function NextConsultBanner({ clientId }: NextConsultBannerProps) {
 
   if (isLoading || !data?.showBanner) return null;
 
-  const { schedules, bookingToken, nextAppointment, nextPendingSchedule, isCalendarConnected } = data;
+  const { schedules, bookingToken, nextAppointment, nextPendingSchedule, isCalendarConnected, sendTime } = data;
 
   // Format week range with month crossing logic
   const formatWeekRange = (dateStr: string) => {
@@ -231,7 +231,7 @@ export function NextConsultBanner({ clientId }: NextConsultBannerProps) {
                   {canSchedule ? (
                     <>O link para agendar sua consulta já está disponível!</>
                   ) : (
-                    <>O link para agendar será enviado na segunda-feira {format(sendLinkMonday, "dd/MM", { locale: ptBR })} às 07:00.</>
+                    <>O link para agendar será enviado na segunda-feira {format(sendLinkMonday, "dd/MM", { locale: ptBR })} às {sendTime}.</>
                   )}
                 </p>
               </div>
