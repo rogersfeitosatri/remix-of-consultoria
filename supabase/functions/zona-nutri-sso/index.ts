@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
     }
 
     // Generate magic link for Zona Nutri
-    const redirectUrl = 'https://zonanutri.lovable.app/auth/callback';
+    const redirectUrl = 'https://zonanutri.com/auth/callback';
     console.log(`Generating magic link with redirect to: ${redirectUrl}`);
     
     const { data: linkData, error: linkError } = await zonaNutriAdmin.auth.admin.generateLink({
