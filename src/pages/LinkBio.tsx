@@ -37,10 +37,18 @@ export default function LinkBio() {
         {items.length === 0 ? (
           <p className="text-center text-gray-400 py-8">Nenhum link disponível</p>
         ) : (
-          items.map((item) => (
+          items.map((item) => {
+            // Ensure link has protocol
+            const linkUrl = item.link_url 
+              ? (item.link_url.startsWith('http://') || item.link_url.startsWith('https://') 
+                  ? item.link_url 
+                  : `https://${item.link_url}`)
+              : '#';
+            
+            return (
             <a
               key={item.id}
-              href={item.link_url || '#'}
+              href={linkUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="block w-full"
@@ -66,7 +74,8 @@ export default function LinkBio() {
                 </div>
               </div>
             </a>
-          ))
+            );
+          })
         )}
 
         {/* Login Button */}
