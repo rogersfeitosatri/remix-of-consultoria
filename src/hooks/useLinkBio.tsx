@@ -37,26 +37,22 @@ export function usePublicLinkBioItems() {
   return useQuery({
     queryKey: ['public-link-bio-items'],
     queryFn: async () => {
-      // Get the first admin's link bio items
-      const { data: adminRole } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'admin')
-        .limit(1)
-        .single();
-      
-      if (!adminRole) return [];
-      
+      // Query all active link bio items ordered by order_index
+      // Using anon key - the RLS policy allows public read access to active items
       const { data, error } = await supabase
         .from('link_bio_items')
         .select('*')
-        .eq('user_id', adminRole.user_id)
         .eq('is_active', true)
         .order('order_index', { ascending: true });
       
-      if (error) throw error;
-      return data as LinkBioItem[];
+      if (error) {
+        console.error('Error fetching public link bio items:', error);
+        return [];
+      }
+      
+      return (data || []) as LinkBioItem[];
     },
+    staleTime: 0, // Always fetch fresh data
   });
 }
 
