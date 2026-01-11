@@ -55,7 +55,6 @@ export function ZonaNutriSection({ hasAccess }: ZonaNutriSectionProps) {
       if (data?.url) {
         const rawUrl: string = data.url;
 
-        // Debug: mostrar info do link (censurado)
         const hasHash = rawUrl.includes('#');
         const hasCode = rawUrl.includes('?code=') || rawUrl.includes('&code=');
         const hasToken = rawUrl.includes('access_token') || rawUrl.includes('token=');
@@ -67,27 +66,12 @@ export function ZonaNutriSection({ hasAccess }: ZonaNutriSectionProps) {
           redirectToUsed: data.debug?.redirectToUsed
         });
 
-        // Alguns apps protegem /app via cookie e redirecionam para /auth antes do JS ler querystring.
-        // Se vier /app?token=..., abrimos /auth?token=... para garantir que o token seja processado.
-        let finalUrl = rawUrl;
-        try {
-          const u = new URL(rawUrl);
-          const token = u.searchParams.get('token');
-          if (u.hostname === 'zonanutri.com' && u.pathname === '/app' && token) {
-            u.pathname = '/auth';
-            finalUrl = u.toString();
-          }
-        } catch {
-          // ignore
-        }
-
         toast.success('Abrindo Zona Nutri...');
 
-        // Abrir em nova aba para não tirar o atleta do painel da consultoria
-        const opened = window.open(finalUrl, '_blank', 'noopener,noreferrer');
+        // Mantém o atleta na área de membros e abre o Zona Nutri em nova aba.
+        const opened = window.open(rawUrl, '_blank', 'noopener,noreferrer');
         if (!opened) {
-          // fallback caso bloqueador de popup impeça
-          window.location.href = finalUrl;
+          toast.error('Seu navegador bloqueou o pop-up. Permita pop-ups e tente novamente.');
         }
       } else {
         console.error('[SSO DEBUG] URL não recebida:', data);
