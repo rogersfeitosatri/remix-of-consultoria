@@ -25,12 +25,10 @@ interface AthleteSidebarProps {
 }
 
 const menuItems = [
-  { id: 'dashboard', label: 'Início', icon: PersonStanding },
-  { id: 'dieta', label: 'Plano Alimentar', icon: Utensils },
-  { id: 'checkins', label: 'Check-ins', icon: ClipboardCheck },
-  { id: 'feedbacks', label: 'Feedbacks', icon: MessageSquare },
-  { id: 'materiais', label: 'Materiais', icon: FileText },
+  { id: 'inicio', label: 'Início', icon: PersonStanding },
+  { id: 'dieta', label: 'Dieta', icon: Utensils },
   { id: 'historico', label: 'Histórico', icon: History },
+  { id: 'materiais', label: 'Materiais', icon: FileText },
   { id: 'perfil', label: 'Perfil', icon: User },
 ];
 

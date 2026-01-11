@@ -4,25 +4,21 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserRole, useAthleteClient, useCheckinResponses, useCheckinQuestions } from '@/hooks/useUserRole';
 import { useAthleteSupportMaterials, useAthleteDietAppConfig } from '@/hooks/useSupportMaterials';
 import { useIsClientContinuation } from '@/hooks/useAthleteFirstConsult';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Home, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Utensils, FileText, Target, Calendar, HelpCircle } from 'lucide-react';
+import { Home, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Utensils, FileText, User } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { EvolutionCharts } from '@/components/athlete/EvolutionCharts';
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
 import { AthleteSidebar } from '@/components/athlete/AthleteSidebar';
-import { Challenge42SectionNew } from '@/components/athlete/Challenge42SectionNew';
-import { DailyControlSection } from '@/components/athlete/DailyControlSection';
 import { FirstConsultCard } from '@/components/athlete/FirstConsultCard';
 import { NextConsultCard } from '@/components/athlete/NextConsultCard';
 import { NextConsultBanner } from '@/components/athlete/NextConsultBanner';
 import { MaterialPost } from '@/components/athlete/MaterialPost';
-import { FormattedText } from '@/lib/formatText';
+import { AthleteProfileSection } from '@/components/athlete/AthleteProfileSection';
 import { LinkifiedText } from '@/lib/linkify';
 import rogersProfile from '@/assets/rogers-profile.jpg';
 
@@ -115,13 +111,12 @@ export default function AthleteDashboard() {
           <div className="mb-6"><h2 className="text-2xl font-bold text-white mb-1">Prévia da Área do Atleta</h2><p className="text-gray-400">Visualize como o atleta verá o conteúdo configurado</p></div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-6 bg-gray-900 border border-gray-800 p-1">
+            <TabsList className="grid w-full grid-cols-5 bg-gray-900 border border-gray-800 p-1">
               <TabsTrigger value="inicio" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Home className="h-4 w-4" /><span className="hidden lg:inline">Início</span></TabsTrigger>
               <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Utensils className="h-4 w-4" /><span className="hidden lg:inline">Dieta</span></TabsTrigger>
               <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><ClipboardCheck className="h-4 w-4" /><span className="hidden lg:inline">Histórico</span></TabsTrigger>
               <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><FileText className="h-4 w-4" /><span className="hidden lg:inline">Materiais</span></TabsTrigger>
-              <TabsTrigger value="desafio42" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Target className="h-4 w-4" /><span className="hidden lg:inline">Desafio 42</span></TabsTrigger>
-              <TabsTrigger value="controle" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Calendar className="h-4 w-4" /><span className="hidden lg:inline">Controle</span></TabsTrigger>
+              <TabsTrigger value="perfil" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><User className="h-4 w-4" /><span className="hidden lg:inline">Perfil</span></TabsTrigger>
             </TabsList>
 
             <TabsContent value="inicio">
@@ -132,7 +127,7 @@ export default function AthleteDashboard() {
                     <div className="space-y-4">{allInicioMaterials.map((m) => (
                       <div key={m.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
                         <h4 className="font-medium text-white mb-2">{m.title}</h4>
-                        {m.content_type === 'text' ? <div className="text-gray-300 text-sm whitespace-pre-wrap"><FormattedText text={m.content || ''} /></div> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}
+                        {m.content_type === 'text' ? <div className="text-gray-300 text-sm whitespace-pre-wrap"><LinkifiedText text={m.content || ''} /></div> : <div className="aspect-video rounded-lg overflow-hidden"><iframe src={getYouTubeEmbedUrl(m.youtube_url || '') || ''} className="w-full h-full" allowFullScreen /></div>}
                       </div>
                     ))}</div>
                   )}
@@ -141,7 +136,7 @@ export default function AthleteDashboard() {
             </TabsContent>
 
             <TabsContent value="dieta">
-              <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Acesso à Dieta</CardTitle></CardHeader><CardContent>{dietConfig?.app_download_instructions ? <div className="text-gray-300 whitespace-pre-wrap"><FormattedText text={dietConfig.app_download_instructions} /></div> : <p className="text-gray-400 text-center py-8">Configure as instruções de acesso à dieta na aba "Conteúdo" → "Acesso à Dieta".</p>}</CardContent></Card>
+              <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Acesso à Dieta</CardTitle></CardHeader><CardContent>{dietConfig?.app_download_instructions ? <div className="text-gray-300 whitespace-pre-wrap"><LinkifiedText text={dietConfig.app_download_instructions} /></div> : <p className="text-gray-400 text-center py-8">Configure as instruções de acesso à dieta na aba "Conteúdo" → "Acesso à Dieta".</p>}</CardContent></Card>
               {dietConfig?.app_code && <Card className="bg-gray-900 border-gray-800 border-[hsl(43,74%,49%)]/30 mt-4"><CardContent className="py-6 text-center"><p className="text-sm text-gray-400 mb-2">Código do App</p><p className="text-3xl font-bold text-[hsl(43,74%,49%)] font-mono">{dietConfig.app_code}</p></CardContent></Card>}
             </TabsContent>
 
@@ -175,12 +170,13 @@ export default function AthleteDashboard() {
               )}
             </TabsContent>
 
-            <TabsContent value="desafio42">
-              <Challenge42SectionNew clientId="" isPreview />
-            </TabsContent>
-
-            <TabsContent value="controle">
-              <DailyControlSection clientId={null} isPreview />
+            <TabsContent value="perfil">
+              <Card className="bg-gray-900 border-gray-800">
+                <CardHeader><CardTitle className="text-white">Perfil</CardTitle></CardHeader>
+                <CardContent>
+                  <p className="text-gray-400 text-center py-8">Prévia - Área de perfil do atleta</p>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </main>
@@ -286,13 +282,12 @@ export default function AthleteDashboard() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-gray-900 border border-gray-800 p-1">
+          <TabsList className="grid w-full grid-cols-5 bg-gray-900 border border-gray-800 p-1">
             <TabsTrigger value="inicio" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Home className="h-4 w-4" /><span className="hidden lg:inline">Início</span></TabsTrigger>
             <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Utensils className="h-4 w-4" /><span className="hidden lg:inline">Dieta</span></TabsTrigger>
             <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><ClipboardCheck className="h-4 w-4" /><span className="hidden lg:inline">Histórico</span></TabsTrigger>
             <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><FileText className="h-4 w-4" /><span className="hidden lg:inline">Materiais</span></TabsTrigger>
-            <TabsTrigger value="desafio42" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Target className="h-4 w-4" /><span className="hidden lg:inline">Desafio 42</span></TabsTrigger>
-            <TabsTrigger value="controle" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Calendar className="h-4 w-4" /><span className="hidden lg:inline">Controle</span></TabsTrigger>
+            <TabsTrigger value="perfil" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><User className="h-4 w-4" /><span className="hidden lg:inline">Perfil</span></TabsTrigger>
           </TabsList>
 
           <TabsContent value="inicio">
@@ -358,8 +353,9 @@ export default function AthleteDashboard() {
             )}
           </TabsContent>
 
-          <TabsContent value="desafio42"><Challenge42SectionNew clientId={client.id} isPreview={isAdmin} /></TabsContent>
-          <TabsContent value="controle"><DailyControlSection clientId={client.id} /></TabsContent>
+          <TabsContent value="perfil">
+            <AthleteProfileSection clientId={client.id} clientName={client.name} />
+          </TabsContent>
         </Tabs>
       </main>
     </div>

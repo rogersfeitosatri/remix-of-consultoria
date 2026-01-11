@@ -409,6 +409,7 @@ export type Database = {
           stress_cause: string | null
           stress_level: string | null
           target_deadline: string | null
+          target_race: string | null
           updated_at: string
           used_supplements_before: string | null
           uses_supplements: string | null
@@ -477,6 +478,7 @@ export type Database = {
           stress_cause?: string | null
           stress_level?: string | null
           target_deadline?: string | null
+          target_race?: string | null
           updated_at?: string
           used_supplements_before?: string | null
           uses_supplements?: string | null
@@ -545,6 +547,7 @@ export type Database = {
           stress_cause?: string | null
           stress_level?: string | null
           target_deadline?: string | null
+          target_race?: string | null
           updated_at?: string
           used_supplements_before?: string | null
           uses_supplements?: string | null
