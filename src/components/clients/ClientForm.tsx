@@ -120,12 +120,11 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     return 4; // default
   };
 
-  // Calculate future consultation windows based on last_consultation_at, interval, and plan_end_at
   // Calculate future consultation windows based on last_consultation_at
   // CRITICAL: Link is sent on the Monday AFTER the full interval period ends
-  // Example: If last consult was 10/01/2026 and interval is 4 weeks:
-  // - 4 weeks end on 07/02/2026 (Saturday)
-  // - The Monday AFTER that is 09/02/2026 - this is when we send the link
+  // Example: If last consult was 10/01/2026 and interval is monthly:
+  // - interval ends on 10/02/2026
+  // - The Monday AFTER that is when we send the link
   const calculatedWindows = useMemo((): CalculatedWindow[] => {
     if (formData.onboarding_type !== 'continuation' || !formData.last_consultation_at || !formData.end_date) {
       return [];
@@ -133,7 +132,6 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
 
     const lastConsultation = parseISO(formData.last_consultation_at);
     const planEndDate = parseISO(formData.end_date);
-    const intervalWeeks = getConsultationIntervalWeeks();
     const today = new Date();
 
     const windows: CalculatedWindow[] = [];
@@ -143,16 +141,18 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
 
     while (iteration <= maxIterations) {
       // Calculate when the interval period ENDS
-      const intervalEndDate = addWeeks(currentBaseDate, intervalWeeks);
-      
+      const intervalEndDate = formData.consultation_frequency === 'six_weeks'
+        ? addWeeks(currentBaseDate, 6)
+        : addMonths(currentBaseDate, 1);
+
       // The Monday AFTER the interval ends is when we send the link
       const sendLinkMonday = nextMonday(intervalEndDate);
-      
+
       // Stop if send link date is beyond plan end
       if (sendLinkMonday > planEndDate) {
         break;
       }
-      
+
       // Only include future dates
       if (sendLinkMonday >= today) {
         const windowStart = sendLinkMonday;
