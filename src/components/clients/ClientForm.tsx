@@ -121,6 +121,11 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
   };
 
   // Calculate future consultation windows based on last_consultation_at, interval, and plan_end_at
+  // Calculate future consultation windows based on last_consultation_at
+  // CRITICAL: Link is sent on the Monday AFTER the full interval period ends
+  // Example: If last consult was 10/01/2026 and interval is 4 weeks:
+  // - 4 weeks end on 07/02/2026 (Saturday)
+  // - The Monday AFTER that is 09/02/2026 - this is when we send the link
   const calculatedWindows = useMemo((): CalculatedWindow[] => {
     if (formData.onboarding_type !== 'continuation' || !formData.last_consultation_at || !formData.end_date) {
       return [];
@@ -131,35 +136,37 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     const intervalWeeks = getConsultationIntervalWeeks();
     const today = new Date();
 
-    // last_allowed_start = plan_end_at - interval_weeks
-    const lastAllowedStart = addWeeks(planEndDate, -intervalWeeks);
-
     const windows: CalculatedWindow[] = [];
-    let currentDue = addWeeks(lastConsultation, intervalWeeks);
+    let currentBaseDate = lastConsultation;
     let iteration = 1;
     const maxIterations = 20; // Safety limit
 
     while (iteration <= maxIterations) {
-      // window_start = Monday of the week containing due
-      const windowStart = startOfWeek(currentDue, { weekStartsOn: 1 });
+      // Calculate when the interval period ENDS
+      const intervalEndDate = addWeeks(currentBaseDate, intervalWeeks);
       
-      // Only include if window_start <= last_allowed_start AND window_start is in the future
-      if (windowStart > lastAllowedStart) {
+      // The Monday AFTER the interval ends is when we send the link
+      const sendLinkMonday = nextMonday(intervalEndDate);
+      
+      // Stop if send link date is beyond plan end
+      if (sendLinkMonday > planEndDate) {
         break;
       }
       
-      if (windowStart >= today) {
-        const windowEnd = endOfWeek(currentDue, { weekStartsOn: 1 });
-        const sendLinkAt = windowStart; // Monday 07:00
+      // Only include future dates
+      if (sendLinkMonday >= today) {
+        const windowStart = sendLinkMonday;
+        const windowEnd = endOfWeek(sendLinkMonday, { weekStartsOn: 1 });
 
         windows.push({
           windowStart,
           windowEnd,
-          sendLinkAt,
+          sendLinkAt: sendLinkMonday,
         });
       }
 
-      currentDue = addWeeks(currentDue, intervalWeeks);
+      // Next cycle starts from the interval end date
+      currentBaseDate = intervalEndDate;
       iteration++;
     }
 
