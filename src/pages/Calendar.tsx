@@ -14,7 +14,7 @@ import {
 } from '@/hooks/useClients';
 import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search } from 'lucide-react';
+import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -36,10 +36,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MondaySendView } from '@/components/scheduling/MondaySendView';
+import { ScheduledAppointmentsView } from '@/components/scheduling/ScheduledAppointmentsView';
 
 export default function CalendarPage() {
   const { data: allClients = [], isLoading: clientsLoading } = useClients();
   const { data: consultations = [], isLoading: consultationsLoading } = useConsultationSchedules();
+  const [activeTab, setActiveTab] = useState('calendar');
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -232,13 +236,60 @@ export default function CalendarPage() {
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6">
+        {/* Header with tabs */}
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                Calendário de Consultas
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Gerencie envios de link e consultas agendadas
+              </p>
+            </div>
+          </div>
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full max-w-md grid-cols-3">
+              <TabsTrigger value="calendar" className="gap-1">
+                <CalendarDays className="h-4 w-4" />
+                <span className="hidden sm:inline">Calendário</span>
+              </TabsTrigger>
+              <TabsTrigger value="monday-sends" className="gap-1">
+                <Send className="h-4 w-4" />
+                <span className="hidden sm:inline">Envios (Seg)</span>
+              </TabsTrigger>
+              <TabsTrigger value="scheduled" className="gap-1">
+                <CalendarCheck2 className="h-4 w-4" />
+                <span className="hidden sm:inline">Agendadas</span>
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* Tab: Monday Sends */}
+            <TabsContent value="monday-sends" className="mt-4">
+              <MondaySendView 
+                consultations={consultations}
+                clients={allClients}
+                onMarkAsSent={handleMarkAsSent}
+                onSendLink={handleSendBookingLink}
+              />
+            </TabsContent>
+            
+            {/* Tab: Scheduled Appointments */}
+            <TabsContent value="scheduled" className="mt-4">
+              <ScheduledAppointmentsView />
+            </TabsContent>
+            
+            {/* Tab: Calendar View */}
+            <TabsContent value="calendar" className="mt-4">
         <Card className="border-border bg-card">
           <CardHeader className="p-4 sm:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2 text-foreground text-base sm:text-lg">
                   <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                  Calendário de Consultas
+                  Visão Mensal
                 </CardTitle>
                 <CardDescription className="text-xs sm:text-sm">
                   Tarefas de envio de link e primeiras consultas
@@ -573,6 +624,9 @@ export default function CalendarPage() {
             </div>
           </CardContent>
         </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </Layout>
   );

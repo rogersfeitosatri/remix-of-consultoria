@@ -1,10 +1,9 @@
-import { Calendar, Clock, CalendarDays, ExternalLink } from 'lucide-react';
+import { Calendar, CalendarDays } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { format, parseISO, isSameMonth, startOfWeek, endOfWeek, isWithinInterval, addDays } from 'date-fns';
+import { format, parseISO, isSameMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface NextConsultCardProps {
@@ -89,11 +88,7 @@ export function NextConsultCard({ clientId }: NextConsultCardProps) {
 
   if (isLoading || !data?.showCard) return null;
 
-  const { schedules, bookingToken, hasScheduledAppointment, nextAppointment } = data;
-
-  // Get the next consultation window
-  const nextWindow = schedules[0];
-  if (!nextWindow) return null;
+  const { schedules } = data;
 
   const formatWeekRange = (dateStr: string) => {
     const date = parseISO(dateStr);
@@ -106,78 +101,12 @@ export function NextConsultCard({ clientId }: NextConsultCardProps) {
     return `${format(weekStart, 'd \'de\' MMM', { locale: ptBR })} a ${format(weekEnd, 'd \'de\' MMM', { locale: ptBR })}`;
   };
 
-  const isWithinCurrentWindow = (dateStr: string) => {
-    const date = parseISO(dateStr);
-    const weekStart = startOfWeek(date, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(date, { weekStartsOn: 1 });
-    const now = new Date();
-    return isWithinInterval(now, { start: weekStart, end: weekEnd });
-  };
-
-  const nextWindowIsActive = isWithinCurrentWindow(nextWindow.scheduled_date);
-  const linkSent = nextWindow.status === 'sent';
-  const canSchedule = linkSent || nextWindowIsActive;
+  // This component now only shows the list of remaining consultations
+  // The main "next consultation" info is shown by NextConsultBanner
+  if (!schedules || schedules.length <= 1) return null;
 
   return (
-    <div className="space-y-4 mb-6">
-      {/* Next Consultation Card */}
-      <Card className="relative overflow-hidden bg-gradient-to-br from-[hsl(43,74%,49%)] via-[hsl(43,74%,45%)] to-[hsl(43,74%,35%)] border-0 shadow-lg">
-        <CardContent className="relative py-6 px-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <Badge className="bg-black/20 text-white border-0 backdrop-blur-sm font-bold">
-                📅 PRÓXIMA CONSULTA
-              </Badge>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <div className="rounded-full bg-black/20 p-4 backdrop-blur-sm">
-                  <Calendar className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-black mb-1">
-                    Semana: {formatWeekRange(nextWindow.scheduled_date)}
-                  </h3>
-                  <p className="text-black/80 text-sm">
-                    {hasScheduledAppointment && nextAppointment ? (
-                      <>Sua consulta está agendada para {format(parseISO(nextAppointment.appointment_date), "dd 'de' MMMM", { locale: ptBR })}</>
-                    ) : canSchedule ? (
-                      <>O link para agendar sua consulta já está disponível!</>
-                    ) : (
-                      <>Aguarde o link de agendamento na segunda-feira da semana indicada</>
-                    )}
-                  </p>
-                </div>
-              </div>
-              
-              {!hasScheduledAppointment && (
-                <>
-                  {canSchedule && bookingToken ? (
-                    <Button
-                      asChild
-                      size="lg"
-                      className="bg-black hover:bg-gray-900 text-[hsl(43,74%,49%)] font-bold whitespace-nowrap shadow-xl hover:scale-105 transition-transform"
-                    >
-                      <a href={`/booking/${bookingToken}`}>
-                        <Calendar className="h-5 w-5 mr-2" />
-                        Agendar Consulta
-                        <ExternalLink className="h-4 w-4 ml-2" />
-                      </a>
-                    </Button>
-                  ) : (
-                    <div className="flex items-center gap-2 text-black/70 bg-black/10 px-4 py-2 rounded-lg">
-                      <Clock className="h-4 w-4" />
-                      <span className="text-sm font-medium">Aguardar link</span>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
+    <div className="mb-6">
       {/* Remaining Consultations List */}
       {schedules.length > 1 && (
         <Card className="bg-gray-900 border-gray-800">
