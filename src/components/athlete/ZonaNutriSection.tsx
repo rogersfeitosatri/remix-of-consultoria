@@ -53,9 +53,28 @@ export function ZonaNutriSection({ hasAccess }: ZonaNutriSectionProps) {
       }
 
       if (data?.url) {
-        window.open(data.url, '_blank');
-        toast.success('Abrindo Zona Nutri em nova aba...');
+        const actionLink = data.url;
+        
+        // Debug: mostrar info do link (censurado)
+        const hasHash = actionLink.includes('#');
+        const hasCode = actionLink.includes('?code=') || actionLink.includes('&code=');
+        const hasToken = actionLink.includes('access_token') || actionLink.includes('token=');
+        console.log('[SSO DEBUG] action_link recebido:', {
+          hasHash,
+          hasCode,
+          hasToken,
+          urlPreview: actionLink.substring(0, 80) + '...',
+          redirectToUsed: data.debug?.redirectToUsed
+        });
+        
+        // IMPORTANTE: usar window.location.href para garantir que os tokens sejam preservados
+        // window.open pode ter problemas com bloqueadores de popup e perder fragmentos de URL
+        toast.success('Redirecionando para Zona Nutri...');
+        
+        // Usar o link EXATAMENTE como retornado pelo Supabase
+        window.location.href = actionLink;
       } else {
+        console.error('[SSO DEBUG] URL não recebida:', data);
         toast.error('Não foi possível gerar o link de acesso.');
       }
     } catch (error) {
