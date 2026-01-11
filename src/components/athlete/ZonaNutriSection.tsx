@@ -53,26 +53,42 @@ export function ZonaNutriSection({ hasAccess }: ZonaNutriSectionProps) {
       }
 
       if (data?.url) {
-        const actionLink = data.url;
-        
+        const rawUrl: string = data.url;
+
         // Debug: mostrar info do link (censurado)
-        const hasHash = actionLink.includes('#');
-        const hasCode = actionLink.includes('?code=') || actionLink.includes('&code=');
-        const hasToken = actionLink.includes('access_token') || actionLink.includes('token=');
-        console.log('[SSO DEBUG] action_link recebido:', {
+        const hasHash = rawUrl.includes('#');
+        const hasCode = rawUrl.includes('?code=') || rawUrl.includes('&code=');
+        const hasToken = rawUrl.includes('access_token') || rawUrl.includes('token=');
+        console.log('[SSO DEBUG] url recebido:', {
           hasHash,
           hasCode,
           hasToken,
-          urlPreview: actionLink.substring(0, 80) + '...',
+          urlPreview: rawUrl.substring(0, 80) + '...',
           redirectToUsed: data.debug?.redirectToUsed
         });
-        
-        // IMPORTANTE: usar window.location.href para garantir que os tokens sejam preservados
-        // window.open pode ter problemas com bloqueadores de popup e perder fragmentos de URL
-        toast.success('Redirecionando para Zona Nutri...');
-        
-        // Usar o link EXATAMENTE como retornado pelo Supabase
-        window.location.href = actionLink;
+
+        // Alguns apps protegem /app via cookie e redirecionam para /auth antes do JS ler querystring.
+        // Se vier /app?token=..., abrimos /auth?token=... para garantir que o token seja processado.
+        let finalUrl = rawUrl;
+        try {
+          const u = new URL(rawUrl);
+          const token = u.searchParams.get('token');
+          if (u.hostname === 'zonanutri.com' && u.pathname === '/app' && token) {
+            u.pathname = '/auth';
+            finalUrl = u.toString();
+          }
+        } catch {
+          // ignore
+        }
+
+        toast.success('Abrindo Zona Nutri...');
+
+        // Abrir em nova aba para não tirar o atleta do painel da consultoria
+        const opened = window.open(finalUrl, '_blank', 'noopener,noreferrer');
+        if (!opened) {
+          // fallback caso bloqueador de popup impeça
+          window.location.href = finalUrl;
+        }
       } else {
         console.error('[SSO DEBUG] URL não recebida:', data);
         toast.error('Não foi possível gerar o link de acesso.');
