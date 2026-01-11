@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { ClientsList } from '@/components/clients/ClientsList';
 import { ClientForm } from '@/components/clients/ClientForm';
+import { ZonaNutriAccessDialog } from '@/components/clients/ZonaNutriAccessDialog';
 import { useClients, useAddClient, useUpdateClient, useDeleteClient, Client } from '@/hooks/useClients';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,9 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const [serviceFilter, setServiceFilter] = useState('all');
   const [planFilter, setPlanFilter] = useState('all');
+  const [zonaNutriAccessUrl, setZonaNutriAccessUrl] = useState('');
+  const [zonaNutriAthleteName, setZonaNutriAthleteName] = useState('');
+  const [showZonaNutriDialog, setShowZonaNutriDialog] = useState(false);
   const { toast } = useToast();
 
   const activeClients = useMemo(() => {
@@ -150,6 +154,35 @@ export default function Clients() {
             }
           } catch (err) {
             console.error('Erro ao processar conta do atleta:', err);
+          }
+        }
+        
+        // Se tem acesso ao Zona Nutri, gerar link de acesso
+        if (data.has_zona_nutri_access && data.email) {
+          try {
+            const { data: zonaNutriResult, error: zonaNutriError } = await supabase.functions.invoke('generate-zona-nutri-access', {
+              body: {
+                email: data.email,
+                name: data.name,
+                expires_in_days: 30,
+              },
+            });
+
+            if (zonaNutriError) {
+              console.error('Erro ao gerar link Zona Nutri:', zonaNutriError);
+              toast({
+                title: 'Aviso',
+                description: 'Atleta cadastrado, mas houve erro ao gerar link do Zona Nutri.',
+                variant: 'destructive',
+              });
+            } else if (zonaNutriResult?.access_url) {
+              // Mostrar dialog com o link
+              setZonaNutriAccessUrl(zonaNutriResult.access_url);
+              setZonaNutriAthleteName(data.name);
+              setShowZonaNutriDialog(true);
+            }
+          } catch (zonaNutriErr) {
+            console.error('Erro ao gerar link Zona Nutri:', zonaNutriErr);
           }
         }
         
@@ -320,6 +353,14 @@ export default function Clients() {
           onClose={handleCloseForm}
         />
       )}
+
+      {/* Zona Nutri Access Dialog */}
+      <ZonaNutriAccessDialog
+        open={showZonaNutriDialog}
+        onOpenChange={setShowZonaNutriDialog}
+        accessUrl={zonaNutriAccessUrl}
+        athleteName={zonaNutriAthleteName}
+      />
     </Layout>
   );
 }
