@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
 import { 
   Menu, 
   LogOut,
@@ -10,7 +11,8 @@ import {
   MessageSquare,
   FileText,
   History,
-  User
+  User,
+  HelpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +48,10 @@ export function AthleteSidebar({
     setIsOpen(false);
   };
 
+  const handleContactSupport = () => {
+    window.open('https://wa.me/5511999999999?text=Olá! Preciso de ajuda com a área do atleta.', '_blank');
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
@@ -63,11 +69,19 @@ export function AthleteSidebar({
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(43,74%,49%)]">
               <PersonStanding className="h-5 w-5 text-black" />
             </div>
-            <div className="text-left">
-              <SheetTitle className="text-lg font-bold text-[hsl(43,74%,49%)]">
-                RF Assessoria
-              </SheetTitle>
-              <p className="text-xs text-gray-400">Esportiva</p>
+            <div className="text-left flex items-center gap-2">
+              <div>
+                <SheetTitle className="text-lg font-bold text-[hsl(43,74%,49%)]">
+                  RF Assessoria
+                </SheetTitle>
+                <p className="text-xs text-gray-400">Esportiva</p>
+              </div>
+              <Badge 
+                variant="outline" 
+                className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50 text-[10px] font-bold px-1.5 py-0"
+              >
+                BETA
+              </Badge>
             </div>
           </div>
         </SheetHeader>
@@ -99,6 +113,17 @@ export function AthleteSidebar({
             );
           })}
         </nav>
+
+        {/* Beta Info & Support */}
+        <div className="absolute bottom-16 left-0 right-0 px-4 pb-2">
+          <button
+            onClick={handleContactSupport}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm hover:bg-yellow-500/20 transition-colors"
+          >
+            <HelpCircle className="h-4 w-4" />
+            <span className="text-xs">Versão Beta - Precisa de ajuda?</span>
+          </button>
+        </div>
 
         {/* Logout Button */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800">

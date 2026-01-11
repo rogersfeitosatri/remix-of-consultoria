@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Home, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Utensils, FileText, Target, Calendar } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Home, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Utensils, FileText, Target, Calendar, HelpCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -60,6 +61,7 @@ export default function AthleteDashboard() {
   const handleSignOut = async () => { await signOut(); navigate('/auth'); };
   const handleBackToAdmin = () => { navigate('/admin'); };
   const handleFillAnamnese = () => { navigate('/athlete/anamnese'); };
+  const handleContactSupport = () => { window.open('https://wa.me/5511999999999?text=Olá! Preciso de ajuda com a área do atleta.', '_blank'); };
 
   const isPendingAnamnese = client?.athlete_status === 'pending_anamnese';
 
@@ -92,9 +94,17 @@ export default function AthleteDashboard() {
               <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]">
                 <img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-[200%] object-cover object-[center_15%]" />
               </div>
-              <div>
-                <h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1>
-                <p className="text-xs text-gray-400">Nutrição e Treinamento</p>
+              <div className="flex items-center gap-2">
+                <div>
+                  <h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1>
+                  <p className="text-xs text-gray-400">Nutrição e Treinamento</p>
+                </div>
+                <Badge 
+                  variant="outline" 
+                  className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50 text-[10px] font-bold px-1.5 py-0"
+                >
+                  BETA
+                </Badge>
               </div>
             </div>
           </div>
@@ -176,7 +186,10 @@ export default function AthleteDashboard() {
           <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]"><img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-[200%] object-cover object-[center_15%]" /></div>
-              <div><h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1><p className="text-xs text-gray-400">Nutrição e Treinamento</p></div>
+              <div className="flex items-center gap-2">
+                <div><h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1><p className="text-xs text-gray-400">Nutrição e Treinamento</p></div>
+                <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50 text-[10px] font-bold px-1.5 py-0">BETA</Badge>
+              </div>
             </div>
             <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-white hover:bg-gray-800"><LogOut className="h-4 w-4" /></Button>
           </div>
@@ -200,7 +213,27 @@ export default function AthleteDashboard() {
           <div className="flex items-center gap-3">
             <AthleteSidebar activeTab={activeTab} onTabChange={setActiveTab} clientName={client.name} userEmail={user.email || ''} onSignOut={handleSignOut} />
             <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]"><img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-[200%] object-cover object-[center_15%]" /></div>
-            <div><h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1><p className="text-xs text-gray-400">Nutrição e Treinamento</p></div>
+            <div className="flex items-center gap-2">
+              <div>
+                <h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1>
+                <p className="text-xs text-gray-400">Nutrição e Treinamento</p>
+              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge 
+                      variant="outline" 
+                      className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50 text-[10px] font-bold px-1.5 py-0 cursor-help"
+                    >
+                      BETA
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[200px] text-center">
+                    <p className="text-xs">Versão beta do sistema. Se precisar de ajuda, entre em contato com o suporte!</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
           <div className="hidden sm:flex items-center gap-4">
             <div className="text-right"><p className="text-sm font-medium text-white">{client.name}</p><p className="text-xs text-gray-400">{user.email}</p></div>
