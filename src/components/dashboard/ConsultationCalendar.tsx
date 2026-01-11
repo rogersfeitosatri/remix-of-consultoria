@@ -9,9 +9,9 @@ import {
   useAddConsultationSchedule,
   useClients,
 } from '@/hooks/useClients';
-import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth } from 'date-fns';
+import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth, addWeeks, nextMonday, isWithinInterval, startOfISOWeek, endOfISOWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check } from 'lucide-react';
+import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -32,6 +32,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ConsultationCalendarProps {
   consultations: (ConsultationSchedule & { client_name: string })[];
@@ -45,6 +46,7 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
   const [newScheduleDate, setNewScheduleDate] = useState<Date | undefined>();
   const [editingSchedule, setEditingSchedule] = useState<(ConsultationSchedule & { client_name: string }) | null>(null);
   const [newSendLinkDate, setNewSendLinkDate] = useState<Date | undefined>();
+  const [selectedDayForList, setSelectedDayForList] = useState<Date | null>(null);
 
   const updateSchedule = useUpdateConsultationSchedule();
   const deleteSchedule = useDeleteConsultationSchedule();
@@ -120,6 +122,45 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
 
     return events;
   };
+
+  // Get athletes with scheduled link sends for a specific week (Monday-based)
+  const getAthletesForWeek = useMemo(() => {
+    if (!selectedDayForList) return [];
+    
+    const weekStart = startOfISOWeek(selectedDayForList);
+    const weekEnd = endOfISOWeek(selectedDayForList);
+    
+    const athletesInWeek: { client: Client; sendDate: Date; consultNumber: number; total: number }[] = [];
+    
+    // Get all clients with consultations
+    const clientsWithPlans = (allClients || []).filter(c => 
+      c.has_consultations && 
+      c.is_active && 
+      c.consultation_count && 
+      c.first_consultation_date
+    );
+    
+    clientsWithPlans.forEach(client => {
+      const firstConsultDate = parseISO(client.first_consultation_date!);
+      const weeksInterval = client.consultation_frequency === 'six_weeks' ? 6 : 4;
+      
+      for (let i = 1; i < (client.consultation_count || 0); i++) {
+        const sendDate = addWeeks(firstConsultDate, weeksInterval * i);
+        const mondayDate = getDay(sendDate) === 1 ? sendDate : nextMonday(sendDate);
+        
+        if (isWithinInterval(mondayDate, { start: weekStart, end: weekEnd })) {
+          athletesInWeek.push({
+            client,
+            sendDate: mondayDate,
+            consultNumber: i + 1,
+            total: client.consultation_count!
+          });
+        }
+      }
+    });
+    
+    return athletesInWeek.sort((a, b) => a.client.name.localeCompare(b.client.name));
+  }, [selectedDayForList, allClients]);
 
   const handleMarkAsSent = async (id: string) => {
     try {
@@ -321,12 +362,14 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
                 <div
                   key={day.toISOString()}
                   className={cn(
-                    "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative",
+                    "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative cursor-pointer hover:bg-muted/50 transition-colors",
                     !isCurrentMonth && "bg-muted/30",
                     isToday && "bg-primary/5",
                     index % 7 === 0 && "border-l-0",
-                    index < 7 && "border-t-0"
+                    index < 7 && "border-t-0",
+                    selectedDayForList && isSameDay(day, selectedDayForList) && "ring-2 ring-primary"
                   )}
+                  onClick={() => setSelectedDayForList(day)}
                 >
                   {/* Day number */}
                   <div className={cn(
@@ -459,6 +502,63 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
             })}
           </div>
         </div>
+
+        {/* Selected Day Athletes List Dialog */}
+        <Dialog open={!!selectedDayForList} onOpenChange={(open) => !open && setSelectedDayForList(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Send className="h-4 w-4 text-amber-500" />
+                Atletas da Semana
+              </DialogTitle>
+              <DialogDescription>
+                {selectedDayForList && (
+                  <>Semana de {format(startOfISOWeek(selectedDayForList), "dd/MM", { locale: ptBR })} a {format(endOfISOWeek(selectedDayForList), "dd/MM/yyyy", { locale: ptBR })}</>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[400px]">
+              {getAthletesForWeek.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Send className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Nenhum envio de link programado para esta semana</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {getAthletesForWeek.map((item, idx) => (
+                    <div
+                      key={`${item.client.id}-${idx}`}
+                      className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-amber-500/20 flex items-center justify-center">
+                          <User className="h-4 w-4 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{item.client.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Consulta {item.consultNumber}/{item.total}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-medium text-amber-600">
+                          {format(item.sendDate, "dd/MM")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Segunda</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSelectedDayForList(null)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

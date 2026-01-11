@@ -4,12 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, AlertCircle, FileText, User, TrendingUp, CalendarCheck, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, Clock, AlertCircle, FileText, User, TrendingUp, CalendarCheck, ClipboardCheck, Send } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { useScheduledCheckinsForClient, ScheduledCheckin } from '@/hooks/useScheduledCheckins';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import { format, parseISO, isBefore, isAfter, startOfDay } from 'date-fns';
+import { format, parseISO, isBefore, isAfter, startOfDay, addWeeks, getDay, nextMonday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
 import { PremiumClientDetails } from '@/components/admin/PremiumClientDetails';
@@ -183,6 +183,52 @@ export default function AthleteHistory() {
 
         {/* Anamnese Section */}
         <AnamneseResponseSection clientId={client.id} clientName={client.name} />
+
+        {/* Scheduled Consultation Link Sends */}
+        {client.has_consultations && client.consultation_count && client.first_consultation_date && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Send className="h-4 w-4 text-amber-500" />
+                Segundas-feiras de Envio de Link (Consultas)
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Datas para envio de link de agendamento - {client.consultation_count} consultas no plano ({client.consultation_frequency === 'six_weeks' ? 'a cada 6 semanas' : client.consultation_frequency === 'monthly' ? 'mensal' : client.consultation_frequency})
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {(() => {
+                  const links: { date: Date; consultNumber: number }[] = [];
+                  const firstConsultDate = parseISO(client.first_consultation_date!);
+                  const weeksInterval = client.consultation_frequency === 'six_weeks' ? 6 : 4;
+                  
+                  for (let i = 1; i < (client.consultation_count || 0); i++) {
+                    const sendDate = addWeeks(firstConsultDate, weeksInterval * i);
+                    // Adjust to next Monday if not already Monday
+                    const mondayDate = getDay(sendDate) === 1 ? sendDate : nextMonday(sendDate);
+                    links.push({ date: mondayDate, consultNumber: i + 1 });
+                  }
+                  
+                  return links.map((link, idx) => (
+                    <Badge 
+                      key={idx}
+                      variant="outline" 
+                      className="bg-amber-500/10 text-amber-600 border-amber-500/30"
+                    >
+                      {format(link.date, "dd/MM/yyyy")} - Consulta {link.consultNumber}/{client.consultation_count}
+                    </Badge>
+                  ));
+                })()}
+              </div>
+              {client.consultation_count === 1 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Este atleta possui apenas 1 consulta no plano (primeira consulta).
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Tabs */}
         <Tabs defaultValue="evolution" className="space-y-4">

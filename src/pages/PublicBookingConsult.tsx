@@ -429,9 +429,16 @@ export default function PublicBookingConsult() {
             </CardContent>
           </Card>
 
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 mb-6">
             Você receberá uma confirmação por WhatsApp com todos os detalhes.
           </p>
+
+          <Button
+            onClick={() => window.location.href = '/atleta'}
+            className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold"
+          >
+            Voltar à largada
+          </Button>
         </main>
       </div>
     );
