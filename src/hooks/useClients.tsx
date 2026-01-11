@@ -251,6 +251,10 @@ function generateConsultationSchedules(
 
 // Generate consultation schedules for CONTINUATION (migration) clients
 // Uses last_consultation_at to calculate future windows based on interval
+// CRITICAL: Link is sent on the Monday AFTER the full interval period ends
+// Example: If last consult was 10/01/2026 and interval is 4 weeks:
+// - 4 weeks end on 07/02/2026 (Saturday)
+// - The Monday AFTER that is 09/02/2026 - this is when we send the link
 function generateContinuationConsultationSchedules(
   userId: string,
   clientId: string,
@@ -266,11 +270,8 @@ function generateContinuationConsultationSchedules(
   // Get interval in weeks
   const intervalWeeks = consultationFrequency === 'six_weeks' ? 6 : 4;
   
-  // Calculate last allowed start date (plan_end_at - interval_weeks)
-  const lastAllowedStart = addWeeks(planEndDate, -intervalWeeks);
-  
   console.debug(
-    `[Automação Consultas - Continuação] client_id=${clientId} | remaining=${remainingConsultations} | intervalo=${intervalWeeks} semanas | término=${format(planEndDate, 'yyyy-MM-dd')} | última_janela_permitida=${format(lastAllowedStart, 'yyyy-MM-dd')} | last_consultation_at=${lastConsultationAt || 'não informado'}`
+    `[Automação Consultas - Continuação] client_id=${clientId} | remaining=${remainingConsultations} | intervalo=${intervalWeeks} semanas | término=${format(planEndDate, 'yyyy-MM-dd')} | last_consultation_at=${lastConsultationAt || 'não informado'}`
   );
   
   if (remainingConsultations <= 0) {
@@ -281,56 +282,71 @@ function generateContinuationConsultationSchedules(
   // If we have last_consultation_at, calculate windows based on it
   if (lastConsultationAt) {
     const lastConsultation = parseISO(lastConsultationAt);
-    let currentDue = addWeeks(lastConsultation, intervalWeeks);
+    let currentBaseDate = lastConsultation;
     let windowsCreated = 0;
 
     while (windowsCreated < remainingConsultations) {
-      const windowStart = startOfWeek(currentDue, { weekStartsOn: 1 });
+      // Calculate when the interval period ENDS (last day of the interval)
+      // For 4 weeks: lastConsult + 4 weeks = end of period
+      const intervalEndDate = addWeeks(currentBaseDate, intervalWeeks);
       
-      // Only include if window_start <= last_allowed_start AND in the future
-      if (windowStart > lastAllowedStart) {
-        console.debug(`[Automação Consultas - Continuação] Parando: janela ${format(windowStart, 'yyyy-MM-dd')} ultrapassa limite`);
+      // The Monday AFTER the interval ends is when we send the link
+      const sendLinkMonday = nextMonday(intervalEndDate);
+      
+      // The consultation window is the week of the sendLinkMonday
+      const windowStart = sendLinkMonday;
+      const windowEnd = endOfWeek(sendLinkMonday, { weekStartsOn: 1 });
+      
+      // Stop if send link date is beyond plan end
+      if (sendLinkMonday > planEndDate) {
+        console.debug(`[Automação Consultas - Continuação] Parando: data de envio ${format(sendLinkMonday, 'yyyy-MM-dd')} ultrapassa término do plano`);
         break;
       }
       
-      if (windowStart >= today) {
-        const windowEnd = endOfWeek(currentDue, { weekStartsOn: 1 });
-        
+      // Only include future dates
+      if (sendLinkMonday >= today) {
         console.debug(
-          `[Automação Consultas - Continuação] Consulta ${windowsCreated + 1}/${remainingConsultations}: window=${format(windowStart, 'yyyy-MM-dd')} a ${format(windowEnd, 'yyyy-MM-dd')}`
+          `[Automação Consultas - Continuação] Consulta ${windowsCreated + 1}/${remainingConsultations}: baseDate=${format(currentBaseDate, 'yyyy-MM-dd')} | intervalEnd=${format(intervalEndDate, 'yyyy-MM-dd')} | sendLink=${format(sendLinkMonday, 'yyyy-MM-dd')} | window=${format(windowStart, 'yyyy-MM-dd')} a ${format(windowEnd, 'yyyy-MM-dd')}`
         );
         
         schedules.push({
           client_id: clientId,
           user_id: userId,
+          // The scheduled_date is the Monday of the consultation window
           scheduled_date: format(windowStart, 'yyyy-MM-dd'),
-          send_link_date: format(windowStart, 'yyyy-MM-dd'),
+          // The send_link_date is the same Monday (when we send the booking link)
+          send_link_date: format(sendLinkMonday, 'yyyy-MM-dd'),
           status: 'pending',
         });
         
         windowsCreated++;
       }
       
-      currentDue = addWeeks(currentDue, intervalWeeks);
+      // Next cycle: the interval starts from the current intervalEndDate
+      currentBaseDate = intervalEndDate;
     }
   } else {
-    // Fallback: start from next Monday
-    let currentWindowStart = nextMonday(today);
+    // Fallback: no last_consultation_at - use today as reference
+    // Calculate first send date as Monday after intervalWeeks from today
+    let currentBaseDate = today;
     
     for (let i = 0; i < remainingConsultations; i++) {
-      if (currentWindowStart > lastAllowedStart) {
+      const intervalEndDate = addWeeks(currentBaseDate, intervalWeeks);
+      const sendLinkMonday = nextMonday(intervalEndDate);
+      
+      if (sendLinkMonday > planEndDate) {
         break;
       }
       
       schedules.push({
         client_id: clientId,
         user_id: userId,
-        scheduled_date: format(currentWindowStart, 'yyyy-MM-dd'),
-        send_link_date: format(currentWindowStart, 'yyyy-MM-dd'),
+        scheduled_date: format(sendLinkMonday, 'yyyy-MM-dd'),
+        send_link_date: format(sendLinkMonday, 'yyyy-MM-dd'),
         status: 'pending',
       });
       
-      currentWindowStart = addWeeks(currentWindowStart, intervalWeeks);
+      currentBaseDate = intervalEndDate;
     }
   }
   
