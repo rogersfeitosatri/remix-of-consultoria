@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_settings: {
+        Row: {
+          created_at: string | null
+          enable_continuation_mode: boolean | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          enable_continuation_mode?: boolean | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          enable_continuation_mode?: boolean | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_analyses: {
         Row: {
           alerts: string[] | null
@@ -1017,15 +1041,18 @@ export type Database = {
           has_zona_nutri_access: boolean | null
           id: string
           is_active: boolean
+          last_consultation_at: string | null
           monthly_value: number
           name: string
           notes: string | null
+          onboarding_type: string | null
           payment_date: string | null
           payment_type: string | null
           phone: string | null
           plan_duration: string | null
           plan_type: string
           registration_source: string | null
+          remaining_consultations: number | null
           service_type: string
           start_date: string
           updated_at: string
@@ -1048,15 +1075,18 @@ export type Database = {
           has_zona_nutri_access?: boolean | null
           id?: string
           is_active?: boolean
+          last_consultation_at?: string | null
           monthly_value: number
           name: string
           notes?: string | null
+          onboarding_type?: string | null
           payment_date?: string | null
           payment_type?: string | null
           phone?: string | null
           plan_duration?: string | null
           plan_type: string
           registration_source?: string | null
+          remaining_consultations?: number | null
           service_type: string
           start_date: string
           updated_at?: string
@@ -1079,15 +1109,18 @@ export type Database = {
           has_zona_nutri_access?: boolean | null
           id?: string
           is_active?: boolean
+          last_consultation_at?: string | null
           monthly_value?: number
           name?: string
           notes?: string | null
+          onboarding_type?: string | null
           payment_date?: string | null
           payment_type?: string | null
           phone?: string | null
           plan_duration?: string | null
           plan_type?: string
           registration_source?: string | null
+          remaining_consultations?: number | null
           service_type?: string
           start_date?: string
           updated_at?: string
