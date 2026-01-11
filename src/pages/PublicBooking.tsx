@@ -1,17 +1,17 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { Badge } from '@/components/ui/badge';
-import { PersonStanding, CalendarDays, Clock, CheckCircle2, Loader2 } from 'lucide-react';
+import { PersonStanding, CalendarDays, Clock, CheckCircle2, Loader2, AlertCircle, Info } from 'lucide-react';
 import { useSchedulingSettingsBySlug, useSchedulingBlocks, useAppointmentsByDate, useCreateAppointment } from '@/hooks/useScheduling';
 import { useTimeBlocksBySettingsSlug } from '@/hooks/useTimeBlocks';
 import { supabase } from '@/integrations/supabase/client';
-import { format, parseISO, addMinutes, isBefore, isAfter, isSameDay, getDay } from 'date-fns';
+import { format, addMinutes, isBefore, isSameDay, getDay, addDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export default function PublicBooking() {
   const { slug } = useParams<{ slug: string }>();
@@ -55,51 +55,51 @@ export default function PublicBooking() {
     selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''
   );
 
-  // Generate available time slots
+  // Buffer minutes from settings
+  const bufferMinutes = (settings as any)?.buffer_minutes || 0;
+
+  // Get days that have time blocks configured (source of truth)
+  const configuredDays = useMemo(() => {
+    if (!timeBlocks || timeBlocks.length === 0) {
+      // Fallback to working_days from settings only if no time blocks exist
+      return settings?.working_days || [];
+    }
+    // Extract unique days from time blocks - THIS is the source of truth
+    return [...new Set(timeBlocks.map(tb => tb.day_of_week))];
+  }, [timeBlocks, settings?.working_days]);
+
+  // Check if any availability is configured
+  const hasConfiguredAvailability = timeBlocks && timeBlocks.length > 0;
+
+  // Generate available time slots - ONLY from time blocks (source of truth)
   const availableSlots = useMemo(() => {
     if (!settings || !selectedDate) return [];
 
     const slots: string[] = [];
     const dayOfWeek = getDay(selectedDate);
-    
-    // Check if this day is a working day
-    if (!settings.working_days.includes(dayOfWeek)) {
-      return [];
-    }
-
-    // Check for full day blocks
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    
+    // Check for full day blocks first
     const fullDayBlock = blocks.find(
       b => b.block_date === dateStr && b.block_type === 'full_day'
     );
     if (fullDayBlock) return [];
 
-    // Check if there are specific time blocks for this day
+    // Get time blocks for this day - ONLY USE TIME BLOCKS, no fallback to working_hours
     const dayTimeBlocks = timeBlocks.filter(tb => tb.day_of_week === dayOfWeek);
     
-    // Define working periods - use time blocks if available, otherwise use general settings
-    const workingPeriods: { start: string; end: string }[] = [];
-    
-    if (dayTimeBlocks.length > 0) {
-      // Use specific time blocks for this day
-      dayTimeBlocks.forEach(tb => {
-        workingPeriods.push({
-          start: tb.start_time.substring(0, 5),
-          end: tb.end_time.substring(0, 5),
-        });
-      });
-    } else {
-      // Use general working hours
-      workingPeriods.push({
-        start: settings.working_hours_start.substring(0, 5),
-        end: settings.working_hours_end.substring(0, 5),
-      });
+    // If no time blocks for this day, no slots available
+    if (dayTimeBlocks.length === 0) {
+      return [];
     }
 
-    // Generate slots for each working period
-    workingPeriods.forEach(period => {
-      const [startHour, startMin] = period.start.split(':').map(Number);
-      const [endHour, endMin] = period.end.split(':').map(Number);
+    // Calculate slot step with buffer
+    const slotStep = settings.slot_duration_minutes + bufferMinutes;
+
+    // Generate slots ONLY from configured time blocks
+    dayTimeBlocks.forEach(tb => {
+      const [startHour, startMin] = tb.start_time.substring(0, 5).split(':').map(Number);
+      const [endHour, endMin] = tb.end_time.substring(0, 5).split(':').map(Number);
       
       let currentTime = new Date(selectedDate);
       currentTime.setHours(startHour, startMin, 0, 0);
@@ -109,7 +109,6 @@ export default function PublicBooking() {
 
       while (isBefore(currentTime, endTime)) {
         const timeStr = format(currentTime, 'HH:mm');
-        const slotEnd = addMinutes(currentTime, settings.slot_duration_minutes);
         
         // Check if slot is blocked by time range
         const isBlocked = blocks.some(b => {
@@ -132,13 +131,14 @@ export default function PublicBooking() {
           slots.push(timeStr);
         }
 
-        currentTime = addMinutes(currentTime, settings.slot_duration_minutes);
+        // Use slot step (duration + buffer) for next slot
+        currentTime = addMinutes(currentTime, slotStep);
       }
     });
 
     // Sort and remove duplicates
     return [...new Set(slots)].sort();
-  }, [settings, selectedDate, blocks, existingAppointments, timeBlocks]);
+  }, [settings, selectedDate, blocks, existingAppointments, timeBlocks, bufferMinutes]);
   
 
   const handleConfirmBooking = async () => {
@@ -220,7 +220,9 @@ export default function PublicBooking() {
     if (!settings) return true;
     
     const dayOfWeek = getDay(date);
-    if (!settings.working_days.includes(dayOfWeek)) return true;
+    
+    // ONLY allow days that have time blocks configured - source of truth
+    if (!configuredDays.includes(dayOfWeek)) return true;
     
     const dateStr = format(date, 'yyyy-MM-dd');
     const hasFullDayBlock = blocks.some(
@@ -232,6 +234,35 @@ export default function PublicBooking() {
     
     return false;
   };
+
+  // Debug info for admin (only shown if debug param present)
+  const [searchParamsDebug] = useSearchParams();
+  const showDebug = searchParamsDebug.get('debug') === 'true';
+  
+  const debugInfo = useMemo(() => {
+    if (!showDebug || !settings) return null;
+    
+    const daysLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const configuredDaysLabels = configuredDays.map(d => daysLabels[d]).join(', ');
+    
+    const timeBlocksByDay: Record<number, string[]> = {};
+    timeBlocks.forEach(tb => {
+      if (!timeBlocksByDay[tb.day_of_week]) {
+        timeBlocksByDay[tb.day_of_week] = [];
+      }
+      timeBlocksByDay[tb.day_of_week].push(`${tb.start_time.substring(0, 5)}-${tb.end_time.substring(0, 5)}`);
+    });
+    
+    return {
+      configuredDays: configuredDaysLabels,
+      timeBlocksByDay,
+      slotDuration: settings.slot_duration_minutes,
+      buffer: bufferMinutes,
+      timezone: 'America/Sao_Paulo',
+      hasTimeBlocks: timeBlocks.length > 0,
+      blocksCount: blocks.length,
+    };
+  }, [showDebug, settings, configuredDays, timeBlocks, bufferMinutes, blocks]);
 
   if (settingsLoading) {
     return (
@@ -248,6 +279,19 @@ export default function PublicBooking() {
         <h1 className="text-2xl font-bold mb-2">Link não encontrado</h1>
         <p className="text-muted-foreground text-center">
           Este link de agendamento não existe ou foi desativado.
+        </p>
+      </div>
+    );
+  }
+
+  // No availability configured
+  if (!hasConfiguredAvailability) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <AlertCircle className="h-16 w-16 text-amber-500 mb-4" />
+        <h1 className="text-2xl font-bold mb-2">Agendamento indisponível</h1>
+        <p className="text-muted-foreground text-center max-w-md">
+          Os horários de atendimento ainda não foram configurados. Por favor, entre em contato para agendar sua consulta.
         </p>
       </div>
     );
@@ -316,6 +360,40 @@ export default function PublicBooking() {
             </CardDescription>
           </CardHeader>
         </Card>
+
+        {/* Debug Panel for Admin */}
+        {showDebug && debugInfo && (
+          <Collapsible className="mb-6">
+            <Card className="border-amber-500/50 bg-amber-500/5">
+              <CollapsibleTrigger className="w-full">
+                <CardHeader className="py-3">
+                  <CardTitle className="text-sm flex items-center gap-2 text-amber-600">
+                    <Info className="h-4 w-4" />
+                    Debug: Configuração carregada (clique para expandir)
+                  </CardTitle>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0">
+                  <div className="text-xs space-y-2 font-mono">
+                    <p><strong>Dias habilitados:</strong> {debugInfo.configuredDays || 'Nenhum'}</p>
+                    <p><strong>Duração slot:</strong> {debugInfo.slotDuration} min</p>
+                    <p><strong>Buffer:</strong> {debugInfo.buffer} min</p>
+                    <p><strong>Timezone:</strong> {debugInfo.timezone}</p>
+                    <p><strong>Time blocks configurados:</strong> {debugInfo.hasTimeBlocks ? 'Sim' : 'Não'}</p>
+                    <p><strong>Bloqueios ativos:</strong> {debugInfo.blocksCount}</p>
+                    <div className="mt-2">
+                      <strong>Janelas por dia:</strong>
+                      <pre className="mt-1 p-2 bg-muted rounded text-xs overflow-auto">
+                        {JSON.stringify(debugInfo.timeBlocksByDay, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        )}
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Date Selection */}
