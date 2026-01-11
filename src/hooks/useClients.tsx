@@ -433,6 +433,19 @@ export function useAddClient() {
 
           if (schedulesError) throw schedulesError;
         }
+        
+        // Create booking_link for clients with consultations
+        const { error: bookingLinkError } = await supabase
+          .from('booking_links')
+          .insert({
+            client_id: client.id,
+            token: crypto.randomUUID(),
+            active: true,
+          });
+        
+        if (bookingLinkError) {
+          console.error('Error creating booking link:', bookingLinkError);
+        }
       }
 
       // Generate scheduled checkins if has_checkin is enabled

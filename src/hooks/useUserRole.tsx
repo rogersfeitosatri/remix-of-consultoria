@@ -132,3 +132,23 @@ export function useCheckinQuestions(formId: string | undefined) {
     enabled: !!formId,
   });
 }
+
+// Hook to get athlete profile for a specific client
+export function useAthleteProfile(clientId: string | undefined) {
+  return useQuery({
+    queryKey: ['athlete_profile', clientId],
+    queryFn: async () => {
+      if (!clientId) return null;
+
+      const { data, error } = await supabase
+        .from('athlete_profiles')
+        .select('*')
+        .eq('client_id', clientId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!clientId,
+  });
+}
