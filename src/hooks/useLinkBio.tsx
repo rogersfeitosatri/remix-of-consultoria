@@ -76,6 +76,7 @@ export function useCreateLinkBioItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['link-bio-items'] });
+      queryClient.invalidateQueries({ queryKey: ['public-link-bio-items'] });
     },
   });
 }
@@ -97,6 +98,7 @@ export function useUpdateLinkBioItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['link-bio-items'] });
+      queryClient.invalidateQueries({ queryKey: ['public-link-bio-items'] });
     },
   });
 }
@@ -115,6 +117,36 @@ export function useDeleteLinkBioItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['link-bio-items'] });
+      queryClient.invalidateQueries({ queryKey: ['public-link-bio-items'] });
+    },
+  });
+}
+
+export function useReorderLinkBioItems() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (items: { id: string; order_index: number }[]) => {
+      // Update all items in parallel
+      const updates = items.map(item => 
+        supabase
+          .from('link_bio_items')
+          .update({ order_index: item.order_index })
+          .eq('id', item.id)
+      );
+      
+      const results = await Promise.all(updates);
+      const errors = results.filter(r => r.error);
+      
+      if (errors.length > 0) {
+        throw new Error('Failed to update some items');
+      }
+      
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['link-bio-items'] });
+      queryClient.invalidateQueries({ queryKey: ['public-link-bio-items'] });
     },
   });
 }
