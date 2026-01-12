@@ -1,7 +1,7 @@
 import { Client } from '@/hooks/useClients';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign, Brain, History, Zap, MessageCircle, CalendarCheck } from 'lucide-react';
+import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign, Brain, History, Zap, MessageCircle, CalendarCheck, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -43,6 +43,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   const { data: schedulingSettings } = useSchedulingSettings();
   const [sendingCheckin, setSendingCheckin] = useState<string | null>(null);
   const [sendingBooking, setSendingBooking] = useState<string | null>(null);
+  const [sendingCredentials, setSendingCredentials] = useState<string | null>(null);
 
   const handleSendCheckinManually = async (client: Client) => {
     if (!client.phone) {
@@ -115,6 +116,67 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
       toast.error('Erro ao enviar link: ' + (error.message || 'Verifique as configurações'));
     } finally {
       setSendingBooking(null);
+    }
+  };
+
+  const handleSendCredentialsManually = async (client: Client) => {
+    if (!client.phone) {
+      toast.error('Cliente não possui telefone cadastrado');
+      return;
+    }
+
+    if (!client.email) {
+      toast.error('Cliente não possui email cadastrado');
+      return;
+    }
+
+    if (!client.athlete_user_id) {
+      toast.error('Cliente não possui conta de acesso criada. Edite o cadastro e crie uma conta.');
+      return;
+    }
+
+    setSendingCredentials(client.id);
+    try {
+      // Generate a random temporary password
+      const tempPassword = Math.random().toString(36).slice(-8) + 'A1!';
+      
+      // Update the user's password using edge function
+      const { error: updateError } = await supabase.functions.invoke('create-athlete-auth', {
+        body: { 
+          email: client.email, 
+          password: tempPassword, 
+          clientId: client.id,
+          updatePasswordOnly: true 
+        },
+      });
+
+      if (updateError) throw updateError;
+
+      // Send credentials via WhatsApp
+      const message = `Olá ${client.name.split(' ')[0]}! 🏃‍♂️
+
+Aqui estão suas credenciais de acesso à área de membros:
+
+📧 E-mail: ${client.email}
+🔑 Senha: ${tempPassword}
+
+🔗 Acesse em: ${window.location.origin}/auth
+
+⚠️ Recomendo que altere sua senha no primeiro acesso.
+
+Qualquer dúvida, estou à disposição! 💪`;
+
+      const { error } = await supabase.functions.invoke('send-whatsapp', {
+        body: { clientId: client.id, message },
+      });
+
+      if (error) throw error;
+      toast.success('Credenciais enviadas via WhatsApp!');
+    } catch (error: any) {
+      console.error('Error sending credentials:', error);
+      toast.error('Erro ao enviar credenciais: ' + (error.message || 'Verifique as configurações'));
+    } finally {
+      setSendingCredentials(null);
     }
   };
 
@@ -251,6 +313,19 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
                         <CalendarCheck className="h-3 w-3" />
                         {sendingBooking === client.id ? '...' : 'Consulta'}
                       </Button>
+                      {client.athlete_user_id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSendCredentialsManually(client)}
+                          disabled={sendingCredentials === client.id}
+                          className="gap-1 text-xs text-primary hover:text-primary"
+                          title="Enviar Credenciais de Acesso via WhatsApp"
+                        >
+                          <Key className="h-3 w-3" />
+                          {sendingCredentials === client.id ? '...' : 'Senha'}
+                        </Button>
+                      )}
                     </>
                   )}
                   <Button
