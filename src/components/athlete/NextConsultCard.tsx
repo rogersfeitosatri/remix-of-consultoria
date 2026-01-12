@@ -24,10 +24,10 @@ export function NextConsultCard({ clientId }: NextConsultCardProps) {
     queryFn: async () => {
       if (!clientId) return null;
 
-      // Get client info including onboarding_type
+      // Get client info including onboarding_type and last_consultation_index
       const { data: client, error: clientError } = await supabase
         .from('clients')
-        .select('id, has_agenda_access, has_consultations, plan_type, user_id, onboarding_type')
+        .select('id, has_agenda_access, has_consultations, plan_type, user_id, onboarding_type, last_consultation_index')
         .eq('id', clientId)
         .single();
 
@@ -77,6 +77,7 @@ export function NextConsultCard({ clientId }: NextConsultCardProps) {
       return {
         showCard: futureSchedules.length > 0,
         onboardingType: client?.onboarding_type,
+        lastConsultationIndex: client?.last_consultation_index || 0,
         schedules: futureSchedules,
         bookingToken: bookingLink?.token,
         hasScheduledAppointment: (appointments || []).length > 0,
@@ -88,7 +89,13 @@ export function NextConsultCard({ clientId }: NextConsultCardProps) {
 
   if (isLoading || !data?.showCard) return null;
 
-  const { schedules } = data;
+  const { schedules, lastConsultationIndex } = data;
+  
+  // For continuation clients, the consultation number starts from lastConsultationIndex + 1
+  // For new clients (lastConsultationIndex = 0), it starts from 1
+  const getConsultationNumber = (index: number) => {
+    return (lastConsultationIndex || 0) + index + 1;
+  };
 
   const formatWeekRange = (dateStr: string) => {
     const date = parseISO(dateStr);
@@ -142,7 +149,7 @@ export function NextConsultCard({ clientId }: NextConsultCardProps) {
                         {formatWeekRange(schedule.scheduled_date)}
                       </p>
                       <p className="text-xs text-gray-400">
-                        Consulta {index + 1}
+                        Consulta {getConsultationNumber(index)}
                       </p>
                     </div>
                   </div>
