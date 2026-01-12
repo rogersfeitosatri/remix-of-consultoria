@@ -205,6 +205,9 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
   // Example: If last consult was 10/01/2026 and interval is monthly:
   // - interval ends on 10/02/2026
   // - The Monday AFTER that is when we send the link
+  // RULES:
+  // 1. Number of windows must match remaining_consultations exactly
+  // 2. Last consultation must be at least 3 weeks before plan end
   const calculatedWindows = useMemo((): CalculatedWindow[] => {
     if (formData.onboarding_type !== 'continuation' || !formData.last_consultation_at || !formData.end_date) {
       return [];
@@ -213,13 +216,19 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     const lastConsultation = parseISO(formData.last_consultation_at);
     const planEndDate = parseISO(formData.end_date);
     const today = new Date();
+    
+    // Calculate the cutoff date: last consultation must be at least 3 weeks before plan end
+    const cutoffDate = addWeeks(planEndDate, -3);
+
+    // Max consultations to generate = remaining_consultations
+    const maxConsultations = formData.remaining_consultations || (getTotalConsultationsForPlan - (formData.last_consultation_index || 1));
 
     const windows: CalculatedWindow[] = [];
     let currentBaseDate = lastConsultation;
     let iteration = 1;
-    const maxIterations = 20; // Safety limit
+    const maxIterations = Math.max(maxConsultations, 24); // Safety limit based on remaining
 
-    while (iteration <= maxIterations) {
+    while (iteration <= maxIterations && windows.length < maxConsultations) {
       // Calculate when the interval period ENDS
       const intervalEndDate = formData.consultation_frequency === 'six_weeks'
         ? addWeeks(currentBaseDate, 6)
@@ -228,8 +237,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       // The Monday AFTER the interval ends is when we send the link
       const sendLinkMonday = nextMonday(intervalEndDate);
 
-      // Stop if send link date is beyond plan end
-      if (sendLinkMonday > planEndDate) {
+      // Stop if send link date is beyond cutoff (3 weeks before plan end)
+      if (sendLinkMonday > cutoffDate) {
         break;
       }
 
@@ -251,7 +260,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     }
 
     return windows;
-  }, [formData.last_consultation_at, formData.end_date, formData.consultation_frequency, formData.onboarding_type]);
+  }, [formData.last_consultation_at, formData.end_date, formData.consultation_frequency, formData.onboarding_type, formData.remaining_consultations, getTotalConsultationsForPlan, formData.last_consultation_index]);
 
   // Auto-update remaining_consultations based on last_consultation_index (only if not manual override)
   useEffect(() => {
@@ -669,9 +678,17 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                               </div>
 
                               <div className="space-y-2">
-                                <p className="text-sm text-muted-foreground font-medium">Próximas janelas previstas:</p>
+                                <p className="text-sm text-muted-foreground font-medium">
+                                  Próximas janelas previstas ({calculatedWindows.length} de {formData.remaining_consultations || 0}):
+                                </p>
+                                {calculatedWindows.length < (formData.remaining_consultations || 0) && (
+                                  <p className="text-xs text-amber-500 flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" />
+                                    Atenção: apenas {calculatedWindows.length} consulta(s) cabem no período restante (limite de 3 semanas antes do fim do plano)
+                                  </p>
+                                )}
                                 <div className="max-h-40 overflow-y-auto space-y-1">
-                                  {calculatedWindows.slice(0, manualOverride && formData.remaining_consultations ? formData.remaining_consultations : undefined).map((window, index) => {
+                                  {calculatedWindows.map((window, index) => {
                                     const consultationNumber = (formData.last_consultation_index || 1) + index + 1;
                                     return (
                                       <div 
@@ -692,12 +709,6 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                                   })}
                                 </div>
                               </div>
-
-                              {manualOverride && formData.remaining_consultations && formData.remaining_consultations < calculatedWindows.length && (
-                                <p className="text-xs text-amber-500">
-                                  ⚠️ Você definiu {formData.remaining_consultations} consultas manualmente (calculado: {calculatedWindows.length})
-                                </p>
-                              )}
                             </div>
                           )}
                         </div>

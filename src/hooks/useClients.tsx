@@ -293,6 +293,9 @@ function generateContinuationConsultationSchedules(
     return schedules;
   }
 
+  // Calculate the cutoff date: last consultation must be at least 3 weeks before plan end
+  const cutoffDate = addWeeks(planEndDate, -3);
+
   // If we have last_consultation_at, calculate windows based on it
   if (lastConsultationAt) {
     const lastConsultation = parseISO(lastConsultationAt);
@@ -312,9 +315,9 @@ function generateContinuationConsultationSchedules(
       const windowStart = sendLinkMonday;
       const windowEnd = endOfWeek(sendLinkMonday, { weekStartsOn: 1 });
 
-      // Stop if send link date is beyond plan end
-      if (sendLinkMonday > planEndDate) {
-        console.debug(`[Automação Consultas - Continuação] Parando: data de envio ${format(sendLinkMonday, 'yyyy-MM-dd')} ultrapassa término do plano`);
+      // Stop if send link date is beyond cutoff (3 weeks before plan end)
+      if (sendLinkMonday > cutoffDate) {
+        console.debug(`[Automação Consultas - Continuação] Parando: data de envio ${format(sendLinkMonday, 'yyyy-MM-dd')} está a menos de 3 semanas do fim do plano (cutoff: ${format(cutoffDate, 'yyyy-MM-dd')})`);
         break;
       }
 
@@ -352,7 +355,9 @@ function generateContinuationConsultationSchedules(
         : addMonths(currentBaseDate, 1);
       const sendLinkMonday = nextMonday(intervalEndDate);
 
-      if (sendLinkMonday > planEndDate) {
+      // Stop if send link date is beyond cutoff (3 weeks before plan end)
+      if (sendLinkMonday > cutoffDate) {
+        console.debug(`[Automação Consultas - Continuação Fallback] Parando: data de envio ${format(sendLinkMonday, 'yyyy-MM-dd')} está a menos de 3 semanas do fim do plano`);
         break;
       }
 
