@@ -181,12 +181,14 @@ export default function PublicBooking() {
       });
 
       // Update consultation schedule status and time
+      // Ensure time is in correct format (HH:mm:ss) for PostgreSQL time type
+      const timeValue = selectedTime.includes(':') ? `${selectedTime}:00` : null;
       await supabase
         .from('consultation_schedules')
         .update({
           status: 'completed',
           scheduled_date: format(selectedDate, 'yyyy-MM-dd'),
-          scheduled_time: selectedTime + ':00',
+          scheduled_time: timeValue,
         })
         .eq('id', consultationSchedule.id);
 
