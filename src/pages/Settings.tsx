@@ -443,6 +443,7 @@ export default function Settings() {
         onboarding_type: 'new' as const,
         remaining_consultations: null,
         last_consultation_at: null,
+        athlete_user_id: null,
       },
       errors: [],
     };

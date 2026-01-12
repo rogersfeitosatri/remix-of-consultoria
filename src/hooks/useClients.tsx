@@ -35,6 +35,7 @@ export interface Client {
   onboarding_type: 'new' | 'continuation' | null;
   remaining_consultations: number | null;
   last_consultation_at: string | null;
+  athlete_user_id: string | null;
 }
 
 export interface Payment {

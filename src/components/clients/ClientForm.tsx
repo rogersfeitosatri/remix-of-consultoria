@@ -430,8 +430,9 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                       <Select
                         value={formData.onboarding_type}
                         onValueChange={(v) => setFormData({ ...formData, onboarding_type: v as 'new' | 'continuation' })}
+                        disabled={!!client}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className={client ? 'opacity-60 cursor-not-allowed' : ''}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -440,6 +441,9 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                           ))}
                         </SelectContent>
                       </Select>
+                      {client && (
+                        <p className="text-xs text-muted-foreground">O tipo de entrada não pode ser alterado após o cadastro.</p>
+                      )}
                     </div>
                   </div>
                   

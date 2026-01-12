@@ -19,7 +19,7 @@ import AthleteDashboard from "./pages/AthleteDashboard";
 import AthleteDynamicAnamneseForm from "./pages/AthleteDynamicAnamneseForm";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import LandingPage from "./pages/LandingPage";
+
 import Forms from "./pages/Forms";
 import AthleteAnalysis from "./pages/AthleteAnalysis";
 import AthleteHistory from "./pages/AthleteHistory";
@@ -88,8 +88,7 @@ function AthleteRoute({ children, allowAdmin = false }: { children: React.ReactN
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/bio" element={<LinkBio />} />
+      <Route path="/" element={<LinkBio />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
       <Route path="/anamnese-form/:formId" element={<PublicAnamneseForm />} />

@@ -7,8 +7,10 @@ const corsHeaders = {
 
 interface CreateAthleteRequest {
   email: string;
-  name: string;
+  name?: string;
   clientId: string;
+  password?: string;
+  updatePasswordOnly?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -27,12 +29,43 @@ Deno.serve(async (req) => {
       },
     });
 
-    const { email, name, clientId }: CreateAthleteRequest = await req.json();
+    const { email, name, clientId, password, updatePasswordOnly }: CreateAthleteRequest = await req.json();
 
     if (!email) {
       return new Response(
         JSON.stringify({ error: "Email é obrigatório" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // If this is a password update request only
+    if (updatePasswordOnly && password) {
+      const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+      
+      if (listError) throw listError;
+
+      const existingUser = existingUsers.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+
+      if (!existingUser) {
+        return new Response(
+          JSON.stringify({ error: "Usuário não encontrado" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        existingUser.id,
+        { password }
+      );
+
+      if (updateError) throw updateError;
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Senha atualizada com sucesso"
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
