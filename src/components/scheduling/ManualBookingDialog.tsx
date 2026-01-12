@@ -198,6 +198,9 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
+      // Ensure time is in correct format (HH:mm:ss)
+      const timeValue = selectedTime.includes(':') ? `${selectedTime}:00` : '00:00:00';
+      
       // Create appointment
       const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
@@ -205,7 +208,7 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
           user_id: user.id,
           client_id: selectedClientId,
           appointment_date: dateStr,
-          appointment_time: selectedTime + ':00',
+          appointment_time: timeValue,
           duration_minutes: settings?.slot_duration_minutes || 60,
           status: 'confirmed',
           timezone: 'America/Fortaleza',
