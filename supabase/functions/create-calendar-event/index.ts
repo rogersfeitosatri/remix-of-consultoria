@@ -92,21 +92,38 @@ Deno.serve(async (req) => {
     // Create event with OAuth (Meet auto-generation enabled)
     console.log('Creating event with OAuth for Meet auto-generation');
     
-    const startDateTime = `${appointment.appointment_date}T${appointment.appointment_time}`;
-    const startDate = new Date(startDateTime);
-    const endDate = new Date(startDate.getTime() + appointment.duration_minutes * 60000);
     const timezone = 'America/Sao_Paulo';
     const conferenceRequestId = crypto.randomUUID();
+
+    // Format time correctly - ensure HH:mm:ss format
+    const appointmentTime = appointment.appointment_time.length === 5 
+      ? `${appointment.appointment_time}:00` 
+      : appointment.appointment_time;
+    
+    // Calculate end time by parsing hours/minutes and adding duration
+    const [hours, minutes] = appointmentTime.split(':').map(Number);
+    const startMinutes = hours * 60 + minutes;
+    const endMinutes = startMinutes + (appointment.duration_minutes || 60);
+    const endHours = Math.floor(endMinutes / 60) % 24;
+    const endMins = endMinutes % 60;
+    const endTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}:00`;
+
+    // Build dateTime strings in LOCAL format (NOT UTC/ISO)
+    // Google Calendar API accepts local time when timeZone is specified
+    const startDateTimeLocal = `${appointment.appointment_date}T${appointmentTime}`;
+    const endDateTimeLocal = `${appointment.appointment_date}T${endTime}`;
+
+    console.log('Event times (local):', { startDateTimeLocal, endDateTimeLocal, timezone });
 
     const eventData = {
       summary: `Consulta - ${appointment.client.name}`,
       description: `Consulta nutricional com ${appointment.client.name}\nE-mail: ${appointment.client.email || 'N/A'}\nTelefone: ${appointment.client.phone || 'N/A'}${appointment.notes ? `\n\nObservações: ${appointment.notes}` : ''}`,
       start: {
-        dateTime: startDate.toISOString(),
+        dateTime: startDateTimeLocal,
         timeZone: timezone,
       },
       end: {
-        dateTime: endDate.toISOString(),
+        dateTime: endDateTimeLocal,
         timeZone: timezone,
       },
       conferenceData: {
@@ -398,21 +415,37 @@ async function createEventWithServiceAccount(
   }
 
   // Create event WITHOUT Meet (Service Account limitation)
-  const startDateTime = `${appointment.appointment_date}T${appointment.appointment_time}`;
-  const startDate = new Date(startDateTime);
-  const endDate = new Date(startDate.getTime() + appointment.duration_minutes * 60000);
   const calendarId = calendarConnection.calendar_id || 'primary';
   const timezone = 'America/Sao_Paulo';
+
+  // Format time correctly - ensure HH:mm:ss format
+  const appointmentTime = appointment.appointment_time.length === 5 
+    ? `${appointment.appointment_time}:00` 
+    : appointment.appointment_time;
+  
+  // Calculate end time by parsing hours/minutes and adding duration
+  const [hours, minutes] = appointmentTime.split(':').map(Number);
+  const startMinutes = hours * 60 + minutes;
+  const endMinutes = startMinutes + (appointment.duration_minutes || 60);
+  const endHours = Math.floor(endMinutes / 60) % 24;
+  const endMins = endMinutes % 60;
+  const endTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}:00`;
+
+  // Build dateTime strings in LOCAL format (NOT UTC/ISO)
+  const startDateTimeLocal = `${appointment.appointment_date}T${appointmentTime}`;
+  const endDateTimeLocal = `${appointment.appointment_date}T${endTime}`;
+
+  console.log('Service Account - Event times (local):', { startDateTimeLocal, endDateTimeLocal, timezone });
 
   const eventData = {
     summary: `Consulta - ${appointment.client.name}`,
     description: `Consulta nutricional com ${appointment.client.name}\nE-mail: ${appointment.client.email || 'N/A'}\nTelefone: ${appointment.client.phone || 'N/A'}${appointment.notes ? `\n\nObservações: ${appointment.notes}` : ''}\n\n⚠️ Meet não gerado automaticamente - configure OAuth para Meet automático.`,
     start: {
-      dateTime: startDate.toISOString(),
+      dateTime: startDateTimeLocal,
       timeZone: timezone,
     },
     end: {
-      dateTime: endDate.toISOString(),
+      dateTime: endDateTimeLocal,
       timeZone: timezone,
     },
     reminders: {
