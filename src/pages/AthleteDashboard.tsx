@@ -57,7 +57,16 @@ export default function AthleteDashboard() {
   
   const [activeTab, setActiveTab] = useState('inicio');
 
-  const handleSignOut = async () => { await signOut(); navigate('/auth'); };
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    } finally {
+      // Always navigate to auth, even if signOut fails
+      navigate('/auth', { replace: true });
+    }
+  };
   const handleBackToAdmin = () => { navigate('/admin'); };
   const handleFillAnamnese = () => { navigate('/athlete/anamnese'); };
   const handleContactSupport = () => { window.open('https://wa.me/5511999999999?text=Olá! Preciso de ajuda com a área do atleta.', '_blank'); };
