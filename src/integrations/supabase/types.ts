@@ -1045,6 +1045,7 @@ export type Database = {
           id: string
           is_active: boolean
           last_consultation_at: string | null
+          last_consultation_index: number | null
           monthly_value: number
           name: string
           notes: string | null
@@ -1079,6 +1080,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_consultation_at?: string | null
+          last_consultation_index?: number | null
           monthly_value: number
           name: string
           notes?: string | null
@@ -1113,6 +1115,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_consultation_at?: string | null
+          last_consultation_index?: number | null
           monthly_value?: number
           name?: string
           notes?: string | null

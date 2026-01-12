@@ -174,12 +174,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     return windows;
   }, [formData.last_consultation_at, formData.end_date, formData.consultation_frequency, formData.onboarding_type]);
 
-  // Auto-update remaining_consultations when calculated windows change (only if not manual override)
+  // Auto-update remaining_consultations based on last_consultation_index (only if not manual override)
   useEffect(() => {
-    if (formData.onboarding_type === 'continuation' && !manualOverride && calculatedWindows.length > 0) {
-      setFormData(prev => ({ ...prev, remaining_consultations: calculatedWindows.length }));
+    if (formData.onboarding_type === 'continuation' && !manualOverride) {
+      const remaining = formData.consultation_count - formData.last_consultation_index;
+      setFormData(prev => ({ ...prev, remaining_consultations: remaining > 0 ? remaining : 0 }));
     }
-  }, [calculatedWindows.length, formData.onboarding_type, manualOverride]);
+  }, [formData.consultation_count, formData.last_consultation_index, formData.onboarding_type, manualOverride]);
 
   // Format week range for display
   const formatWeekRange = (windowStart: Date, windowEnd: Date) => {
@@ -192,9 +193,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
   // Recalculate button handler
   const handleRecalculate = () => {
     setManualOverride(false);
-    if (calculatedWindows.length > 0) {
-      setFormData(prev => ({ ...prev, remaining_consultations: calculatedWindows.length }));
-    }
+    const remaining = formData.consultation_count - formData.last_consultation_index;
+    setFormData(prev => ({ ...prev, remaining_consultations: remaining > 0 ? remaining : 0 }));
   };
 
   // Calculate end date based on plan duration - always auto-calculate when start_date or plan_duration changes
@@ -268,6 +268,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       payment_date: formData.payment_date || null,
       last_consultation_at: formData.last_consultation_at || null,
       remaining_consultations: formData.onboarding_type === 'continuation' ? formData.remaining_consultations : null,
+      last_consultation_index: formData.onboarding_type === 'continuation' ? formData.last_consultation_index : null,
     };
     onSubmit(dataToSubmit as any, { sendCredentials, skipAnamnese });
   };
@@ -578,22 +579,25 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                               <div className="space-y-2">
                                 <p className="text-sm text-muted-foreground font-medium">Próximas janelas previstas:</p>
                                 <div className="max-h-40 overflow-y-auto space-y-1">
-                                  {calculatedWindows.slice(0, manualOverride && formData.remaining_consultations ? formData.remaining_consultations : undefined).map((window, index) => (
-                                    <div 
-                                      key={index}
-                                      className="flex items-center justify-between text-sm p-2 rounded bg-background/50"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                                        <span className="font-medium">
-                                          Semana: {formatWeekRange(window.windowStart, window.windowEnd)}
+                                  {calculatedWindows.slice(0, manualOverride && formData.remaining_consultations ? formData.remaining_consultations : undefined).map((window, index) => {
+                                    const consultationNumber = (formData.last_consultation_index || 1) + index + 1;
+                                    return (
+                                      <div 
+                                        key={index}
+                                        className="flex items-center justify-between text-sm p-2 rounded bg-background/50"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                                          <span className="font-medium">
+                                            Consulta {consultationNumber}: {formatWeekRange(window.windowStart, window.windowEnd)}
+                                          </span>
+                                        </div>
+                                        <span className="text-xs text-muted-foreground">
+                                          Link: {format(window.sendLinkAt, "dd/MM 'às' 07:00", { locale: ptBR })}
                                         </span>
                                       </div>
-                                      <span className="text-xs text-muted-foreground">
-                                        Link: {format(window.sendLinkAt, "dd/MM 'às' 07:00", { locale: ptBR })}
-                                      </span>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
 

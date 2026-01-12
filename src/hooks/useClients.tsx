@@ -35,6 +35,7 @@ export interface Client {
   onboarding_type: 'new' | 'continuation' | null;
   remaining_consultations: number | null;
   last_consultation_at: string | null;
+  last_consultation_index: number | null;
   athlete_user_id: string | null;
 }
 
@@ -256,23 +257,35 @@ function generateConsultationSchedules(
 // Example: If last consult was 10/01/2026 and interval is 4 weeks:
 // - 4 weeks end on 07/02/2026 (Saturday)
 // - The Monday AFTER that is 09/02/2026 - this is when we send the link
+// 
+// The consultation_index parameter indicates which consultation was the last one completed.
+// The generated schedules will continue the numbering from there.
+// For example: if last_consultation_index = 1, the first generated schedule will be Consulta 2
+interface ContinuationSchedule extends Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'> {
+  consultation_index?: number;
+}
+
 function generateContinuationConsultationSchedules(
   userId: string,
   clientId: string,
   consultationFrequency: 'once' | 'monthly' | 'six_weeks',
   endDate: string,
   remainingConsultations: number,
-  lastConsultationAt?: string | null
-): Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] {
-  const schedules: Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>[] = [];
+  lastConsultationAt?: string | null,
+  lastConsultationIndex?: number | null
+): ContinuationSchedule[] {
+  const schedules: ContinuationSchedule[] = [];
   const planEndDate = parseISO(endDate);
   const today = new Date();
+  
+  // The next consultation number starts after the last completed one
+  const startingIndex = (lastConsultationIndex || 0) + 1;
   
   // Interval type
   const intervalLabel = consultationFrequency === 'six_weeks' ? '6 semanas' : 'mensal';
   
   console.debug(
-    `[Automação Consultas - Continuação] client_id=${clientId} | remaining=${remainingConsultations} | intervalo=${intervalLabel} | término=${format(planEndDate, 'yyyy-MM-dd')} | last_consultation_at=${lastConsultationAt || 'não informado'}`
+    `[Automação Consultas - Continuação] client_id=${clientId} | remaining=${remainingConsultations} | starting_index=${startingIndex} | intervalo=${intervalLabel} | término=${format(planEndDate, 'yyyy-MM-dd')} | last_consultation_at=${lastConsultationAt || 'não informado'}`
   );
   
   if (remainingConsultations <= 0) {
@@ -307,8 +320,9 @@ function generateContinuationConsultationSchedules(
 
       // Only include future dates
       if (sendLinkMonday >= today) {
+        const consultationNumber = startingIndex + windowsCreated;
         console.debug(
-          `[Automação Consultas - Continuação] Consulta ${windowsCreated + 1}/${remainingConsultations}: baseDate=${format(currentBaseDate, 'yyyy-MM-dd')} | intervalEnd=${format(intervalEndDate, 'yyyy-MM-dd')} | sendLink=${format(sendLinkMonday, 'yyyy-MM-dd')} | window=${format(windowStart, 'yyyy-MM-dd')} a ${format(windowEnd, 'yyyy-MM-dd')}`
+          `[Automação Consultas - Continuação] Consulta ${consultationNumber} (janela ${windowsCreated + 1}/${remainingConsultations}): baseDate=${format(currentBaseDate, 'yyyy-MM-dd')} | intervalEnd=${format(intervalEndDate, 'yyyy-MM-dd')} | sendLink=${format(sendLinkMonday, 'yyyy-MM-dd')} | window=${format(windowStart, 'yyyy-MM-dd')} a ${format(windowEnd, 'yyyy-MM-dd')}`
         );
 
         schedules.push({
@@ -319,6 +333,7 @@ function generateContinuationConsultationSchedules(
           // The send_link_date is the same Monday (when we send the booking link)
           send_link_date: format(sendLinkMonday, 'yyyy-MM-dd'),
           status: 'pending',
+          consultation_index: consultationNumber,
         });
 
         windowsCreated++;
@@ -342,12 +357,14 @@ function generateContinuationConsultationSchedules(
         break;
       }
 
+      const consultationNumber = startingIndex + i;
       schedules.push({
         client_id: clientId,
         user_id: userId,
         scheduled_date: format(sendLinkMonday, 'yyyy-MM-dd'),
         send_link_date: format(sendLinkMonday, 'yyyy-MM-dd'),
         status: 'pending',
+        consultation_index: consultationNumber,
       });
 
       currentBaseDate = intervalEndDate;
@@ -415,7 +432,8 @@ export function useAddClient() {
             client.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
             client.end_date,
             client.remaining_consultations,
-            client.last_consultation_at
+            client.last_consultation_at,
+            client.last_consultation_index
           );
         } else if (client.first_consultation_date) {
           // Standard new client flow
@@ -546,7 +564,8 @@ export function useUpdateClient() {
               updatedClient.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
               updatedClient.end_date,
               updatedClient.remaining_consultations,
-              updatedClient.last_consultation_at
+              updatedClient.last_consultation_at,
+              updatedClient.last_consultation_index
             );
           }
           // New clients (standard flow)
