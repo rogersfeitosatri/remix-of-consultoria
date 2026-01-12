@@ -107,9 +107,9 @@ export function ScheduledAppointmentsView() {
                       <div className="rounded-full p-2 bg-emerald-500/20">
                         <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                       </div>
-                      <div>
+                        <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm">{apt.client?.name || 'Cliente'}</p>
+                          <p className="font-medium text-sm">{typeof apt.client?.name === 'string' ? apt.client.name : 'Cliente'}</p>
                           <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
                             Confirmada
                           </Badge>
@@ -141,19 +141,19 @@ export function ScheduledAppointmentsView() {
                         asChild
                         className="h-7 text-xs"
                       >
-                        <Link to={`/appointment/${apt.id}`}>
+                        <Link to={`/appointments/${apt.id}`}>
                           <ExternalLink className="h-3 w-3 mr-1" />
                           Detalhes
                         </Link>
                       </Button>
-                      {apt.client?.name && (
+                      {typeof apt.client?.name === 'string' && apt.client.name && (
                         <Button 
                           size="sm" 
                           variant="ghost" 
                           asChild
                           className="h-7 text-xs"
                         >
-                          <Link to={`/clients?search=${encodeURIComponent(apt.client.name)}`}>
+                          <Link to={`/clients?search=${encodeURIComponent(String(apt.client.name))}`}>
                             <User className="h-3 w-3 mr-1" />
                             Ver atleta
                           </Link>
