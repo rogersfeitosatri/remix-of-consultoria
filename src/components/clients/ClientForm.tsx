@@ -248,11 +248,12 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
   }, [formData.plan_duration, client]);
 
   // Reset onboarding_type to 'new' if continuation mode is disabled
+  // BUT only for new clients - existing clients should keep their saved value
   useEffect(() => {
-    if (!adminSettings?.enable_continuation_mode && formData.onboarding_type === 'continuation') {
+    if (!client && !adminSettings?.enable_continuation_mode && formData.onboarding_type === 'continuation') {
       setFormData(prev => ({ ...prev, onboarding_type: 'new', remaining_consultations: null, last_consultation_at: '' }));
     }
-  }, [adminSettings?.enable_continuation_mode, formData.onboarding_type]);
+  }, [adminSettings?.enable_continuation_mode, formData.onboarding_type, client]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
