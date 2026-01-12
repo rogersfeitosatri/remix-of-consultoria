@@ -39,14 +39,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MondaySendView } from '@/components/scheduling/MondaySendView';
 import { ScheduledAppointmentsView } from '@/components/scheduling/ScheduledAppointmentsView';
+import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function CalendarPage() {
+  const queryClient = useQueryClient();
   const { data: allClients = [], isLoading: clientsLoading } = useClients();
   const { data: consultations = [], isLoading: consultationsLoading } = useConsultationSchedules();
   const [activeTab, setActiveTab] = useState('calendar');
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isManualBookingOpen, setIsManualBookingOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [newScheduleDate, setNewScheduleDate] = useState<Date | undefined>();
   const [editingSchedule, setEditingSchedule] = useState<(ConsultationSchedule & { client_name: string }) | null>(null);
@@ -278,8 +282,28 @@ export default function CalendarPage() {
             
             {/* Tab: Scheduled Appointments */}
             <TabsContent value="scheduled" className="mt-4">
-              <ScheduledAppointmentsView />
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <Button 
+                    size="sm" 
+                    className="gap-1"
+                    onClick={() => setIsManualBookingOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Agendar Manualmente
+                  </Button>
+                </div>
+                <ScheduledAppointmentsView />
+              </div>
             </TabsContent>
+            
+            <ManualBookingDialog
+              open={isManualBookingOpen}
+              onOpenChange={setIsManualBookingOpen}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['appointments'] });
+              }}
+            />
             
             {/* Tab: Calendar View */}
             <TabsContent value="calendar" className="mt-4">
