@@ -44,6 +44,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   const [sendingCheckin, setSendingCheckin] = useState<string | null>(null);
   const [sendingBooking, setSendingBooking] = useState<string | null>(null);
   const [sendingCredentials, setSendingCredentials] = useState<string | null>(null);
+  const [creatingAccount, setCreatingAccount] = useState<string | null>(null);
 
   const handleSendCheckinManually = async (client: Client) => {
     if (!client.phone) {
@@ -119,6 +120,68 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
     }
   };
 
+  const handleCreateAccountAndSendCredentials = async (client: Client) => {
+    if (!client.phone) {
+      toast.error('Cliente não possui telefone cadastrado');
+      return;
+    }
+
+    if (!client.email) {
+      toast.error('Cliente não possui email cadastrado');
+      return;
+    }
+
+    setCreatingAccount(client.id);
+    try {
+      // Generate a random temporary password
+      const tempPassword = Math.random().toString(36).slice(-8) + 'A1!';
+      
+      // Create the user account using edge function
+      const { error: createError } = await supabase.functions.invoke('create-athlete-auth', {
+        body: { 
+          email: client.email, 
+          password: tempPassword, 
+          clientId: client.id,
+        },
+      });
+
+      if (createError) throw createError;
+
+      // Send credentials via WhatsApp
+      const message = `Olá ${client.name.split(' ')[0]}! 🏃‍♂️
+
+Aqui estão suas credenciais de acesso à área de membros:
+
+📧 E-mail: ${client.email}
+🔑 Senha: ${tempPassword}
+
+🔗 Acesse em: ${window.location.origin}/auth
+
+⚠️ Recomendo que altere sua senha no primeiro acesso.
+
+Qualquer dúvida, estou à disposição! 💪`;
+
+      const { error } = await supabase.functions.invoke('send-whatsapp', {
+        body: { clientId: client.id, message },
+      });
+
+      if (error) {
+        console.warn('WhatsApp send failed, but account was created:', error);
+        toast.success('Conta criada! Erro ao enviar WhatsApp - envie manualmente.');
+      } else {
+        toast.success('Conta criada e credenciais enviadas via WhatsApp!');
+      }
+      
+      // Refresh the clients list to show the new athlete_user_id
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error creating account:', error);
+      toast.error('Erro ao criar conta: ' + (error.message || 'Verifique as configurações'));
+    } finally {
+      setCreatingAccount(null);
+    }
+  };
+
   const handleSendCredentialsManually = async (client: Client) => {
     if (!client.phone) {
       toast.error('Cliente não possui telefone cadastrado');
@@ -131,8 +194,8 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
     }
 
     if (!client.athlete_user_id) {
-      toast.error('Cliente não possui conta de acesso criada. Edite o cadastro e crie uma conta.');
-      return;
+      // If no account exists, create one first
+      return handleCreateAccountAndSendCredentials(client);
     }
 
     setSendingCredentials(client.id);
@@ -313,17 +376,28 @@ Qualquer dúvida, estou à disposição! 💪`;
                         <CalendarCheck className="h-3 w-3" />
                         {sendingBooking === client.id ? '...' : 'Consulta'}
                       </Button>
-                      {client.athlete_user_id && (
+                      {client.email && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleSendCredentialsManually(client)}
-                          disabled={sendingCredentials === client.id}
-                          className="gap-1 text-xs text-primary hover:text-primary"
-                          title="Enviar Credenciais de Acesso via WhatsApp"
+                          disabled={sendingCredentials === client.id || creatingAccount === client.id}
+                          className={cn(
+                            "gap-1 text-xs",
+                            client.athlete_user_id 
+                              ? "text-primary hover:text-primary" 
+                              : "text-amber-600 hover:text-amber-700 border-amber-300"
+                          )}
+                          title={client.athlete_user_id 
+                            ? "Enviar Credenciais de Acesso via WhatsApp" 
+                            : "Criar conta e enviar credenciais"
+                          }
                         >
                           <Key className="h-3 w-3" />
-                          {sendingCredentials === client.id ? '...' : 'Senha'}
+                          {(sendingCredentials === client.id || creatingAccount === client.id) 
+                            ? '...' 
+                            : client.athlete_user_id ? 'Senha' : 'Criar Acesso'
+                          }
                         </Button>
                       )}
                     </>
