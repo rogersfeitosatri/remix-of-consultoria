@@ -118,10 +118,28 @@ export default function PublicBooking() {
           return timeStr >= blockStart! && timeStr < blockEnd!;
         });
 
-        // Check if slot is already booked
+        // Check if slot conflicts with existing appointments (considering duration + buffer)
         const isBooked = existingAppointments.some(a => {
-          const aptTime = a.appointment_time?.substring(0, 5);
-          return aptTime === timeStr;
+          if (!a.appointment_time) return false;
+          const aptTime = a.appointment_time.substring(0, 5);
+          const [aptHour, aptMin] = aptTime.split(':').map(Number);
+          
+          // Create appointment start and end times with buffer
+          const aptStart = new Date(selectedDate);
+          aptStart.setHours(aptHour, aptMin, 0, 0);
+          
+          // Block from (aptStart - buffer) to (aptEnd + buffer)
+          const aptDuration = a.duration_minutes || settings.slot_duration_minutes;
+          const blockStart = addMinutes(aptStart, -bufferMinutes);
+          const blockEnd = addMinutes(aptStart, aptDuration + bufferMinutes);
+          
+          // Check if this slot falls within the blocked range
+          const slotStart = new Date(selectedDate);
+          slotStart.setHours(parseInt(timeStr.split(':')[0]), parseInt(timeStr.split(':')[1]), 0, 0);
+          const slotEnd = addMinutes(slotStart, settings.slot_duration_minutes);
+          
+          // Slot conflicts if it overlaps with blocked range
+          return slotStart < blockEnd && slotEnd > blockStart;
         });
 
         // Check if slot is in the past (for today)
