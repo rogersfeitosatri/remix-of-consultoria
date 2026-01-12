@@ -108,6 +108,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     onboarding_type: client?.onboarding_type || 'new' as 'new' | 'continuation',
     remaining_consultations: client?.remaining_consultations || null as number | null,
     last_consultation_at: client?.last_consultation_at || '' as string,
+    last_consultation_index: (client?.last_consultation_index as number) || 1 as number,
   });
 
   // Manual override toggle for remaining consultations
@@ -452,7 +453,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                     <div className="space-y-4 mt-3">
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <Label htmlFor="lastConsultationAt">Última Consulta Realizada *</Label>
+                          <Label htmlFor="lastConsultationAt">Data da Última Consulta *</Label>
                           <Input
                             id="lastConsultationAt"
                             type="date"
@@ -461,9 +462,41 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                             required={formData.onboarding_type === 'continuation'}
                           />
                           <p className="text-xs text-muted-foreground">
-                            Data da última consulta realizada (obrigatório)
+                            Data em que a última consulta foi realizada
                           </p>
                         </div>
+                        <div className="space-y-2">
+                          <Label>Essa foi qual consulta do plano? *</Label>
+                          <Select
+                            value={formData.last_consultation_index?.toString() || '1'}
+                            onValueChange={(v) => {
+                              const index = parseInt(v);
+                              const remaining = formData.consultation_count - index;
+                              setFormData({ 
+                                ...formData, 
+                                last_consultation_index: index,
+                                remaining_consultations: remaining > 0 ? remaining : 0
+                              });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: formData.consultation_count }, (_, i) => i + 1).map((num) => (
+                                <SelectItem key={num} value={num.toString()}>
+                                  Consulta {num}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Ex: Se foi a 1ª consulta, restam {formData.consultation_count - 1} consultas
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                           <Label>Intervalo entre Consultas *</Label>
                           <Select
@@ -482,57 +515,44 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                             Intervalo: {getConsultationIntervalWeeks()} semanas
                           </p>
                         </div>
-                      </div>
-
-                      {/* Remaining Consultations with manual override */}
-                      <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="remainingConsultations">
-                              Consultas Restantes {manualOverride ? '(manual)' : '(calculado)'}
-                            </Label>
-                            <div className="flex items-center gap-2">
+                          <Label>Consultas Restantes</Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              id="remainingConsultations"
+                              type="number"
+                              min="0"
+                              value={formData.remaining_consultations ?? ''}
+                              onChange={(e) => {
+                                setManualOverride(true);
+                                setFormData({ ...formData, remaining_consultations: parseInt(e.target.value) || 0 });
+                              }}
+                              className="flex-1"
+                              disabled={!manualOverride}
+                            />
+                            <div className="flex items-center gap-1">
                               <Switch
                                 id="manualOverride"
                                 checked={manualOverride}
                                 onCheckedChange={(checked) => {
                                   setManualOverride(checked);
-                                  if (!checked && calculatedWindows.length > 0) {
-                                    setFormData(prev => ({ ...prev, remaining_consultations: calculatedWindows.length }));
+                                  if (!checked) {
+                                    const remaining = formData.consultation_count - (formData.last_consultation_index || 1);
+                                    setFormData(prev => ({ ...prev, remaining_consultations: remaining > 0 ? remaining : 0 }));
                                   }
                                 }}
                               />
-                              <Label htmlFor="manualOverride" className="text-xs cursor-pointer">
-                                Editar manualmente
+                              <Label htmlFor="manualOverride" className="text-xs cursor-pointer whitespace-nowrap">
+                                Editar
                               </Label>
                             </div>
                           </div>
-                          <Input
-                            id="remainingConsultations"
-                            type="number"
-                            min="1"
-                            value={formData.remaining_consultations || ''}
-                            onChange={(e) => {
-                              setManualOverride(true);
-                              setFormData({ ...formData, remaining_consultations: parseInt(e.target.value) || null });
-                            }}
-                            placeholder="Ex: 3"
-                            disabled={!manualOverride && calculatedWindows.length > 0}
-                            required={formData.onboarding_type === 'continuation'}
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleRecalculate}
-                            disabled={!formData.last_consultation_at || !formData.end_date}
-                            className="gap-2"
-                          >
-                            <RefreshCw className="h-4 w-4" />
-                            Recalcular
-                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            {formData.remaining_consultations === 0 
+                              ? '⚠️ Nenhuma consulta futura será gerada'
+                              : `Calculado: ${formData.consultation_count} total - ${formData.last_consultation_index || 1} realizadas = ${formData.remaining_consultations || 0}`
+                            }
+                          </p>
                         </div>
                       </div>
 
