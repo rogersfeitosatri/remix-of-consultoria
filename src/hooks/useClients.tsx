@@ -13,7 +13,7 @@ export interface Client {
   service_type: 'nutrition' | 'training' | 'both';
   plan_type: 'consultoria' | 'premium';
   plan_duration: 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks';
-  checkin_frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly' | null;
+  checkin_frequency: 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly' | null;
   has_checkin: boolean;
   has_agenda_access: boolean;
   start_date: string;
@@ -261,9 +261,9 @@ function generateConsultationSchedules(
 // The consultation_index parameter indicates which consultation was the last one completed.
 // The generated schedules will continue the numbering from there.
 // For example: if last_consultation_index = 1, the first generated schedule will be Consulta 2
-interface ContinuationSchedule extends Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'> {
-  consultation_index?: number;
-}
+// ContinuationSchedule is the same as the base schedule type
+// Note: consultation_index is only used for display/logging, not stored in DB
+type ContinuationSchedule = Omit<ConsultationSchedule, 'id' | 'created_at' | 'updated_at' | 'client_name'>;
 
 function generateContinuationConsultationSchedules(
   userId: string,
@@ -333,7 +333,6 @@ function generateContinuationConsultationSchedules(
           // The send_link_date is the same Monday (when we send the booking link)
           send_link_date: format(sendLinkMonday, 'yyyy-MM-dd'),
           status: 'pending',
-          consultation_index: consultationNumber,
         });
 
         windowsCreated++;
@@ -364,7 +363,6 @@ function generateContinuationConsultationSchedules(
         scheduled_date: format(sendLinkMonday, 'yyyy-MM-dd'),
         send_link_date: format(sendLinkMonday, 'yyyy-MM-dd'),
         status: 'pending',
-        consultation_index: consultationNumber,
       });
 
       currentBaseDate = intervalEndDate;
