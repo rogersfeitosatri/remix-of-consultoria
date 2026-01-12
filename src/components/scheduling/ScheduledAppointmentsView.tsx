@@ -28,28 +28,7 @@ export function ScheduledAppointmentsView() {
       });
   }, [appointments]);
 
-  if (isLoading) {
-    return (
-      <Card className="border-border bg-card">
-        <CardContent className="py-12 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (upcomingAppointments.length === 0) {
-    return (
-      <Card className="border-border bg-card">
-        <CardContent className="py-12 text-center">
-          <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-          <p className="text-muted-foreground">Nenhuma consulta agendada.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Group by date
+  // Group by date - must be called before early returns
   const groupedByDate = useMemo(() => {
     const groups: { date: string; appointments: typeof upcomingAppointments }[] = [];
     
@@ -70,6 +49,26 @@ export function ScheduledAppointmentsView() {
     return dateStr === today;
   };
 
+  if (isLoading) {
+    return (
+      <Card className="border-border bg-card">
+        <CardContent className="py-12 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (upcomingAppointments.length === 0) {
+    return (
+      <Card className="border-border bg-card">
+        <CardContent className="py-12 text-center">
+          <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+          <p className="text-muted-foreground">Nenhuma consulta agendada.</p>
+        </CardContent>
+      </Card>
+    );
+  }
   return (
     <div className="space-y-4">
       {groupedByDate.map(group => {
