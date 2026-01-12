@@ -89,86 +89,95 @@ export default function Clients() {
     data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
     options?: { sendCredentials: boolean; skipAnamnese: boolean }
   ) => {
-    try {
-      if (editingClient) {
-        await updateClient.mutateAsync({ id: editingClient.id, ...data });
-        toast({
-          title: 'Atleta atualizado',
-          description: 'Os dados foram salvos com sucesso.',
-        });
-      } else {
-        // Criar o atleta primeiro
-        const newClient = await addClient.mutateAsync(data);
-        
-        // Se email foi fornecido, criar conta de usuário auth
-        if (data.email) {
-          try {
-            const { data: authResult, error: authError } = await supabase.functions.invoke('create-athlete-auth', {
-              body: {
-                email: data.email,
-                name: data.name,
-                clientId: newClient.id,
-              },
-            });
+    // OPTIMISTIC UI: Fechar o modal IMEDIATAMENTE
+    setShowForm(false);
+    setEditingClient(undefined);
 
-            if (authError) {
-              console.error('Erro ao criar conta do atleta:', authError);
-              toast({
-                title: 'Aviso',
-                description: 'Atleta cadastrado, mas houve erro ao criar conta de acesso.',
-                variant: 'destructive',
+    // Processar em background (sem bloquear a UI)
+    const processInBackground = async () => {
+      try {
+        if (editingClient) {
+          await updateClient.mutateAsync({ id: editingClient.id, ...data });
+          toast({
+            title: 'Atleta atualizado',
+            description: 'Os dados foram salvos com sucesso.',
+          });
+        } else {
+          // Criar o atleta primeiro
+          const newClient = await addClient.mutateAsync(data);
+          
+          // Se email foi fornecido, criar conta de usuário auth
+          if (data.email) {
+            try {
+              const { data: authResult, error: authError } = await supabase.functions.invoke('create-athlete-auth', {
+                body: {
+                  email: data.email,
+                  name: data.name,
+                  clientId: newClient.id,
+                },
               });
-            } else if (options?.sendCredentials && data.phone) {
-              // Enviar credenciais via Z-API (WhatsApp direto)
-              const baseUrl = window.location.origin;
-              const message = `🏃 *RF Assessoria - Bem-vindo!*\n\nOlá ${data.name}!\n\nSua conta foi criada com sucesso.\n\n📧 *Login:* ${data.email}\n🔑 *Senha:* 123456\n\n🔗 Acesse: ${baseUrl}/auth\n\n⚠️ Recomendamos trocar sua senha no primeiro acesso.\n\nQualquer dúvida, estamos à disposição!`;
-              
-              try {
-                const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
-                  body: {
-                    clientId: newClient.id,
-                    message: message,
-                  },
+
+              if (authError) {
+                console.error('Erro ao criar conta do atleta:', authError);
+                toast({
+                  title: 'Aviso',
+                  description: 'Atleta cadastrado, mas houve erro ao criar conta de acesso.',
+                  variant: 'destructive',
                 });
+              } else if (options?.sendCredentials && data.phone) {
+                // Enviar credenciais via Z-API (WhatsApp direto)
+                const baseUrl = window.location.origin;
+                const message = `🏃 *RF Assessoria - Bem-vindo!*\n\nOlá ${data.name}!\n\nSua conta foi criada com sucesso.\n\n📧 *Login:* ${data.email}\n🔑 *Senha:* 123456\n\n🔗 Acesse: ${baseUrl}/auth\n\n⚠️ Recomendamos trocar sua senha no primeiro acesso.\n\nQualquer dúvida, estamos à disposição!`;
                 
-                if (whatsappError) {
-                  console.error('Erro ao enviar WhatsApp:', whatsappError);
-                  toast({
-                    title: 'Aviso',
-                    description: 'Atleta cadastrado, mas houve erro ao enviar credenciais via WhatsApp.',
-                    variant: 'destructive',
+                try {
+                  const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
+                    body: {
+                      clientId: newClient.id,
+                      message: message,
+                    },
                   });
-                } else {
-                  toast({
-                    title: 'Credenciais enviadas',
-                    description: 'Mensagem de boas-vindas enviada via WhatsApp com sucesso!',
-                  });
+                  
+                  if (whatsappError) {
+                    console.error('Erro ao enviar WhatsApp:', whatsappError);
+                    toast({
+                      title: 'Aviso',
+                      description: 'Atleta cadastrado, mas houve erro ao enviar credenciais via WhatsApp.',
+                      variant: 'destructive',
+                    });
+                  } else {
+                    toast({
+                      title: 'Credenciais enviadas',
+                      description: 'Mensagem de boas-vindas enviada via WhatsApp com sucesso!',
+                    });
+                  }
+                } catch (whatsappErr) {
+                  console.error('Erro ao enviar WhatsApp:', whatsappErr);
                 }
-              } catch (whatsappErr) {
-                console.error('Erro ao enviar WhatsApp:', whatsappErr);
               }
+            } catch (err) {
+              console.error('Erro ao processar conta do atleta:', err);
             }
-          } catch (err) {
-            console.error('Erro ao processar conta do atleta:', err);
+          }
+          
+          if (!options?.sendCredentials) {
+            toast({
+              title: 'Atleta cadastrado',
+              description: 'O novo atleta foi adicionado com sucesso.',
+            });
           }
         }
-        
-        if (!options?.sendCredentials) {
-          toast({
-            title: 'Atleta cadastrado',
-            description: 'O novo atleta foi adicionado com sucesso.',
-          });
-        }
+      } catch (error) {
+        console.error('Erro ao salvar atleta:', error);
+        toast({
+          title: 'Erro ao salvar',
+          description: 'Ocorreu um erro ao salvar os dados. Por favor, tente novamente.',
+          variant: 'destructive',
+        });
       }
-      setShowForm(false);
-      setEditingClient(undefined);
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Ocorreu um erro ao salvar os dados.',
-        variant: 'destructive',
-      });
-    }
+    };
+
+    // Executar em background sem await
+    processInBackground();
   };
 
   const handleEdit = (client: Client) => {
