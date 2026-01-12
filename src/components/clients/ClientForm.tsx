@@ -121,6 +121,85 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     return 4; // default
   };
 
+  // Calculate total consultation count based on plan duration (DYNAMIC)
+  // Used for continuation mode to show proper options (Consulta 1 to N)
+  const getTotalConsultationsForPlan = useMemo(() => {
+    // If has manual consultation_count and it's not the default, use it
+    if (client && client.consultation_count && client.consultation_count > 1) {
+      return client.consultation_count;
+    }
+
+    // Calculate based on plan duration and consultation frequency
+    const durationToMonths: Record<string, number> = {
+      six_weeks: 1.5,
+      monthly: 1,
+      quarterly: 3,
+      semiannual: 6,
+      annual: 12,
+    };
+
+    const months = durationToMonths[formData.plan_duration] || 12;
+    
+    if (formData.consultation_frequency === 'monthly') {
+      // Monthly = 1 consultation per month
+      return Math.max(1, Math.ceil(months));
+    } else if (formData.consultation_frequency === 'six_weeks') {
+      // 6 weeks = ~1.5 months per consultation
+      return Math.max(1, Math.floor(months / 1.5));
+    }
+    
+    // Fallback: use months as count (reasonable default)
+    return Math.max(1, Math.ceil(months));
+  }, [formData.plan_duration, formData.consultation_frequency, client]);
+
+  // Update consultation_count when plan changes (for continuation mode)
+  useEffect(() => {
+    if (formData.onboarding_type === 'continuation' && !client) {
+      setFormData(prev => ({ ...prev, consultation_count: getTotalConsultationsForPlan }));
+    }
+  }, [getTotalConsultationsForPlan, formData.onboarding_type, client]);
+
+  // Auto-suggest consultation index based on dates
+  // When admin fills last_consultation_at, calculate suggested index
+  useEffect(() => {
+    if (
+      formData.onboarding_type === 'continuation' &&
+      formData.last_consultation_at &&
+      formData.start_date &&
+      !client // Only for new clients
+    ) {
+      const lastConsultDate = parseISO(formData.last_consultation_at);
+      const planStartDate = parseISO(formData.start_date);
+      
+      // Calculate months difference between start and last consultation
+      const msPerMonth = 30 * 24 * 60 * 60 * 1000;
+      const monthsDiff = Math.floor((lastConsultDate.getTime() - planStartDate.getTime()) / msPerMonth);
+      
+      let suggestedIndex: number;
+      if (formData.consultation_frequency === 'six_weeks') {
+        // 6 weeks = 1.5 months per consultation
+        suggestedIndex = Math.floor(monthsDiff / 1.5) + 1;
+      } else {
+        // Monthly = 1 month per consultation
+        suggestedIndex = monthsDiff + 1;
+      }
+      
+      // Clamp between 1 and total
+      suggestedIndex = Math.max(1, Math.min(suggestedIndex, getTotalConsultationsForPlan));
+      
+      // Only update if different (to avoid loops)
+      if (suggestedIndex !== formData.last_consultation_index) {
+        const remaining = getTotalConsultationsForPlan - suggestedIndex;
+        setFormData(prev => ({
+          ...prev,
+          last_consultation_index: suggestedIndex,
+          remaining_consultations: remaining > 0 ? remaining : 0,
+          consultation_count: getTotalConsultationsForPlan,
+        }));
+      }
+    }
+  }, [formData.last_consultation_at, formData.start_date, formData.consultation_frequency, formData.onboarding_type, client, getTotalConsultationsForPlan]);
+
   // Calculate future consultation windows based on last_consultation_at
   // CRITICAL: Link is sent on the Monday AFTER the full interval period ends
   // Example: If last consult was 10/01/2026 and interval is monthly:
@@ -177,10 +256,10 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
   // Auto-update remaining_consultations based on last_consultation_index (only if not manual override)
   useEffect(() => {
     if (formData.onboarding_type === 'continuation' && !manualOverride) {
-      const remaining = formData.consultation_count - formData.last_consultation_index;
+      const remaining = getTotalConsultationsForPlan - formData.last_consultation_index;
       setFormData(prev => ({ ...prev, remaining_consultations: remaining > 0 ? remaining : 0 }));
     }
-  }, [formData.consultation_count, formData.last_consultation_index, formData.onboarding_type, manualOverride]);
+  }, [getTotalConsultationsForPlan, formData.last_consultation_index, formData.onboarding_type, manualOverride]);
 
   // Format week range for display
   const formatWeekRange = (windowStart: Date, windowEnd: Date) => {
@@ -193,7 +272,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
   // Recalculate button handler
   const handleRecalculate = () => {
     setManualOverride(false);
-    const remaining = formData.consultation_count - formData.last_consultation_index;
+    const remaining = getTotalConsultationsForPlan - formData.last_consultation_index;
     setFormData(prev => ({ ...prev, remaining_consultations: remaining > 0 ? remaining : 0 }));
   };
 
@@ -473,11 +552,12 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                             value={formData.last_consultation_index?.toString() || '1'}
                             onValueChange={(v) => {
                               const index = parseInt(v);
-                              const remaining = formData.consultation_count - index;
+                              const remaining = getTotalConsultationsForPlan - index;
                               setFormData({ 
                                 ...formData, 
                                 last_consultation_index: index,
-                                remaining_consultations: remaining > 0 ? remaining : 0
+                                remaining_consultations: remaining > 0 ? remaining : 0,
+                                consultation_count: getTotalConsultationsForPlan,
                               });
                             }}
                           >
@@ -485,7 +565,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                               <SelectValue placeholder="Selecione..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {Array.from({ length: formData.consultation_count }, (_, i) => i + 1).map((num) => (
+                              {Array.from({ length: getTotalConsultationsForPlan }, (_, i) => i + 1).map((num) => (
                                 <SelectItem key={num} value={num.toString()}>
                                   Consulta {num}
                                 </SelectItem>
@@ -493,7 +573,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                             </SelectContent>
                           </Select>
                           <p className="text-xs text-muted-foreground">
-                            Ex: Se foi a 1ª consulta, restam {formData.consultation_count - 1} consultas
+                            Total do plano: {getTotalConsultationsForPlan} consultas. Ex: Se foi a 1ª, restam {getTotalConsultationsForPlan - 1}
                           </p>
                         </div>
                       </div>
@@ -539,7 +619,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                                 onCheckedChange={(checked) => {
                                   setManualOverride(checked);
                                   if (!checked) {
-                                    const remaining = formData.consultation_count - (formData.last_consultation_index || 1);
+                                    const remaining = getTotalConsultationsForPlan - (formData.last_consultation_index || 1);
                                     setFormData(prev => ({ ...prev, remaining_consultations: remaining > 0 ? remaining : 0 }));
                                   }
                                 }}
@@ -552,7 +632,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                           <p className="text-xs text-muted-foreground">
                             {formData.remaining_consultations === 0 
                               ? '⚠️ Nenhuma consulta futura será gerada'
-                              : `Calculado: ${formData.consultation_count} total - ${formData.last_consultation_index || 1} realizadas = ${formData.remaining_consultations || 0}`
+                              : `Calculado: ${getTotalConsultationsForPlan} total - ${formData.last_consultation_index || 1} realizadas = ${formData.remaining_consultations || 0}`
                             }
                           </p>
                         </div>
@@ -572,9 +652,20 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                             </p>
                           ) : (
                             <div className="space-y-3">
-                              <div className="flex items-center gap-2 text-sm">
-                                <span className="text-muted-foreground">Consultas restantes estimadas:</span>
-                                <span className="font-bold text-primary">{calculatedWindows.length}</span>
+                              {/* Plan summary */}
+                              <div className="grid grid-cols-3 gap-2 text-sm">
+                                <div className="p-2 bg-background/50 rounded text-center">
+                                  <span className="text-muted-foreground block text-xs">Total do plano</span>
+                                  <span className="font-bold text-foreground">{getTotalConsultationsForPlan}</span>
+                                </div>
+                                <div className="p-2 bg-background/50 rounded text-center">
+                                  <span className="text-muted-foreground block text-xs">Última realizada</span>
+                                  <span className="font-bold text-foreground">Consulta {formData.last_consultation_index || 1}</span>
+                                </div>
+                                <div className="p-2 bg-primary/10 rounded text-center">
+                                  <span className="text-muted-foreground block text-xs">Restantes</span>
+                                  <span className="font-bold text-primary">{formData.remaining_consultations || 0}</span>
+                                </div>
                               </div>
 
                               <div className="space-y-2">
