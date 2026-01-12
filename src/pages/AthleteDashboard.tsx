@@ -63,6 +63,9 @@ export default function AthleteDashboard() {
     } catch (error) {
       console.error('Error signing out:', error);
     } finally {
+      // Clear all local storage to ensure clean session
+      localStorage.clear();
+      sessionStorage.clear();
       // Always navigate to auth, even if signOut fails
       navigate('/auth', { replace: true });
     }
