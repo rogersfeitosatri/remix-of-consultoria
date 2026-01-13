@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library, Sparkles } from 'lucide-react';
+import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library, Sparkles, FileSearch } from 'lucide-react';
 import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm, useCreateDefaultCheckinForm } from '@/hooks/useCheckinForms';
 import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm, useCreateDefaultAnamneseForm } from '@/hooks/useAnamneseForms';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +35,7 @@ import { PendingReviewsList } from '@/components/forms/PendingReviewsList';
 import { PendingAnamneseList } from '@/components/forms/PendingAnamneseList';
 import { ScheduledCheckinsSection } from '@/components/forms/ScheduledCheckinsSection';
 import { QuestionBankSection } from '@/components/forms/QuestionBankSection';
+import { AnamneseResponsesTab } from '@/components/forms/AnamneseResponsesTab';
 
 export default function Forms() {
   const navigate = useNavigate();
@@ -203,7 +204,7 @@ export default function Forms() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
             <TabsTrigger value="checkin" className="gap-2">
               <ClipboardList className="h-4 w-4" />
               <span className="hidden sm:inline">Checkin</span>
@@ -216,6 +217,10 @@ export default function Forms() {
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Anamnese</span>
             </TabsTrigger>
+            <TabsTrigger value="respostas" className="gap-2">
+              <FileSearch className="h-4 w-4" />
+              <span className="hidden sm:inline">Respostas</span>
+            </TabsTrigger>
             <TabsTrigger value="banco" className="gap-2">
               <Library className="h-4 w-4" />
               <span className="hidden sm:inline">Perguntas</span>
@@ -225,6 +230,11 @@ export default function Forms() {
           {/* Scheduled Checkins Tab */}
           <TabsContent value="agendados" className="space-y-6 mt-6">
             <ScheduledCheckinsSection />
+          </TabsContent>
+
+          {/* Anamnese Responses Tab */}
+          <TabsContent value="respostas" className="space-y-6 mt-6">
+            <AnamneseResponsesTab />
           </TabsContent>
 
           {/* Question Bank Tab */}
