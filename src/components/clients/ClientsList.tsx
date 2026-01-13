@@ -1,7 +1,7 @@
 import { Client } from '@/hooks/useClients';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign, Brain, History, Zap, MessageCircle, CalendarCheck, Key } from 'lucide-react';
+import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign, Brain, History, Zap, MessageCircle, CalendarCheck, Key, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,7 @@ import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { useSchedulingSettings } from '@/hooks/useScheduling';
 import { toast } from 'sonner';
 import { useState } from 'react';
+import { ChangeAthletePasswordDialog } from './ChangeAthletePasswordDialog';
 
 const SERVICE_LABELS = {
   nutrition: 'Nutrição',
@@ -44,6 +45,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   const [sendingCheckin, setSendingCheckin] = useState<string | null>(null);
   const [sendingBooking, setSendingBooking] = useState<string | null>(null);
   const [sendingCredentials, setSendingCredentials] = useState<string | null>(null);
+  const [passwordDialogClient, setPasswordDialogClient] = useState<Client | null>(null);
 
   const handleSendCheckinManually = async (client: Client) => {
     if (!client.phone) {
@@ -314,17 +316,29 @@ Qualquer dúvida, estou à disposição! 💪`;
                         {sendingBooking === client.id ? '...' : 'Consulta'}
                       </Button>
                       {client.athlete_user_id && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSendCredentialsManually(client)}
-                          disabled={sendingCredentials === client.id}
-                          className="gap-1 text-xs text-primary hover:text-primary"
-                          title="Enviar Credenciais de Acesso via WhatsApp"
-                        >
-                          <Key className="h-3 w-3" />
-                          {sendingCredentials === client.id ? '...' : 'Senha'}
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSendCredentialsManually(client)}
+                            disabled={sendingCredentials === client.id}
+                            className="gap-1 text-xs text-primary hover:text-primary"
+                            title="Enviar Credenciais de Acesso via WhatsApp"
+                          >
+                            <Key className="h-3 w-3" />
+                            {sendingCredentials === client.id ? '...' : 'Senha'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPasswordDialogClient(client)}
+                            className="gap-1 text-xs text-orange-600 hover:text-orange-700"
+                            title="Alterar Senha do Atleta"
+                          >
+                            <Lock className="h-3 w-3" />
+                            Alterar
+                          </Button>
+                        </>
                       )}
                     </>
                   )}
@@ -368,6 +382,17 @@ Qualquer dúvida, estou à disposição! 💪`;
           </div>
         );
       })}
+
+      {/* Dialog para alterar senha do atleta */}
+      {passwordDialogClient && (
+        <ChangeAthletePasswordDialog
+          open={!!passwordDialogClient}
+          onOpenChange={(open) => !open && setPasswordDialogClient(null)}
+          clientId={passwordDialogClient.id}
+          clientEmail={passwordDialogClient.email || ''}
+          clientName={passwordDialogClient.name}
+        />
+      )}
     </div>
   );
 }
