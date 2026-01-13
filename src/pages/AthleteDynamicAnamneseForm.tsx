@@ -56,7 +56,13 @@ export default function AthleteDynamicAnamneseForm() {
   // Fetch the active anamnese form for the admin that owns this client
   useEffect(() => {
     const fetchForm = async () => {
-      if (!client) return;
+      if (!client) {
+        // If client is null but clientLoading is false, stop loading
+        if (!clientLoading) {
+          setLoading(false);
+        }
+        return;
+      }
 
       try {
         // Get the admin user_id from the client record
@@ -118,10 +124,8 @@ export default function AthleteDynamicAnamneseForm() {
       }
     };
 
-    if (client) {
-      fetchForm();
-    }
-  }, [client]);
+    fetchForm();
+  }, [client, clientLoading]);
 
   const handleAnswerChange = (questionId: string, value: any) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
