@@ -1612,6 +1612,42 @@ export type Database = {
         }
         Relationships: []
       }
+      message_templates: {
+        Row: {
+          available_variables: string[] | null
+          created_at: string
+          description: string | null
+          id: string
+          template_content: string
+          template_key: string
+          template_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          available_variables?: string[] | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          template_content: string
+          template_key: string
+          template_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          available_variables?: string[] | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          template_content?: string
+          template_key?: string
+          template_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number

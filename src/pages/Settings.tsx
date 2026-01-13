@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useClients, usePayments, useAddClient, Client } from '@/hooks/useClients';
-import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock } from 'lucide-react';
+import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAdminSettings, useSaveAdminSettings } from '@/hooks/useAdminSettings';
 import { ChangePasswordForm } from '@/components/athlete/ChangePasswordForm';
+import { MessageTemplatesSection } from '@/components/settings/MessageTemplatesSection';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
@@ -1048,6 +1049,24 @@ export default function Settings() {
                   Selecionar Arquivo de Backup
                 </Button>
               </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Message Templates */}
+          <AccordionItem value="messages" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <MessageSquare className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Mensagens WhatsApp</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Personalize as mensagens enviadas aos atletas
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <MessageTemplatesSection />
             </AccordionContent>
           </AccordionItem>
 
