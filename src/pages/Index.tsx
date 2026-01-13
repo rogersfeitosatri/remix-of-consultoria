@@ -2,21 +2,41 @@ import { Layout } from '@/components/layout/Layout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { ConsultationCalendar } from '@/components/dashboard/ConsultationCalendar';
 import { PendingCheckinsAlert } from '@/components/dashboard/PendingCheckinsAlert';
-import { useClients, usePayments, useConsultationSchedules, getExpiringThisMonth, getMonthlyIncome } from '@/hooks/useClients';
-import { Users, DollarSign, AlertTriangle, Loader2 } from 'lucide-react';
+import { useClients, usePayments, useConsultationSchedules, getExpiringThisMonth, getOverduePayments } from '@/hooks/useClients';
+import { getMonthlyIncomeByPaidAt, getDueAmountInPeriod } from '@/hooks/useFinancialData';
+import { Users, DollarSign, AlertTriangle, Loader2, CreditCard } from 'lucide-react';
+import { startOfMonth, endOfMonth } from 'date-fns';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
   const { data: consultations = [], isLoading: consultationsLoading } = useConsultationSchedules();
 
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth();
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  
+  // Período do mês atual
+  const monthStart = startOfMonth(today);
+  const monthEnd = endOfMonth(today);
 
   const activeClients = clients.filter(c => c.is_active);
   const expiringThisMonth = getExpiringThisMonth(clients, currentYear, currentMonth);
-  const monthlyIncome = getMonthlyIncome(payments, currentYear, currentMonth);
   
+  // Entradas do mês: apenas pagamentos com paid_at no mês atual
+  const monthlyIncome = useMemo(() => 
+    getMonthlyIncomeByPaidAt(payments, monthStart, monthEnd),
+    [payments, monthStart, monthEnd]
+  );
+  
+  // Vencimentos do mês: pagamentos com due_date no mês atual (não pagos)
+  const monthlyDue = useMemo(() =>
+    getDueAmountInPeriod(payments, monthStart, monthEnd),
+    [payments, monthStart, monthEnd]
+  );
 
   const isLoading = clientsLoading || paymentsLoading || consultationsLoading;
 
@@ -40,7 +60,7 @@ export default function Dashboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Atletas Ativos"
             value={activeClients.length}
@@ -48,19 +68,36 @@ export default function Dashboard() {
             icon={<Users className="h-6 w-6" />}
             variant="primary"
           />
+          <button 
+            onClick={() => navigate('/financial')}
+            className="text-left transition-transform hover:scale-[1.02]"
+          >
+            <StatCard
+              title="Entradas do Mês"
+              value={`R$ ${monthlyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+              subtitle="recebido"
+              icon={<DollarSign className="h-6 w-6" />}
+              variant="success"
+            />
+          </button>
+          <button 
+            onClick={() => navigate('/financial?filter=upcoming')}
+            className="text-left transition-transform hover:scale-[1.02]"
+          >
+            <StatCard
+              title="Vencimentos do Mês"
+              value={`R$ ${monthlyDue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+              subtitle="pendentes"
+              icon={<CreditCard className="h-6 w-6" />}
+              variant="warning"
+            />
+          </button>
           <StatCard
-            title="Entradas do Mês"
-            value={`R$ ${monthlyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-            subtitle="recebido"
-            icon={<DollarSign className="h-6 w-6" />}
-            variant="success"
-          />
-          <StatCard
-            title="Vencimentos do Mês"
+            title="Planos Vencendo"
             value={expiringThisMonth.length}
-            subtitle="planos"
+            subtitle="no mês"
             icon={<AlertTriangle className="h-6 w-6" />}
-            variant="warning"
+            variant="default"
           />
         </div>
 
