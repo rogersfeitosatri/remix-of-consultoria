@@ -1,40 +1,92 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { MonthlyRevenue } from '@/components/financial/MonthlyRevenue';
-import { UpcomingPayments } from '@/components/financial/UpcomingPayments';
-import { ExpensesSection } from '@/components/financial/ExpensesSection';
 import { StatCard } from '@/components/dashboard/StatCard';
-import { ExpiringClientsAlert } from '@/components/dashboard/ExpiringClientsAlert';
-import { useClients, usePayments, getMonthlyRevenue, getUpcomingPayments, getTotalMonthlyRecurring, getOverduePayments, getNewPlansThisMonth, getExpiringClients } from '@/hooks/useClients';
-import { DollarSign, TrendingUp, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
-import { parseISO } from 'date-fns';
+import { FinancialCharts } from '@/components/financial/FinancialCharts';
+import { FinancialFilters } from '@/components/financial/FinancialFilters';
+import { IncomeList } from '@/components/financial/IncomeList';
+import { DuePaymentsList } from '@/components/financial/DuePaymentsList';
+import { ExpensesSection } from '@/components/financial/ExpensesSection';
+import { useClients, usePayments, getOverduePayments } from '@/hooks/useClients';
+import { 
+  getMonthlyIncomeByPaidAt, 
+  getDueAmountInPeriod, 
+  getIncomePaymentsInPeriod,
+  getDuePaymentsInPeriod,
+  getDailyIncomeData,
+  getMonthlyIncomeData,
+  getDailyDueData,
+  getMonthlyDueData
+} from '@/hooks/useFinancialData';
+import { DollarSign, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
+import { startOfMonth, endOfMonth } from 'date-fns';
 
 export default function Financial() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialFilter = searchParams.get('filter') || 'all';
   
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  
+  // Filtros de período
+  const [filterStartDate, setFilterStartDate] = useState<Date>(startOfMonth(today));
+  const [filterEndDate, setFilterEndDate] = useState<Date>(endOfMonth(today));
   const [filter, setFilter] = useState<'all' | 'overdue' | 'upcoming'>(initialFilter as 'all' | 'overdue' | 'upcoming');
   
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
 
-  const monthlyData = getMonthlyRevenue(payments, currentYear, currentMonth);
-  const upcomingPayments = getUpcomingPayments(payments, 30);
+  // Cálculos baseados no período filtrado
+  const incomeTotal = useMemo(() => 
+    getMonthlyIncomeByPaidAt(payments, filterStartDate, filterEndDate),
+    [payments, filterStartDate, filterEndDate]
+  );
+  
+  const dueTotal = useMemo(() =>
+    getDueAmountInPeriod(payments, filterStartDate, filterEndDate),
+    [payments, filterStartDate, filterEndDate]
+  );
+  
+  const incomePayments = useMemo(() =>
+    getIncomePaymentsInPeriod(payments, filterStartDate, filterEndDate),
+    [payments, filterStartDate, filterEndDate]
+  );
+  
+  const duePayments = useMemo(() =>
+    getDuePaymentsInPeriod(payments, filterStartDate, filterEndDate),
+    [payments, filterStartDate, filterEndDate]
+  );
+  
+  // Dados para gráficos (sempre baseados no mês atual para visão diária)
+  const dailyIncomeData = useMemo(() =>
+    getDailyIncomeData(payments, currentYear, currentMonth),
+    [payments, currentYear, currentMonth]
+  );
+  
+  const monthlyIncomeData = useMemo(() =>
+    getMonthlyIncomeData(payments, 12),
+    [payments]
+  );
+  
+  const dailyDueData = useMemo(() =>
+    getDailyDueData(payments, currentYear, currentMonth),
+    [payments, currentYear, currentMonth]
+  );
+  
+  const monthlyDueData = useMemo(() =>
+    getMonthlyDueData(payments, 12),
+    [payments]
+  );
+  
+  // Pagamentos em atraso (para o card)
   const overduePayments = getOverduePayments(payments);
-  const monthlyRecurring = getTotalMonthlyRecurring(clients);
-  const newPlans = getNewPlansThisMonth(clients, currentYear, currentMonth);
-  const expiringClients = getExpiringClients(clients, 30);
 
-  const handleMonthChange = (year: number, month: number) => {
-    setCurrentYear(year);
-    setCurrentMonth(month);
+  const handleDateChange = (start: Date, end: Date) => {
+    setFilterStartDate(start);
+    setFilterEndDate(end);
   };
-
-  const paidThisMonth = monthlyData.payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
 
   const isLoading = clientsLoading || paymentsLoading;
 
@@ -53,12 +105,6 @@ export default function Financial() {
     );
   }
 
-  const displayPayments = filter === 'overdue' 
-    ? overduePayments 
-    : filter === 'upcoming' 
-      ? upcomingPayments 
-      : [...overduePayments, ...upcomingPayments];
-
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6 lg:space-y-8">
@@ -68,11 +114,11 @@ export default function Financial() {
           <p className="mt-1 text-sm sm:text-base text-muted-foreground">Controle de recebimentos e pagamentos</p>
         </div>
 
-        {/* Stats */}
+        {/* Stats - Resumo do período filtrado */}
         <div className="grid gap-2 sm:gap-3 lg:gap-4 grid-cols-3">
           <StatCard
-            title="Entradas do Mês"
-            value={`R$ ${paidThisMonth.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+            title="Entradas do Período"
+            value={`R$ ${incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             subtitle="confirmados"
             icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />}
             variant="success"
@@ -82,9 +128,9 @@ export default function Financial() {
             className="text-left transition-transform hover:scale-[1.02] h-full"
           >
             <StatCard
-              title="Vencimentos do Mês"
-              value={`R$ ${upcomingPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              subtitle={`${upcomingPayments.length} pagamentos`}
+              title="Vencimentos do Período"
+              value={`R$ ${dueTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+              subtitle={`${duePayments.filter(p => p.status !== 'paid').length} pendentes`}
               icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />}
               variant="default"
             />
@@ -103,20 +149,31 @@ export default function Financial() {
           </button>
         </div>
 
-        {/* Content */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
-          <UpcomingPayments 
-            payments={displayPayments} 
-            title={
-              filter === 'overdue' 
-                ? 'Pagamentos Atrasados' 
-                : filter === 'upcoming' 
-                  ? 'Vencimentos do Mês' 
-                  : 'Todos os Pagamentos'
-            }
+        {/* Filtros de período */}
+        <div className="glass-card rounded-xl p-4">
+          <FinancialFilters
+            startDate={filterStartDate}
+            endDate={filterEndDate}
+            onDateChange={handleDateChange}
           />
-          <ExpensesSection />
         </div>
+
+        {/* Gráficos */}
+        <FinancialCharts
+          dailyIncomeData={dailyIncomeData}
+          monthlyIncomeData={monthlyIncomeData}
+          dailyDueData={dailyDueData}
+          monthlyDueData={monthlyDueData}
+        />
+
+        {/* Listas detalhadas */}
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+          <IncomeList payments={incomePayments} title="Entradas Confirmadas" />
+          <DuePaymentsList payments={duePayments} title="Vencimentos" />
+        </div>
+
+        {/* Despesas */}
+        <ExpensesSection />
       </div>
     </Layout>
   );
