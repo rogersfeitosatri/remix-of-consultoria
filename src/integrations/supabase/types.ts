@@ -353,6 +353,7 @@ export type Database = {
       }
       athlete_profiles: {
         Row: {
+          anamnese_completed: boolean | null
           anamnese_submitted_at: string | null
           bedtime: string | null
           birth_date: string | null
@@ -422,6 +423,7 @@ export type Database = {
           work_schedule: string | null
         }
         Insert: {
+          anamnese_completed?: boolean | null
           anamnese_submitted_at?: string | null
           bedtime?: string | null
           birth_date?: string | null
@@ -491,6 +493,7 @@ export type Database = {
           work_schedule?: string | null
         }
         Update: {
+          anamnese_completed?: boolean | null
           anamnese_submitted_at?: string | null
           bedtime?: string | null
           birth_date?: string | null

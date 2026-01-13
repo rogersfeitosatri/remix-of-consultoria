@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useUserRole, useAthleteClient, useCheckinResponses, useCheckinQuestions } from '@/hooks/useUserRole';
+import { useUserRole, useAthleteClient, useCheckinResponses, useCheckinQuestions, useAthleteProfile } from '@/hooks/useUserRole';
 import { useAthleteSupportMaterials, useAthleteDietAppConfig } from '@/hooks/useSupportMaterials';
 import { useIsClientContinuation } from '@/hooks/useAthleteFirstConsult';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Home, LogOut, ArrowLeft, Eye, Lock, ClipboardCheck, Utensils, FileText, User } from 'lucide-react';
+import { Home, LogOut, ArrowLeft, Eye, ClipboardCheck, Utensils, FileText, User } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
@@ -20,6 +20,7 @@ import { NextConsultBanner } from '@/components/athlete/NextConsultBanner';
 import { NextConsultInfo } from '@/components/athlete/NextConsultInfo';
 import { MaterialPost } from '@/components/athlete/MaterialPost';
 import { AthleteProfileSection } from '@/components/athlete/AthleteProfileSection';
+import { AnamnesePendingBanner } from '@/components/athlete/AnamnesePendingBanner';
 import { LinkifiedText } from '@/lib/linkify';
 import rogersProfile from '@/assets/rogers-profile.jpg';
 
@@ -42,6 +43,7 @@ export default function AthleteDashboard() {
   const { isAdmin, isLoading: roleLoading } = useUserRole();
   const { data: client, isLoading: clientLoading } = useAthleteClient();
   const { data: continuationStatus } = useIsClientContinuation(client?.id);
+  const { data: athleteProfile } = useAthleteProfile(client?.id);
   const { data: checkinResponses = [], isLoading: responsesLoading } = useCheckinResponses(client?.id);
   const firstFormId = checkinResponses[0]?.form_id;
   const { data: checkinQuestions = [] } = useCheckinQuestions(firstFormId);
@@ -56,6 +58,9 @@ export default function AthleteDashboard() {
   const allSupportMaterials = [...supportMaterials, ...materialSuporte];
   
   const [activeTab, setActiveTab] = useState('inicio');
+  
+  // Check if anamnese is completed
+  const anamneseCompleted = athleteProfile?.anamnese_completed === true || athleteProfile?.anamnese_submitted_at != null;
 
   const handleSignOut = async () => {
     try {
@@ -73,8 +78,6 @@ export default function AthleteDashboard() {
   const handleBackToAdmin = () => { navigate('/admin'); };
   const handleFillAnamnese = () => { navigate('/athlete/anamnese'); };
   const handleContactSupport = () => { window.open('https://wa.me/5511999999999?text=Olá! Preciso de ajuda com a área do atleta.', '_blank'); };
-
-  const isPendingAnamnese = client?.athlete_status === 'pending_anamnese';
 
   if (authLoading || clientLoading || roleLoading) {
     return (
@@ -208,33 +211,6 @@ export default function AthleteDashboard() {
     );
   }
 
-  if (isPendingAnamnese) {
-    return (
-      <div className="min-h-screen bg-black text-white">
-        <header className="border-b border-gray-800 bg-black">
-          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]"><img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-[200%] object-cover object-[center_15%]" /></div>
-              <div className="flex items-center gap-2">
-                <div><h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1><p className="text-xs text-gray-400">Nutrição e Treinamento</p></div>
-                <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50 text-[10px] font-bold px-1.5 py-0">BETA</Badge>
-              </div>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-white hover:bg-gray-800"><LogOut className="h-4 w-4" /></Button>
-          </div>
-        </header>
-        <main className="max-w-2xl mx-auto px-4 py-12 text-center">
-          <Lock className="h-16 w-16 text-[hsl(43,74%,49%)] mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Área Bloqueada</h2>
-          <p className="text-gray-400 mb-6">Complete a anamnese inicial para liberar o acesso.</p>
-          <Button size="lg" onClick={handleFillAnamnese} className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold">
-            <ClipboardCheck className="h-5 w-5 mr-2" />Preencher Anamnese
-          </Button>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-black text-white">
       <header className="border-b border-gray-800 bg-black sticky top-0 z-50">
@@ -281,6 +257,9 @@ export default function AthleteDashboard() {
       <main className="max-w-4xl mx-auto px-4 py-6">
         <div className="mb-6"><h2 className="text-2xl font-bold text-white mb-1">Olá, {client.name.split(' ')[0]}!</h2><p className="text-gray-400">Bem-vindo à sua área de membros</p></div>
 
+        {/* Banner de anamnese pendente ou concluída */}
+        <AnamnesePendingBanner anamneseCompleted={anamneseCompleted} />
+
         {/* Banner de próxima consulta - unificado para todos os atletas premium */}
         <NextConsultBanner clientId={client.id} />
 
@@ -289,8 +268,8 @@ export default function AthleteDashboard() {
           <NextConsultCard clientId={client.id} />
         )}
 
-        {/* Card de 1ª consulta - apenas para novos clientes sem schedule */}
-        {!continuationStatus?.isContinuation && (
+        {/* Card de 1ª consulta - apenas para novos clientes sem schedule E com anamnese concluída */}
+        {!continuationStatus?.isContinuation && anamneseCompleted && (
           <FirstConsultCard clientId={client.id} />
         )}
 
