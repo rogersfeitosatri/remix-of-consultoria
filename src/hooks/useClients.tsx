@@ -404,7 +404,7 @@ export function useAddClient() {
       if (error) throw error;
 
       // Generate payment entry for the client
-      // If payment_date is set, mark as paid on that date
+      // If payment_date is set, mark as paid on that date (use that date as paid_at)
       const clientStartDate = parseISO(client.start_date);
       const paymentDate = client.payment_date ? parseISO(client.payment_date) : clientStartDate;
       const isPaid = !!client.payment_date;
@@ -417,7 +417,11 @@ export function useAddClient() {
           due_date: format(paymentDate, 'yyyy-MM-dd'),
           amount: client.monthly_value,
           status: isPaid ? 'paid' : 'pending',
-          paid_at: isPaid ? new Date().toISOString() : null,
+          // CRITICAL: Use the payment_date as paid_at (not current date)
+          // This ensures "Entradas do mês" calculates correctly based on when payment was registered
+          paid_at: isPaid && client.payment_date 
+            ? parseISO(client.payment_date).toISOString() 
+            : null,
         });
 
       if (paymentError) throw paymentError;
