@@ -102,17 +102,14 @@ export function getDueAmountInPeriod(
 }
 
 /**
- * Gráfico: Entradas por dia no mês atual
+ * Gráfico: Entradas por dia no período selecionado
  */
 export function getDailyIncomeData(
   payments: (Payment & { client_name?: string })[],
-  year: number,
-  month: number
+  startDate: Date,
+  endDate: Date
 ): DailyData[] {
-  const monthStart = startOfMonth(new Date(year, month));
-  const monthEnd = endOfMonth(new Date(year, month));
-  
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const days = eachDayOfInterval({ start: startOfDay(startDate), end: endOfDay(endDate) });
   
   return days.map(day => {
     const dayStart = startOfDay(day);
@@ -135,17 +132,14 @@ export function getDailyIncomeData(
 }
 
 /**
- * Gráfico: Entradas mês a mês (últimos 12 meses)
+ * Gráfico: Entradas mês a mês dentro do período filtrado
  */
 export function getMonthlyIncomeData(
   payments: (Payment & { client_name?: string })[],
-  monthsBack: number = 12
+  startDate: Date,
+  endDate: Date
 ): MonthlyData[] {
-  const today = new Date();
-  const startDate = startOfMonth(subMonths(today, monthsBack - 1));
-  const endDate = endOfMonth(today);
-  
-  const months = eachMonthOfInterval({ start: startDate, end: endDate });
+  const months = eachMonthOfInterval({ start: startOfMonth(startDate), end: endOfMonth(endDate) });
   
   return months.map(monthDate => {
     const monthStart = startOfMonth(monthDate);
@@ -168,17 +162,14 @@ export function getMonthlyIncomeData(
 }
 
 /**
- * Gráfico: Vencimentos por dia no mês atual
+ * Gráfico: Vencimentos por dia no período selecionado
  */
 export function getDailyDueData(
   payments: (Payment & { client_name?: string })[],
-  year: number,
-  month: number
+  startDate: Date,
+  endDate: Date
 ): DailyData[] {
-  const monthStart = startOfMonth(new Date(year, month));
-  const monthEnd = endOfMonth(new Date(year, month));
-  
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const days = eachDayOfInterval({ start: startOfDay(startDate), end: endOfDay(endDate) });
   
   return days.map(day => {
     const dayStart = startOfDay(day);
@@ -200,17 +191,14 @@ export function getDailyDueData(
 }
 
 /**
- * Gráfico: Vencimentos mês a mês (últimos 12 meses)
+ * Gráfico: Vencimentos mês a mês dentro do período filtrado
  */
 export function getMonthlyDueData(
   payments: (Payment & { client_name?: string })[],
-  monthsBack: number = 12
+  startDate: Date,
+  endDate: Date
 ): MonthlyData[] {
-  const today = new Date();
-  const startDate = startOfMonth(subMonths(today, monthsBack - 1));
-  const endDate = endOfMonth(today);
-  
-  const months = eachMonthOfInterval({ start: startDate, end: endDate });
+  const months = eachMonthOfInterval({ start: startOfMonth(startDate), end: endOfMonth(endDate) });
   
   return months.map(monthDate => {
     const monthStart = startOfMonth(monthDate);
@@ -270,23 +258,23 @@ export function useFinancialData(
   );
   
   const dailyIncomeData = useMemo(() =>
-    getDailyIncomeData(payments, currentYear, currentMonth),
-    [payments, currentYear, currentMonth]
+    getDailyIncomeData(payments, startDate, endDate),
+    [payments, startDate, endDate]
   );
   
   const monthlyIncomeData = useMemo(() =>
-    getMonthlyIncomeData(payments, 12),
-    [payments]
+    getMonthlyIncomeData(payments, startDate, endDate),
+    [payments, startDate, endDate]
   );
   
   const dailyDueData = useMemo(() =>
-    getDailyDueData(payments, currentYear, currentMonth),
-    [payments, currentYear, currentMonth]
+    getDailyDueData(payments, startDate, endDate),
+    [payments, startDate, endDate]
   );
   
   const monthlyDueData = useMemo(() =>
-    getMonthlyDueData(payments, 12),
-    [payments]
+    getMonthlyDueData(payments, startDate, endDate),
+    [payments, startDate, endDate]
   );
   
   return {

@@ -52,20 +52,20 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-6 lg:space-y-8">
+      <div className="space-y-4 sm:space-y-6 lg:space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="mt-1 text-sm sm:text-base text-muted-foreground">RF Assessoria Esportiva - Visão geral</p>
         </div>
 
-        {/* Stats */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
+        {/* Stats - Mobile: 2 columns (stacked look), Desktop: 4 columns */}
+        <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Atletas Ativos"
             value={activeClients.length}
             subtitle="cadastrados"
-            icon={<Users className="h-6 w-6" />}
+            icon={<Users className="h-5 w-5 sm:h-6 sm:w-6" />}
             variant="primary"
           />
           <button 
@@ -76,7 +76,7 @@ export default function Dashboard() {
               title="Entradas do Mês"
               value={`R$ ${monthlyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
               subtitle="recebido"
-              icon={<DollarSign className="h-6 w-6" />}
+              icon={<DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />}
               variant="success"
             />
           </button>
@@ -88,7 +88,7 @@ export default function Dashboard() {
               title="Vencimentos do Mês"
               value={`R$ ${monthlyDue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
               subtitle="pendentes"
-              icon={<CreditCard className="h-6 w-6" />}
+              icon={<CreditCard className="h-5 w-5 sm:h-6 sm:w-6" />}
               variant="warning"
             />
           </button>
@@ -96,7 +96,7 @@ export default function Dashboard() {
             title="Planos Vencendo"
             value={expiringThisMonth.length}
             subtitle="no mês"
-            icon={<AlertTriangle className="h-6 w-6" />}
+            icon={<AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />}
             variant="default"
           />
         </div>

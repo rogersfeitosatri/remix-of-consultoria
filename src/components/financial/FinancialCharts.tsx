@@ -19,6 +19,16 @@ function FinancialChart({ dailyData, monthlyData, title, color, icon }: ChartPro
   const data = viewType === 'daily' ? dailyData : monthlyData;
   const xKey = viewType === 'daily' ? 'day' : 'month';
   
+  // Para mobile, reduzir quantidade de labels no eixo X
+  const getInterval = () => {
+    if (viewType === 'daily') {
+      // Para diário, mostrar a cada 5 dias no mobile, a cada 4 no desktop
+      return typeof window !== 'undefined' && window.innerWidth < 640 ? 6 : 4;
+    }
+    // Para mensal, mostrar a cada 2 meses no mobile
+    return typeof window !== 'undefined' && window.innerWidth < 640 ? 1 : 0;
+  };
+  
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
@@ -30,7 +40,7 @@ function FinancialChart({ dailyData, monthlyData, title, color, icon }: ChartPro
           <p className="text-sm font-medium text-foreground">
             {viewType === 'daily' ? `Dia ${label}` : label}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm font-semibold text-primary">
             {formatCurrency(payload[0].value)}
           </p>
         </div>
@@ -41,42 +51,46 @@ function FinancialChart({ dailyData, monthlyData, title, color, icon }: ChartPro
   
   return (
     <Card className="border-border bg-card">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0 pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           {icon}
           {title}
         </CardTitle>
         <Tabs value={viewType} onValueChange={(v) => setViewType(v as 'daily' | 'monthly')}>
           <TabsList className="h-8">
-            <TabsTrigger value="daily" className="text-xs px-2 h-6">
+            <TabsTrigger value="daily" className="text-xs px-2 sm:px-3 h-6">
               <Calendar className="h-3 w-3 mr-1" />
-              Diário
+              <span className="hidden sm:inline">Diário</span>
+              <span className="sm:hidden">Dia</span>
             </TabsTrigger>
-            <TabsTrigger value="monthly" className="text-xs px-2 h-6">
+            <TabsTrigger value="monthly" className="text-xs px-2 sm:px-3 h-6">
               <TrendingUp className="h-3 w-3 mr-1" />
-              Mensal
+              <span className="hidden sm:inline">Mensal</span>
+              <span className="sm:hidden">Mês</span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
       </CardHeader>
-      <CardContent>
-        <div className="h-[250px] w-full">
+      <CardContent className="pt-2">
+        {/* Altura maior no mobile para melhor visualização */}
+        <div className="h-[220px] sm:h-[250px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             {viewType === 'daily' ? (
-              <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <BarChart data={data} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey={xKey} 
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
                   axisLine={{ stroke: 'hsl(var(--border))' }}
                   tickLine={false}
-                  interval={viewType === 'daily' ? 4 : 0}
+                  interval={getInterval()}
                 />
                 <YAxis 
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
                   axisLine={{ stroke: 'hsl(var(--border))' }}
                   tickLine={false}
                   tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}
+                  width={35}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar 
@@ -86,19 +100,21 @@ function FinancialChart({ dailyData, monthlyData, title, color, icon }: ChartPro
                 />
               </BarChart>
             ) : (
-              <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <LineChart data={data} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey={xKey} 
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
                   axisLine={{ stroke: 'hsl(var(--border))' }}
                   tickLine={false}
+                  interval={getInterval()}
                 />
                 <YAxis 
-                  tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
                   axisLine={{ stroke: 'hsl(var(--border))' }}
                   tickLine={false}
                   tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}
+                  width={35}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Line 
