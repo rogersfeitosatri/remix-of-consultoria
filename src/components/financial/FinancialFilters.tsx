@@ -75,34 +75,46 @@ export function FinancialFilters({ startDate, endDate, onDateChange }: Financial
   };
   
   return (
-    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-      <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium text-muted-foreground">Período:</span>
+    <div className="flex flex-col gap-3">
+      {/* Linha principal - Mobile: empilhado, Desktop: em linha */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground">Período:</span>
+        </div>
+        
+        {/* Select ocupa 100% no mobile */}
+        <Select value={preset} onValueChange={handlePresetChange}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Selecionar período" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="current_month">Mês atual</SelectItem>
+            <SelectItem value="last_30">Últimos 30 dias</SelectItem>
+            <SelectItem value="last_90">Últimos 90 dias</SelectItem>
+            <SelectItem value="current_quarter">Trimestre atual</SelectItem>
+            <SelectItem value="current_year">Ano atual</SelectItem>
+            <SelectItem value="custom">Personalizado</SelectItem>
+          </SelectContent>
+        </Select>
+        
+        {(isCustom || preset !== 'current_month') && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground self-end sm:self-auto">
+            <X className="h-4 w-4 mr-1" />
+            Limpar
+          </Button>
+        )}
       </div>
       
-      <Select value={preset} onValueChange={handlePresetChange}>
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Selecionar período" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="current_month">Mês atual</SelectItem>
-          <SelectItem value="last_30">Últimos 30 dias</SelectItem>
-          <SelectItem value="last_90">Últimos 90 dias</SelectItem>
-          <SelectItem value="current_quarter">Trimestre atual</SelectItem>
-          <SelectItem value="current_year">Ano atual</SelectItem>
-          <SelectItem value="custom">Personalizado</SelectItem>
-        </SelectContent>
-      </Select>
-      
+      {/* Calendários customizados - Mobile: empilhado, Desktop: em linha */}
       {isCustom && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-[130px] justify-start text-left font-normal",
+                  "w-full sm:w-[150px] justify-start text-left font-normal",
                   !startDate && "text-muted-foreground"
                 )}
               >
@@ -117,18 +129,19 @@ export function FinancialFilters({ startDate, endDate, onDateChange }: Financial
                 onSelect={handleStartDateSelect}
                 initialFocus
                 locale={ptBR}
+                className="pointer-events-auto"
               />
             </PopoverContent>
           </Popover>
           
-          <span className="text-muted-foreground">até</span>
+          <span className="text-muted-foreground hidden sm:block">até</span>
           
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
-                  "w-[130px] justify-start text-left font-normal",
+                  "w-full sm:w-[150px] justify-start text-left font-normal",
                   !endDate && "text-muted-foreground"
                 )}
               >
@@ -143,21 +156,16 @@ export function FinancialFilters({ startDate, endDate, onDateChange }: Financial
                 onSelect={handleEndDateSelect}
                 initialFocus
                 locale={ptBR}
+                className="pointer-events-auto"
               />
             </PopoverContent>
           </Popover>
         </div>
       )}
       
-      {(isCustom || preset !== 'current_month') && (
-        <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-          <X className="h-4 w-4 mr-1" />
-          Limpar
-        </Button>
-      )}
-      
-      <div className="text-xs text-muted-foreground ml-auto">
-        {format(startDate, "dd/MM/yyyy")} - {format(endDate, "dd/MM/yyyy")}
+      {/* Intervalo selecionado - sempre visível */}
+      <div className="text-xs sm:text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 text-center sm:text-left">
+        📅 {format(startDate, "dd/MM/yyyy")} — {format(endDate, "dd/MM/yyyy")}
       </div>
     </div>
   );

@@ -27,8 +27,6 @@ export default function Financial() {
   const initialFilter = searchParams.get('filter') || 'all';
   
   const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth();
   
   // Filtros de período
   const [filterStartDate, setFilterStartDate] = useState<Date>(startOfMonth(today));
@@ -59,25 +57,25 @@ export default function Financial() {
     [payments, filterStartDate, filterEndDate]
   );
   
-  // Dados para gráficos (sempre baseados no mês atual para visão diária)
+  // Dados para gráficos - agora respeitam o período filtrado
   const dailyIncomeData = useMemo(() =>
-    getDailyIncomeData(payments, currentYear, currentMonth),
-    [payments, currentYear, currentMonth]
+    getDailyIncomeData(payments, filterStartDate, filterEndDate),
+    [payments, filterStartDate, filterEndDate]
   );
   
   const monthlyIncomeData = useMemo(() =>
-    getMonthlyIncomeData(payments, 12),
-    [payments]
+    getMonthlyIncomeData(payments, filterStartDate, filterEndDate),
+    [payments, filterStartDate, filterEndDate]
   );
   
   const dailyDueData = useMemo(() =>
-    getDailyDueData(payments, currentYear, currentMonth),
-    [payments, currentYear, currentMonth]
+    getDailyDueData(payments, filterStartDate, filterEndDate),
+    [payments, filterStartDate, filterEndDate]
   );
   
   const monthlyDueData = useMemo(() =>
-    getMonthlyDueData(payments, 12),
-    [payments]
+    getMonthlyDueData(payments, filterStartDate, filterEndDate),
+    [payments, filterStartDate, filterEndDate]
   );
   
   // Pagamentos em atraso (para o card)
@@ -114,8 +112,8 @@ export default function Financial() {
           <p className="mt-1 text-sm sm:text-base text-muted-foreground">Controle de recebimentos e pagamentos</p>
         </div>
 
-        {/* Stats - Resumo do período filtrado */}
-        <div className="grid gap-2 sm:gap-3 lg:gap-4 grid-cols-3">
+        {/* Stats - Mobile: single column, Desktop: 3 columns */}
+        <div className="grid gap-3 sm:gap-4 lg:gap-4 grid-cols-1 sm:grid-cols-3">
           <StatCard
             title="Entradas do Período"
             value={`R$ ${incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
@@ -150,7 +148,7 @@ export default function Financial() {
         </div>
 
         {/* Filtros de período */}
-        <div className="glass-card rounded-xl p-4">
+        <div className="glass-card rounded-xl p-3 sm:p-4">
           <FinancialFilters
             startDate={filterStartDate}
             endDate={filterEndDate}
