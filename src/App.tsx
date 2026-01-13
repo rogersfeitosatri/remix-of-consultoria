@@ -32,6 +32,7 @@ import LinkBio from "./pages/LinkBio";
 import LinkBioManager from "./pages/LinkBioManager";
 import QuestionBank from "./pages/QuestionBank";
 import AppointmentDetail from "./pages/AppointmentDetail";
+import AnamneseResponseDetail from "./pages/AnamneseResponseDetail";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -111,6 +112,7 @@ function AppRoutes() {
       <Route path="/clients/:clientId/analysis" element={<ProtectedRoute adminOnly><AthleteAnalysis /></ProtectedRoute>} />
       <Route path="/clients/:clientId/history" element={<ProtectedRoute adminOnly><AthleteHistory /></ProtectedRoute>} />
       <Route path="/checkin-review/:responseId" element={<ProtectedRoute adminOnly><CheckinReview /></ProtectedRoute>} />
+      <Route path="/anamnese-response/:responseId" element={<ProtectedRoute adminOnly><AnamneseResponseDetail /></ProtectedRoute>} />
       <Route path="/appointments/:appointmentId" element={<ProtectedRoute adminOnly><AppointmentDetail /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
