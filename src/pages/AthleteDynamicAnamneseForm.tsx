@@ -232,6 +232,20 @@ export default function AthleteDynamicAnamneseForm() {
 
       if (updateError) throw updateError;
 
+      // Update athlete_profiles to mark anamnese as completed
+      const { error: profileError } = await supabase
+        .from('athlete_profiles')
+        .upsert({
+          client_id: client.id,
+          anamnese_completed: true,
+          anamnese_submitted_at: new Date().toISOString(),
+        }, { onConflict: 'client_id' });
+
+      if (profileError) {
+        console.error('Error updating athlete profile:', profileError);
+        // Don't throw - the main response was saved successfully
+      }
+
       toast.success('Anamnese enviada com sucesso!');
       navigate('/athlete');
     } catch (error) {

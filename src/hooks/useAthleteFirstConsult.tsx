@@ -39,6 +39,24 @@ export function useAthleteFirstConsultStatus(clientId: string | undefined) {
         };
       }
 
+      // Check if anamnese is completed
+      const { data: athleteProfile } = await supabase
+        .from('athlete_profiles')
+        .select('anamnese_completed, anamnese_submitted_at')
+        .eq('client_id', clientId)
+        .maybeSingle();
+
+      const anamneseCompleted = athleteProfile?.anamnese_completed === true || athleteProfile?.anamnese_submitted_at != null;
+
+      // If anamnese is not completed, don't show the card
+      if (!anamneseCompleted) {
+        return {
+          showCard: false,
+          reason: 'anamnese_pending',
+          anamneseCompleted: false,
+        };
+      }
+
       // Check if there's any confirmed appointment for this client in the current plan cycle
       const { data: appointments, error: aptError } = await supabase
         .from('appointments')

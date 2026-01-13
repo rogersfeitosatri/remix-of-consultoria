@@ -132,6 +132,21 @@ export default function PublicBookingConsult() {
         setIsVerifying(false);
         return;
       }
+
+      // Check if anamnese is completed
+      const { data: athleteProfile } = await supabase
+        .from('athlete_profiles')
+        .select('anamnese_completed, anamnese_submitted_at')
+        .eq('client_id', result.client_id)
+        .maybeSingle();
+
+      const anamneseCompleted = athleteProfile?.anamnese_completed === true || athleteProfile?.anamnese_submitted_at != null;
+
+      if (!anamneseCompleted) {
+        setVerificationError('Para agendar sua 1ª consulta, finalize a anamnese primeiro. Acesse sua área de membros para preencher.');
+        setIsVerifying(false);
+        return;
+      }
       
       // Success - set context
       setBookingContext({
