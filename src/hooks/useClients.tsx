@@ -498,6 +498,18 @@ export function useAddClient() {
         }
       }
 
+      // CRITICAL: Create athlete_profile for the new client
+      // This is required for the athlete tab to be visible in admin area
+      const { error: profileError } = await supabase
+        .from('athlete_profiles')
+        .insert({
+          client_id: client.id,
+        });
+
+      if (profileError) {
+        console.error('Error creating athlete profile:', profileError);
+      }
+
       return client;
     },
     onSuccess: () => {
