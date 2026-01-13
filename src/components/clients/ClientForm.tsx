@@ -866,7 +866,6 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                     id="sendCredentials"
                     checked={sendCredentials}
                     onCheckedChange={setSendCredentials}
-                    disabled={!formData.email || !formData.phone}
                   />
                   <div>
                     <Label htmlFor="sendCredentials" className="cursor-pointer">
