@@ -7,7 +7,9 @@ import { FinancialFilters } from '@/components/financial/FinancialFilters';
 import { IncomeList } from '@/components/financial/IncomeList';
 import { ExpiringPlansList } from '@/components/financial/ExpiringPlansList';
 import { ExpensesSection } from '@/components/financial/ExpensesSection';
-import { useClients, usePayments, getOverduePayments } from '@/hooks/useClients';
+import { AddPaymentDialog } from '@/components/financial/AddPaymentDialog';
+import { Button } from '@/components/ui/button';
+import { useClients, usePayments, getOverduePayments, useAddPayment } from '@/hooks/useClients';
 import { 
   getMonthlyIncomeByPaidAt, 
   getIncomePaymentsInPeriod,
@@ -18,8 +20,9 @@ import {
   getExpiringPlansInPeriod,
   getExpiringPlansTotal
 } from '@/hooks/useFinancialData';
-import { DollarSign, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
+import { DollarSign, CreditCard, AlertCircle, Loader2, Plus } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { toast } from 'sonner';
 
 export default function Financial() {
   const navigate = useNavigate();
@@ -32,9 +35,11 @@ export default function Financial() {
   const [filterStartDate, setFilterStartDate] = useState<Date>(startOfMonth(today));
   const [filterEndDate, setFilterEndDate] = useState<Date>(endOfMonth(today));
   const [filter, setFilter] = useState<'all' | 'overdue' | 'upcoming'>(initialFilter as 'all' | 'overdue' | 'upcoming');
+  const [showAddPayment, setShowAddPayment] = useState(false);
   
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
+  const addPaymentMutation = useAddPayment();
 
   // Cálculos de entradas baseados no período filtrado (data de pagamento - paid_at)
   const incomeTotal = useMemo(() => 
@@ -94,6 +99,25 @@ export default function Financial() {
     navigate(`/financial?filter=${newFilter}`);
   };
 
+  const handleAddPayment = async (data: {
+    client_id: string;
+    amount: number;
+    payment_method: string;
+    payment_date: string;
+    notes?: string;
+    plan_start_date?: string;
+    plan_end_date?: string;
+  }) => {
+    try {
+      await addPaymentMutation.mutateAsync(data);
+      toast.success('Entrada registrada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao registrar entrada:', error);
+      toast.error('Erro ao registrar entrada');
+      throw error;
+    }
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -108,9 +132,15 @@ export default function Financial() {
     <Layout>
       <div className="space-y-4 sm:space-y-6 lg:space-y-8">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Financeiro</h1>
-          <p className="mt-1 text-sm sm:text-base text-muted-foreground">Controle de recebimentos e pagamentos</p>
+        <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Financeiro</h1>
+            <p className="mt-1 text-sm sm:text-base text-muted-foreground">Controle de recebimentos e pagamentos</p>
+          </div>
+          <Button onClick={() => setShowAddPayment(true)} className="gap-2 w-full sm:w-auto">
+            <Plus className="h-4 w-4" />
+            Registrar Entrada
+          </Button>
         </div>
 
         {/* Stats - Mobile: single column, Desktop: 3 columns */}
@@ -169,6 +199,15 @@ export default function Financial() {
         {/* Despesas */}
         <ExpensesSection />
       </div>
+
+      {/* Dialog para registrar entrada */}
+      <AddPaymentDialog
+        open={showAddPayment}
+        onOpenChange={setShowAddPayment}
+        clients={clients}
+        onSubmit={handleAddPayment}
+        isSubmitting={addPaymentMutation.isPending}
+      />
     </Layout>
   );
 }
