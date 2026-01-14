@@ -91,20 +91,52 @@ export default function AnamneseResponseDetail() {
     const responses = responseData?.responses as Record<string, any> | null;
     if (!responses) return '(não respondeu)';
 
-    const answer = responses[questionId];
+    let answer = responses[questionId];
     
     if (answer === undefined || answer === null || answer === '') {
       return '(não respondeu)';
     }
 
+    // Handle object with "answer" property (common format)
+    if (typeof answer === 'object' && !Array.isArray(answer)) {
+      // Extract the actual answer value from { answer: "...", comment: "..." } structure
+      if ('answer' in answer) {
+        const mainAnswer = answer.answer;
+        const comment = answer.comment;
+        
+        if (mainAnswer === undefined || mainAnswer === null || mainAnswer === '') {
+          return '(não respondeu)';
+        }
+        
+        let result = '';
+        
+        if (Array.isArray(mainAnswer)) {
+          result = mainAnswer.length > 0 ? mainAnswer.join(', ') : '(não respondeu)';
+        } else {
+          result = String(mainAnswer);
+        }
+        
+        // Append comment if exists
+        if (comment && String(comment).trim()) {
+          result += `\nObservação: ${comment}`;
+        }
+        
+        return result;
+      }
+      
+      // For other complex objects (like meal data), try to format nicely
+      const entries = Object.entries(answer);
+      if (entries.length === 0) return '(não respondeu)';
+      
+      return entries
+        .filter(([_, v]) => v !== null && v !== undefined && v !== '')
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('\n') || '(não respondeu)';
+    }
+
     if (Array.isArray(answer)) {
       if (answer.length === 0) return '(não respondeu)';
       return answer.join(', ');
-    }
-
-    if (typeof answer === 'object') {
-      // Handle complex objects like meal data
-      return JSON.stringify(answer, null, 2);
     }
 
     return String(answer);
