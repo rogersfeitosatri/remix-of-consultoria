@@ -60,10 +60,7 @@ const CONSULTATION_FREQUENCY_LABELS = {
   six_weeks: '1 a cada 6 semanas',
 };
 
-const PAYMENT_TYPE_LABELS = {
-  pix: 'PIX',
-  card: 'Cartão',
-};
+// PAYMENT_TYPE_LABELS removed - financial data is now in Financial module
 
 const ONBOARDING_TYPE_LABELS = {
   new: 'Novo (padrão)',
@@ -407,44 +404,11 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                 onChange={(value) => setFormData({ ...formData, phone: value })}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="monthlyValue">Valor Pago (R$)</Label>
-              <Input
-                id="monthlyValue"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.monthly_value}
-                onChange={(e) => setFormData({ ...formData, monthly_value: parseFloat(e.target.value) || 0 })}
-                placeholder="0,00"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo de Pagamento</Label>
-              <Select
-                value={formData.payment_type}
-                onValueChange={(v) => setFormData({ ...formData, payment_type: v as 'pix' | 'card' })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(PAYMENT_TYPE_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="paymentDate">Data de Pagamento</Label>
-              <Input
-                id="paymentDate"
-                type="date"
-                value={formData.payment_date || ''}
-                onChange={(e) => setFormData({ ...formData, payment_date: e.target.value || '' })}
-              />
-            </div>
+          </div>
+
+          {/* Info box about financial data */}
+          <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+            <p>💰 Os dados financeiros (valor, forma de pagamento, data) são registrados separadamente na aba Financeiro.</p>
           </div>
 
           {/* Plan Info */}

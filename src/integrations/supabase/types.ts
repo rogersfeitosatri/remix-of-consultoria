@@ -1658,7 +1658,11 @@ export type Database = {
           created_at: string
           due_date: string
           id: string
+          notes: string | null
           paid_at: string | null
+          payment_method: string | null
+          plan_end_date: string | null
+          plan_start_date: string | null
           status: string
           updated_at: string
           user_id: string
@@ -1669,7 +1673,11 @@ export type Database = {
           created_at?: string
           due_date: string
           id?: string
+          notes?: string | null
           paid_at?: string | null
+          payment_method?: string | null
+          plan_end_date?: string | null
+          plan_start_date?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -1680,7 +1688,11 @@ export type Database = {
           created_at?: string
           due_date?: string
           id?: string
+          notes?: string | null
           paid_at?: string | null
+          payment_method?: string | null
+          plan_end_date?: string | null
+          plan_start_date?: string | null
           status?: string
           updated_at?: string
           user_id?: string

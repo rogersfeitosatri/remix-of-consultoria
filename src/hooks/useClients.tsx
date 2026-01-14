@@ -47,6 +47,10 @@ export interface Payment {
   amount: number;
   status: 'pending' | 'paid' | 'overdue';
   paid_at: string | null;
+  payment_method?: string;
+  notes?: string;
+  plan_start_date?: string;
+  plan_end_date?: string;
   created_at: string;
   updated_at: string;
   client_name?: string;
@@ -403,28 +407,8 @@ export function useAddClient() {
 
       if (error) throw error;
 
-      // Generate payment entry for the client
-      // If payment_date is set, mark as paid on that date (use that date as paid_at)
-      const clientStartDate = parseISO(client.start_date);
-      const paymentDate = client.payment_date ? parseISO(client.payment_date) : clientStartDate;
-      const isPaid = !!client.payment_date;
-      
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          user_id: user.id,
-          client_id: client.id,
-          due_date: format(paymentDate, 'yyyy-MM-dd'),
-          amount: client.monthly_value,
-          status: isPaid ? 'paid' : 'pending',
-          // CRITICAL: Use the payment_date as paid_at (not current date)
-          // This ensures "Entradas do mês" calculates correctly based on when payment was registered
-          paid_at: isPaid && client.payment_date 
-            ? parseISO(client.payment_date).toISOString() 
-            : null,
-        });
-
-      if (paymentError) throw paymentError;
+      // NOTE: Financial entries are now created separately via the Financial module
+      // The useAddPayment hook handles payment registration independently
 
       // Generate consultation schedules if applicable
       if (client.has_consultations && client.consultation_frequency) {
@@ -870,5 +854,51 @@ export function getConsultationsThisMonth(
   return schedules.filter(schedule => {
     const scheduledDate = parseISO(schedule.scheduled_date);
     return isWithinInterval(scheduledDate, { start: monthStart, end: monthEnd });
+  });
+}
+
+/**
+ * Mutation to add a new payment entry (for the Financial module)
+ * This is used to register payments independently from client registration
+ */
+export function useAddPayment() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (paymentData: {
+      client_id: string;
+      amount: number;
+      payment_method: string;
+      payment_date: string;
+      notes?: string;
+      plan_start_date?: string;
+      plan_end_date?: string;
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('payments')
+        .insert({
+          user_id: user.id,
+          client_id: paymentData.client_id,
+          amount: paymentData.amount,
+          due_date: paymentData.payment_date,
+          status: 'paid' as const,
+          paid_at: new Date(paymentData.payment_date).toISOString(),
+          payment_method: paymentData.payment_method,
+          notes: paymentData.notes || null,
+          plan_start_date: paymentData.plan_start_date || null,
+          plan_end_date: paymentData.plan_end_date || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+    },
   });
 }
