@@ -102,6 +102,34 @@ export function getDueAmountInPeriod(
 }
 
 /**
+ * Planos expirando: clientes com end_date dentro do período
+ */
+export function getExpiringPlansInPeriod(
+  clients: { id: string; name: string; end_date: string; monthly_value: number; plan_type: string; is_active: boolean }[],
+  startDate: Date,
+  endDate: Date
+) {
+  return clients
+    .filter(client => {
+      const endDate_ = parseISO(client.end_date);
+      return isWithinInterval(endDate_, { start: startOfDay(startDate), end: endOfDay(endDate) });
+    })
+    .sort((a, b) => parseISO(a.end_date).getTime() - parseISO(b.end_date).getTime());
+}
+
+/**
+ * Total de valor mensal de planos expirando no período
+ */
+export function getExpiringPlansTotal(
+  clients: { id: string; name: string; end_date: string; monthly_value: number; plan_type: string; is_active: boolean }[],
+  startDate: Date,
+  endDate: Date
+): number {
+  return getExpiringPlansInPeriod(clients, startDate, endDate)
+    .reduce((sum, c) => sum + c.monthly_value, 0);
+}
+
+/**
  * Gráfico: Entradas por dia no período selecionado
  */
 export function getDailyIncomeData(

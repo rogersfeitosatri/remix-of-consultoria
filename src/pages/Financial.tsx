@@ -5,18 +5,18 @@ import { StatCard } from '@/components/dashboard/StatCard';
 import { FinancialCharts } from '@/components/financial/FinancialCharts';
 import { FinancialFilters } from '@/components/financial/FinancialFilters';
 import { IncomeList } from '@/components/financial/IncomeList';
-import { DuePaymentsList } from '@/components/financial/DuePaymentsList';
+import { ExpiringPlansList } from '@/components/financial/ExpiringPlansList';
 import { ExpensesSection } from '@/components/financial/ExpensesSection';
 import { useClients, usePayments, getOverduePayments } from '@/hooks/useClients';
 import { 
   getMonthlyIncomeByPaidAt, 
-  getDueAmountInPeriod, 
   getIncomePaymentsInPeriod,
-  getDuePaymentsInPeriod,
   getDailyIncomeData,
   getMonthlyIncomeData,
   getDailyDueData,
-  getMonthlyDueData
+  getMonthlyDueData,
+  getExpiringPlansInPeriod,
+  getExpiringPlansTotal
 } from '@/hooks/useFinancialData';
 import { DollarSign, CreditCard, AlertCircle, Loader2 } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
@@ -36,14 +36,9 @@ export default function Financial() {
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
 
-  // Cálculos baseados no período filtrado
+  // Cálculos de entradas baseados no período filtrado (data de pagamento - paid_at)
   const incomeTotal = useMemo(() => 
     getMonthlyIncomeByPaidAt(payments, filterStartDate, filterEndDate),
-    [payments, filterStartDate, filterEndDate]
-  );
-  
-  const dueTotal = useMemo(() =>
-    getDueAmountInPeriod(payments, filterStartDate, filterEndDate),
     [payments, filterStartDate, filterEndDate]
   );
   
@@ -52,9 +47,15 @@ export default function Financial() {
     [payments, filterStartDate, filterEndDate]
   );
   
-  const duePayments = useMemo(() =>
-    getDuePaymentsInPeriod(payments, filterStartDate, filterEndDate),
-    [payments, filterStartDate, filterEndDate]
+  // Cálculos de planos expirando (end_date do cliente)
+  const expiringPlans = useMemo(() =>
+    getExpiringPlansInPeriod(clients, filterStartDate, filterEndDate),
+    [clients, filterStartDate, filterEndDate]
+  );
+  
+  const expiringTotal = useMemo(() =>
+    getExpiringPlansTotal(clients, filterStartDate, filterEndDate),
+    [clients, filterStartDate, filterEndDate]
   );
   
   // Dados para gráficos - agora respeitam o período filtrado
@@ -121,18 +122,13 @@ export default function Financial() {
             icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />}
             variant="success"
           />
-          <button 
-            onClick={() => handleFilterClick('upcoming')}
-            className="text-left transition-transform hover:scale-[1.02] h-full"
-          >
-            <StatCard
-              title="Vencimentos do Período"
-              value={`R$ ${dueTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              subtitle={`${duePayments.filter(p => p.status !== 'paid').length} pendentes`}
-              icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />}
-              variant="default"
-            />
-          </button>
+          <StatCard
+            title="Planos Expirando"
+            value={`R$ ${expiringTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+            subtitle={`${expiringPlans.length} planos`}
+            icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />}
+            variant="default"
+          />
           <button 
             onClick={() => handleFilterClick('overdue')}
             className="text-left transition-transform hover:scale-[1.02] h-full"
@@ -167,7 +163,7 @@ export default function Financial() {
         {/* Listas detalhadas */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
           <IncomeList payments={incomePayments} title="Entradas Confirmadas" />
-          <DuePaymentsList payments={duePayments} title="Vencimentos" />
+          <ExpiringPlansList clients={expiringPlans} title="Planos Expirando" />
         </div>
 
         {/* Despesas */}
