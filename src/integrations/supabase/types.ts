@@ -2205,6 +2205,17 @@ export type Database = {
         Returns: boolean
       }
       invoke_booking_links_processor: { Args: never; Returns: undefined }
+      mark_pending_reminders: {
+        Args: never
+        Returns: {
+          appointment_date: string
+          appointment_id: string
+          appointment_time: string
+          client_name: string
+          client_phone: string
+          google_meet_link: string
+        }[]
+      }
       validate_booking_email: {
         Args: { p_email: string; p_token: string }
         Returns: {
