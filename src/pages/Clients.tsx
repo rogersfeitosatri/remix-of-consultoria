@@ -16,6 +16,7 @@ import {
 import { Plus, Search, Loader2, Users, UserX, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 const SERVICE_OPTIONS = [
   { value: 'all', label: 'Todos os Serviços' },
@@ -35,6 +36,7 @@ export default function Clients() {
   const addClient = useAddClient();
   const updateClient = useUpdateClient();
   const deleteClientMutation = useDeleteClient();
+  const queryClient = useQueryClient();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -124,34 +126,39 @@ export default function Clients() {
                   description: 'Atleta cadastrado, mas houve erro ao criar conta de acesso.',
                   variant: 'destructive',
                 });
-              } else if (options?.sendCredentials && data.phone) {
-                // Enviar credenciais via Z-API (WhatsApp direto)
-                const baseUrl = window.location.origin;
-                const message = `🏃 *RF Assessoria - Bem-vindo!*\n\nOlá ${data.name}!\n\nSua conta foi criada com sucesso.\n\n📧 *Login:* ${data.email}\n🔑 *Senha:* 123456\n\n🔗 Acesse: ${baseUrl}/auth\n\n⚠️ Recomendamos trocar sua senha no primeiro acesso.\n\nQualquer dúvida, estamos à disposição!`;
+              } else {
+                // Invalidar cache para atualizar athlete_user_id na lista
+                queryClient.invalidateQueries({ queryKey: ['clients'] });
                 
-                try {
-                  const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
-                    body: {
-                      clientId: newClient.id,
-                      message: message,
-                    },
-                  });
+                if (options?.sendCredentials && data.phone) {
+                  // Enviar credenciais via Z-API (WhatsApp direto)
+                  const baseUrl = window.location.origin;
+                  const message = `🏃 *RF Assessoria - Bem-vindo!*\n\nOlá ${data.name}!\n\nSua conta foi criada com sucesso.\n\n📧 *Login:* ${data.email}\n🔑 *Senha:* 123456\n\n🔗 Acesse: ${baseUrl}/auth\n\n⚠️ Recomendamos trocar sua senha no primeiro acesso.\n\nQualquer dúvida, estamos à disposição!`;
                   
-                  if (whatsappError) {
-                    console.error('Erro ao enviar WhatsApp:', whatsappError);
-                    toast({
-                      title: 'Aviso',
-                      description: 'Atleta cadastrado, mas houve erro ao enviar credenciais via WhatsApp.',
-                      variant: 'destructive',
+                  try {
+                    const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
+                      body: {
+                        clientId: newClient.id,
+                        message: message,
+                      },
                     });
-                  } else {
-                    toast({
-                      title: 'Credenciais enviadas',
-                      description: 'Mensagem de boas-vindas enviada via WhatsApp com sucesso!',
-                    });
+                    
+                    if (whatsappError) {
+                      console.error('Erro ao enviar WhatsApp:', whatsappError);
+                      toast({
+                        title: 'Aviso',
+                        description: 'Atleta cadastrado, mas houve erro ao enviar credenciais via WhatsApp.',
+                        variant: 'destructive',
+                      });
+                    } else {
+                      toast({
+                        title: 'Credenciais enviadas',
+                        description: 'Mensagem de boas-vindas enviada via WhatsApp com sucesso!',
+                      });
+                    }
+                  } catch (whatsappErr) {
+                    console.error('Erro ao enviar WhatsApp:', whatsappErr);
                   }
-                } catch (whatsappErr) {
-                  console.error('Erro ao enviar WhatsApp:', whatsappErr);
                 }
               }
             } catch (err) {
