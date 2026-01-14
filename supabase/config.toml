@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.refresh-google-token]
 verify_jwt = false
+
+[functions.send-reminder-15m]
+verify_jwt = false

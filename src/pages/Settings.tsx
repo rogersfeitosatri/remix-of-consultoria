@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { useAdminSettings, useSaveAdminSettings } from '@/hooks/useAdminSettings';
 import { ChangePasswordForm } from '@/components/athlete/ChangePasswordForm';
 import { MessageTemplatesSection } from '@/components/settings/MessageTemplatesSection';
+import { WhatsAppControlCenter } from '@/components/settings/WhatsAppControlCenter';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
@@ -1052,21 +1053,21 @@ export default function Settings() {
             </AccordionContent>
           </AccordionItem>
 
-          {/* Message Templates */}
-          <AccordionItem value="messages" className="border border-border rounded-lg bg-card px-4">
+          {/* WhatsApp Control Center */}
+          <AccordionItem value="whatsapp" className="border border-border rounded-lg bg-card px-4">
             <AccordionTrigger className="hover:no-underline py-4">
               <div className="flex items-center gap-2 text-left">
                 <MessageSquare className="h-5 w-5 text-primary shrink-0" />
                 <div>
-                  <div className="font-semibold">Mensagens WhatsApp</div>
+                  <div className="font-semibold">Central de WhatsApp</div>
                   <div className="text-sm text-muted-foreground font-normal">
-                    Personalize as mensagens enviadas aos atletas
+                    Templates, mensagens programadas e histórico de envios
                   </div>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="pb-4">
-              <MessageTemplatesSection />
+              <WhatsAppControlCenter />
             </AccordionContent>
           </AccordionItem>
 
