@@ -131,15 +131,19 @@ Deno.serve(async (req) => {
     const saoPauloOffset = -3 * 60; // São Paulo is UTC-3
     const saoPauloNow = new Date(now.getTime() + (now.getTimezoneOffset() + saoPauloOffset) * 60 * 1000);
     
-    // Calculate the target window: 14-16 minutes from now
-    const in14Min = new Date(saoPauloNow.getTime() + 14 * 60 * 1000);
-    const in16Min = new Date(saoPauloNow.getTime() + 16 * 60 * 1000);
+    // Truncate seconds for more reliable matching (appointments are usually at :00)
+    saoPauloNow.setSeconds(0, 0);
+    
+    // Calculate the target window: 4-20 minutes from now (wider window to avoid missing reminders)
+    // Cron runs every minute, so we check a broad range
+    const in4Min = new Date(saoPauloNow.getTime() + 4 * 60 * 1000);
+    const in20Min = new Date(saoPauloNow.getTime() + 20 * 60 * 1000);
     
     const todayStr = saoPauloNow.toISOString().split('T')[0];
     const tomorrowStr = new Date(saoPauloNow.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     
-    console.log('Current São Paulo time:', saoPauloNow.toISOString());
-    console.log('Looking for appointments between:', in14Min.toISOString(), 'and', in16Min.toISOString());
+    console.log('Current São Paulo time (truncated):', saoPauloNow.toISOString());
+    console.log('Looking for appointments between:', in4Min.toISOString(), 'and', in20Min.toISOString());
 
     // Fetch appointments that:
     // 1. Are confirmed
@@ -177,7 +181,7 @@ Deno.serve(async (req) => {
         const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
         
         // Check if appointment is within the 14-16 minute window
-        if (appointmentDateTime < in14Min || appointmentDateTime > in16Min) {
+        if (appointmentDateTime < in4Min || appointmentDateTime > in20Min) {
           console.log('Skipping appointment outside window:', appointment.id, appointmentDateTime.toISOString());
           continue;
         }
@@ -356,7 +360,7 @@ Deno.serve(async (req) => {
 
     for (const apt of pendingMeetAppointments || []) {
       const aptDateTime = new Date(`${apt.appointment_date}T${apt.appointment_time}`);
-      if (aptDateTime >= in14Min && aptDateTime <= in16Min) {
+      if (aptDateTime >= in4Min && aptDateTime <= in20Min) {
         const clientData = apt.clients as unknown as { name: string; phone: string } | null;
         console.log('Appointment without Meet link:', apt.id);
         
