@@ -250,6 +250,7 @@ export type Database = {
           meet_status: string | null
           notes: string | null
           notes_admin: string | null
+          reminder_15m_sent_at: string | null
           reminder_sent_at: string | null
           status: string
           timezone: string | null
@@ -270,6 +271,7 @@ export type Database = {
           meet_status?: string | null
           notes?: string | null
           notes_admin?: string | null
+          reminder_15m_sent_at?: string | null
           reminder_sent_at?: string | null
           status?: string
           timezone?: string | null
@@ -290,6 +292,7 @@ export type Database = {
           meet_status?: string | null
           notes?: string | null
           notes_admin?: string | null
+          reminder_15m_sent_at?: string | null
           reminder_sent_at?: string | null
           status?: string
           timezone?: string | null
@@ -565,6 +568,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "athlete_profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      athlete_whatsapp_settings: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          disabled_all: boolean | null
+          disabled_template_keys: string[] | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          disabled_all?: boolean | null
+          disabled_template_keys?: string[] | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          disabled_all?: boolean | null
+          disabled_template_keys?: string[] | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_whatsapp_settings_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
             referencedRelation: "clients"
@@ -2022,6 +2060,105 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_message_logs: {
+        Row: {
+          appointment_id: string | null
+          client_id: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          message_type: string
+          metadata: Json | null
+          payload_preview: string | null
+          status: string
+          template_key: string | null
+          to_phone: string
+          user_id: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_type: string
+          metadata?: Json | null
+          payload_preview?: string | null
+          status?: string
+          template_key?: string | null
+          to_phone: string
+          user_id: string
+        }
+        Update: {
+          appointment_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_type?: string
+          metadata?: Json | null
+          payload_preview?: string | null
+          status?: string
+          template_key?: string | null
+          to_phone?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_message_logs_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_message_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_templates: {
+        Row: {
+          body: string
+          created_at: string | null
+          default_timing: string | null
+          id: string
+          is_active: boolean | null
+          template_key: string
+          template_name: string
+          updated_at: string | null
+          user_id: string
+          variables: string[] | null
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          default_timing?: string | null
+          id?: string
+          is_active?: boolean | null
+          template_key: string
+          template_name: string
+          updated_at?: string | null
+          user_id: string
+          variables?: string[] | null
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          default_timing?: string | null
+          id?: string
+          is_active?: boolean | null
+          template_key?: string
+          template_name?: string
+          updated_at?: string | null
+          user_id?: string
+          variables?: string[] | null
         }
         Relationships: []
       }
