@@ -66,7 +66,7 @@ Sua consulta é em 15 minutos:
 
 Até já! 🙂`,
     is_active: true,
-    default_timing: '-15m',
+    default_timing: '15 min antes',
     variables: ['nome', 'data', 'hora', 'link'],
   },
   {
@@ -81,7 +81,7 @@ Clique no link abaixo para escolher o melhor horário:
 
 Abraços! 🙂`,
     is_active: true,
-    default_timing: 'monday 07:00',
+    default_timing: 'Manual',
     variables: ['nome', 'link'],
   },
   {
@@ -94,13 +94,46 @@ Olá {nome}!
 Sua consulta foi agendada com sucesso:
 📅 Data: {data}
 🕒 Horário: {hora}
-
-{link_section}
+🎥 Link: {meet_link}
 
 Até lá! 🙂`,
     is_active: true,
-    default_timing: null,
-    variables: ['nome', 'data', 'hora', 'link_section'],
+    default_timing: 'Imediato',
+    variables: ['nome', 'data', 'hora', 'meet_link'],
+  },
+  {
+    template_key: 'weekly_booking_link',
+    template_name: 'Link Semanal de Agendamento',
+    body: `📅 *Agende sua Consulta*
+
+Olá {nome}!
+
+Está na hora de agendar sua próxima consulta! 🎯
+
+Escolha o melhor dia e horário:
+🔗 {booking_link}
+
+⏰ Este link é válido por 7 dias.
+
+Qualquer dúvida, estou à disposição! 💪`,
+    is_active: true,
+    default_timing: 'Segunda 10:00',
+    variables: ['nome', 'booking_link'],
+  },
+  {
+    template_key: 'checkin_reminder',
+    template_name: 'Lembrete de Check-in',
+    body: `Olá {nome}! 📋
+
+É hora do seu check-in semanal! 
+
+Responda o formulário para acompanharmos sua evolução:
+{link_checkin}
+
+Qualquer dúvida, estou por aqui! 💪`,
+    is_active: true,
+    default_timing: 'Conforme agendado',
+    variables: ['nome', 'link_checkin'],
   },
 ];
 
