@@ -60,7 +60,9 @@ export function WhatsAppLogsTab({ logs, isLoading }: WhatsAppLogsTabProps) {
       case 'reminder_15m': return 'Lembrete 15min';
       case 'booking_invite': return 'Convite Agendamento';
       case 'booking_confirmed': return 'Confirmação';
+      case 'confirmation': return 'Confirmação';
       case 'weekly_booking_link': return 'Link Semanal';
+      case 'checkin_reminder': return 'Lembrete Check-in';
       default: return type;
     }
   };
