@@ -64,8 +64,15 @@ export function WhatsAppTemplatesTab({ templates }: WhatsAppTemplatesTabProps) {
       case 'reminder_15m': return 'Lembrete 15 min antes';
       case 'booking_invite': return 'Convite de Agendamento';
       case 'booking_confirmed': return 'Confirmação de Agendamento';
+      case 'weekly_booking_link': return 'Link Semanal de Agendamento';
+      case 'checkin_reminder': return 'Lembrete de Check-in';
       default: return key;
     }
+  };
+
+  const getTemplateTiming = (template: WhatsAppTemplate) => {
+    if (!template.default_timing) return null;
+    return template.default_timing;
   };
 
   return (
@@ -102,19 +109,26 @@ export function WhatsAppTemplatesTab({ templates }: WhatsAppTemplatesTabProps) {
                         Alterado
                       </Badge>
                     )}
+                    {template.default_timing && (
+                      <span className="text-xs text-muted-foreground">
+                        📅 {template.default_timing}
+                      </span>
+                    )}
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
                   <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id={`active-${template.id}`}
-                        checked={data.is_active}
-                        onCheckedChange={(checked) => handleChange(template.id, 'is_active', checked)}
-                      />
-                      <Label htmlFor={`active-${template.id}`}>
-                        {data.is_active ? 'Template ativo' : 'Template desativado'}
-                      </Label>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id={`active-${template.id}`}
+                          checked={data.is_active}
+                          onCheckedChange={(checked) => handleChange(template.id, 'is_active', checked)}
+                        />
+                        <Label htmlFor={`active-${template.id}`}>
+                          {data.is_active ? 'Template ativo' : 'Template desativado'}
+                        </Label>
+                      </div>
                     </div>
 
                     {template.variables && template.variables.length > 0 && (
