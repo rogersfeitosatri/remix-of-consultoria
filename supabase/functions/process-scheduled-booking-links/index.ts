@@ -5,27 +5,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Function to send WhatsApp message via Z-API
-async function sendWhatsAppMessage(phone: string, message: string): Promise<boolean> {
-  const zapiInstanceId = Deno.env.get('ZAPI_INSTANCE_ID');
-  const zapiToken = Deno.env.get('ZAPI_TOKEN');
-  const zapiClientToken = Deno.env.get('ZAPI_CLIENT_TOKEN');
+interface WhatsAppSendResult {
+  success: boolean;
+  error?: string;
+  zapiResponse?: unknown;
+}
 
-  if (!zapiInstanceId || !zapiToken) {
-    console.error('Z-API credentials not configured');
-    return false;
-  }
-
-  // Format phone number
-  let formattedPhone = phone.replace(/\D/g, '');
-  if (formattedPhone.startsWith('0')) {
-    formattedPhone = formattedPhone.substring(1);
-  }
-  if (!formattedPhone.startsWith('55')) {
-    formattedPhone = '55' + formattedPhone;
-  }
-
+async function sendWhatsAppMessage(
+  phone: string, 
+  message: string,
+  zapiInstanceId: string,
+  zapiToken: string,
+  zapiClientToken: string
+): Promise<WhatsAppSendResult> {
   try {
+    let formattedPhone = phone.replace(/\D/g, '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = formattedPhone.substring(1);
+    }
+    if (!formattedPhone.startsWith('55')) {
+      formattedPhone = '55' + formattedPhone;
+    }
+
     const response = await fetch(
       `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}/send-text`,
       {
@@ -41,17 +42,25 @@ async function sendWhatsAppMessage(phone: string, message: string): Promise<bool
       }
     );
 
+    const result = await response.json();
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Z-API error:', response.status, errorText);
-      return false;
+      return { success: false, error: JSON.stringify(result), zapiResponse: result };
     }
 
-    return true;
-  } catch (error) {
-    console.error('Error sending WhatsApp:', error);
-    return false;
+    return { success: true, zapiResponse: result };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
   }
+}
+
+function formatMessage(template: string, variables: Record<string, string>): string {
+  let message = template;
+  for (const [key, value] of Object.entries(variables)) {
+    message = message.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+  }
+  return message;
 }
 
 Deno.serve(async (req) => {
@@ -59,16 +68,23 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  const zapiInstanceId = Deno.env.get('ZAPI_INSTANCE_ID');
+  const zapiToken = Deno.env.get('ZAPI_TOKEN');
+  const zapiClientToken = Deno.env.get('ZAPI_CLIENT_TOKEN') || '';
+
+  if (!zapiInstanceId || !zapiToken) {
+    console.error('ZAPI credentials not configured');
+    return new Response(
+      JSON.stringify({ error: 'ZAPI credentials not configured' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase configuration is missing');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     console.log('Processing scheduled booking links...');
 
     // Get pending booking invites using the RPC function
@@ -93,11 +109,50 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${pendingInvites.length} pending invites to process`);
 
-    let successCount = 0;
-    let errorCount = 0;
+    const results: { clientId: string; status: string; error?: string }[] = [];
+    const baseUrl = 'https://rogersfeitosa.lovable.app';
 
     for (const invite of pendingInvites) {
       try {
+        // Check athlete WhatsApp settings
+        const { data: athleteSettings } = await supabase
+          .from('athlete_whatsapp_settings')
+          .select('disabled_all, disabled_template_keys')
+          .eq('client_id', invite.client_id)
+          .maybeSingle();
+
+        if (athleteSettings?.disabled_all) {
+          console.log('WhatsApp disabled for athlete:', invite.client_id);
+          await supabase.from('whatsapp_message_logs').insert({
+            user_id: invite.admin_user_id,
+            client_id: invite.client_id,
+            message_type: 'weekly_booking_link',
+            template_key: 'weekly_booking_link',
+            to_phone: invite.client_phone || 'N/A',
+            status: 'skipped',
+            error_message: 'WhatsApp disabled for athlete',
+            metadata: { reason: 'athlete_disabled' }
+          });
+          results.push({ clientId: invite.client_id, status: 'skipped', error: 'WhatsApp disabled' });
+          continue;
+        }
+
+        if (athleteSettings?.disabled_template_keys?.includes('weekly_booking_link')) {
+          console.log('weekly_booking_link disabled for athlete:', invite.client_id);
+          await supabase.from('whatsapp_message_logs').insert({
+            user_id: invite.admin_user_id,
+            client_id: invite.client_id,
+            message_type: 'weekly_booking_link',
+            template_key: 'weekly_booking_link',
+            to_phone: invite.client_phone || 'N/A',
+            status: 'skipped',
+            error_message: 'Template disabled for athlete',
+            metadata: { reason: 'template_disabled' }
+          });
+          results.push({ clientId: invite.client_id, status: 'skipped', error: 'Template disabled' });
+          continue;
+        }
+
         // Get or create booking link
         let { data: bookingLink } = await supabase
           .from('booking_links')
@@ -107,7 +162,6 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (!bookingLink) {
-          // Create new booking link
           const { data: newLink, error: linkError } = await supabase
             .from('booking_links')
             .insert({ client_id: invite.client_id })
@@ -116,73 +170,114 @@ Deno.serve(async (req) => {
 
           if (linkError) {
             console.error('Error creating booking link:', linkError);
-            errorCount++;
+            results.push({ clientId: invite.client_id, status: 'failed', error: 'Failed to create booking link' });
             continue;
           }
           bookingLink = newLink;
         }
 
-        // Get message template
-        const { data: automationSettings } = await supabase
-          .from('consult_automation_settings')
-          .select('message_template_booking')
+        // Get template from database
+        const { data: template } = await supabase
+          .from('whatsapp_templates')
+          .select('body, is_active')
           .eq('user_id', invite.admin_user_id)
+          .eq('template_key', 'weekly_booking_link')
           .maybeSingle();
 
-        const baseUrl = 'https://preview--rogersnutri.lovable.app';
-        const bookingUrl = `${baseUrl}/booking/${bookingLink.token}`;
+        if (template && !template.is_active) {
+          console.log('Template weekly_booking_link is inactive');
+          await supabase.from('whatsapp_message_logs').insert({
+            user_id: invite.admin_user_id,
+            client_id: invite.client_id,
+            message_type: 'weekly_booking_link',
+            template_key: 'weekly_booking_link',
+            to_phone: invite.client_phone || 'N/A',
+            status: 'skipped',
+            error_message: 'Template is inactive',
+            metadata: { reason: 'template_inactive' }
+          });
+          results.push({ clientId: invite.client_id, status: 'skipped', error: 'Template inactive' });
+          continue;
+        }
 
-        let message = automationSettings?.message_template_booking || 
+        const bookingUrl = `${baseUrl}/booking/${bookingLink.token}`;
+        const templateBody = template?.body || 
           'Olá {nome}! Hora de agendar sua próxima consulta. Escolha seu melhor horário aqui: {booking_link}';
         
-        message = message
-          .replace('{nome}', invite.client_name.split(' ')[0])
-          .replace('{booking_link}', bookingUrl);
+        const message = formatMessage(templateBody, {
+          nome: invite.client_name.split(' ')[0],
+          booking_link: bookingUrl,
+        });
 
-        // Send WhatsApp
-        if (invite.client_phone) {
-          const sent = await sendWhatsAppMessage(invite.client_phone, message);
-          
-          // Log the attempt
-          await supabase.from('consult_invite_logs').insert({
-            client_id: invite.client_id,
-            channel: 'whatsapp',
-            status: sent ? 'sent' : 'failed',
-            message_type: 'scheduled_booking_invite',
-            error_message: sent ? null : 'Failed to send WhatsApp message',
-          });
-
-          if (sent) {
-            // Update the consultation schedule rule
-            await supabase
-              .from('consultation_schedule_rules')
-              .update({ 
-                last_link_sent_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              })
-              .eq('client_id', invite.client_id);
-
-            // Update booking link last_sent_at
-            await supabase
-              .from('booking_links')
-              .update({ last_sent_at: new Date().toISOString() })
-              .eq('token', bookingLink.token);
-
-            successCount++;
-            console.log(`Successfully sent booking invite to ${invite.client_name}`);
-          } else {
-            errorCount++;
-          }
-        } else {
+        if (!invite.client_phone) {
           console.log(`No phone number for client ${invite.client_name}`);
-          errorCount++;
+          await supabase.from('whatsapp_message_logs').insert({
+            user_id: invite.admin_user_id,
+            client_id: invite.client_id,
+            message_type: 'weekly_booking_link',
+            template_key: 'weekly_booking_link',
+            to_phone: 'N/A',
+            status: 'skipped',
+            error_message: 'No phone number',
+            metadata: { reason: 'no_phone' }
+          });
+          results.push({ clientId: invite.client_id, status: 'skipped', error: 'No phone' });
+          continue;
         }
-      } catch (error) {
+
+        console.log(`Sending booking link to ${invite.client_name}`);
+        const sendResult = await sendWhatsAppMessage(
+          invite.client_phone,
+          message,
+          zapiInstanceId,
+          zapiToken,
+          zapiClientToken
+        );
+
+        // Log the attempt
+        await supabase.from('whatsapp_message_logs').insert({
+          user_id: invite.admin_user_id,
+          client_id: invite.client_id,
+          message_type: 'weekly_booking_link',
+          template_key: 'weekly_booking_link',
+          to_phone: invite.client_phone,
+          payload_preview: message.substring(0, 500),
+          status: sendResult.success ? 'success' : 'failed',
+          error_message: sendResult.error,
+          metadata: { zapi_response: sendResult.zapiResponse }
+        });
+
+        if (sendResult.success) {
+          // Update the consultation schedule rule
+          await supabase
+            .from('consultation_schedule_rules')
+            .update({ 
+              last_link_sent_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('client_id', invite.client_id);
+
+          // Update booking link last_sent_at
+          await supabase
+            .from('booking_links')
+            .update({ last_sent_at: new Date().toISOString() })
+            .eq('token', bookingLink.token);
+
+          results.push({ clientId: invite.client_id, status: 'success' });
+          console.log(`Successfully sent booking invite to ${invite.client_name}`);
+        } else {
+          results.push({ clientId: invite.client_id, status: 'failed', error: sendResult.error });
+        }
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error(`Error processing invite for ${invite.client_name}:`, error);
-        errorCount++;
+        results.push({ clientId: invite.client_id, status: 'failed', error: errorMessage });
       }
     }
 
+    const successCount = results.filter(r => r.status === 'success').length;
+    const errorCount = results.filter(r => r.status === 'failed').length;
+    
     console.log(`Processing complete. Success: ${successCount}, Errors: ${errorCount}`);
 
     return new Response(JSON.stringify({ 
@@ -190,13 +285,14 @@ Deno.serve(async (req) => {
       processed: pendingInvites.length,
       successCount,
       errorCount,
+      results,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    console.error('Error in process-scheduled-booking-links:', error);
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error in process-scheduled-booking-links:', error);
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

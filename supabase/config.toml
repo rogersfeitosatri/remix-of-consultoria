@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.send-reminder-15m]
 verify_jwt = false
+
+[functions.send-checkin-reminders]
+verify_jwt = false
