@@ -265,7 +265,7 @@ export function useAvailabilityRules() {
       // First try to get from scheduling_time_blocks (new system)
       const { data: settings } = await supabase
         .from('scheduling_settings')
-        .select('id, slot_duration_minutes')
+        .select('id, slot_duration_minutes, buffer_minutes')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -279,13 +279,15 @@ export function useAvailabilityRules() {
 
         if (!blocksError && timeBlocks && timeBlocks.length > 0) {
           // Convert time blocks to availability rules format
+          // slot_minutes = consultation duration + buffer between appointments
+          const totalSlotMinutes = (settings.slot_duration_minutes || 30) + (settings.buffer_minutes || 15);
           return timeBlocks.map(block => ({
             id: block.id,
             user_id: user.id,
             day_of_week: block.day_of_week,
             start_time: block.start_time,
             end_time: block.end_time,
-            slot_minutes: settings.slot_duration_minutes || 30,
+            slot_minutes: totalSlotMinutes,
             is_enabled: true,
             created_at: block.created_at,
             updated_at: block.created_at,
