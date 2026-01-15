@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useClients, usePayments, useAddClient, Client } from '@/hooks/useClients';
-import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock, MessageSquare } from 'lucide-react';
+import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock, MessageSquare, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -16,6 +16,7 @@ import { useAdminSettings, useSaveAdminSettings } from '@/hooks/useAdminSettings
 import { ChangePasswordForm } from '@/components/athlete/ChangePasswordForm';
 import { MessageTemplatesSection } from '@/components/settings/MessageTemplatesSection';
 import { WhatsAppControlCenter } from '@/components/settings/WhatsAppControlCenter';
+import { LandingPageSettingsSection } from '@/components/settings/LandingPageSettingsSection';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
@@ -1068,6 +1069,24 @@ export default function Settings() {
             </AccordionTrigger>
             <AccordionContent className="pb-4">
               <WhatsAppControlCenter />
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Landing Page Plans */}
+          <AccordionItem value="landing-plans" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <ExternalLink className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Landing Page - Plans</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Configure os links dos botões de WhatsApp da página /plans
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <LandingPageSettingsSection />
             </AccordionContent>
           </AccordionItem>
 
