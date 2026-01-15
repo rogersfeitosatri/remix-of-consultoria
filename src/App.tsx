@@ -33,6 +33,7 @@ import LinkBioManager from "./pages/LinkBioManager";
 import QuestionBank from "./pages/QuestionBank";
 import AppointmentDetail from "./pages/AppointmentDetail";
 import AnamneseResponseDetail from "./pages/AnamneseResponseDetail";
+import PlansLanding from "./pages/PlansLanding";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -90,6 +91,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LinkBio />} />
+      <Route path="/plans" element={<PlansLanding />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
       <Route path="/anamnese-form/:formId" element={<PublicAnamneseForm />} />
