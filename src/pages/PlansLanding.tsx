@@ -53,19 +53,19 @@ export default function PlansLanding() {
             Nutrição Esportiva Especializada
           </span>
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-tight">
-            Consultoria Nutricional para{' '}
+            Consultoria{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
-              Endurance
+              Nutricional
             </span>
           </h1>
           <p className="text-xl md:text-2xl text-gray-300 font-medium mb-4">
-            Corrida e Triathlon
+            Emagrecimento e Performance
           </p>
           <p className="text-lg md:text-xl text-gray-400 mb-6 max-w-3xl mx-auto">
-            Foco em <strong className="text-white">performance</strong>, <strong className="text-white">recuperação</strong>, rotina real do atleta amador e estratégia de prova/longão.
+            Acompanhamento personalizado para quem busca <strong className="text-white">emagrecer com saúde</strong>, melhorar a <strong className="text-white">performance esportiva</strong> ou alcançar a melhor forma física.
           </p>
           <p className="text-base text-gray-500 italic mb-10">
-            Se seu objetivo for emagrecimento ou definição corporal, os dois planos também atendem isso.
+            Planos adaptados à sua rotina, seja você atleta amador, praticante de corrida, triathlon ou qualquer outra modalidade.
           </p>
           <Button
             size="lg"
