@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Separator } from '@/components/ui/separator';
 import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar, Clock, Video, User, ExternalLink, CheckCircle2 } from 'lucide-react';
@@ -103,10 +105,73 @@ export function ScheduledAppointmentsView() {
                     className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="rounded-full p-2 bg-emerald-500/20">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      </div>
-                        <div>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="rounded-full p-2 bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors"
+                            aria-label="Ver informações da consulta"
+                          >
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 p-4" align="start">
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-sm font-medium">
+                                {typeof apt.client?.name === 'string' ? apt.client.name : 'Cliente'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(parseISO(apt.appointment_date), 'dd/MM/yyyy')} • {apt.appointment_time.substring(0, 5)} • {(apt.duration_minutes ?? 30)} min
+                              </p>
+                            </div>
+
+                            <Separator />
+
+                            <div className="space-y-1 text-xs">
+                              {apt.client?.email && (
+                                <div className="flex items-start justify-between gap-3">
+                                  <span className="text-muted-foreground">E-mail</span>
+                                  <span className="text-foreground break-all">{apt.client.email}</span>
+                                </div>
+                              )}
+                              {apt.client?.phone && (
+                                <div className="flex items-start justify-between gap-3">
+                                  <span className="text-muted-foreground">WhatsApp</span>
+                                  <span className="text-foreground">{apt.client.phone}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {apt.google_meet_link && (
+                              <a
+                                href={apt.google_meet_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-sm text-blue-500 hover:text-blue-600"
+                              >
+                                <Video className="h-4 w-4" />
+                                Abrir Google Meet
+                              </a>
+                            )}
+
+                            <Separator />
+
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" asChild className="flex-1">
+                                <Link to={`/appointments/${apt.id}`}>Abrir detalhes</Link>
+                              </Button>
+                              {typeof apt.client?.name === 'string' && apt.client.name && (
+                                <Button size="sm" variant="outline" asChild className="flex-1">
+                                  <Link to={`/clients?search=${encodeURIComponent(String(apt.client.name))}`}>Ver atleta</Link>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+
+                      <div>
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-sm">{typeof apt.client?.name === 'string' ? apt.client.name : 'Cliente'}</p>
                           <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
