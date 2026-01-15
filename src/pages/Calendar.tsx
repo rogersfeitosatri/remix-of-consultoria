@@ -14,7 +14,7 @@ import {
 } from '@/hooks/useClients';
 import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2 } from 'lucide-react';
+import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2, Phone, Mail, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -529,14 +529,54 @@ export default function CalendarPage() {
                         {events.map((event, eventIndex) => {
                           if (event.type === 'first' && event.client) {
                             return (
-                              <div
-                                key={`first-${event.client.id}`}
-                                className="text-[10px] sm:text-xs p-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-foreground truncate"
-                                title={`1ª Consulta: ${event.client.name}`}
-                              >
-                                <span className="hidden sm:inline">1ª </span>
-                                {event.client.name}
-                              </div>
+                              <Popover key={`first-${event.client.id}`}>
+                                <PopoverTrigger asChild>
+                                  <div
+                                    className="text-[10px] sm:text-xs p-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-foreground truncate cursor-pointer hover:bg-emerald-500/30 transition-colors"
+                                    title={`1ª Consulta: ${event.client.name}`}
+                                  >
+                                    <span className="hidden sm:inline">1ª </span>
+                                    {event.client.name}
+                                  </div>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-72 p-3" align="start">
+                                  <div className="space-y-3">
+                                    <div>
+                                      <p className="font-medium text-sm">{event.client.name}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        1ª Consulta: {format(parseISO(event.client.first_consultation_date!), "dd/MM/yyyy")}
+                                      </p>
+                                    </div>
+                                    <div className="space-y-1.5 text-xs">
+                                      {event.client.phone && (
+                                        <div className="flex items-center gap-2">
+                                          <Phone className="h-3 w-3 text-muted-foreground" />
+                                          <span>{event.client.phone}</span>
+                                        </div>
+                                      )}
+                                      {event.client.email && (
+                                        <div className="flex items-center gap-2">
+                                          <Mail className="h-3 w-3 text-muted-foreground" />
+                                          <span className="truncate">{event.client.email}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2 pt-1">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1 text-xs"
+                                        asChild
+                                      >
+                                        <a href={`/clients?search=${encodeURIComponent(event.client.name)}`}>
+                                          <User className="h-3 w-3 mr-1" />
+                                          Ver atleta
+                                        </a>
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             );
                           }
 
