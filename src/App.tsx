@@ -91,6 +91,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LinkBio />} />
+      <Route path="/bio" element={<LinkBio />} />
       <Route path="/plans" element={<PlansLanding />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/form/:formId" element={<PublicCheckinForm />} />
