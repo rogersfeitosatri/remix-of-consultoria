@@ -221,6 +221,7 @@ Deno.serve(async (req) => {
     const oldDate = appointment.appointment_date;
     const oldTime = appointment.appointment_time.substring(0, 5);
 
+    // Reset reminder fields so the new reminders can be sent for the rescheduled appointment
     await supabase
       .from('appointments')
       .update({
@@ -229,6 +230,8 @@ Deno.serve(async (req) => {
         google_calendar_event_id: newEventId || appointment.google_calendar_event_id,
         google_meet_link: newMeetLink,
         notes_admin: `Remarcado de ${oldDate} ${oldTime} para ${newDate} ${newTime}`,
+        reminder_sent_at: null, // Reset 24h reminder
+        reminder_15m_sent_at: null, // Reset 15min reminder
         updated_at: new Date().toISOString(),
       })
       .eq('id', appointmentId);
