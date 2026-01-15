@@ -12,6 +12,7 @@ import {
   useClients,
   useConsultationSchedules,
 } from '@/hooks/useClients';
+import { useConsultationAppointments } from '@/hooks/useConsultations';
 import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2, Phone, Mail, ExternalLink } from 'lucide-react';
@@ -41,11 +42,13 @@ import { MondaySendView } from '@/components/scheduling/MondaySendView';
 import { ScheduledAppointmentsView } from '@/components/scheduling/ScheduledAppointmentsView';
 import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 
 export default function CalendarPage() {
   const queryClient = useQueryClient();
   const { data: allClients = [], isLoading: clientsLoading } = useClients();
   const { data: consultations = [], isLoading: consultationsLoading } = useConsultationSchedules();
+  const { data: appointments = [] } = useConsultationAppointments();
   const [activeTab, setActiveTab] = useState('calendar');
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -528,6 +531,12 @@ export default function CalendarPage() {
                       <div className="space-y-1 overflow-y-auto max-h-[70px] sm:max-h-[85px]">
                         {events.map((event, eventIndex) => {
                           if (event.type === 'first' && event.client) {
+                            // Find the appointment for this client on this date
+                            const clientAppointment = appointments?.find(
+                              apt => apt.client_id === event.client!.id && 
+                                     apt.appointment_date === event.client!.first_consultation_date
+                            );
+                            
                             return (
                               <Popover key={`first-${event.client.id}`}>
                                 <PopoverTrigger asChild>
@@ -562,17 +571,31 @@ export default function CalendarPage() {
                                       )}
                                     </div>
                                     <div className="flex gap-2 pt-1">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="flex-1 text-xs"
-                                        asChild
-                                      >
-                                        <a href={`/clients?search=${encodeURIComponent(event.client.name)}`}>
-                                          <User className="h-3 w-3 mr-1" />
-                                          Ver atleta
-                                        </a>
-                                      </Button>
+                                      {clientAppointment ? (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="flex-1 text-xs"
+                                          asChild
+                                        >
+                                          <Link to={`/appointments/${clientAppointment.id}`}>
+                                            <CalendarCheck2 className="h-3 w-3 mr-1" />
+                                            Detalhes da consulta
+                                          </Link>
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="flex-1 text-xs"
+                                          asChild
+                                        >
+                                          <Link to={`/clients?search=${encodeURIComponent(event.client.name)}`}>
+                                            <User className="h-3 w-3 mr-1" />
+                                            Ver atleta
+                                          </Link>
+                                        </Button>
+                                      )}
                                     </div>
                                   </div>
                                 </PopoverContent>
