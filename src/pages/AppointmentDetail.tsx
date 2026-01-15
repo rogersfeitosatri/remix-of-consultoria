@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,9 +12,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { useRescheduleAppointment, useCancelAppointment, useAvailabilityRules } from '@/hooks/useConsultations';
+import { useRescheduleAppointment, useCancelAppointment } from '@/hooks/useConsultations';
+import { useSchedulingSettings, useSchedulingBlocks, useAppointmentsByDate } from '@/hooks/useScheduling';
+import { useTimeBlocks } from '@/hooks/useTimeBlocks';
 import { toast } from 'sonner';
-import { format, parseISO, setHours, setMinutes, isBefore, startOfDay, addDays } from 'date-fns';
+import { format, parseISO, setHours, setMinutes, isBefore, startOfDay, addDays, addMinutes, isSameDay, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   ArrowLeft, 
@@ -81,7 +83,17 @@ export default function AppointmentDetail() {
   
   const rescheduleAppointment = useRescheduleAppointment();
   const cancelAppointment = useCancelAppointment();
-  const { data: availabilityRules = [] } = useAvailabilityRules();
+  
+  // Fetch scheduling settings and time blocks (same as PublicBooking)
+  const { data: schedulingSettings } = useSchedulingSettings();
+  const { data: timeBlocks = [] } = useTimeBlocks(schedulingSettings?.id);
+  const { data: blocks = [] } = useSchedulingBlocks(schedulingSettings?.user_id);
+  
+  // Get appointments for the selected new date (for conflict checking)
+  const { data: existingAppointments = [] } = useAppointmentsByDate(
+    schedulingSettings?.user_id || '',
+    newDate ? format(newDate, 'yyyy-MM-dd') : ''
+  );
   
   // Fetch appointment details
   const { data: appointment, isLoading, refetch } = useQuery({
@@ -108,31 +120,99 @@ export default function AppointmentDetail() {
     }
   }, [appointment]);
   
-  // Generate available time slots for reschedule
-  const availableSlots = (() => {
-    if (!newDate) return [];
-    
-    const dayOfWeek = newDate.getDay();
-    const rulesForDay = availabilityRules.filter(r => r.day_of_week === dayOfWeek && r.is_enabled);
+  // Buffer minutes from settings
+  const bufferMinutes = (schedulingSettings as any)?.buffer_minutes || 15;
+  const slotDuration = schedulingSettings?.slot_duration_minutes || 30;
+  
+  // Generate available time slots for reschedule - SAME LOGIC AS PublicBooking
+  const availableSlots = useMemo(() => {
+    if (!schedulingSettings || !newDate) return [];
     
     const slots: string[] = [];
+    const dayOfWeek = getDay(newDate);
+    const dateStr = format(newDate, 'yyyy-MM-dd');
     
-    rulesForDay.forEach(rule => {
-      const [startHour, startMin] = rule.start_time.split(':').map(Number);
-      const [endHour, endMin] = rule.end_time.split(':').map(Number);
+    // Check for full day blocks first
+    const fullDayBlock = blocks.find(
+      b => b.block_date === dateStr && b.block_type === 'full_day'
+    );
+    if (fullDayBlock) return [];
+    
+    // Get time blocks for this day - ONLY USE TIME BLOCKS
+    const dayTimeBlocks = timeBlocks.filter(tb => tb.day_of_week === dayOfWeek);
+    
+    // If no time blocks for this day, no slots available
+    if (dayTimeBlocks.length === 0) {
+      return [];
+    }
+    
+    // Calculate slot step with buffer (same as PublicBooking)
+    const slotStep = slotDuration + bufferMinutes;
+    
+    // Generate slots ONLY from configured time blocks
+    dayTimeBlocks.forEach(tb => {
+      const [startHour, startMin] = tb.start_time.substring(0, 5).split(':').map(Number);
+      const [endHour, endMin] = tb.end_time.substring(0, 5).split(':').map(Number);
       
-      let current = setMinutes(setHours(newDate, startHour), startMin);
-      const end = setMinutes(setHours(newDate, endHour), endMin);
+      let currentTime = new Date(newDate);
+      currentTime.setHours(startHour, startMin, 0, 0);
       
-      while (isBefore(current, end)) {
-        slots.push(format(current, 'HH:mm'));
-        current = new Date(current.getTime() + (rule.slot_minutes || 30) * 60000);
+      const endTime = new Date(newDate);
+      endTime.setHours(endHour, endMin, 0, 0);
+      
+      while (isBefore(currentTime, endTime)) {
+        const timeStr = format(currentTime, 'HH:mm');
+        
+        // Check if slot is blocked by time range
+        const isBlocked = blocks.some(b => {
+          if (b.block_date !== dateStr || b.block_type !== 'time_range') return false;
+          const blockStart = b.start_time?.substring(0, 5);
+          const blockEnd = b.end_time?.substring(0, 5);
+          return timeStr >= blockStart! && timeStr < blockEnd!;
+        });
+        
+        // Check if slot conflicts with existing appointments (considering duration + buffer)
+        // EXCLUDE the current appointment being rescheduled from conflict check
+        const isBooked = existingAppointments.some(a => {
+          if (!a.appointment_time) return false;
+          if (a.id === appointmentId) return false; // Don't block the slot if it's the same appointment
+          
+          const aptTime = a.appointment_time.substring(0, 5);
+          const [aptHour, aptMin] = aptTime.split(':').map(Number);
+          
+          // Create appointment start and end times with buffer
+          const aptStart = new Date(newDate);
+          aptStart.setHours(aptHour, aptMin, 0, 0);
+          
+          // Block from (aptStart - buffer) to (aptEnd + buffer)
+          const aptDuration = a.duration_minutes || slotDuration;
+          const blockStart = addMinutes(aptStart, -bufferMinutes);
+          const blockEnd = addMinutes(aptStart, aptDuration + bufferMinutes);
+          
+          // Check if this slot falls within the blocked range
+          const slotStart = new Date(newDate);
+          slotStart.setHours(parseInt(timeStr.split(':')[0]), parseInt(timeStr.split(':')[1]), 0, 0);
+          const slotEnd = addMinutes(slotStart, slotDuration);
+          
+          // Slot conflicts if it overlaps with blocked range
+          return slotStart < blockEnd && slotEnd > blockStart;
+        });
+        
+        // Check if slot is in the past (for today)
+        const isPast = isSameDay(newDate, new Date()) && isBefore(currentTime, new Date());
+        
+        if (!isBlocked && !isBooked && !isPast) {
+          slots.push(timeStr);
+        }
+        
+        // Use slot step (duration + buffer) for next slot
+        currentTime = addMinutes(currentTime, slotStep);
       }
     });
     
-    return slots.sort();
-  })();
-  
+    // Sort and remove duplicates
+    return [...new Set(slots)].sort();
+  }, [schedulingSettings, newDate, blocks, existingAppointments, timeBlocks, bufferMinutes, slotDuration, appointmentId]);
   const handleSaveNotes = async () => {
     if (!appointmentId) return;
     
