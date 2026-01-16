@@ -55,13 +55,13 @@ export function usePendingDietAlerts() {
   return useQuery({
     queryKey: ['pending-diet-alerts', user?.id],
     queryFn: async () => {
-      // Fetch eligible clients: Consultoria or Premium with 0 or 1 consultation
+      // Fetch eligible clients: ONLY Consultoria OR Consulta Única (single consultation)
+      // Exclude Premium with recurring consultations (consultation_frequency set)
       const { data: eligibleClients, error: clientsError } = await supabase
         .from('clients')
-        .select('id, name, plan_type, consultation_count, is_active')
+        .select('id, name, plan_type, consultation_count, consultation_frequency, is_active')
         .eq('is_active', true)
-        .in('plan_type', ['consultoria', 'premium'])
-        .or('consultation_count.is.null,consultation_count.lte.1');
+        .or('plan_type.eq.consultoria,plan_type.eq.consulta_unica');
 
       if (clientsError) throw clientsError;
 
@@ -78,6 +78,7 @@ export function usePendingDietAlerts() {
         client_name: string;
         plan_type: string;
         consultation_count: number | null;
+        consultation_frequency: string | null;
         last_adjustment_at: string | null;
         next_alert_at: string | null;
         is_pending: boolean;
@@ -85,6 +86,11 @@ export function usePendingDietAlerts() {
       }> = [];
 
       for (const client of eligibleClients || []) {
+        // Double-check: skip if consultation_frequency is set (means recurring consultations)
+        if (client.consultation_frequency) {
+          continue;
+        }
+        
         const existingAlert = alerts?.find(a => a.client_id === client.id);
 
         if (!existingAlert) {
@@ -94,6 +100,7 @@ export function usePendingDietAlerts() {
             client_name: client.name,
             plan_type: client.plan_type,
             consultation_count: client.consultation_count,
+            consultation_frequency: client.consultation_frequency,
             last_adjustment_at: null,
             next_alert_at: null,
             is_pending: true,
@@ -110,6 +117,7 @@ export function usePendingDietAlerts() {
               client_name: client.name,
               plan_type: client.plan_type,
               consultation_count: client.consultation_count,
+              consultation_frequency: client.consultation_frequency,
               last_adjustment_at: existingAlert.last_adjustment_at,
               next_alert_at: existingAlert.next_alert_at,
               is_pending: true,
