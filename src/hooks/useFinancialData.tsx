@@ -101,32 +101,62 @@ export function getDueAmountInPeriod(
     .reduce((sum, p) => sum + p.amount, 0);
 }
 
+export interface ExpiringPlanWithPayment {
+  id: string;
+  name: string;
+  end_date: string;
+  plan_type: string;
+  is_active: boolean;
+  payment_amount: number;
+}
+
 /**
  * Planos expirando: clientes com end_date dentro do período
+ * Retorna o valor pago do plano atual (da tabela payments com plan_end_date correspondente)
  */
 export function getExpiringPlansInPeriod(
   clients: { id: string; name: string; end_date: string; monthly_value: number; plan_type: string; is_active: boolean }[],
+  payments: (Payment & { client_name?: string })[],
   startDate: Date,
   endDate: Date
-) {
+): ExpiringPlanWithPayment[] {
   return clients
     .filter(client => {
       const endDate_ = parseISO(client.end_date);
       return isWithinInterval(endDate_, { start: startOfDay(startDate), end: endOfDay(endDate) });
     })
+    .map(client => {
+      // Buscar o pagamento que corresponde ao plano atual (plan_end_date = end_date do cliente)
+      const matchingPayment = payments.find(p => 
+        p.client_id === client.id && 
+        p.plan_end_date && 
+        p.plan_end_date === client.end_date &&
+        p.status === 'paid'
+      );
+      
+      return {
+        id: client.id,
+        name: client.name,
+        end_date: client.end_date,
+        plan_type: client.plan_type,
+        is_active: client.is_active,
+        payment_amount: matchingPayment?.amount || 0
+      };
+    })
     .sort((a, b) => parseISO(a.end_date).getTime() - parseISO(b.end_date).getTime());
 }
 
 /**
- * Total de valor mensal de planos expirando no período
+ * Total de valor pago dos planos expirando no período
  */
 export function getExpiringPlansTotal(
   clients: { id: string; name: string; end_date: string; monthly_value: number; plan_type: string; is_active: boolean }[],
+  payments: (Payment & { client_name?: string })[],
   startDate: Date,
   endDate: Date
 ): number {
-  return getExpiringPlansInPeriod(clients, startDate, endDate)
-    .reduce((sum, c) => sum + c.monthly_value, 0);
+  return getExpiringPlansInPeriod(clients, payments, startDate, endDate)
+    .reduce((sum, c) => sum + c.payment_amount, 0);
 }
 
 /**

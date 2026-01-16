@@ -10,9 +10,9 @@ interface ExpiringPlan {
   id: string;
   name: string;
   end_date: string;
-  monthly_value: number;
   plan_type: string;
   is_active: boolean;
+  payment_amount: number;
 }
 
 interface ExpiringPlansListProps {
@@ -23,7 +23,7 @@ interface ExpiringPlansListProps {
 export function ExpiringPlansList({ clients, title = "Planos Expirando" }: ExpiringPlansListProps) {
   const today = new Date();
   
-  const totalValue = clients.reduce((sum, c) => sum + c.monthly_value, 0);
+  const totalValue = clients.reduce((sum, c) => sum + c.payment_amount, 0);
   const activeCount = clients.filter(c => c.is_active).length;
   
   const getStatusInfo = (client: ExpiringPlan) => {
@@ -139,7 +139,7 @@ export function ExpiringPlansList({ clients, title = "Planos Expirando" }: Expir
                       "text-sm font-semibold whitespace-nowrap",
                       "text-foreground"
                     )}>
-                      R$ {client.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {client.payment_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
