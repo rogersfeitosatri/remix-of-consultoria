@@ -52,15 +52,15 @@ export default function Financial() {
     [payments, filterStartDate, filterEndDate]
   );
   
-  // Cálculos de planos expirando (end_date do cliente)
+  // Cálculos de planos expirando (end_date do cliente + valor pago do pagamento correspondente)
   const expiringPlans = useMemo(() =>
-    getExpiringPlansInPeriod(clients, filterStartDate, filterEndDate),
-    [clients, filterStartDate, filterEndDate]
+    getExpiringPlansInPeriod(clients, payments, filterStartDate, filterEndDate),
+    [clients, payments, filterStartDate, filterEndDate]
   );
   
   const expiringTotal = useMemo(() =>
-    getExpiringPlansTotal(clients, filterStartDate, filterEndDate),
-    [clients, filterStartDate, filterEndDate]
+    getExpiringPlansTotal(clients, payments, filterStartDate, filterEndDate),
+    [clients, payments, filterStartDate, filterEndDate]
   );
   
   // Dados para gráficos - agora respeitam o período filtrado
