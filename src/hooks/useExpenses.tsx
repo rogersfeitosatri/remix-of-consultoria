@@ -13,8 +13,16 @@ export interface Expense {
   status: 'pending' | 'paid' | 'overdue';
   paid_at: string | null;
   notes: string | null;
+  expense_type: 'single' | 'subscription';
+  due_day: number | null;
   created_at: string;
   updated_at: string;
+}
+
+// Virtual expense for displaying subscriptions with calculated due dates
+export interface VirtualExpense extends Expense {
+  is_virtual?: boolean;
+  original_id?: string;
 }
 
 export function useExpenses() {
@@ -35,18 +43,48 @@ export function useExpenses() {
   });
 }
 
+export type AddExpenseInput = {
+  description: string;
+  amount: number;
+  category: string;
+  notes?: string | null;
+  status: 'pending' | 'paid' | 'overdue';
+  paid_at?: string | null;
+  expense_type: 'single' | 'subscription';
+  due_date?: string; // Required for 'single'
+  due_day?: number | null; // Required for 'subscription'
+};
+
 export function useAddExpense() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (expense: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (expense: AddExpenseInput) => {
       if (!user) throw new Error('Not authenticated');
+
+      // For subscriptions, we need to generate a due_date based on due_day
+      let dueDate = expense.due_date;
+      if (expense.expense_type === 'subscription' && expense.due_day) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = today.getMonth();
+        // Set to current month's due_day
+        dueDate = new Date(year, month, expense.due_day).toISOString().split('T')[0];
+      }
 
       const { data, error } = await supabase
         .from('expenses')
         .insert({
-          ...expense,
+          description: expense.description,
+          amount: expense.amount,
+          category: expense.category,
+          notes: expense.notes || null,
+          status: expense.status,
+          paid_at: expense.paid_at || null,
+          expense_type: expense.expense_type,
+          due_date: dueDate!,
+          due_day: expense.due_day || null,
           user_id: user.id,
         })
         .select()
@@ -101,16 +139,64 @@ export function useDeleteExpense() {
 }
 
 // Helper functions
+
+// Generate virtual expenses for subscriptions within a date range
+export function getExpensesForPeriod(
+  expenses: Expense[],
+  startDate: Date,
+  endDate: Date
+): VirtualExpense[] {
+  const result: VirtualExpense[] = [];
+
+  for (const expense of expenses) {
+    if (expense.expense_type === 'single') {
+      // Single expenses: check if due_date is within range
+      const dueDate = parseISO(expense.due_date);
+      if (isWithinInterval(dueDate, { start: startDate, end: endDate })) {
+        result.push({ ...expense, is_virtual: false });
+      }
+    } else if (expense.expense_type === 'subscription' && expense.due_day) {
+      // Subscription expenses: generate virtual entries for each month in range
+      const startMonth = startOfMonth(startDate);
+      const endMonth = endOfMonth(endDate);
+      
+      let currentMonth = startMonth;
+      while (currentMonth <= endMonth) {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth();
+        
+        // Calculate the due date for this month
+        // Handle months with fewer days (e.g., due_day=31 in February)
+        const lastDayOfMonth = endOfMonth(currentMonth).getDate();
+        const actualDueDay = Math.min(expense.due_day, lastDayOfMonth);
+        const virtualDueDate = new Date(year, month, actualDueDay);
+        
+        if (isWithinInterval(virtualDueDate, { start: startDate, end: endDate })) {
+          result.push({
+            ...expense,
+            id: `${expense.id}-${year}-${month}`,
+            due_date: virtualDueDate.toISOString().split('T')[0],
+            is_virtual: true,
+            original_id: expense.id,
+          });
+        }
+        
+        // Move to next month
+        currentMonth = new Date(year, month + 1, 1);
+      }
+    }
+  }
+
+  return result.sort((a, b) => parseISO(a.due_date).getTime() - parseISO(b.due_date).getTime());
+}
+
 export function getUpcomingExpenses(expenses: Expense[], days: number = 30) {
   const today = new Date();
-  return expenses
-    .filter(expense => {
-      if (expense.status === 'paid') return false;
-      const dueDate = parseISO(expense.due_date);
-      const daysUntilDue = differenceInDays(dueDate, today);
-      return daysUntilDue >= 0 && daysUntilDue <= days;
-    })
-    .sort((a, b) => parseISO(a.due_date).getTime() - parseISO(b.due_date).getTime());
+  const endDate = new Date(today);
+  endDate.setDate(endDate.getDate() + days);
+  
+  return getExpensesForPeriod(expenses, today, endDate)
+    .filter(expense => expense.status !== 'paid');
 }
 
 export function getOverdueExpenses(expenses: Expense[]) {
@@ -118,6 +204,7 @@ export function getOverdueExpenses(expenses: Expense[]) {
   return expenses
     .filter(expense => {
       if (expense.status === 'paid') return false;
+      if (expense.expense_type === 'subscription') return false; // Subscriptions are always "current"
       const dueDate = parseISO(expense.due_date);
       return dueDate < today;
     })
@@ -128,10 +215,7 @@ export function getMonthlyExpenses(expenses: Expense[], year: number, month: num
   const monthStart = startOfMonth(new Date(year, month));
   const monthEnd = endOfMonth(new Date(year, month));
 
-  const monthExpenses = expenses.filter(expense => {
-    const dueDate = parseISO(expense.due_date);
-    return isWithinInterval(dueDate, { start: monthStart, end: monthEnd });
-  });
+  const monthExpenses = getExpensesForPeriod(expenses, monthStart, monthEnd);
 
   const total = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
   const paid = monthExpenses.filter(e => e.status === 'paid').reduce((sum, e) => sum + e.amount, 0);

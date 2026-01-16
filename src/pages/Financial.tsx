@@ -197,7 +197,7 @@ export default function Financial() {
         </div>
 
         {/* Despesas */}
-        <ExpensesSection />
+        <ExpensesSection filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
       </div>
 
       {/* Dialog para registrar entrada */}

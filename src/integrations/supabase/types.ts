@@ -1431,6 +1431,47 @@ export type Database = {
           },
         ]
       }
+      diet_adjustment_alerts: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          last_adjustment_at: string | null
+          next_alert_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          last_adjustment_at?: string | null
+          next_alert_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          last_adjustment_at?: string | null
+          next_alert_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diet_adjustment_alerts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diet_app_config: {
         Row: {
           app_code: string | null
@@ -1468,6 +1509,8 @@ export type Database = {
           created_at: string
           description: string
           due_date: string
+          due_day: number | null
+          expense_type: string
           id: string
           notes: string | null
           paid_at: string | null
@@ -1481,6 +1524,8 @@ export type Database = {
           created_at?: string
           description: string
           due_date: string
+          due_day?: number | null
+          expense_type?: string
           id?: string
           notes?: string | null
           paid_at?: string | null
@@ -1494,6 +1539,8 @@ export type Database = {
           created_at?: string
           description?: string
           due_date?: string
+          due_day?: number | null
+          expense_type?: string
           id?: string
           notes?: string | null
           paid_at?: string | null

@@ -2,7 +2,8 @@ import { Layout } from '@/components/layout/Layout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { ConsultationCalendar } from '@/components/dashboard/ConsultationCalendar';
 import { PendingCheckinsAlert } from '@/components/dashboard/PendingCheckinsAlert';
-import { useClients, usePayments, useConsultationSchedules, getExpiringThisMonth, getOverduePayments } from '@/hooks/useClients';
+import { DietAdjustmentAlert } from '@/components/dashboard/DietAdjustmentAlert';
+import { useClients, usePayments, useConsultationSchedules, getExpiringThisMonth } from '@/hooks/useClients';
 import { getMonthlyIncomeByPaidAt, getDueAmountInPeriod } from '@/hooks/useFinancialData';
 import { Users, DollarSign, AlertTriangle, Loader2, CreditCard } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
@@ -101,8 +102,11 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Pending Checkins Alert */}
-        <PendingCheckinsAlert />
+        {/* Alerts Section */}
+        <div className="space-y-4">
+          <PendingCheckinsAlert />
+          <DietAdjustmentAlert />
+        </div>
 
         {/* Calendar Only */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1">
