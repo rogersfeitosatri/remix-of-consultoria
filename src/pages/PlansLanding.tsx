@@ -24,7 +24,7 @@ export default function PlansLanding() {
   ];
 
   const consultasFeatures = [
-    '1 consulta nutricional por mês',
+    'Consultas nutricionais a cada 6 semanas',
     'Plano alimentar pra fase atual do ciclo de treino',
     'Plano suplementar com estratégias de pré, intra e pós-treino adaptados à rotina do corredor',
     'Suporte longão via Zona Nutri (sistema de ajuste estratégico de géis + pré, intra e pós)',
