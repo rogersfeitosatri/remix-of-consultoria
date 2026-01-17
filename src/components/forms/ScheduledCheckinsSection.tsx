@@ -7,17 +7,21 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useScheduledCheckins, useUpdateScheduledCheckin } from '@/hooks/useScheduledCheckins';
 import { useClients } from '@/hooks/useClients';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
+import { useWhatsAppTemplates, renderTemplate } from '@/hooks/useWhatsAppTemplates';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Loader2, Calendar, ClipboardCheck, ChevronDown, ChevronRight, User, Check, MessageCircle, Pause, Play, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 export function ScheduledCheckinsSection() {
+  const { user } = useAuth();
   const { data: checkins = [], isLoading: checkinsLoading } = useScheduledCheckins();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: forms = [] } = useCheckinForms();
+  const { data: templates = [] } = useWhatsAppTemplates();
   const updateCheckin = useUpdateScheduledCheckin();
   const { toast } = useToast();
   const [openClients, setOpenClients] = useState<Set<string>>(new Set());
@@ -66,6 +70,18 @@ export function ScheduledCheckinsSection() {
       return;
     }
 
+    // Find the active checkin_reminder template
+    const template = templates.find(t => t.template_key === 'checkin_reminder' && t.is_active);
+    
+    if (!template) {
+      toast({
+        title: 'Erro',
+        description: 'Template de lembrete de check-in não encontrado ou inativo na Central WhatsApp.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSendingCheckins(prev => new Set(prev).add(checkinId));
 
     try {
@@ -75,22 +91,34 @@ export function ScheduledCheckinsSection() {
         ? `${baseUrl}/form/${activeForm.id}?client=${clientId}`
         : `${baseUrl}/form?client=${clientId}`;
 
-      const message = `📋 *Checkin Semanal*
+      // Render the template with variables
+      const variables: Record<string, string> = {
+        nome: client.name || '',
+        link: formLink,
+        data: format(new Date(), "dd/MM/yyyy"),
+      };
+      
+      const rendered = renderTemplate(
+        { title: template.title, body: template.body },
+        variables
+      );
 
-Olá, ${client.name}! 👋
-
-É hora do seu checkin! Por favor, preencha o formulário para que possamos acompanhar seu progresso.
-
-🔗 *Acesse aqui:* ${formLink}
-
-Após preencher, aguarde o feedback da nossa equipe.
-
-💪 Continue firme na jornada!`;
+      console.log('[ScheduledCheckinsSection] Sending checkin with template:', {
+        scheduled_checkin_id: checkinId,
+        template_key: template.template_key,
+        template_id: template.id,
+        template_updated_at: template.updated_at,
+        message_preview: rendered.body.substring(0, 120) + '...',
+      });
 
       const { data, error } = await supabase.functions.invoke('send-whatsapp', {
         body: {
           clientId: clientId,
-          message: message,
+          message: rendered.body,
+          templateKey: template.template_key,
+          templateId: template.id,
+          templateUpdatedAt: template.updated_at,
+          scheduledCheckinId: checkinId,
         },
       });
 
@@ -105,7 +133,7 @@ Após preencher, aguarde o feedback da nossa equipe.
 
       toast({
         title: 'Checkin enviado!',
-        description: `Mensagem enviada para ${client.name} via WhatsApp.`,
+        description: `Mensagem enviada para ${client.name} via WhatsApp usando template ativo.`,
       });
     } catch (error: any) {
       console.error('Error sending checkin:', error);
