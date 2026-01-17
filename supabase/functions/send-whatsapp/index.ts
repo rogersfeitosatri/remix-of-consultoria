@@ -9,6 +9,11 @@ interface SendWhatsAppRequest {
   clientId: string;
   message: string;
   feedbackId?: string;
+  templateKey?: string;
+  templateId?: string;
+  templateUpdatedAt?: string;
+  scheduledCheckinId?: string;
+  appointmentId?: string;
 }
 
 Deno.serve(async (req) => {
@@ -29,13 +34,31 @@ Deno.serve(async (req) => {
       throw new Error('ZAPI credentials not configured');
     }
 
-    const { clientId, message, feedbackId }: SendWhatsAppRequest = await req.json();
-    console.log('Sending WhatsApp to client:', clientId);
+    const { 
+      clientId, 
+      message, 
+      feedbackId,
+      templateKey,
+      templateId,
+      templateUpdatedAt,
+      scheduledCheckinId,
+      appointmentId,
+    }: SendWhatsAppRequest = await req.json();
+    
+    console.log('[send-whatsapp] Request received:', {
+      clientId,
+      templateKey,
+      templateId,
+      templateUpdatedAt,
+      scheduledCheckinId,
+      appointmentId,
+      message_preview: message?.substring(0, 120) + '...',
+    });
 
-    // Get client phone
+    // Get client phone and user_id
     const { data: client, error: clientError } = await supabase
       .from('clients')
-      .select('phone, name')
+      .select('phone, name, user_id')
       .eq('id', clientId)
       .single();
 
@@ -56,7 +79,7 @@ Deno.serve(async (req) => {
       phone = '55' + phone;
     }
 
-    console.log('Sending to phone:', phone);
+    console.log('[send-whatsapp] Sending to phone:', phone);
 
     // Send message via ZAPI
     const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}/send-text`;
@@ -74,7 +97,36 @@ Deno.serve(async (req) => {
     });
 
     const zapiResult = await zapiResponse.json();
-    console.log('ZAPI response:', zapiResult);
+    console.log('[send-whatsapp] ZAPI response:', zapiResult);
+
+    const messageStatus = zapiResponse.ok ? 'sent' : 'failed';
+    const errorMessage = zapiResponse.ok ? null : JSON.stringify(zapiResult);
+
+    // Log the message with template metadata
+    try {
+      await supabase
+        .from('whatsapp_message_logs')
+        .insert({
+          user_id: client.user_id,
+          client_id: clientId,
+          appointment_id: appointmentId || null,
+          message_type: templateKey || 'manual',
+          template_key: templateKey || null,
+          to_phone: phone,
+          status: messageStatus,
+          error_message: errorMessage,
+          payload_preview: message?.substring(0, 500),
+          metadata: {
+            template_id: templateId,
+            template_updated_at: templateUpdatedAt,
+            scheduled_checkin_id: scheduledCheckinId,
+            zapi_response: zapiResult,
+          },
+        });
+      console.log('[send-whatsapp] Message logged successfully');
+    } catch (logError) {
+      console.error('[send-whatsapp] Error logging message:', logError);
+    }
 
     if (!zapiResponse.ok) {
       throw new Error(`ZAPI error: ${JSON.stringify(zapiResult)}`);
@@ -92,7 +144,7 @@ Deno.serve(async (req) => {
         .eq('id', feedbackId);
 
       if (updateError) {
-        console.error('Error updating feedback status:', updateError);
+        console.error('[send-whatsapp] Error updating feedback status:', updateError);
       }
     }
 
@@ -105,7 +157,7 @@ Deno.serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error('Error sending WhatsApp:', error);
+    console.error('[send-whatsapp] Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
