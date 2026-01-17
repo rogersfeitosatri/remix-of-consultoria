@@ -2197,6 +2197,76 @@ export type Database = {
           },
         ]
       }
+      whatsapp_scheduled_messages: {
+        Row: {
+          appointment_id: string | null
+          client_id: string
+          context_data: Json
+          created_at: string
+          error_message: string | null
+          id: string
+          scheduled_checkin_id: string | null
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          template_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          client_id: string
+          context_data?: Json
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          scheduled_checkin_id?: string | null
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          template_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          appointment_id?: string | null
+          client_id?: string
+          context_data?: Json
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          scheduled_checkin_id?: string | null
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          template_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_scheduled_messages_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_scheduled_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_scheduled_messages_scheduled_checkin_id_fkey"
+            columns: ["scheduled_checkin_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_checkins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_templates: {
         Row: {
           body: string
@@ -2206,6 +2276,7 @@ export type Database = {
           is_active: boolean | null
           template_key: string
           template_name: string
+          title: string | null
           updated_at: string | null
           user_id: string
           variables: string[] | null
@@ -2218,6 +2289,7 @@ export type Database = {
           is_active?: boolean | null
           template_key: string
           template_name: string
+          title?: string | null
           updated_at?: string | null
           user_id: string
           variables?: string[] | null
@@ -2230,6 +2302,7 @@ export type Database = {
           is_active?: boolean | null
           template_key?: string
           template_name?: string
+          title?: string | null
           updated_at?: string | null
           user_id?: string
           variables?: string[] | null

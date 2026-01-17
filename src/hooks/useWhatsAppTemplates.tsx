@@ -8,6 +8,7 @@ export interface WhatsAppTemplate {
   user_id: string;
   template_key: string;
   template_name: string;
+  title: string | null;
   body: string;
   is_active: boolean;
   default_timing: string | null;
@@ -48,14 +49,33 @@ export interface WhatsAppMessageLog {
   } | null;
 }
 
+export interface WhatsAppScheduledMessage {
+  id: string;
+  user_id: string;
+  client_id: string;
+  template_key: string;
+  context_data: Record<string, unknown>;
+  scheduled_for: string;
+  status: 'scheduled' | 'sent' | 'failed' | 'cancelled';
+  sent_at: string | null;
+  error_message: string | null;
+  appointment_id: string | null;
+  scheduled_checkin_id: string | null;
+  created_at: string;
+  updated_at: string;
+  clients?: {
+    name: string;
+    phone: string | null;
+  } | null;
+}
+
 // Default templates for initial setup
 export const DEFAULT_WHATSAPP_TEMPLATES: Omit<WhatsAppTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'>[] = [
   {
     template_key: 'reminder_15m',
     template_name: 'Lembrete 15 minutos antes',
-    body: `⏰ *Lembrete de Consulta*
-
-Olá {nome}!
+    title: '⏰ Lembrete de Consulta',
+    body: `Olá {nome}!
 
 Sua consulta é em 15 minutos:
 📅 Data: {data}
@@ -72,9 +92,8 @@ Até já! 🙂`,
   {
     template_key: 'booking_confirmed',
     template_name: 'Confirmação de Agendamento',
-    body: `✅ *Consulta Confirmada*
-
-Olá {nome}!
+    title: '✅ Consulta Confirmada',
+    body: `Olá {nome}!
 
 Sua consulta foi agendada com sucesso:
 📅 Data: {data}
@@ -89,9 +108,8 @@ Até lá! 🙂`,
   {
     template_key: 'weekly_booking_link',
     template_name: 'Link Semanal de Agendamento',
-    body: `📅 *Agende sua Consulta*
-
-Olá {nome}!
+    title: '📅 Agende sua Consulta',
+    body: `Olá {nome}!
 
 Está na hora de agendar sua próxima consulta! 🎯
 
@@ -108,6 +126,7 @@ Qualquer dúvida, estou à disposição! 💪`,
   {
     template_key: 'checkin_reminder',
     template_name: 'Lembrete de Check-in',
+    title: '📋 Check-in Semanal',
     body: `Olá {nome}! 📋
 
 É hora do seu check-in semanal! 
@@ -194,11 +213,19 @@ export function useSaveWhatsAppTemplate() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (template: { id: string; body?: string; is_active?: boolean; template_name?: string; default_timing?: string | null }) => {
+    mutationFn: async (template: { 
+      id: string; 
+      title?: string | null;
+      body?: string; 
+      is_active?: boolean; 
+      template_name?: string; 
+      default_timing?: string | null 
+    }) => {
       const { error } = await supabase
         .from('whatsapp_templates')
         .update({
           template_name: template.template_name,
+          title: template.title,
           body: template.body,
           is_active: template.is_active,
           default_timing: template.default_timing,
@@ -209,6 +236,7 @@ export function useSaveWhatsAppTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-templates'] });
+      queryClient.invalidateQueries({ queryKey: ['scheduled-messages'] });
       toast.success('Template salvo com sucesso');
     },
     onError: (error) => {
@@ -311,7 +339,22 @@ export function useScheduledMessages() {
     queryFn: async () => {
       if (!user?.id) return [];
       
-      // Get upcoming appointments that haven't had 15m reminder sent
+      // First, get scheduled messages from the new table
+      const { data: scheduledMessages, error: scheduledError } = await supabase
+        .from('whatsapp_scheduled_messages')
+        .select(`
+          *,
+          clients(name, phone)
+        `)
+        .eq('user_id', user.id)
+        .in('status', ['scheduled', 'sent', 'failed'])
+        .order('scheduled_for', { ascending: true });
+
+      if (scheduledError) {
+        console.error('Error fetching scheduled messages:', scheduledError);
+      }
+
+      // Also get upcoming appointments that will generate reminders
       const now = new Date();
       const todayStr = now.toISOString().split('T')[0];
       
@@ -334,24 +377,36 @@ export function useScheduledMessages() {
 
       if (aptError) throw aptError;
 
-      // Transform to scheduled message format
-      const scheduledMessages = (upcomingAppointments || []).map(apt => {
+      // Get templates for display
+      const { data: templates } = await supabase
+        .from('whatsapp_templates')
+        .select('template_key, title, template_name')
+        .eq('user_id', user.id);
+
+      const templateMap = new Map(templates?.map(t => [t.template_key, t]) || []);
+
+      // Transform appointments to scheduled message format
+      const appointmentMessages = (upcomingAppointments || []).map(apt => {
         const client = apt.clients as unknown as { id: string; name: string; phone: string; email: string } | null;
         const aptDateTime = new Date(`${apt.appointment_date}T${apt.appointment_time}`);
         const reminderTime = new Date(aptDateTime.getTime() - 15 * 60 * 1000);
+        const template = templateMap.get('reminder_15m');
         
-        let status = 'scheduled';
+        let status: 'scheduled' | 'sent' | 'failed' | 'pending_meet' = 'scheduled';
         if (apt.reminder_15m_sent_at) {
           status = 'sent';
         } else if (!apt.google_meet_link) {
           status = 'pending_meet';
         } else if (reminderTime < now) {
-          status = 'overdue';
+          status = 'scheduled'; // Will be processed by cron
         }
 
         return {
-          id: apt.id,
+          id: `apt-${apt.id}`,
           type: 'reminder_15m',
+          template_key: 'reminder_15m',
+          template_title: template?.title || '⏰ Lembrete de Consulta',
+          template_name: template?.template_name || 'Lembrete 15 min',
           scheduled_for: reminderTime.toISOString(),
           client_name: client?.name || 'Unknown',
           client_phone: client?.phone || 'N/A',
@@ -360,12 +415,83 @@ export function useScheduledMessages() {
           appointment_time: apt.appointment_time,
           has_meet_link: !!apt.google_meet_link,
           status,
+          context_data: {
+            appointment_id: apt.id,
+            meet_link: apt.google_meet_link,
+          },
         };
       });
 
-      return scheduledMessages;
+      // Transform scheduled messages from new table
+      const scheduledFromTable = (scheduledMessages || []).map(msg => {
+        const client = msg.clients as unknown as { name: string; phone: string | null } | null;
+        const template = templateMap.get(msg.template_key);
+        const contextData = msg.context_data as Record<string, unknown>;
+        
+        return {
+          id: msg.id,
+          type: msg.template_key,
+          template_key: msg.template_key,
+          template_title: template?.title || msg.template_key,
+          template_name: template?.template_name || msg.template_key,
+          scheduled_for: msg.scheduled_for,
+          client_name: client?.name || 'Unknown',
+          client_phone: client?.phone || 'N/A',
+          client_email: null,
+          appointment_date: contextData?.appointment_date as string || null,
+          appointment_time: contextData?.appointment_time as string || null,
+          has_meet_link: !!contextData?.meet_link,
+          status: msg.status as 'scheduled' | 'sent' | 'failed' | 'pending_meet',
+          context_data: contextData,
+        };
+      });
+
+      // Combine and deduplicate (prefer new table records)
+      const existingIds = new Set(scheduledFromTable.map(m => m.context_data?.appointment_id));
+      const filteredAppointments = appointmentMessages.filter(
+        m => !existingIds.has(m.context_data.appointment_id)
+      );
+
+      return [...scheduledFromTable, ...filteredAppointments].sort((a, b) => 
+        new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime()
+      );
     },
     enabled: !!user?.id,
     refetchInterval: 60000, // Refresh every minute
   });
+}
+
+// Helper function to render a template with variables
+export function renderTemplate(
+  template: { title?: string | null; body: string },
+  variables: Record<string, string | undefined>
+): { title: string; body: string } {
+  let title = template.title || '';
+  let body = template.body;
+
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`\\{${key}\\}`, 'g');
+    const safeValue = value || '';
+    title = title.replace(regex, safeValue);
+    body = body.replace(regex, safeValue);
+  }
+
+  // Log warning for any remaining unsubstituted variables
+  const remainingVars = body.match(/\{[^}]+\}/g);
+  if (remainingVars) {
+    console.warn('Template has unsubstituted variables:', remainingVars);
+  }
+
+  return { title, body };
+}
+
+// Get template label for display
+export function getTemplateLabel(key: string): string {
+  switch (key) {
+    case 'reminder_15m': return 'Lembrete 15 min antes';
+    case 'booking_confirmed': return 'Confirmação de Agendamento';
+    case 'weekly_booking_link': return 'Link Semanal de Agendamento';
+    case 'checkin_reminder': return 'Lembrete de Check-in';
+    default: return key;
+  }
 }

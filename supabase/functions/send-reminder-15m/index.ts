@@ -20,28 +20,16 @@ interface AppointmentWithClient {
 
 interface WhatsAppTemplate {
   id: string;
+  title: string | null;
   body: string;
   is_active: boolean;
+  updated_at: string;
 }
 
 interface AthleteWhatsAppSettings {
   disabled_all: boolean;
   disabled_template_keys: string[];
 }
-
-// Default template if none exists
-const DEFAULT_REMINDER_TEMPLATE = `⏰ *Lembrete de Consulta*
-
-Olá {nome}!
-
-Sua consulta é em 15 minutos:
-📅 Data: {data}
-🕒 Horário: {hora}
-
-🎥 Link da reunião:
-{link}
-
-Até já! 🙂`;
 
 async function sendWhatsAppMessage(
   phone: string, 
@@ -51,7 +39,6 @@ async function sendWhatsAppMessage(
   zapiClientToken: string
 ): Promise<{ success: boolean; error?: string; zapiResponse?: unknown }> {
   try {
-    // Format phone number
     let formattedPhone = phone.replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) {
       formattedPhone = formattedPhone.substring(1);
@@ -87,12 +74,29 @@ async function sendWhatsAppMessage(
   }
 }
 
-function formatMessage(template: string, variables: Record<string, string>): string {
-  let message = template;
+// Render template with variables - logs warnings for missing variables
+function renderTemplate(
+  template: { title?: string | null; body: string },
+  variables: Record<string, string | undefined>
+): { title: string; body: string } {
+  let title = template.title || '';
+  let body = template.body;
+
   for (const [key, value] of Object.entries(variables)) {
-    message = message.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    const regex = new RegExp(`\\{${key}\\}`, 'g');
+    const safeValue = value || '';
+    title = title.replace(regex, safeValue);
+    body = body.replace(regex, safeValue);
   }
-  return message;
+
+  // Log warning for any remaining unsubstituted variables
+  const remainingVarsTitle = title.match(/\{[^}]+\}/g);
+  const remainingVarsBody = body.match(/\{[^}]+\}/g);
+  if (remainingVarsTitle || remainingVarsBody) {
+    console.warn('Template has unsubstituted variables:', [...(remainingVarsTitle || []), ...(remainingVarsBody || [])]);
+  }
+
+  return { title, body };
 }
 
 function formatDateBR(dateStr: string): string {
@@ -128,14 +132,10 @@ Deno.serve(async (req) => {
   try {
     // Get current time in São Paulo timezone
     const now = new Date();
-    const saoPauloOffset = -3 * 60; // São Paulo is UTC-3
+    const saoPauloOffset = -3 * 60;
     const saoPauloNow = new Date(now.getTime() + (now.getTimezoneOffset() + saoPauloOffset) * 60 * 1000);
-    
-    // Truncate seconds for more reliable matching (appointments are usually at :00)
     saoPauloNow.setSeconds(0, 0);
     
-    // Calculate the target window: 4-20 minutes from now (wider window to avoid missing reminders)
-    // Cron runs every minute, so we check a broad range
     const in4Min = new Date(saoPauloNow.getTime() + 4 * 60 * 1000);
     const in20Min = new Date(saoPauloNow.getTime() + 20 * 60 * 1000);
     
@@ -145,11 +145,6 @@ Deno.serve(async (req) => {
     console.log('Current São Paulo time (truncated):', saoPauloNow.toISOString());
     console.log('Looking for appointments between:', in4Min.toISOString(), 'and', in20Min.toISOString());
 
-    // Fetch appointments that:
-    // 1. Are confirmed
-    // 2. Have google_meet_link
-    // 3. Haven't had 15m reminder sent
-    // 4. Are scheduled within today or tomorrow
     const { data: appointments, error: appointmentsError } = await supabase
       .from('appointments')
       .select(`
@@ -177,10 +172,8 @@ Deno.serve(async (req) => {
 
     for (const appointment of appointments || []) {
       try {
-        // Parse appointment datetime
         const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
         
-        // Check if appointment is within the 14-16 minute window
         if (appointmentDateTime < in4Min || appointmentDateTime > in20Min) {
           console.log('Skipping appointment outside window:', appointment.id, appointmentDateTime.toISOString());
           continue;
@@ -191,7 +184,6 @@ Deno.serve(async (req) => {
         if (!client?.phone) {
           console.log('Skipping appointment without phone:', appointment.id);
           
-          // Log as skipped
           await supabase.from('whatsapp_message_logs').insert({
             user_id: appointment.user_id,
             client_id: appointment.client_id,
@@ -253,17 +245,17 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Fetch template for this user
+        // ALWAYS fetch template from database - NO HARDCODE FALLBACK
         const { data: template } = await supabase
           .from('whatsapp_templates')
-          .select('id, body, is_active')
+          .select('id, title, body, is_active, updated_at')
           .eq('user_id', appointment.user_id)
           .eq('template_key', 'reminder_15m')
           .single() as { data: WhatsAppTemplate | null };
 
-        // Check if template is active (or use default)
-        if (template && !template.is_active) {
-          console.log('Template reminder_15m is inactive for user:', appointment.user_id);
+        // If no template or template is inactive, skip
+        if (!template || !template.is_active) {
+          console.log('Template reminder_15m not found or inactive for user:', appointment.user_id);
           
           await supabase.from('whatsapp_message_logs').insert({
             user_id: appointment.user_id,
@@ -273,36 +265,41 @@ Deno.serve(async (req) => {
             template_key: 'reminder_15m',
             to_phone: client.phone,
             status: 'skipped',
-            error_message: 'Template is inactive',
-            metadata: { reason: 'template_inactive' }
+            error_message: template ? 'Template is inactive' : 'No template configured',
+            metadata: { reason: template ? 'template_inactive' : 'no_template' }
           });
           
-          results.push({ appointmentId: appointment.id, status: 'skipped', error: 'Template inactive' });
+          results.push({ appointmentId: appointment.id, status: 'skipped', error: template ? 'Template inactive' : 'No template' });
           continue;
         }
 
-        const templateBody = template?.body || DEFAULT_REMINDER_TEMPLATE;
+        // Render the template with variables
+        const rendered = renderTemplate(
+          { title: template.title, body: template.body },
+          {
+            nome: client.name.split(' ')[0],
+            data: formatDateBR(appointment.appointment_date),
+            hora: formatTime(appointment.appointment_time),
+            link: appointment.google_meet_link!,
+          }
+        );
 
-        // Format the message
-        const message = formatMessage(templateBody, {
-          nome: client.name,
-          data: formatDateBR(appointment.appointment_date),
-          hora: formatTime(appointment.appointment_time),
-          link: appointment.google_meet_link!,
-        });
+        // Build final message with title if available
+        const finalMessage = rendered.title 
+          ? `*${rendered.title}*\n\n${rendered.body}`
+          : rendered.body;
 
         console.log('Sending reminder to:', client.phone, 'for appointment:', appointment.id);
+        console.log('Using template updated_at:', template.updated_at);
 
-        // Send WhatsApp message
         const sendResult = await sendWhatsAppMessage(
           client.phone,
-          message,
+          finalMessage,
           zapiInstanceId,
           zapiToken,
           zapiClientToken
         );
 
-        // Log the attempt
         await supabase.from('whatsapp_message_logs').insert({
           user_id: appointment.user_id,
           client_id: appointment.client_id,
@@ -310,14 +307,17 @@ Deno.serve(async (req) => {
           message_type: 'reminder_15m',
           template_key: 'reminder_15m',
           to_phone: client.phone,
-          payload_preview: message.substring(0, 500),
+          payload_preview: finalMessage.substring(0, 500),
           status: sendResult.success ? 'success' : 'failed',
           error_message: sendResult.error,
-          metadata: { zapi_response: sendResult.zapiResponse }
+          metadata: { 
+            zapi_response: sendResult.zapiResponse,
+            template_id: template.id,
+            template_updated_at: template.updated_at 
+          }
         });
 
         if (sendResult.success) {
-          // Mark reminder as sent
           await supabase
             .from('appointments')
             .update({ reminder_15m_sent_at: new Date().toISOString() })
@@ -332,7 +332,6 @@ Deno.serve(async (req) => {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error('Error processing appointment:', appointment.id, error);
         
-        // Log the error
         await supabase.from('whatsapp_message_logs').insert({
           user_id: appointment.user_id,
           client_id: appointment.client_id,
