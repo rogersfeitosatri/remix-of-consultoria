@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
         .eq('client_id', clientId)
         .maybeSingle();
 
-      const templateKey = messageType === 'booking_invite' ? 'booking_invite' : 'booking_confirmed';
+      const templateKey = messageType === 'booking_invite' ? 'weekly_booking_link' : 'booking_confirmed';
 
       if (athleteSettings?.disabled_all || athleteSettings?.disabled_template_keys?.includes(templateKey)) {
         await supabase.from('whatsapp_message_logs').insert({
@@ -211,11 +211,28 @@ Deno.serve(async (req) => {
         }
 
         const bookingUrl = `${appUrl}/booking/${bookingLink.token}`;
-        const templateBody = template?.body || 
-          'Olá {nome}! Chegou a hora de agendar sua próxima consulta. Escolha seu horário: {link}';
         
-        message = formatMessage(templateBody, {
+        // Use template from database - if not found, skip sending
+        if (!template?.body) {
+          await supabase.from('whatsapp_message_logs').insert({
+            user_id: client.user_id,
+            client_id: clientId,
+            message_type: messageType,
+            template_key: templateKey,
+            to_phone: client.phone,
+            status: 'skipped',
+            error_message: 'No template configured',
+            metadata: { reason: 'no_template' }
+          });
+          return new Response(
+            JSON.stringify({ success: true, skipped: true, reason: 'no_template' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        message = formatMessage(template.body, {
           nome: client.name.split(' ')[0],
+          booking_link: bookingUrl,
           link: bookingUrl,
         });
 
@@ -319,13 +336,30 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get template from database
+    // Get template from database - use weekly_booking_link (unified template)
     const { data: template } = await supabase
       .from('whatsapp_templates')
       .select('body, is_active')
       .eq('user_id', schedule.user_id)
-      .eq('template_key', 'booking_invite')
+      .eq('template_key', 'weekly_booking_link')
       .maybeSingle();
+
+    if (!template?.body || !template.is_active) {
+      await supabase.from('whatsapp_message_logs').insert({
+        user_id: schedule.user_id,
+        client_id: clientData?.id,
+        message_type: 'booking_invite',
+        template_key: 'weekly_booking_link',
+        to_phone: clientPhone,
+        status: 'skipped',
+        error_message: template ? 'Template is inactive' : 'No template configured',
+        metadata: { consultation_schedule_id: consultationScheduleId, reason: template ? 'template_inactive' : 'no_template' }
+      });
+      return new Response(
+        JSON.stringify({ success: true, skipped: true, reason: template ? 'template_inactive' : 'no_template' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { data: settings } = await supabase
       .from('scheduling_settings')
@@ -337,11 +371,9 @@ Deno.serve(async (req) => {
       ? `${appUrl}/agendar/${settings.booking_link_slug}?token=${bookingToken}`
       : `${appUrl}/booking/${bookingToken}`;
 
-    const templateBody = template?.body || 
-      '📅 Olá {nome}! Está na hora de agendar sua próxima consulta. Clique aqui: {link}';
-    
-    const message = formatMessage(templateBody, {
+    const message = formatMessage(template.body, {
       nome: clientName.split(' ')[0],
+      booking_link: bookingUrl,
       link: bookingUrl,
     });
 
@@ -358,7 +390,7 @@ Deno.serve(async (req) => {
       user_id: schedule.user_id,
       client_id: clientData?.id,
       message_type: 'booking_invite',
-      template_key: 'booking_invite',
+      template_key: 'weekly_booking_link',
       to_phone: clientPhone,
       payload_preview: message.substring(0, 500),
       status: sendResult.success ? 'success' : 'failed',
