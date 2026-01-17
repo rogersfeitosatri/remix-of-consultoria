@@ -463,11 +463,11 @@ export function useScheduledMessages() {
 
 // Helper function to render a template with variables
 export function renderTemplate(
-  template: { title?: string | null; body: string },
+  template: { title?: string | null; body?: string | null },
   variables: Record<string, string | undefined>
 ): { title: string; body: string } {
   let title = template.title || '';
-  let body = template.body;
+  let body = template.body || '';
 
   for (const [key, value] of Object.entries(variables)) {
     const regex = new RegExp(`\\{${key}\\}`, 'g');

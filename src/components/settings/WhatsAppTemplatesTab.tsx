@@ -26,7 +26,7 @@ export function WhatsAppTemplatesTab({ templates }: WhatsAppTemplatesTabProps) {
   const getTemplateData = (template: WhatsAppTemplate) => {
     return editedTemplates[template.id] || { 
       title: template.title || '', 
-      body: template.body, 
+      body: template.body || '', 
       is_active: template.is_active 
     };
   };
