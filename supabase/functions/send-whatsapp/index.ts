@@ -7,13 +7,63 @@ const corsHeaders = {
 
 interface SendWhatsAppRequest {
   clientId: string;
-  message: string;
-  feedbackId?: string;
+  // Legacy mode: pre-rendered message
+  message?: string;
+  // Template mode: template_key + context (preferred)
   templateKey?: string;
+  context?: Record<string, string>;
+  // Metadata for logging
   templateId?: string;
   templateUpdatedAt?: string;
   scheduledCheckinId?: string;
   appointmentId?: string;
+  feedbackId?: string;
+}
+
+interface WhatsAppTemplate {
+  id: string;
+  title: string | null;
+  body: string;
+  is_active: boolean;
+  updated_at: string;
+}
+
+// Render template with variables - supports both {var} and {{var}} syntax
+function renderTemplateVars(
+  template: { title?: string | null; body: string },
+  variables: Record<string, string | undefined>
+): { title: string; body: string } {
+  let title = template.title || '';
+  let body = template.body;
+
+  // Normalize variable names for compatibility
+  const normalizedVars: Record<string, string> = {};
+  for (const [key, value] of Object.entries(variables)) {
+    normalizedVars[key] = value || '';
+    // Also map link_checkin -> checkin_link for compatibility
+    if (key === 'checkin_link') {
+      normalizedVars['link_checkin'] = value || '';
+    }
+    if (key === 'link_checkin') {
+      normalizedVars['checkin_link'] = value || '';
+    }
+  }
+
+  for (const [key, value] of Object.entries(normalizedVars)) {
+    // Support both {var} and {{var}} syntax
+    const singleBrace = new RegExp(`\\{${key}\\}`, 'g');
+    const doubleBrace = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+    title = title.replace(singleBrace, value).replace(doubleBrace, value);
+    body = body.replace(singleBrace, value).replace(doubleBrace, value);
+  }
+
+  // Log warning for any remaining unsubstituted variables
+  const remainingVars = [...(title.match(/\{+[^}]+\}+/g) || []), ...(body.match(/\{+[^}]+\}+/g) || [])];
+  if (remainingVars.length > 0) {
+    console.warn('[send-whatsapp] Template has unsubstituted variables:', remainingVars);
+  }
+
+  return { title, body };
 }
 
 Deno.serve(async (req) => {
@@ -34,28 +84,29 @@ Deno.serve(async (req) => {
       throw new Error('ZAPI credentials not configured');
     }
 
+    const requestBody: SendWhatsAppRequest = await req.json();
     const { 
       clientId, 
-      message, 
-      feedbackId,
+      message: legacyMessage,
       templateKey,
-      templateId,
-      templateUpdatedAt,
+      context,
+      templateId: providedTemplateId,
+      templateUpdatedAt: providedTemplateUpdatedAt,
       scheduledCheckinId,
       appointmentId,
-    }: SendWhatsAppRequest = await req.json();
-    
+      feedbackId,
+    } = requestBody;
+
     console.log('[send-whatsapp] Request received:', {
       clientId,
       templateKey,
-      templateId,
-      templateUpdatedAt,
+      hasContext: !!context,
+      hasLegacyMessage: !!legacyMessage,
       scheduledCheckinId,
       appointmentId,
-      message_preview: message?.substring(0, 120) + '...',
     });
 
-    // Get client phone and user_id
+    // Get client info
     const { data: client, error: clientError } = await supabase
       .from('clients')
       .select('phone, name, user_id')
@@ -70,7 +121,74 @@ Deno.serve(async (req) => {
       throw new Error('Client phone not registered');
     }
 
-    // Format phone number (remove non-digits and ensure country code)
+    // Determine message to send
+    let finalMessage: string;
+    let usedTemplateId: string | null = providedTemplateId || null;
+    let usedTemplateUpdatedAt: string | null = providedTemplateUpdatedAt || null;
+    let renderedPreview: string = '';
+
+    // TEMPLATE MODE: When templateKey + context are provided, fetch and render from DB
+    if (templateKey && context) {
+      console.log('[send-whatsapp] Using TEMPLATE MODE with key:', templateKey);
+
+      // Fetch the active template from database
+      const { data: template, error: templateError } = await supabase
+        .from('whatsapp_templates')
+        .select('id, title, body, is_active, updated_at')
+        .eq('user_id', client.user_id)
+        .eq('template_key', templateKey)
+        .maybeSingle() as { data: WhatsAppTemplate | null, error: unknown };
+
+      if (templateError) {
+        console.error('[send-whatsapp] Error fetching template:', templateError);
+        throw new Error(`Failed to fetch template: ${templateKey}`);
+      }
+
+      if (!template) {
+        console.error('[send-whatsapp] Template not found:', templateKey);
+        throw new Error(`Template not found: ${templateKey}`);
+      }
+
+      if (!template.is_active) {
+        console.error('[send-whatsapp] Template is inactive:', templateKey);
+        throw new Error(`Template is inactive: ${templateKey}`);
+      }
+
+      usedTemplateId = template.id;
+      usedTemplateUpdatedAt = template.updated_at;
+
+      // Render the template with provided context
+      const rendered = renderTemplateVars(
+        { title: template.title, body: template.body },
+        context
+      );
+
+      // Build final message with title in bold if available
+      if (rendered.title && rendered.title.trim()) {
+        finalMessage = `*${rendered.title}*\n\n${rendered.body}`;
+      } else {
+        finalMessage = rendered.body;
+      }
+
+      renderedPreview = finalMessage.substring(0, 200);
+
+      console.log('[send-whatsapp] Template rendered:', {
+        template_id: usedTemplateId,
+        template_updated_at: usedTemplateUpdatedAt,
+        has_title: !!rendered.title,
+        message_preview: renderedPreview,
+      });
+
+    } else if (legacyMessage) {
+      // LEGACY MODE: Use pre-rendered message
+      console.log('[send-whatsapp] Using LEGACY MODE with pre-rendered message');
+      finalMessage = legacyMessage;
+      renderedPreview = legacyMessage.substring(0, 200);
+    } else {
+      throw new Error('Either message or templateKey+context must be provided');
+    }
+
+    // Format phone number
     let phone = client.phone.replace(/\D/g, '');
     if (phone.startsWith('0')) {
       phone = phone.substring(1);
@@ -92,7 +210,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         phone: phone,
-        message: message,
+        message: finalMessage,
       }),
     });
 
@@ -102,7 +220,7 @@ Deno.serve(async (req) => {
     const messageStatus = zapiResponse.ok ? 'sent' : 'failed';
     const errorMessage = zapiResponse.ok ? null : JSON.stringify(zapiResult);
 
-    // Log the message with template metadata
+    // Log the message with full audit trail
     try {
       await supabase
         .from('whatsapp_message_logs')
@@ -115,11 +233,13 @@ Deno.serve(async (req) => {
           to_phone: phone,
           status: messageStatus,
           error_message: errorMessage,
-          payload_preview: message?.substring(0, 500),
+          payload_preview: finalMessage.substring(0, 500),
           metadata: {
-            template_id: templateId,
-            template_updated_at: templateUpdatedAt,
+            template_id: usedTemplateId,
+            template_updated_at: usedTemplateUpdatedAt,
             scheduled_checkin_id: scheduledCheckinId,
+            context: context || null,
+            rendered_message_preview: renderedPreview,
             zapi_response: zapiResult,
           },
         });
@@ -149,7 +269,14 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, zapiResult }),
+      JSON.stringify({ 
+        success: true, 
+        zapiResult,
+        templateUsed: {
+          id: usedTemplateId,
+          updated_at: usedTemplateUpdatedAt,
+        },
+      }),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

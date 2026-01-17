@@ -462,6 +462,7 @@ export function useScheduledMessages() {
 }
 
 // Helper function to render a template with variables
+// Supports both {var} and {{var}} syntax for compatibility
 export function renderTemplate(
   template: { title?: string | null; body?: string | null },
   variables: Record<string, string | undefined>
@@ -469,16 +470,30 @@ export function renderTemplate(
   let title = template.title || '';
   let body = template.body || '';
 
+  // Normalize variable names for compatibility
+  const normalizedVars: Record<string, string> = {};
   for (const [key, value] of Object.entries(variables)) {
-    const regex = new RegExp(`\\{${key}\\}`, 'g');
-    const safeValue = value || '';
-    title = title.replace(regex, safeValue);
-    body = body.replace(regex, safeValue);
+    normalizedVars[key] = value || '';
+    // Also map link_checkin <-> checkin_link for compatibility
+    if (key === 'checkin_link') {
+      normalizedVars['link_checkin'] = value || '';
+    }
+    if (key === 'link_checkin') {
+      normalizedVars['checkin_link'] = value || '';
+    }
+  }
+
+  for (const [key, value] of Object.entries(normalizedVars)) {
+    // Support both {var} and {{var}} syntax
+    const singleBrace = new RegExp(`\\{${key}\\}`, 'g');
+    const doubleBrace = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+    title = title.replace(singleBrace, value).replace(doubleBrace, value);
+    body = body.replace(singleBrace, value).replace(doubleBrace, value);
   }
 
   // Log warning for any remaining unsubstituted variables
-  const remainingVars = body.match(/\{[^}]+\}/g);
-  if (remainingVars) {
+  const remainingVars = [...(title.match(/\{+[^}]+\}+/g) || []), ...(body.match(/\{+[^}]+\}+/g) || [])];
+  if (remainingVars.length > 0) {
     console.warn('Template has unsubstituted variables:', remainingVars);
   }
 
