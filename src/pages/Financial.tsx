@@ -5,6 +5,7 @@ import { StatCard } from '@/components/dashboard/StatCard';
 import { FinancialCharts } from '@/components/financial/FinancialCharts';
 import { FinancialFilters } from '@/components/financial/FinancialFilters';
 import { IncomeList } from '@/components/financial/IncomeList';
+import { AthletePaymentSearch } from '@/components/financial/AthletePaymentSearch';
 import { ExpiringPlansList } from '@/components/financial/ExpiringPlansList';
 import { ExpensesSection } from '@/components/financial/ExpensesSection';
 import { AddPaymentDialog } from '@/components/financial/AddPaymentDialog';
@@ -189,6 +190,9 @@ export default function Financial() {
           dailyDueData={dailyDueData}
           monthlyDueData={monthlyDueData}
         />
+
+        {/* Busca por atleta */}
+        <AthletePaymentSearch payments={payments} />
 
         {/* Listas detalhadas */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
