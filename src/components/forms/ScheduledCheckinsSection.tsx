@@ -4,10 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { useScheduledCheckins, useUpdateScheduledCheckin } from '@/hooks/useScheduledCheckins';
+import { useScheduledCheckins, useUpdateScheduledCheckin, ScheduledCheckin } from '@/hooks/useScheduledCheckins';
 import { useClients } from '@/hooks/useClients';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
-import { useWhatsAppTemplates, renderTemplate } from '@/hooks/useWhatsAppTemplates';
+import { useWhatsAppTemplates } from '@/hooks/useWhatsAppTemplates';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
@@ -48,14 +48,42 @@ export function ScheduledCheckinsSection() {
     return forms.find(f => f.is_active);
   };
 
+  // Build checkin link from scheduled checkin or active form
+  const buildCheckinLink = (checkin: ScheduledCheckin, clientId: string): string | null => {
+    const baseUrl = 'https://rogersfeitosa.lovable.app';
+    
+    // Priority 1: Use form_id from the scheduled checkin itself
+    if (checkin.form_id) {
+      return `${baseUrl}/form/${checkin.form_id}?client=${clientId}`;
+    }
+    
+    // Priority 2: Use active form as fallback
+    const activeForm = getActiveForm();
+    if (activeForm) {
+      return `${baseUrl}/form/${activeForm.id}?client=${clientId}`;
+    }
+    
+    // No valid form found
+    return null;
+  };
+
   const handleSendCheckin = async (checkinId: string, clientId: string) => {
     const client = getClient(clientId);
-    const activeForm = getActiveForm();
+    const checkin = checkins.find(c => c.id === checkinId);
 
     if (!client) {
       toast({
         title: 'Erro',
         description: 'Cliente não encontrado.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!checkin) {
+      toast({
+        title: 'Erro',
+        description: 'Agendamento não encontrado.',
         variant: 'destructive',
       });
       return;
@@ -70,7 +98,7 @@ export function ScheduledCheckinsSection() {
       return;
     }
 
-    // Find the active checkin_reminder template
+    // Verify template exists and is active
     const template = templates.find(t => t.template_key === 'checkin_reminder' && t.is_active);
     
     if (!template) {
@@ -82,47 +110,58 @@ export function ScheduledCheckinsSection() {
       return;
     }
 
+    // Build the checkin link
+    const checkinLink = buildCheckinLink(checkin, clientId);
+    
+    if (!checkinLink) {
+      toast({
+        title: 'Erro',
+        description: 'Link do check-in não encontrado para este agendamento. Configure um formulário de check-in ativo.',
+        variant: 'destructive',
+      });
+      console.error('[ScheduledCheckinsSection] No checkin link available:', {
+        scheduled_checkin_id: checkinId,
+        form_id: checkin.form_id,
+        has_active_form: !!getActiveForm(),
+      });
+      return;
+    }
+
     setSendingCheckins(prev => new Set(prev).add(checkinId));
 
     try {
-      // Generate checkin form link
-      const baseUrl = window.location.origin;
-      const formLink = activeForm 
-        ? `${baseUrl}/form/${activeForm.id}?client=${clientId}`
-        : `${baseUrl}/form?client=${clientId}`;
-
-      // Render the template with variables
-      const variables: Record<string, string> = {
-        nome: client.name || '',
-        link: formLink,
-        data: format(new Date(), "dd/MM/yyyy"),
+      // Build context for template rendering (done on backend now)
+      const context: Record<string, string> = {
+        nome: client.name?.split(' ')[0] || client.name || '',
+        link_checkin: checkinLink,
+        checkin_link: checkinLink, // Both for compatibility
+        data: format(new Date(), "dd/MM/yyyy", { locale: ptBR }),
       };
-      
-      const rendered = renderTemplate(
-        { title: template.title, body: template.body },
-        variables
-      );
 
-      console.log('[ScheduledCheckinsSection] Sending checkin with template:', {
+      console.log('[ScheduledCheckinsSection] Sending checkin via template mode:', {
         scheduled_checkin_id: checkinId,
-        template_key: template.template_key,
-        template_id: template.id,
-        template_updated_at: template.updated_at,
-        message_preview: rendered.body.substring(0, 120) + '...',
+        template_key: 'checkin_reminder',
+        checkin_link: checkinLink,
+        context_keys: Object.keys(context),
       });
 
+      // Call send-whatsapp in TEMPLATE MODE (templateKey + context)
+      // The backend will fetch the active template and render it
       const { data, error } = await supabase.functions.invoke('send-whatsapp', {
         body: {
           clientId: clientId,
-          message: rendered.body,
-          templateKey: template.template_key,
-          templateId: template.id,
-          templateUpdatedAt: template.updated_at,
+          templateKey: 'checkin_reminder',
+          context: context,
           scheduledCheckinId: checkinId,
         },
       });
 
       if (error) throw error;
+
+      console.log('[ScheduledCheckinsSection] Send result:', {
+        success: data?.success,
+        template_used: data?.templateUsed,
+      });
 
       // Update checkin status to sent
       await updateCheckin.mutateAsync({
@@ -136,7 +175,7 @@ export function ScheduledCheckinsSection() {
         description: `Mensagem enviada para ${client.name} via WhatsApp usando template ativo.`,
       });
     } catch (error: any) {
-      console.error('Error sending checkin:', error);
+      console.error('[ScheduledCheckinsSection] Error sending checkin:', error);
       toast({
         title: 'Erro ao enviar',
         description: error.message || 'Não foi possível enviar o checkin.',
