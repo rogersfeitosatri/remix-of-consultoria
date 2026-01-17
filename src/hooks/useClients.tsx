@@ -672,6 +672,75 @@ export function useUpdatePaymentStatus() {
   });
 }
 
+export function useUpdatePayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      id, 
+      amount, 
+      status, 
+      due_date, 
+      paid_at, 
+      payment_method, 
+      plan_start_date, 
+      plan_end_date,
+      notes 
+    }: { 
+      id: string; 
+      amount?: number;
+      status?: 'pending' | 'paid' | 'overdue'; 
+      due_date?: string;
+      paid_at?: string | null;
+      payment_method?: string | null;
+      plan_start_date?: string | null;
+      plan_end_date?: string | null;
+      notes?: string | null;
+    }) => {
+      const updateData: Record<string, unknown> = {};
+      if (amount !== undefined) updateData.amount = amount;
+      if (status !== undefined) updateData.status = status;
+      if (due_date !== undefined) updateData.due_date = due_date;
+      if (paid_at !== undefined) updateData.paid_at = paid_at;
+      if (payment_method !== undefined) updateData.payment_method = payment_method;
+      if (plan_start_date !== undefined) updateData.plan_start_date = plan_start_date;
+      if (plan_end_date !== undefined) updateData.plan_end_date = plan_end_date;
+      if (notes !== undefined) updateData.notes = notes;
+
+      const { data, error } = await supabase
+        .from('payments')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+    },
+  });
+}
+
+export function useDeletePayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('payments')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+    },
+  });
+}
+
 // Mutation to update consultation schedule (for editing send_link_date or status)
 export function useUpdateConsultationSchedule() {
   const queryClient = useQueryClient();
