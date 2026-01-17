@@ -202,12 +202,20 @@ export default function AthleteHistory() {
                   const links: { date: Date; consultNumber: number }[] = [];
                   const firstConsultDate = parseISO(client.first_consultation_date!);
                   const weeksInterval = client.consultation_frequency === 'six_weeks' ? 6 : 4;
+                  const lastCompletedConsult = client.last_consultation_index || 0;
+                  const totalConsults = client.consultation_count || 0;
                   
-                  for (let i = 1; i < (client.consultation_count || 0); i++) {
-                    const sendDate = addWeeks(firstConsultDate, weeksInterval * i);
+                  // Start from the next consultation after the last completed one
+                  for (let consultNum = lastCompletedConsult + 1; consultNum <= totalConsults; consultNum++) {
+                    // Skip the first consultation (no link send needed for it)
+                    if (consultNum === 1) continue;
+                    
+                    // Calculate weeks from first consultation
+                    const weeksFromFirst = weeksInterval * (consultNum - 1);
+                    const sendDate = addWeeks(firstConsultDate, weeksFromFirst);
                     // Adjust to next Monday if not already Monday
                     const mondayDate = getDay(sendDate) === 1 ? sendDate : nextMonday(sendDate);
-                    links.push({ date: mondayDate, consultNumber: i + 1 });
+                    links.push({ date: mondayDate, consultNumber: consultNum });
                   }
                   
                   return links.map((link, idx) => (
