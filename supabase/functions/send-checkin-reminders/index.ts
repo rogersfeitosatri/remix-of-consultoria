@@ -11,6 +11,14 @@ interface WhatsAppSendResult {
   zapiResponse?: unknown;
 }
 
+interface WhatsAppTemplate {
+  id: string;
+  title: string | null;
+  body: string;
+  is_active: boolean;
+  updated_at: string;
+}
+
 async function sendWhatsAppMessage(
   phone: string, 
   message: string,
@@ -55,12 +63,33 @@ async function sendWhatsAppMessage(
   }
 }
 
-function formatMessage(template: string, variables: Record<string, string>): string {
-  let message = template;
+// Render template with variables - logs warnings for missing variables
+function renderTemplate(
+  template: { title?: string | null; body: string },
+  variables: Record<string, string | undefined>
+): { title: string; body: string } {
+  let title = template.title || '';
+  let body = template.body;
+
   for (const [key, value] of Object.entries(variables)) {
-    message = message.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    const regex = new RegExp(`\\{${key}\\}`, 'g');
+    const safeValue = value || '';
+    title = title.replace(regex, safeValue);
+    body = body.replace(regex, safeValue);
   }
-  return message;
+
+  // Log warning for any remaining unsubstituted variables
+  const remainingVars = [...(title.match(/\{[^}]+\}/g) || []), ...(body.match(/\{[^}]+\}/g) || [])];
+  if (remainingVars.length > 0) {
+    console.warn('Template has unsubstituted variables:', remainingVars);
+  }
+
+  return { title, body };
+}
+
+function formatDateBR(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
 }
 
 interface ScheduledCheckin {
@@ -108,9 +137,8 @@ Deno.serve(async (req) => {
     const todayStr = saoPauloNow.toISOString().split('T')[0];
     const currentHour = saoPauloNow.getHours();
     const currentMinute = saoPauloNow.getMinutes();
-    const currentTimeStr = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}:00`;
 
-    console.log('Processing checkin reminders for:', todayStr, 'current time:', currentTimeStr);
+    console.log('Processing checkin reminders for:', todayStr, 'current time:', `${currentHour}:${currentMinute}`);
 
     // Fetch scheduled checkins for today that haven't been sent
     const { data: scheduledCheckins, error: fetchError } = await supabase
@@ -157,7 +185,6 @@ Deno.serve(async (req) => {
           const schedMinutes = schedHour * 60 + schedMin;
           const currentMinutes = currentHour * 60 + currentMinute;
           
-          // Skip if not within window (current time should be >= scheduled time and < scheduled time + 5 min)
           if (currentMinutes < schedMinutes || currentMinutes >= schedMinutes + 5) {
             console.log('Skipping checkin outside time window:', checkin.id);
             continue;
@@ -221,16 +248,17 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Get template from database
+        // ALWAYS fetch template from database - NO HARDCODE FALLBACK
         const { data: template } = await supabase
           .from('whatsapp_templates')
-          .select('body, is_active')
+          .select('id, title, body, is_active, updated_at')
           .eq('user_id', checkin.user_id)
           .eq('template_key', 'checkin_reminder')
-          .maybeSingle();
+          .maybeSingle() as { data: WhatsAppTemplate | null };
 
-        if (template && !template.is_active) {
-          console.log('Template checkin_reminder is inactive');
+        // If no template or template is inactive, skip
+        if (!template || !template.is_active) {
+          console.log('Template checkin_reminder not found or inactive');
           await supabase.from('whatsapp_message_logs').insert({
             user_id: checkin.user_id,
             client_id: checkin.client_id,
@@ -238,66 +266,62 @@ Deno.serve(async (req) => {
             template_key: 'checkin_reminder',
             to_phone: client.phone,
             status: 'skipped',
-            error_message: 'Template is inactive',
-            metadata: { scheduled_checkin_id: checkin.id, reason: 'template_inactive' }
+            error_message: template ? 'Template is inactive' : 'No template configured',
+            metadata: { scheduled_checkin_id: checkin.id, reason: template ? 'template_inactive' : 'no_template' }
           });
-          results.push({ checkinId: checkin.id, status: 'skipped', error: 'Template inactive' });
+          results.push({ checkinId: checkin.id, status: 'skipped', error: template ? 'Template inactive' : 'No template' });
           continue;
         }
 
         // Build checkin link
-        // If athlete has login, use the dashboard. Otherwise use public form link if form_id exists
         let checkinLink = `${appUrl}/atleta`;
         if (checkin.form_id && !client.athlete_user_id) {
           checkinLink = `${appUrl}/checkin/${checkin.form_id}?client=${checkin.client_id}`;
         }
 
-        // Use template from database - if not found, skip sending (admin should configure templates)
-        if (!template?.body) {
-          console.log('No template body configured for checkin_reminder, skipping');
-          await supabase.from('whatsapp_message_logs').insert({
-            user_id: checkin.user_id,
-            client_id: checkin.client_id,
-            message_type: 'checkin_reminder',
-            template_key: 'checkin_reminder',
-            to_phone: client.phone,
-            status: 'skipped',
-            error_message: 'No template configured',
-            metadata: { scheduled_checkin_id: checkin.id, reason: 'no_template' }
-          });
-          results.push({ checkinId: checkin.id, status: 'skipped', error: 'No template configured' });
-          continue;
-        }
-        
-        const message = formatMessage(template.body, {
-          nome: client.name.split(' ')[0],
-          link_checkin: checkinLink,
-        });
+        // Render the template with variables
+        const rendered = renderTemplate(
+          { title: template.title, body: template.body },
+          {
+            nome: client.name.split(' ')[0],
+            link_checkin: checkinLink,
+          }
+        );
+
+        // Build final message with title if available
+        const finalMessage = rendered.title 
+          ? `*${rendered.title}*\n\n${rendered.body}`
+          : rendered.body;
 
         console.log('Sending checkin reminder to:', client.phone);
+        console.log('Using template updated_at:', template.updated_at);
+
         const sendResult = await sendWhatsAppMessage(
           client.phone,
-          message,
+          finalMessage,
           zapiInstanceId,
           zapiToken,
           zapiClientToken
         );
 
-        // Log the attempt
         await supabase.from('whatsapp_message_logs').insert({
           user_id: checkin.user_id,
           client_id: checkin.client_id,
           message_type: 'checkin_reminder',
           template_key: 'checkin_reminder',
           to_phone: client.phone,
-          payload_preview: message.substring(0, 500),
+          payload_preview: finalMessage.substring(0, 500),
           status: sendResult.success ? 'success' : 'failed',
           error_message: sendResult.error,
-          metadata: { scheduled_checkin_id: checkin.id, zapi_response: sendResult.zapiResponse }
+          metadata: { 
+            scheduled_checkin_id: checkin.id, 
+            zapi_response: sendResult.zapiResponse,
+            template_id: template.id,
+            template_updated_at: template.updated_at
+          }
         });
 
         if (sendResult.success) {
-          // Mark checkin as sent
           await supabase
             .from('scheduled_checkins')
             .update({ 

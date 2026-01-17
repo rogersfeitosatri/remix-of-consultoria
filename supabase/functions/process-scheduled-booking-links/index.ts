@@ -11,6 +11,14 @@ interface WhatsAppSendResult {
   zapiResponse?: unknown;
 }
 
+interface WhatsAppTemplate {
+  id: string;
+  title: string | null;
+  body: string;
+  is_active: boolean;
+  updated_at: string;
+}
+
 async function sendWhatsAppMessage(
   phone: string, 
   message: string,
@@ -55,12 +63,28 @@ async function sendWhatsAppMessage(
   }
 }
 
-function formatMessage(template: string, variables: Record<string, string>): string {
-  let message = template;
+// Render template with variables - logs warnings for missing variables
+function renderTemplate(
+  template: { title?: string | null; body: string },
+  variables: Record<string, string | undefined>
+): { title: string; body: string } {
+  let title = template.title || '';
+  let body = template.body;
+
   for (const [key, value] of Object.entries(variables)) {
-    message = message.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    const regex = new RegExp(`\\{${key}\\}`, 'g');
+    const safeValue = value || '';
+    title = title.replace(regex, safeValue);
+    body = body.replace(regex, safeValue);
   }
-  return message;
+
+  // Log warning for any remaining unsubstituted variables
+  const remainingVars = [...(title.match(/\{[^}]+\}/g) || []), ...(body.match(/\{[^}]+\}/g) || [])];
+  if (remainingVars.length > 0) {
+    console.warn('Template has unsubstituted variables:', remainingVars);
+  }
+
+  return { title, body };
 }
 
 Deno.serve(async (req) => {
@@ -176,16 +200,17 @@ Deno.serve(async (req) => {
           bookingLink = newLink;
         }
 
-        // Get template from database
+        // ALWAYS fetch template from database - NO HARDCODE FALLBACK
         const { data: template } = await supabase
           .from('whatsapp_templates')
-          .select('body, is_active')
+          .select('id, title, body, is_active, updated_at')
           .eq('user_id', invite.admin_user_id)
           .eq('template_key', 'weekly_booking_link')
-          .maybeSingle();
+          .maybeSingle() as { data: WhatsAppTemplate | null };
 
-        if (template && !template.is_active) {
-          console.log('Template weekly_booking_link is inactive');
+        // If no template or template is inactive, skip
+        if (!template || !template.is_active) {
+          console.log('Template weekly_booking_link not found or inactive');
           await supabase.from('whatsapp_message_logs').insert({
             user_id: invite.admin_user_id,
             client_id: invite.client_id,
@@ -193,21 +218,29 @@ Deno.serve(async (req) => {
             template_key: 'weekly_booking_link',
             to_phone: invite.client_phone || 'N/A',
             status: 'skipped',
-            error_message: 'Template is inactive',
-            metadata: { reason: 'template_inactive' }
+            error_message: template ? 'Template is inactive' : 'No template configured',
+            metadata: { reason: template ? 'template_inactive' : 'no_template' }
           });
-          results.push({ clientId: invite.client_id, status: 'skipped', error: 'Template inactive' });
+          results.push({ clientId: invite.client_id, status: 'skipped', error: template ? 'Template inactive' : 'No template' });
           continue;
         }
 
         const bookingUrl = `${baseUrl}/booking/${bookingLink.token}`;
-        const templateBody = template?.body || 
-          'Olá {nome}! Hora de agendar sua próxima consulta. Escolha seu melhor horário aqui: {booking_link}';
         
-        const message = formatMessage(templateBody, {
-          nome: invite.client_name.split(' ')[0],
-          booking_link: bookingUrl,
-        });
+        // Render the template with variables
+        const rendered = renderTemplate(
+          { title: template.title, body: template.body },
+          {
+            nome: invite.client_name.split(' ')[0],
+            booking_link: bookingUrl,
+            link: bookingUrl,
+          }
+        );
+
+        // Build final message with title if available
+        const finalMessage = rendered.title 
+          ? `*${rendered.title}*\n\n${rendered.body}`
+          : rendered.body;
 
         if (!invite.client_phone) {
           console.log(`No phone number for client ${invite.client_name}`);
@@ -226,29 +259,33 @@ Deno.serve(async (req) => {
         }
 
         console.log(`Sending booking link to ${invite.client_name}`);
+        console.log('Using template updated_at:', template.updated_at);
+
         const sendResult = await sendWhatsAppMessage(
           invite.client_phone,
-          message,
+          finalMessage,
           zapiInstanceId,
           zapiToken,
           zapiClientToken
         );
 
-        // Log the attempt
         await supabase.from('whatsapp_message_logs').insert({
           user_id: invite.admin_user_id,
           client_id: invite.client_id,
           message_type: 'weekly_booking_link',
           template_key: 'weekly_booking_link',
           to_phone: invite.client_phone,
-          payload_preview: message.substring(0, 500),
+          payload_preview: finalMessage.substring(0, 500),
           status: sendResult.success ? 'success' : 'failed',
           error_message: sendResult.error,
-          metadata: { zapi_response: sendResult.zapiResponse }
+          metadata: { 
+            zapi_response: sendResult.zapiResponse,
+            template_id: template.id,
+            template_updated_at: template.updated_at
+          }
         });
 
         if (sendResult.success) {
-          // Update the consultation schedule rule
           await supabase
             .from('consultation_schedule_rules')
             .update({ 
@@ -257,7 +294,6 @@ Deno.serve(async (req) => {
             })
             .eq('client_id', invite.client_id);
 
-          // Update booking link last_sent_at
           await supabase
             .from('booking_links')
             .update({ last_sent_at: new Date().toISOString() })
