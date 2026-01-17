@@ -252,10 +252,24 @@ Deno.serve(async (req) => {
           checkinLink = `${appUrl}/checkin/${checkin.form_id}?client=${checkin.client_id}`;
         }
 
-        const templateBody = template?.body || 
-          'Olá {nome}! 📋 É hora do seu check-in semanal! Responda aqui: {link_checkin}';
+        // Use template from database - if not found, skip sending (admin should configure templates)
+        if (!template?.body) {
+          console.log('No template body configured for checkin_reminder, skipping');
+          await supabase.from('whatsapp_message_logs').insert({
+            user_id: checkin.user_id,
+            client_id: checkin.client_id,
+            message_type: 'checkin_reminder',
+            template_key: 'checkin_reminder',
+            to_phone: client.phone,
+            status: 'skipped',
+            error_message: 'No template configured',
+            metadata: { scheduled_checkin_id: checkin.id, reason: 'no_template' }
+          });
+          results.push({ checkinId: checkin.id, status: 'skipped', error: 'No template configured' });
+          continue;
+        }
         
-        const message = formatMessage(templateBody, {
+        const message = formatMessage(template.body, {
           nome: client.name.split(' ')[0],
           link_checkin: checkinLink,
         });

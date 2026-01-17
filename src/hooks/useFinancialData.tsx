@@ -112,7 +112,7 @@ export interface ExpiringPlanWithPayment {
 
 /**
  * Planos expirando: clientes com end_date dentro do período
- * Retorna o valor pago do plano atual (da tabela payments com plan_end_date correspondente)
+ * Retorna o valor do último pagamento pago do cliente (não necessariamente vinculado por plan_end_date)
  */
 export function getExpiringPlansInPeriod(
   clients: { id: string; name: string; end_date: string; monthly_value: number; plan_type: string; is_active: boolean }[],
@@ -126,13 +126,25 @@ export function getExpiringPlansInPeriod(
       return isWithinInterval(endDate_, { start: startOfDay(startDate), end: endOfDay(endDate) });
     })
     .map(client => {
-      // Buscar o pagamento que corresponde ao plano atual (plan_end_date = end_date do cliente)
-      const matchingPayment = payments.find(p => 
+      // Buscar todos os pagamentos pagos deste cliente
+      const clientPayments = payments.filter(p => 
         p.client_id === client.id && 
-        p.plan_end_date && 
-        p.plan_end_date === client.end_date &&
         p.status === 'paid'
       );
+      
+      // Primeiro tentar encontrar pagamento com plan_end_date = end_date do cliente
+      let matchingPayment = clientPayments.find(p => 
+        p.plan_end_date && p.plan_end_date === client.end_date
+      );
+      
+      // Se não encontrar, pegar o pagamento mais recente (por paid_at ou due_date)
+      if (!matchingPayment && clientPayments.length > 0) {
+        matchingPayment = clientPayments.sort((a, b) => {
+          const dateA = a.paid_at ? parseISO(a.paid_at) : parseISO(a.due_date);
+          const dateB = b.paid_at ? parseISO(b.paid_at) : parseISO(b.due_date);
+          return dateB.getTime() - dateA.getTime();
+        })[0];
+      }
       
       return {
         id: client.id,
@@ -140,7 +152,7 @@ export function getExpiringPlansInPeriod(
         end_date: client.end_date,
         plan_type: client.plan_type,
         is_active: client.is_active,
-        payment_amount: matchingPayment?.amount || 0
+        payment_amount: matchingPayment?.amount || client.monthly_value
       };
     })
     .sort((a, b) => parseISO(a.end_date).getTime() - parseISO(b.end_date).getTime());

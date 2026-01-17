@@ -70,21 +70,6 @@ Até já! 🙂`,
     variables: ['nome', 'data', 'hora', 'link'],
   },
   {
-    template_key: 'booking_invite',
-    template_name: 'Convite para Agendamento',
-    body: `📅 Olá {nome}!
-
-Chegou a hora de agendar sua próxima consulta!
-
-Clique no link abaixo para escolher o melhor horário:
-{link}
-
-Abraços! 🙂`,
-    is_active: true,
-    default_timing: 'Manual',
-    variables: ['nome', 'link'],
-  },
-  {
     template_key: 'booking_confirmed',
     template_name: 'Confirmação de Agendamento',
     body: `✅ *Consulta Confirmada*

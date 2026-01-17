@@ -62,13 +62,15 @@ export function WhatsAppTemplatesTab({ templates }: WhatsAppTemplatesTabProps) {
   const getTemplateLabel = (key: string) => {
     switch (key) {
       case 'reminder_15m': return 'Lembrete 15 min antes';
-      case 'booking_invite': return 'Convite de Agendamento';
       case 'booking_confirmed': return 'Confirmação de Agendamento';
       case 'weekly_booking_link': return 'Link Semanal de Agendamento';
       case 'checkin_reminder': return 'Lembrete de Check-in';
       default: return key;
     }
   };
+
+  // Filter out deprecated booking_invite template (replaced by weekly_booking_link)
+  const visibleTemplates = templates.filter(t => t.template_key !== 'booking_invite');
 
   const getTemplateTiming = (template: WhatsAppTemplate) => {
     if (!template.default_timing) return null;
@@ -84,7 +86,7 @@ export function WhatsAppTemplatesTab({ templates }: WhatsAppTemplatesTabProps) {
         </p>
       </div>
 
-      {templates.length === 0 ? (
+      {visibleTemplates.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             Nenhum template encontrado. Os templates serão criados automaticamente.
@@ -92,7 +94,7 @@ export function WhatsAppTemplatesTab({ templates }: WhatsAppTemplatesTabProps) {
         </Card>
       ) : (
         <Accordion type="multiple" className="space-y-2">
-          {templates.map((template) => {
+          {visibleTemplates.map((template) => {
             const data = getTemplateData(template);
             const changed = hasChanges(template);
 
