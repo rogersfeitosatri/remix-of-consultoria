@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -13,40 +13,56 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Cache session in memory for faster access
+let cachedSession: Session | null = null;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => cachedSession?.user ?? null);
+  const [session, setSession] = useState<Session | null>(() => cachedSession);
+  const [loading, setLoading] = useState(!cachedSession);
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (event, newSession) => {
+        if (!mounted) return;
+        
+        cachedSession = newSession;
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
         setLoading(false);
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // THEN check for existing session (only if no cached session)
+    if (!cachedSession) {
+      supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+        if (!mounted) return;
+        
+        cachedSession = existingSession;
+        setSession(existingSession);
+        setUser(existingSession?.user ?? null);
+        setLoading(false);
+      });
+    }
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     return { error };
-  };
+  }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signUp({
@@ -60,14 +76,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
     return { error };
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
+    cachedSession = null;
     await supabase.auth.signOut();
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    user,
+    session,
+    loading,
+    signIn,
+    signUp,
+    signOut
+  }), [user, session, loading, signIn, signUp, signOut]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
