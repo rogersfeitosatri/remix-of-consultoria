@@ -2373,6 +2373,20 @@ export type Database = {
           valid: boolean
         }[]
       }
+      validate_booking_email_v2: {
+        Args: { p_email: string; p_token: string }
+        Returns: {
+          admin_user_id: string
+          anamnese_completed: boolean
+          client_id: string
+          client_name: string
+          eligible_for_booking: boolean
+          error_message: string
+          is_active: boolean
+          onboarding_type: string
+          valid: boolean
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "athlete"

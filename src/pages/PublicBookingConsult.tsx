@@ -111,9 +111,9 @@ export default function PublicBookingConsult() {
     setVerificationError(null);
     
     try {
-      // Validate email using secure RPC function (bypasses RLS)
+      // Use new v2 function that returns all needed data (bypasses RLS completely)
       const { data, error } = await supabase
-        .rpc('validate_booking_email', { 
+        .rpc('validate_booking_email_v2', { 
           p_token: token,
           p_email: emailInput.trim()
         });
@@ -133,30 +133,14 @@ export default function PublicBookingConsult() {
         return;
       }
 
-      // Check client's onboarding type - continuation clients skip anamnese requirement
-      const { data: clientData } = await supabase
-        .from('clients')
-        .select('onboarding_type')
-        .eq('id', result.client_id)
-        .maybeSingle();
-
-      const isContinuationClient = clientData?.onboarding_type === 'continuation';
+      // Check if continuation client (skip anamnese requirement)
+      const isContinuationClient = result.onboarding_type === 'continuation';
 
       // Only require anamnese for NEW clients (not continuation)
-      if (!isContinuationClient) {
-        const { data: athleteProfile } = await supabase
-          .from('athlete_profiles')
-          .select('anamnese_completed, anamnese_submitted_at')
-          .eq('client_id', result.client_id)
-          .maybeSingle();
-
-        const anamneseCompleted = athleteProfile?.anamnese_completed === true || athleteProfile?.anamnese_submitted_at != null;
-
-        if (!anamneseCompleted) {
-          setVerificationError('Para agendar sua 1ª consulta, finalize a anamnese primeiro. Acesse sua área de membros para preencher.');
-          setIsVerifying(false);
-          return;
-        }
+      if (!isContinuationClient && !result.anamnese_completed) {
+        setVerificationError('Para agendar sua 1ª consulta, finalize a anamnese primeiro. Acesse sua área de membros para preencher.');
+        setIsVerifying(false);
+        return;
       }
       
       // Success - set context
