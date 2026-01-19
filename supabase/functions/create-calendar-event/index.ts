@@ -52,12 +52,16 @@ Deno.serve(async (req) => {
 
     // Check if OAuth connection exists and is valid
     if (oauthConnection?.access_token && oauthConnection?.refresh_token) {
-      const tokenExpired = oauthConnection.token_expires_at &&
-        new Date(oauthConnection.token_expires_at) < new Date();
+      // Proactive refresh: renew if token expires in less than 5 minutes
+      const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
+      const tokenExpiresAt = oauthConnection.token_expires_at 
+        ? new Date(oauthConnection.token_expires_at).getTime() 
+        : 0;
+      const needsRefresh = tokenExpiresAt < (Date.now() + TOKEN_REFRESH_BUFFER_MS);
 
-      if (tokenExpired) {
-        // Refresh the token
-        console.log('Token expired, refreshing...');
+      if (needsRefresh) {
+        // Proactive refresh - renew before expiration
+        console.log('Token expiring soon or expired, refreshing proactively...');
         const refreshResult = await refreshGoogleToken(
           oauthConnection.refresh_token,
           clientId!,
@@ -68,14 +72,16 @@ Deno.serve(async (req) => {
         if (refreshResult.success && refreshResult.access_token) {
           accessToken = refreshResult.access_token;
           useOAuth = true;
-          console.log('Token refreshed successfully');
+          console.log('Token refreshed successfully (proactive)');
         } else {
           console.error('Failed to refresh token:', refreshResult.error);
+          // Token refresh failed - connection needs re-authorization
+          // The refreshGoogleToken function already marks it as needing reauth
         }
       } else {
         accessToken = oauthConnection.access_token;
         useOAuth = true;
-        console.log('Using existing OAuth token');
+        console.log('Using existing OAuth token (valid for', Math.round((tokenExpiresAt - Date.now()) / 60000), 'min)');
       }
     }
 
@@ -274,7 +280,31 @@ async function refreshGoogleToken(
     const tokenData = await tokenResponse.json();
 
     if (!tokenResponse.ok || !tokenData.access_token) {
-      return { success: false, error: tokenData.error_description || 'Failed to refresh token' };
+      const errorType = tokenData.error;
+      const errorDesc = tokenData.error_description || 'Failed to refresh token';
+      
+      console.error('Google token refresh failed:', { error: errorType, description: errorDesc });
+      
+      // If refresh token was revoked/invalidated, mark connection as needing re-authorization
+      if (errorType === 'invalid_grant') {
+        console.log('Refresh token invalidated - marking connection for re-authorization');
+        await supabase
+          .from('google_oauth_connections')
+          .update({
+            access_token: null,
+            token_expires_at: null,
+            // Keep refresh_token for reference but mark as expired
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId);
+        
+        return { 
+          success: false, 
+          error: 'Conexão Google expirada. Necessário reconectar no painel de Configurações → Integração Google Meet.' 
+        };
+      }
+      
+      return { success: false, error: errorDesc };
     }
 
     const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000);
@@ -289,8 +319,10 @@ async function refreshGoogleToken(
       })
       .eq('user_id', userId);
 
+    console.log('Token refreshed, new expiration:', expiresAt.toISOString());
     return { success: true, access_token: tokenData.access_token };
   } catch (error: any) {
+    console.error('Exception during token refresh:', error.message);
     return { success: false, error: error.message };
   }
 }
