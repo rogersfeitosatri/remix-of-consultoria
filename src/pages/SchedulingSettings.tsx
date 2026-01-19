@@ -38,7 +38,7 @@ import { ConsultAutomationPanel } from '@/components/scheduling/ConsultAutomatio
 import { GoogleCalendarSettings } from '@/components/scheduling/GoogleCalendarSettings';
 import { GoogleOAuthSettings } from '@/components/scheduling/GoogleOAuthSettings';
 import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog';
-import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban, Settings, Video, UserPlus } from 'lucide-react';
+import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban, Settings, Video, UserPlus, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -82,6 +82,16 @@ export default function SchedulingSettings() {
   const [blockEndTime, setBlockEndTime] = useState('18:00');
   const [blockReason, setBlockReason] = useState('');
   const [isManualBookingOpen, setIsManualBookingOpen] = useState(false);
+
+  // Track if there are unsaved changes
+  const hasUnsavedChanges = settings ? (
+    JSON.stringify(workingDays) !== JSON.stringify(settings.working_days) ||
+    startTime + ':00' !== settings.working_hours_start ||
+    endTime + ':00' !== settings.working_hours_end ||
+    slotDuration !== settings.slot_duration_minutes ||
+    bufferMinutes !== ((settings as any).buffer_minutes || 0) ||
+    slug !== (settings.booking_link_slug || '')
+  ) : false;
 
   useEffect(() => {
     if (settings) {
@@ -173,12 +183,44 @@ export default function SchedulingSettings() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Agendamento de Consultas</h1>
-          <p className="mt-1 text-sm sm:text-base text-muted-foreground">
-            Configure horários de atendimento e bloqueie datas
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Agendamento de Consultas</h1>
+            <p className="mt-1 text-sm sm:text-base text-muted-foreground">
+              Configure horários de atendimento e bloqueie datas
+            </p>
+          </div>
+          
+          {/* Save button always visible in header */}
+          <Button 
+            onClick={handleSave} 
+            disabled={saveSettings.isPending || !hasUnsavedChanges}
+            className="gap-2 self-start sm:self-center"
+            variant={hasUnsavedChanges ? "default" : "outline"}
+          >
+            {saveSettings.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                {hasUnsavedChanges ? 'Salvar Alterações' : 'Configurações Salvas'}
+              </>
+            )}
+          </Button>
         </div>
+
+        {/* Unsaved changes indicator */}
+        {hasUnsavedChanges && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400">
+            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <p className="text-sm">
+              Você tem alterações não salvas. Clique em "Salvar Alterações" para confirmar.
+            </p>
+          </div>
+        )}
 
         <Tabs defaultValue="settings" className="space-y-6">
           <TabsList className="flex-wrap h-auto gap-1">
@@ -357,17 +399,6 @@ export default function SchedulingSettings() {
                 )}
               </CardContent>
             </Card>
-
-            <Button onClick={handleSave} disabled={saveSettings.isPending} className="w-full sm:w-auto mb-6">
-              {saveSettings.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                'Salvar Configurações'
-              )}
-            </Button>
 
             {/* Time Blocks Manager - Multiple time blocks per day */}
             {settings?.id && (
