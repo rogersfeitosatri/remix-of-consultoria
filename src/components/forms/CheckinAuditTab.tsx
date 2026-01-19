@@ -53,6 +53,7 @@ export function CheckinAuditTab() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = toZonedTime(new Date(), SAO_PAULO_TZ);
     return startOfMonth(now);
@@ -87,6 +88,15 @@ export function CheckinAuditTab() {
         return true;
       })
       .filter(checkin => {
+        if (frequencyFilter !== 'all') {
+          const client = clientsMap[checkin.client_id];
+          if (client?.checkin_frequency !== frequencyFilter) {
+            return false;
+          }
+        }
+        return true;
+      })
+      .filter(checkin => {
         if (!searchQuery) return true;
         const client = clientsMap[checkin.client_id];
         const clientName = client?.name?.toLowerCase() || '';
@@ -100,7 +110,7 @@ export function CheckinAuditTab() {
         const clientB = clientsMap[b.client_id]?.name || '';
         return clientA.localeCompare(clientB);
       });
-  }, [checkins, currentMonth, searchQuery, statusFilter, clientsMap]);
+  }, [checkins, currentMonth, searchQuery, statusFilter, frequencyFilter, clientsMap]);
 
   // Stats for the month
   const stats = useMemo(() => {
@@ -381,6 +391,19 @@ export function CheckinAuditTab() {
               </SelectContent>
             </Select>
 
+            {/* Frequency Filter */}
+            <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Periodicidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="weekly">Semanal</SelectItem>
+                <SelectItem value="biweekly">Quinzenal</SelectItem>
+                <SelectItem value="monthly">Mensal</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* Search */}
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -400,6 +423,7 @@ export function CheckinAuditTab() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Atleta</TableHead>
+                    <TableHead>Periodicidade</TableHead>
                     <TableHead>Telefone</TableHead>
                     <TableHead>Data Agendada</TableHead>
                     <TableHead>Horário</TableHead>
@@ -411,7 +435,7 @@ export function CheckinAuditTab() {
                 <TableBody>
                   {filteredCheckins.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         Nenhum check-in encontrado para este período.
                       </TableCell>
                     </TableRow>
@@ -425,6 +449,14 @@ export function CheckinAuditTab() {
                         <TableRow key={checkin.id}>
                           <TableCell className="font-medium">
                             {client?.name || 'Cliente não encontrado'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {client?.checkin_frequency === 'weekly' && 'Semanal'}
+                              {client?.checkin_frequency === 'biweekly' && 'Quinzenal'}
+                              {client?.checkin_frequency === 'monthly' && 'Mensal'}
+                              {!client?.checkin_frequency && '-'}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground font-mono">
                             {client?.phone || '-'}
