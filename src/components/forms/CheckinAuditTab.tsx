@@ -122,14 +122,18 @@ export function CheckinAuditTab() {
       });
   }, [checkins, currentMonth, specificDate, searchQuery, statusFilter, frequencyFilter, clientsMap]);
 
-  // Stats for the month
+  // Stats for the month - Updated logic:
+  // - Pendentes: Not sent yet (pending) OR sent but not responded (sent)
+  // - Respondidos: Completed (responded)
   const stats = useMemo(() => {
     const total = filteredCheckins.length;
     const sent = filteredCheckins.filter(c => c.status === 'sent').length;
     const pending = filteredCheckins.filter(c => c.status === 'pending').length;
     const skipped = filteredCheckins.filter(c => c.status === 'skipped').length;
     const completed = filteredCheckins.filter(c => c.status === 'completed').length;
-    return { total, sent, pending, skipped, completed };
+    // Awaiting response = pending (not sent) + sent (sent but not responded)
+    const awaitingResponse = pending + sent;
+    return { total, sent, pending, skipped, completed, awaitingResponse };
   }, [filteredCheckins]);
 
   const handleSendCheckin = async (checkinId: string, clientId: string) => {
@@ -345,21 +349,21 @@ export function CheckinAuditTab() {
               <div className="text-2xl font-bold">{stats.total}</div>
               <div className="text-xs text-muted-foreground">Total</div>
             </div>
-            <div className="bg-green-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.sent}</div>
-              <div className="text-xs text-muted-foreground">Enviados</div>
-            </div>
             <div className="bg-amber-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
-              <div className="text-xs text-muted-foreground">Pendentes</div>
-            </div>
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-muted-foreground">{stats.skipped}</div>
-              <div className="text-xs text-muted-foreground">Pausados</div>
+              <div className="text-2xl font-bold text-amber-600">{stats.awaitingResponse}</div>
+              <div className="text-xs text-muted-foreground">Sem Resposta</div>
             </div>
             <div className="bg-blue-500/10 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-blue-600">{stats.completed}</div>
               <div className="text-xs text-muted-foreground">Respondidos</div>
+            </div>
+            <div className="bg-green-500/10 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-green-600">{stats.sent}</div>
+              <div className="text-xs text-muted-foreground">Enviados</div>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-muted-foreground">{stats.skipped}</div>
+              <div className="text-xs text-muted-foreground">Pausados</div>
             </div>
           </div>
 

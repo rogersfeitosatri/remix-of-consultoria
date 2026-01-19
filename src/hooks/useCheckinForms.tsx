@@ -56,6 +56,7 @@ export function useCheckinForms() {
       return data as CheckinForm[];
     },
     enabled: !!user,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }
 

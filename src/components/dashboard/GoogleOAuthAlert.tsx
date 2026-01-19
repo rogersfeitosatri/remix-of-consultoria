@@ -78,8 +78,10 @@ export function GoogleOAuthAlert() {
       
       return {
         title: `${oauthStatus.failedMeets.length} consulta(s) sem link do Meet`,
-        description: `Consultas de ${clientNames}${oauthStatus.failedMeets.length > 3 ? ' e outros' : ''} estão sem link do Google Meet. Reconecte o Google e reprocesse.`,
+        description: `Consultas de ${clientNames}${oauthStatus.failedMeets.length > 3 ? ' e outros' : ''} estão sem link do Google Meet. Clique para reprocessar e enviar.`,
         variant: 'destructive' as const,
+        // Store the first failed appointment ID for navigation
+        firstAppointmentId: oauthStatus.failedMeets[0]?.id,
       };
     }
 
@@ -107,15 +109,15 @@ export function GoogleOAuthAlert() {
             <RefreshCw className="h-4 w-4" />
             Configurar Google
           </Button>
-          {oauthStatus.failedMeets.length > 0 && (
+          {oauthStatus.failedMeets.length > 0 && content.firstAppointmentId && (
             <Button 
               size="sm" 
-              variant="outline"
-              onClick={() => navigate('/calendar')}
+              variant="default"
+              onClick={() => navigate(`/appointments/${content.firstAppointmentId}`)}
               className="gap-2"
             >
-              <ExternalLink className="h-4 w-4" />
-              Ver Agenda
+              <RefreshCw className="h-4 w-4" />
+              Reprocessar Consulta
             </Button>
           )}
         </div>
