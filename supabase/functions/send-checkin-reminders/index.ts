@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const appUrl = 'https://rogersfeitosa.lovable.app';
+  const appUrl = 'https://rogersfeitosa.com.br';
 
   try {
     // Get current time in São Paulo

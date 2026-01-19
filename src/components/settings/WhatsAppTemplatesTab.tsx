@@ -89,8 +89,8 @@ export function WhatsAppTemplatesTab({ templates }: WhatsAppTemplatesTabProps) {
         case 'hora': vars[v] = '14:30'; break;
         case 'link': vars[v] = 'https://meet.google.com/abc-defg-hij'; break;
         case 'meet_link': vars[v] = 'https://meet.google.com/abc-defg-hij'; break;
-        case 'booking_link': vars[v] = 'https://rogersfeitosa.lovable.app/booking/abc123'; break;
-        case 'link_checkin': vars[v] = 'https://rogersfeitosa.lovable.app/checkin/form123'; break;
+        case 'booking_link': vars[v] = 'https://rogersfeitosa.com.br/booking/abc123'; break;
+        case 'link_checkin': vars[v] = 'https://rogersfeitosa.com.br/checkin/form123'; break;
         default: vars[v] = `[${v}]`;
       }
     }
