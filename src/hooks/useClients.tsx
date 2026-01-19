@@ -83,6 +83,7 @@ export function useClients() {
       return data as Client[];
     },
     enabled: !!user,
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   });
 }
 

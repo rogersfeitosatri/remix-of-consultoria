@@ -59,6 +59,7 @@ export function useAnamneseForms() {
       return (data || []) as unknown as AnamneseForm[];
     },
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }
 
