@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
   const zapiInstanceId = Deno.env.get('ZAPI_INSTANCE_ID');
   const zapiToken = Deno.env.get('ZAPI_TOKEN');
   const zapiClientToken = Deno.env.get('ZAPI_CLIENT_TOKEN') || '';
-  const appUrl = 'https://rogersfeitosa.lovable.app';
+  const appUrl = 'https://rogersfeitosa.com.br';
 
   if (!zapiInstanceId || !zapiToken) {
     console.error('ZAPI credentials not configured');
