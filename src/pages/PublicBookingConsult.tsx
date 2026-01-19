@@ -133,15 +133,8 @@ export default function PublicBookingConsult() {
         return;
       }
 
-      // Check if continuation client (skip anamnese requirement)
-      const isContinuationClient = result.onboarding_type === 'continuation';
-
-      // Only require anamnese for NEW clients (not continuation)
-      if (!isContinuationClient && !result.anamnese_completed) {
-        setVerificationError('Para agendar sua 1ª consulta, finalize a anamnese primeiro. Acesse sua área de membros para preencher.');
-        setIsVerifying(false);
-        return;
-      }
+      // Anamnese check removed - athletes can book without completing anamnese
+      // The anamnese can be filled later before the actual consultation
       
       // Success - set context
       setBookingContext({
