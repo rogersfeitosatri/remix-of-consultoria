@@ -663,12 +663,12 @@ export function useSendBookingInvite() {
 
   return useMutation({
     mutationFn: async ({ clientId, bookingToken }: { clientId: string; bookingToken: string }) => {
-      const bookingUrl = `${window.location.origin}/booking/${bookingToken}`;
-
-      const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+      // Use send-booking-link function which uses the correct domain (rogersfeitosa.com.br)
+      // and fetches template from database
+      const { data, error } = await supabase.functions.invoke('send-booking-link', {
         body: {
           clientId,
-          message: `Olá! Hora de agendar sua consulta. Escolha seu melhor horário aqui: ${bookingUrl}`,
+          messageType: 'booking_invite',
         },
       });
 
@@ -682,17 +682,12 @@ export function useSendBookingInvite() {
         message_type: 'booking_invite',
       });
 
-      // Update booking link last_sent_at
-      await supabase
-        .from('booking_links')
-        .update({ last_sent_at: new Date().toISOString() })
-        .eq('token', bookingToken);
-
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['booking-links'] });
       queryClient.invalidateQueries({ queryKey: ['consult-invite-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['client-booking-link'] });
     },
   });
 }
