@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -123,6 +123,7 @@ function applyPhoneMask(value: string): string {
 export default function PublicCheckinForm() {
   const { formId } = useParams<{ formId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [form, setForm] = useState<Form | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -262,27 +263,24 @@ export default function PublicCheckinForm() {
       setVerifyingPhone(true);
 
       const { normalizedInputPhone } = validatePhoneOrThrow();
+      const clientParam = new URLSearchParams(location.search).get('client') || undefined;
 
-      const { data: clients, error: clientError } = await supabase
-        .from('clients')
-        .select('id, phone')
-        .not('phone', 'is', null);
-
-      if (clientError) throw clientError;
-
-      const matchingClient = clients?.find(client => {
-        if (!client.phone) return false;
-        const normalizedDbPhone = normalizePhoneToE164(client.phone);
-        return normalizedDbPhone === normalizedInputPhone;
+      const { data, error } = await supabase.functions.invoke('verify-checkin-phone', {
+        body: {
+          clientId: clientParam,
+          phone: normalizedInputPhone,
+        },
       });
 
-      if (!matchingClient) {
+      if (error) throw error;
+
+      if (!data?.valid || !data?.clientId) {
         toast.error('Telefone não encontrado. Confirme o número que você recebeu no WhatsApp e tente novamente.');
         setVerifiedClientId(null);
         return;
       }
 
-      setVerifiedClientId(matchingClient.id);
+      setVerifiedClientId(data.clientId);
       toast.success('Telefone confirmado. Você já pode preencher o check-in.');
     } catch (err: any) {
       toast.error(err?.message || 'Não foi possível confirmar o telefone.');
