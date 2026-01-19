@@ -10,7 +10,7 @@ import { useClients } from '@/hooks/useClients';
 import { useWhatsAppTemplates } from '@/hooks/useWhatsAppTemplates';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isSameDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { ptBR } from 'date-fns/locale';
 import { 
@@ -25,9 +25,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Pause,
-  Filter
+  Filter,
+  CalendarDays,
+  X
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +62,7 @@ export function CheckinAuditTab() {
     const now = toZonedTime(new Date(), SAO_PAULO_TZ);
     return startOfMonth(now);
   });
+  const [specificDate, setSpecificDate] = useState<Date | undefined>(undefined);
   const [sendingCheckins, setSendingCheckins] = useState<Set<string>>(new Set());
   const [deletingCheckins, setDeletingCheckins] = useState<Set<string>>(new Set());
 
@@ -79,6 +84,11 @@ export function CheckinAuditTab() {
     return checkins
       .filter(checkin => {
         const checkinDate = parseISO(checkin.scheduled_send_date);
+        // If specific date is selected, filter by that date only
+        if (specificDate) {
+          return isSameDay(checkinDate, specificDate);
+        }
+        // Otherwise filter by month
         return checkinDate >= monthStart && checkinDate <= monthEnd;
       })
       .filter(checkin => {
@@ -110,7 +120,7 @@ export function CheckinAuditTab() {
         const clientB = clientsMap[b.client_id]?.name || '';
         return clientA.localeCompare(clientB);
       });
-  }, [checkins, currentMonth, searchQuery, statusFilter, frequencyFilter, clientsMap]);
+  }, [checkins, currentMonth, specificDate, searchQuery, statusFilter, frequencyFilter, clientsMap]);
 
   // Stats for the month
   const stats = useMemo(() => {
@@ -354,26 +364,75 @@ export function CheckinAuditTab() {
           </div>
 
           {/* Filters */}
-          <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex flex-col md:flex-row gap-3 flex-wrap">
             {/* Month Navigation */}
             <div className="flex items-center gap-2">
               <Button 
                 variant="outline" 
                 size="icon"
-                onClick={() => setCurrentMonth(prev => subMonths(prev, 1))}
+                onClick={() => {
+                  setSpecificDate(undefined);
+                  setCurrentMonth(prev => subMonths(prev, 1));
+                }}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <div className="text-sm font-medium min-w-[120px] text-center">
-                {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+                {specificDate 
+                  ? format(specificDate, 'dd/MM/yyyy', { locale: ptBR })
+                  : format(currentMonth, 'MMMM yyyy', { locale: ptBR })
+                }
               </div>
               <Button 
                 variant="outline" 
                 size="icon"
-                onClick={() => setCurrentMonth(prev => addMonths(prev, 1))}
+                onClick={() => {
+                  setSpecificDate(undefined);
+                  setCurrentMonth(prev => addMonths(prev, 1));
+                }}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
+            </div>
+
+            {/* Specific Date Picker */}
+            <div className="flex items-center gap-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant={specificDate ? "default" : "outline"} 
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    {specificDate ? format(specificDate, 'dd/MM/yyyy', { locale: ptBR }) : 'Data específica'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={specificDate}
+                    onSelect={(date) => {
+                      setSpecificDate(date);
+                      if (date) {
+                        setCurrentMonth(startOfMonth(date));
+                      }
+                    }}
+                    locale={ptBR}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              {specificDate && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setSpecificDate(undefined)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
 
             {/* Status Filter */}
