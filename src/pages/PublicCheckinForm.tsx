@@ -259,9 +259,9 @@ export default function PublicCheckinForm() {
   };
 
   const handleVerifyPhone = async () => {
-    try {
-      setVerifyingPhone(true);
+    setVerifyingPhone(true);
 
+    try {
       const { normalizedInputPhone } = validatePhoneOrThrow();
       const clientParam = new URLSearchParams(location.search).get('client') || undefined;
 
@@ -281,7 +281,7 @@ export default function PublicCheckinForm() {
       }
 
       setVerifiedClientId(data.clientId);
-      toast.success('Telefone confirmado. Você já pode preencher o check-in.');
+      toast.success('Telefone confirmado!');
     } catch (err: any) {
       toast.error(err?.message || 'Não foi possível confirmar o telefone.');
       setVerifiedClientId(null);
@@ -492,8 +492,18 @@ export default function PublicCheckinForm() {
                         {question.question_type === 'short_text' && (
                           <Input
                             value={answers[question.id] || ''}
-                            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                            placeholder="Sua resposta..."
+                            onChange={(e) => {
+                              // Se a pergunta é sobre peso, aceitar apenas números
+                              const isWeightQuestion = /peso.*jejum|peso.*recente/i.test(question.question_text);
+                              if (isWeightQuestion) {
+                                const numericValue = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                                handleAnswerChange(question.id, numericValue);
+                              } else {
+                                handleAnswerChange(question.id, e.target.value);
+                              }
+                            }}
+                            placeholder={/peso.*jejum|peso.*recente/i.test(question.question_text) ? "Ex: 72.5" : "Sua resposta..."}
+                            inputMode={/peso.*jejum|peso.*recente/i.test(question.question_text) ? "decimal" : "text"}
                           />
                         )}
 
