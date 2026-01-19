@@ -131,12 +131,30 @@ export function ScheduledCheckinsSection() {
     setSendingCheckins(prev => new Set(prev).add(checkinId));
 
     try {
+      // Format phone as access code (human readable format)
+      const formatPhoneAsAccessCode = (phone: string): string => {
+        const digits = phone.replace(/\D/g, '');
+        if (digits.length === 13 && digits.startsWith('55')) {
+          return `(${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
+        } else if (digits.length === 12 && digits.startsWith('55')) {
+          return `(${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`;
+        } else if (digits.length === 11) {
+          return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+        } else if (digits.length === 10) {
+          return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+        }
+        return phone;
+      };
+
+      const codigoAcesso = formatPhoneAsAccessCode(client.phone);
+
       // Build context for template rendering (done on backend now)
       const context: Record<string, string> = {
         nome: client.name?.split(' ')[0] || client.name || '',
         link_checkin: checkinLink,
         checkin_link: checkinLink, // Both for compatibility
         data: format(new Date(), "dd/MM/yyyy", { locale: ptBR }),
+        codigo_acesso: codigoAcesso,
       };
 
       console.log('[ScheduledCheckinsSection] Sending checkin via template mode:', {
