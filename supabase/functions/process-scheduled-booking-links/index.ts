@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     console.log(`Found ${pendingInvites.length} pending invites to process`);
 
     const results: { clientId: string; status: string; error?: string }[] = [];
-    const baseUrl = 'https://rogersfeitosa.lovable.app';
+    const baseUrl = 'https://rogersfeitosa.com.br';
 
     for (const invite of pendingInvites) {
       try {
