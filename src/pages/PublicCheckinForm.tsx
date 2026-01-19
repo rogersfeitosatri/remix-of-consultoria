@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
-import { PersonStanding, Send, CheckCircle2 } from 'lucide-react';
+import { PersonStanding, Send, CheckCircle2, Phone } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -42,6 +42,60 @@ interface Form {
   is_active: boolean;
 }
 
+// Normalize phone to E.164 format (e.g., +5599984817697)
+function normalizePhoneToE164(phone: string): string {
+  // Remove all non-digit characters
+  let digits = phone.replace(/\D/g, '');
+  
+  // Remove leading zeros
+  while (digits.startsWith('0')) {
+    digits = digits.substring(1);
+  }
+  
+  // Add Brazil country code if not present
+  if (!digits.startsWith('55')) {
+    digits = '55' + digits;
+  }
+  
+  return '+' + digits;
+}
+
+// Format phone for display (Brazilian format)
+function formatPhoneForDisplay(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  
+  if (digits.length === 13 && digits.startsWith('55')) {
+    // +55 (DD) 9XXXX-XXXX
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
+  } else if (digits.length === 12 && digits.startsWith('55')) {
+    // +55 (DD) XXXX-XXXX
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`;
+  } else if (digits.length === 11) {
+    // (DD) 9XXXX-XXXX
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  } else if (digits.length === 10) {
+    // (DD) XXXX-XXXX
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  
+  return phone;
+}
+
+// Apply mask while typing
+function applyPhoneMask(value: string): string {
+  let digits = value.replace(/\D/g, '');
+  
+  // Limit to 11 digits (DDD + 9 digits)
+  if (digits.length > 11) {
+    digits = digits.slice(0, 11);
+  }
+  
+  if (digits.length === 0) return '';
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 export default function PublicCheckinForm() {
   const { formId } = useParams<{ formId: string }>();
   const navigate = useNavigate();
@@ -52,8 +106,7 @@ export default function PublicCheckinForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const [athleteName, setAthleteName] = useState('');
-  const [athleteEmail, setAthleteEmail] = useState('');
+  const [athletePhone, setAthletePhone] = useState('');
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
 
@@ -138,6 +191,11 @@ export default function PublicCheckinForm() {
     fetchForm();
   }, [formId]);
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = applyPhoneMask(e.target.value);
+    setAthletePhone(masked);
+  };
+
   const handleAnswerChange = (questionId: string, value: any) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
   };
@@ -160,15 +218,10 @@ export default function PublicCheckinForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!athleteName.trim() || !athleteEmail.trim()) {
-      toast.error('Nome e email são obrigatórios');
-      return;
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(athleteEmail)) {
-      toast.error('Email inválido');
+    // Validate phone
+    const phoneDigits = athletePhone.replace(/\D/g, '');
+    if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+      toast.error('Telefone inválido. Digite o DDD + número');
       return;
     }
 
@@ -194,23 +247,31 @@ export default function PublicCheckinForm() {
     setSubmitting(true);
 
     try {
-      // Find client by email (case-insensitive search)
-      const normalizedEmail = athleteEmail.toLowerCase().trim();
+      // Normalize phone to E.164 for comparison
+      const normalizedInputPhone = normalizePhoneToE164(athletePhone);
+      
+      // Get all clients with phones to find a match
       const { data: clients, error: clientError } = await supabase
         .from('clients')
-        .select('id')
-        .ilike('email', normalizedEmail)
-        .limit(1);
+        .select('id, phone')
+        .not('phone', 'is', null);
 
       if (clientError) throw clientError;
 
-      if (!clients || clients.length === 0) {
-        toast.error('Email não encontrado. Verifique se está usando o email cadastrado pelo seu assessor.');
+      // Find client by normalized phone
+      const matchingClient = clients?.find(client => {
+        if (!client.phone) return false;
+        const normalizedDbPhone = normalizePhoneToE164(client.phone);
+        return normalizedDbPhone === normalizedInputPhone;
+      });
+
+      if (!matchingClient) {
+        toast.error('Telefone não encontrado. Confirme o número que você recebeu no WhatsApp e tente novamente.');
         setSubmitting(false);
         return;
       }
 
-      const clientId = clients[0].id;
+      const clientId = matchingClient.id;
 
       // Prepare responses with comments
       const responsesWithComments: Record<string, any> = {};
@@ -319,27 +380,21 @@ export default function PublicCheckinForm() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Seu Nome *</Label>
+                <Label htmlFor="phone" className="flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  Seu Telefone (código de acesso) *
+                </Label>
                 <Input
-                  id="name"
-                  value={athleteName}
-                  onChange={(e) => setAthleteName(e.target.value)}
-                  placeholder="Digite seu nome completo"
+                  id="phone"
+                  type="tel"
+                  value={athletePhone}
+                  onChange={handlePhoneChange}
+                  placeholder="(DD) 9XXXX-XXXX"
                   required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Seu Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={athleteEmail}
-                  onChange={(e) => setAthleteEmail(e.target.value)}
-                  placeholder="Use o email cadastrado pelo seu assessor"
-                  required
+                  maxLength={16}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Use o mesmo email que seu assessor cadastrou no sistema
+                  Use o telefone cadastrado que você recebeu na mensagem do WhatsApp
                 </p>
               </div>
             </CardContent>
@@ -467,17 +522,22 @@ export default function PublicCheckinForm() {
           </div>
 
           {/* Submit */}
-          <div className="mt-8">
-            <Button type="submit" className="w-full gap-2" disabled={submitting}>
+          <div className="mt-6">
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={submitting}
+            >
               {submitting ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Enviando...
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4" />
-                  Enviar Checkin
+                  <Send className="h-4 w-4 mr-2" />
+                  Enviar Check-in
                 </>
               )}
             </Button>
