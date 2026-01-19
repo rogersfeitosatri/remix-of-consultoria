@@ -816,7 +816,16 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                 checked={formData.is_active}
                 onCheckedChange={(v) => setFormData({ ...formData, is_active: v })}
               />
-              <Label htmlFor="isActive">Atleta Ativo</Label>
+              <div className="flex flex-col">
+                <Label htmlFor="isActive" className={formData.is_active ? '' : 'text-destructive'}>
+                  {formData.is_active ? 'Atleta Ativo' : '⚠️ Atleta INATIVO'}
+                </Label>
+                {!formData.is_active && (
+                  <span className="text-xs text-destructive">
+                    O atleta não aparecerá na aba "Ativos"
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
