@@ -194,11 +194,12 @@ export default function PublicCheckinForm() {
     setSubmitting(true);
 
     try {
-      // Find client by email
+      // Find client by email (case-insensitive search)
+      const normalizedEmail = athleteEmail.toLowerCase().trim();
       const { data: clients, error: clientError } = await supabase
         .from('clients')
         .select('id')
-        .eq('email', athleteEmail.toLowerCase().trim())
+        .ilike('email', normalizedEmail)
         .limit(1);
 
       if (clientError) throw clientError;
