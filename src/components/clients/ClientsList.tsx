@@ -47,6 +47,22 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   const [sendingCredentials, setSendingCredentials] = useState<string | null>(null);
   const [passwordDialogClient, setPasswordDialogClient] = useState<Client | null>(null);
 
+  // Helper to format phone as access code with DDI
+  const formatPhoneAsAccessCode = (phone: string | null): string => {
+    if (!phone) return '';
+    // Remove all non-digits
+    const digits = phone.replace(/\D/g, '');
+    // Ensure it has the 55 DDI
+    const withDDI = digits.startsWith('55') ? digits : `55${digits}`;
+    // Format as +55 (XX) XXXXX-XXXX
+    if (withDDI.length === 13) {
+      return `+${withDDI.slice(0, 2)} (${withDDI.slice(2, 4)}) ${withDDI.slice(4, 9)}-${withDDI.slice(9)}`;
+    } else if (withDDI.length === 12) {
+      return `+${withDDI.slice(0, 2)} (${withDDI.slice(2, 4)}) ${withDDI.slice(4, 8)}-${withDDI.slice(8)}`;
+    }
+    return `+55 ${phone}`;
+  };
+
   const handleSendCheckinManually = async (client: Client) => {
     if (!client.phone) {
       toast.error('Cliente não possui telefone cadastrado');
@@ -61,11 +77,23 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
 
     setSendingCheckin(client.id);
     try {
-      const checkinLink = `${window.location.origin}/form/${activeForm.id}`;
-      const message = `Olá ${client.name.split(' ')[0]}! 👋\n\nÉ hora do seu check-in semanal!\n\nPreencha o formulário no link abaixo:\n${checkinLink}\n\nQualquer dúvida, estou à disposição! 💪`;
+      const checkinLink = `https://rogersfeitosa.com.br/form/${activeForm.id}?client=${client.id}`;
+      const codigoAcesso = formatPhoneAsAccessCode(client.phone);
+
+      const context = {
+        nome: client.name.split(' ')[0],
+        link_checkin: checkinLink,
+        checkin_link: checkinLink,
+        data: format(new Date(), "dd/MM/yyyy", { locale: ptBR }),
+        codigo_acesso: codigoAcesso,
+      };
 
       const { error } = await supabase.functions.invoke('send-whatsapp', {
-        body: { clientId: client.id, message },
+        body: { 
+          clientId: client.id, 
+          templateKey: 'lembrete_checkin',
+          context,
+        },
       });
 
       if (error) throw error;
