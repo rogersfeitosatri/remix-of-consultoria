@@ -366,8 +366,22 @@ export default function CheckinReview() {
               <CardContent className="space-y-4">
                 {questions.map((question, index) => {
                   const response = checkinResponse?.responses?.[question.id];
-                  const answer = response?.answer || response;
-                  const comment = response?.comment;
+                  // Handle nested object structure - extract answer from object if needed
+                  let answer = response;
+                  let comment = null;
+                  
+                  if (response && typeof response === 'object' && !Array.isArray(response)) {
+                    answer = response.answer ?? response;
+                    comment = response.comment;
+                    // If answer is still an object (edge case), try to stringify it
+                    if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+                      answer = answer.answer ?? JSON.stringify(answer);
+                    }
+                  }
+
+                  const displayAnswer = Array.isArray(answer) 
+                    ? answer.join(', ') 
+                    : (typeof answer === 'string' || typeof answer === 'number' ? String(answer) : 'Não respondido');
 
                   return (
                     <div key={question.id} className="border-b border-border/50 pb-4 last:border-0">
@@ -375,7 +389,7 @@ export default function CheckinReview() {
                         {index + 1}. {question.question_text}
                       </p>
                       <p className="text-foreground">
-                        {Array.isArray(answer) ? answer.join(', ') : (answer || 'Não respondido')}
+                        {displayAnswer || 'Não respondido'}
                       </p>
                       {comment && (
                         <p className="text-sm text-muted-foreground mt-1 italic">
