@@ -91,7 +91,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
       const { error } = await supabase.functions.invoke('send-whatsapp', {
         body: { 
           clientId: client.id, 
-          templateKey: 'lembrete_checkin',
+          templateKey: 'checkin_reminder',
           context,
         },
       });
