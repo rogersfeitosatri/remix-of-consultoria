@@ -8,10 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Plus, Receipt, Check, Trash2, X, RefreshCw } from 'lucide-react';
+import { Plus, Receipt, Check, Trash2, X, RefreshCw, Pencil } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useExpenses, useAddExpense, useUpdateExpense, useDeleteExpense, Expense, getExpensesForPeriod } from '@/hooks/useExpenses';
+import { useExpenses, useAddExpense, useUpdateExpense, useDeleteExpense, Expense, VirtualExpense, getExpensesForPeriod } from '@/hooks/useExpenses';
 import { toast } from 'sonner';
 import { startOfMonth, endOfMonth } from 'date-fns';
 
@@ -39,7 +39,21 @@ export function ExpensesSection({ filterStartDate, filterEndDate }: ExpensesSect
   const deleteExpense = useDeleteExpense();
   
   const [isOpen, setIsOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  
   const [formData, setFormData] = useState({
+    description: '',
+    amount: '',
+    due_date: '',
+    due_day: '',
+    category: 'geral',
+    notes: '',
+    expense_type: 'single' as 'single' | 'subscription',
+  });
+
+  const [editFormData, setEditFormData] = useState({
     description: '',
     amount: '',
     due_date: '',
@@ -81,18 +95,87 @@ export function ExpensesSection({ filterStartDate, filterEndDate }: ExpensesSect
     }
   };
 
-  const handleTogglePaid = async (expense: Expense) => {
+  const handleOpenEdit = (expense: VirtualExpense) => {
+    // Get the original expense ID for virtual entries
+    const originalId = expense.original_id || expense.id;
+    const originalExpense = expenses.find(e => e.id === originalId);
+    
+    if (!originalExpense) {
+      toast.error('Despesa não encontrada');
+      return;
+    }
+    
+    setEditingExpense(originalExpense);
+    setEditFormData({
+      description: originalExpense.description,
+      amount: originalExpense.amount.toString(),
+      due_date: originalExpense.expense_type === 'single' ? originalExpense.due_date : '',
+      due_day: originalExpense.due_day?.toString() || '',
+      category: originalExpense.category,
+      notes: originalExpense.notes || '',
+      expense_type: originalExpense.expense_type,
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingExpense) return;
+    
+    try {
+      if (editFormData.expense_type === 'single' && !editFormData.due_date) {
+        toast.error('Informe a data de vencimento');
+        return;
+      }
+      if (editFormData.expense_type === 'subscription' && !editFormData.due_day) {
+        toast.error('Informe o dia do mês para vencimento');
+        return;
+      }
+
+      // Calculate due_date for subscriptions
+      let dueDate = editFormData.due_date;
+      if (editFormData.expense_type === 'subscription' && editFormData.due_day) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = today.getMonth();
+        dueDate = new Date(year, month, parseInt(editFormData.due_day)).toISOString().split('T')[0];
+      }
+
+      await updateExpense.mutateAsync({
+        id: editingExpense.id,
+        description: editFormData.description,
+        amount: parseFloat(editFormData.amount),
+        category: editFormData.category,
+        notes: editFormData.notes || null,
+        expense_type: editFormData.expense_type,
+        due_date: dueDate,
+        due_day: editFormData.expense_type === 'subscription' ? parseInt(editFormData.due_day) : null,
+      });
+      
+      toast.success('Despesa atualizada!');
+      setIsEditOpen(false);
+      setEditingExpense(null);
+    } catch (error) {
+      toast.error('Erro ao atualizar despesa');
+    }
+  };
+
+  const handleTogglePaid = async (expense: VirtualExpense) => {
+    // Get the original expense ID for virtual entries
+    const originalId = expense.original_id || expense.id;
+    
     try {
       if (expense.status === 'paid') {
         await updateExpense.mutateAsync({
-          id: expense.id,
+          id: originalId,
           status: 'pending',
           paid_at: null,
         });
         toast.success('Despesa marcada como pendente');
       } else {
         await updateExpense.mutateAsync({
-          id: expense.id,
+          id: originalId,
           status: 'paid',
           paid_at: new Date().toISOString(),
         });
@@ -103,12 +186,22 @@ export function ExpensesSection({ filterStartDate, filterEndDate }: ExpensesSect
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (expense: VirtualExpense) => {
+    // Get the original expense ID for virtual entries
+    const originalId = expense.original_id || expense.id;
+    
+    // Prevent double-clicks
+    if (deletingId === originalId) return;
+    
+    setDeletingId(originalId);
+    
     try {
-      await deleteExpense.mutateAsync(id);
+      await deleteExpense.mutateAsync(originalId);
       toast.success('Despesa removida');
     } catch (error) {
       toast.error('Erro ao remover despesa');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -277,6 +370,122 @@ export function ExpensesSection({ filterStartDate, filterEndDate }: ExpensesSect
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="text-foreground">Editar Despesa</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              {/* Tipo de conta */}
+              <div>
+                <Label className="text-foreground mb-3 block">Tipo de conta</Label>
+                <RadioGroup 
+                  value={editFormData.expense_type} 
+                  onValueChange={(value: 'single' | 'subscription') => setEditFormData({ ...editFormData, expense_type: value })}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="single" id="edit-single" />
+                    <Label htmlFor="edit-single" className="text-foreground cursor-pointer">Conta única do mês</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="subscription" id="edit-subscription" />
+                    <Label htmlFor="edit-subscription" className="text-foreground cursor-pointer">Assinatura (recorrente)</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-description" className="text-foreground">Descrição</Label>
+                <Input
+                  id="edit-description"
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  placeholder={editFormData.expense_type === 'subscription' ? 'Ex: Netflix, Aluguel, Internet' : 'Ex: Compra de equipamento'}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-amount" className="text-foreground">Valor (R$)</Label>
+                  <Input
+                    id="edit-amount"
+                    type="number"
+                    step="0.01"
+                    value={editFormData.amount}
+                    onChange={(e) => setEditFormData({ ...editFormData, amount: e.target.value })}
+                    placeholder="0,00"
+                    required
+                  />
+                </div>
+                {editFormData.expense_type === 'single' ? (
+                  <div>
+                    <Label htmlFor="edit-due_date" className="text-foreground">Vencimento</Label>
+                    <Input
+                      id="edit-due_date"
+                      type="date"
+                      value={editFormData.due_date}
+                      onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="edit-due_day" className="text-foreground">Dia do mês</Label>
+                    <Select 
+                      value={editFormData.due_day} 
+                      onValueChange={(value) => setEditFormData({ ...editFormData, due_day: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Dia..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DUE_DAYS.map((day) => (
+                          <SelectItem key={day} value={day.toString()}>
+                            Dia {day}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="edit-category" className="text-foreground">Categoria</Label>
+                <Select value={editFormData.category} onValueChange={(value) => setEditFormData({ ...editFormData, category: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPENSE_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-notes" className="text-foreground">Observações</Label>
+                <Textarea
+                  id="edit-notes"
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                  placeholder="Informações adicionais..."
+                  rows={2}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={updateExpense.isPending}>
+                  {updateExpense.isPending ? 'Salvando...' : 'Salvar'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </CardHeader>
       <CardContent>
         {displayExpenses.length === 0 ? (
@@ -292,8 +501,7 @@ export function ExpensesSection({ filterStartDate, filterEndDate }: ExpensesSect
               const isUrgent = daysUntilDue >= 0 && daysUntilDue <= 7 && expense.status !== 'paid';
               const categoryLabel = EXPENSE_CATEGORIES.find(c => c.value === expense.category)?.label || expense.category;
               const isSubscription = expense.expense_type === 'subscription';
-              // For virtual subscription entries, get the original ID for actions
-              const actionId = expense.original_id || expense.id;
+              const isDeleting = deletingId === (expense.original_id || expense.id);
 
               return (
                 <div
@@ -338,25 +546,37 @@ export function ExpensesSection({ filterStartDate, filterEndDate }: ExpensesSect
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
+                    {/* Edit button */}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-primary"
+                      onClick={() => handleOpenEdit(expense)}
+                      title="Editar"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    {/* Toggle paid */}
                     <Button
                       size="icon"
                       variant="ghost"
                       className={expense.status === 'paid' ? 'text-green-500' : 'text-muted-foreground hover:text-green-500'}
-                      onClick={() => handleTogglePaid({ ...expense, id: actionId })}
+                      onClick={() => handleTogglePaid(expense)}
+                      title={expense.status === 'paid' ? 'Marcar como pendente' : 'Marcar como pago'}
                     >
                       {expense.status === 'paid' ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
                     </Button>
-                    {/* Only show delete for original expenses, not virtual entries */}
-                    {!expense.is_virtual && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(expense.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    {/* Delete - only for original (non-virtual) entries or always use original_id */}
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDelete(expense)}
+                      disabled={isDeleting}
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               );
