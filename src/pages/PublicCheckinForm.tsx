@@ -331,29 +331,19 @@ export default function PublicCheckinForm() {
         };
       });
 
-      // Submit response
-      const { data: responseData, error: submitError } = await supabase
+      // Submit response (no .select() since public users don't have SELECT permission)
+      const { error: submitError } = await supabase
         .from('checkin_responses')
         .insert({
           form_id: formId,
           client_id: clientId,
           responses: responsesWithComments,
-        })
-        .select('id')
-        .single();
+        });
 
       if (submitError) throw submitError;
 
-      // Trigger automatic AI analysis (fire and forget)
-      if (responseData?.id) {
-        supabase.functions.invoke('analyze-checkin', {
-          body: { checkinResponseId: responseData.id },
-        }).then(() => {
-          console.log('AI analysis triggered successfully');
-        }).catch((err) => {
-          console.error('AI analysis trigger failed:', err);
-        });
-      }
+      // AI analysis will be triggered by admin when reviewing the response
+      // since public users can't read back the response ID
 
       setSubmitted(true);
       toast.success('Checkin enviado com sucesso!');
