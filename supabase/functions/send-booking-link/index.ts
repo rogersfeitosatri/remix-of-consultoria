@@ -329,19 +329,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get booking link token
-    let bookingToken = schedule.booking_token;
-    if (!bookingToken) {
-      bookingToken = crypto.randomUUID();
-      await supabase
-        .from('consultation_schedules')
-        .update({ 
-          booking_token: bookingToken,
-          booking_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .eq('id', consultationScheduleId);
-    }
-
     const clientData = schedule.clients as { id: string; name: string; email: string; phone: string; user_id: string };
     const clientPhone = clientData?.phone;
     const clientName = clientData?.name || 'Atleta';
@@ -352,6 +339,30 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Get or create booking_links entry (same as direct client flow)
+    let { data: bookingLink } = await supabase
+      .from('booking_links')
+      .select('*')
+      .eq('client_id', clientData.id)
+      .eq('active', true)
+      .single();
+
+    if (!bookingLink) {
+      const { data: newLink, error: createError } = await supabase
+        .from('booking_links')
+        .insert({ client_id: clientData.id, active: true })
+        .select()
+        .single();
+
+      if (createError) {
+        throw new Error('Failed to create booking link: ' + createError.message);
+      }
+      bookingLink = newLink;
+    }
+
+    // Always use /booking/{token} format with booking_links.token
+    const bookingUrl = `${appUrl}/booking/${bookingLink.token}`;
 
     // ALWAYS fetch template from database - NO HARDCODE FALLBACK
     const { data: template } = await supabase
@@ -377,16 +388,6 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const { data: settings } = await supabase
-      .from('scheduling_settings')
-      .select('booking_link_slug')
-      .eq('user_id', schedule.user_id)
-      .maybeSingle();
-
-    const bookingUrl = settings?.booking_link_slug 
-      ? `${appUrl}/agendar/${settings.booking_link_slug}?token=${bookingToken}`
-      : `${appUrl}/booking/${bookingToken}`;
 
     const rendered = renderTemplate(
       { title: template.title, body: template.body },
@@ -427,6 +428,15 @@ Deno.serve(async (req) => {
         template_updated_at: template.updated_at
       }
     });
+
+    // Update booking_link last_sent_at
+    await supabase
+      .from('booking_links')
+      .update({
+        last_sent_at: new Date().toISOString(),
+        usage_count: (bookingLink.usage_count || 0) + 1,
+      })
+      .eq('id', bookingLink.id);
 
     await supabase
       .from('consultation_schedules')
