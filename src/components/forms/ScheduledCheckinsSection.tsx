@@ -50,7 +50,7 @@ export function ScheduledCheckinsSection() {
 
   // Build checkin link from scheduled checkin or active form
   const buildCheckinLink = (checkin: ScheduledCheckin, clientId: string): string | null => {
-    const baseUrl = 'https://rogersfeitosa.lovable.app';
+    const baseUrl = 'https://rogersfeitosa.com.br';
     
     // Priority 1: Use form_id from the scheduled checkin itself
     if (checkin.form_id) {
