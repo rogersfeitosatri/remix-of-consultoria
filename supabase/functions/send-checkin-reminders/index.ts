@@ -189,12 +189,30 @@ Deno.serve(async (req) => {
         const today = new Date();
         const formattedDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
+        // Format phone as access code (human readable format)
+        const formatPhoneAsAccessCode = (phone: string): string => {
+          const digits = phone.replace(/\D/g, '');
+          if (digits.length === 13 && digits.startsWith('55')) {
+            return `(${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
+          } else if (digits.length === 12 && digits.startsWith('55')) {
+            return `(${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`;
+          } else if (digits.length === 11) {
+            return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+          } else if (digits.length === 10) {
+            return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+          }
+          return phone;
+        };
+
+        const codigoAcesso = formatPhoneAsAccessCode(client.phone);
+
         // Build context for template rendering
         const context: Record<string, string> = {
           nome: client.name.split(' ')[0],
           link_checkin: checkinLink,
           checkin_link: checkinLink, // Both for compatibility
           data: formattedDate,
+          codigo_acesso: codigoAcesso,
         };
 
         console.log('[send-checkin-reminders] Calling send-whatsapp in template mode:', {

@@ -134,10 +134,12 @@ Qualquer dúvida, estou à disposição! 💪`,
 Responda o formulário para acompanharmos sua evolução:
 {link_checkin}
 
+Seu código de acesso é: {codigo_acesso}
+
 Qualquer dúvida, estou por aqui! 💪`,
     is_active: true,
     default_timing: 'Conforme agendado',
-    variables: ['nome', 'link_checkin'],
+    variables: ['nome', 'link_checkin', 'codigo_acesso'],
   },
 ];
 
