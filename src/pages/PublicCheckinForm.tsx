@@ -84,13 +84,37 @@ function formatPhoneForDisplay(phone: string): string {
 // Apply mask while typing
 function applyPhoneMask(value: string): string {
   let digits = value.replace(/\D/g, '');
-  
-  // Limit to 11 digits (DDD + 9 digits)
-  if (digits.length > 11) {
-    digits = digits.slice(0, 11);
+
+  // Allow copy/paste with DDI (55) while still supporting local format (DDD + número)
+  const hasDDI = digits.startsWith('55');
+  const maxDigits = hasDDI ? 13 : 11;
+
+  if (digits.length > maxDigits) {
+    digits = digits.slice(0, maxDigits);
   }
-  
+
   if (digits.length === 0) return '';
+
+  if (hasDDI) {
+    const rest = digits.slice(2); // after country code
+    if (rest.length === 0) return '+55';
+    if (rest.length <= 2) return `+55 (${rest}`;
+
+    const ddd = rest.slice(0, 2);
+    const number = rest.slice(2);
+
+    if (number.length === 0) return `+55 (${ddd})`;
+    if (number.length <= 4) return `+55 (${ddd}) ${number}`;
+
+    // Landline (8 digits) -> 4-4, Mobile (9 digits) -> 5-4
+    if (number.length <= 8) {
+      return `+55 (${ddd}) ${number.slice(0, 4)}-${number.slice(4)}`;
+    }
+
+    return `+55 (${ddd}) ${number.slice(0, 5)}-${number.slice(5)}`;
+  }
+
+  // Local format (no DDI)
   if (digits.length <= 2) return `(${digits}`;
   if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
@@ -107,6 +131,8 @@ export default function PublicCheckinForm() {
   const [submitted, setSubmitted] = useState(false);
 
   const [athletePhone, setAthletePhone] = useState('');
+  const [verifiedClientId, setVerifiedClientId] = useState<string | null>(null);
+  const [verifyingPhone, setVerifyingPhone] = useState(false);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
 
@@ -194,6 +220,7 @@ export default function PublicCheckinForm() {
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const masked = applyPhoneMask(e.target.value);
     setAthletePhone(masked);
+    setVerifiedClientId(null);
   };
 
   const handleAnswerChange = (questionId: string, value: any) => {
@@ -215,13 +242,61 @@ export default function PublicCheckinForm() {
     });
   };
 
+  const validatePhoneOrThrow = (): { normalizedInputPhone: string } => {
+    const phoneDigits = athletePhone.replace(/\D/g, '');
+    const hasDDI = phoneDigits.startsWith('55');
+
+    const valid =
+      (hasDDI && (phoneDigits.length === 12 || phoneDigits.length === 13)) ||
+      (!hasDDI && (phoneDigits.length === 10 || phoneDigits.length === 11));
+
+    if (!valid) {
+      throw new Error('Telefone inválido. Use o código exatamente como recebeu no WhatsApp.');
+    }
+
+    return { normalizedInputPhone: normalizePhoneToE164(athletePhone) };
+  };
+
+  const handleVerifyPhone = async () => {
+    try {
+      setVerifyingPhone(true);
+
+      const { normalizedInputPhone } = validatePhoneOrThrow();
+
+      const { data: clients, error: clientError } = await supabase
+        .from('clients')
+        .select('id, phone')
+        .not('phone', 'is', null);
+
+      if (clientError) throw clientError;
+
+      const matchingClient = clients?.find(client => {
+        if (!client.phone) return false;
+        const normalizedDbPhone = normalizePhoneToE164(client.phone);
+        return normalizedDbPhone === normalizedInputPhone;
+      });
+
+      if (!matchingClient) {
+        toast.error('Telefone não encontrado. Confirme o número que você recebeu no WhatsApp e tente novamente.');
+        setVerifiedClientId(null);
+        return;
+      }
+
+      setVerifiedClientId(matchingClient.id);
+      toast.success('Telefone confirmado. Você já pode preencher o check-in.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Não foi possível confirmar o telefone.');
+      setVerifiedClientId(null);
+    } finally {
+      setVerifyingPhone(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate phone
-    const phoneDigits = athletePhone.replace(/\D/g, '');
-    if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-      toast.error('Telefone inválido. Digite o DDD + número');
+    if (!verifiedClientId) {
+      toast.error('Confirme o telefone antes de iniciar o preenchimento.');
       return;
     }
 
@@ -247,31 +322,7 @@ export default function PublicCheckinForm() {
     setSubmitting(true);
 
     try {
-      // Normalize phone to E.164 for comparison
-      const normalizedInputPhone = normalizePhoneToE164(athletePhone);
-      
-      // Get all clients with phones to find a match
-      const { data: clients, error: clientError } = await supabase
-        .from('clients')
-        .select('id, phone')
-        .not('phone', 'is', null);
-
-      if (clientError) throw clientError;
-
-      // Find client by normalized phone
-      const matchingClient = clients?.find(client => {
-        if (!client.phone) return false;
-        const normalizedDbPhone = normalizePhoneToE164(client.phone);
-        return normalizedDbPhone === normalizedInputPhone;
-      });
-
-      if (!matchingClient) {
-        toast.error('Telefone não encontrado. Confirme o número que você recebeu no WhatsApp e tente novamente.');
-        setSubmitting(false);
-        return;
-      }
-
-      const clientId = matchingClient.id;
+      const clientId = verifiedClientId;
 
       // Prepare responses with comments
       const responsesWithComments: Record<string, any> = {};
@@ -389,159 +440,194 @@ export default function PublicCheckinForm() {
                   type="tel"
                   value={athletePhone}
                   onChange={handlePhoneChange}
-                  placeholder="(DD) 9XXXX-XXXX"
+                  placeholder="+55 (DD) 9XXXX-XXXX ou (DD) 9XXXX-XXXX"
                   required
-                  maxLength={16}
+                  maxLength={22}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Use o telefone cadastrado que você recebeu na mensagem do WhatsApp
+                  Cole exatamente o código que você recebeu no WhatsApp
                 </p>
               </div>
+
+              <Button
+                type="button"
+                className="w-full"
+                onClick={handleVerifyPhone}
+                disabled={verifyingPhone || !athletePhone.trim()}
+              >
+                {verifyingPhone ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Confirmando...
+                  </>
+                ) : (
+                  <>Confirmar telefone</>
+                )}
+              </Button>
+
+              {verifiedClientId && (
+                <p className="text-xs text-muted-foreground">
+                  Telefone confirmado: {formatPhoneForDisplay(athletePhone)}
+                </p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Questions */}
-          <div className="space-y-4">
-            {visibleQuestions.map((question, index) => (
-              <Card key={question.id}>
-                <CardContent className="pt-6">
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-2">
-                      <span className="text-muted-foreground font-medium">{index + 1}.</span>
-                      <div className="flex-1">
-                        <Label className={cn(question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
-                          {question.question_text}
-                        </Label>
-                      </div>
-                    </div>
-
-                    {question.question_type === 'short_text' && (
-                      <Input
-                        value={answers[question.id] || ''}
-                        onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                        placeholder="Sua resposta..."
-                      />
-                    )}
-
-                    {question.question_type === 'long_text' && (
-                      <Textarea
-                        value={answers[question.id] || ''}
-                        onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                        placeholder="Sua resposta..."
-                        rows={4}
-                      />
-                    )}
-
-                    {question.question_type === 'multiple_choice' && question.options && (
-                      <RadioGroup
-                        value={answers[question.id] || ''}
-                        onValueChange={(value) => handleAnswerChange(question.id, value)}
-                      >
-                        {(question.options as string[]).map((option, i) => (
-                          <div key={i} className="flex items-center space-x-2">
-                            <RadioGroupItem value={option} id={`${question.id}-${i}`} />
-                            <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
-                              {option}
-                            </Label>
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    )}
-
-                    {question.question_type === 'checkbox' && question.options && (
-                      <div className="space-y-2">
-                        {(question.options as string[]).map((option, i) => (
-                          <div key={i} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`${question.id}-${i}`}
-                              checked={(answers[question.id] || []).includes(option)}
-                              onCheckedChange={(checked) => handleCheckboxChange(question.id, option, checked as boolean)}
-                            />
-                            <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
-                              {option}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {question.question_type === 'scale' && (
+          {/* Questions / Submit */}
+          {verifiedClientId ? (
+            <>
+              {/* Questions */}
+              <div className="space-y-4">
+                {visibleQuestions.map((question, index) => (
+                  <Card key={question.id}>
+                    <CardContent className="pt-6">
                       <div className="space-y-4">
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>{question.scale_min}</span>
-                          <span className="font-medium text-foreground">{answers[question.id]}</span>
-                          <span>{question.scale_max}</span>
+                        <div className="flex items-start gap-2">
+                          <span className="text-muted-foreground font-medium">{index + 1}.</span>
+                          <div className="flex-1">
+                            <Label className={cn(question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
+                              {question.question_text}
+                            </Label>
+                          </div>
                         </div>
-                        <Slider
-                          value={[answers[question.id] || question.scale_min]}
-                          onValueChange={([value]) => handleAnswerChange(question.id, value)}
-                          min={question.scale_min}
-                          max={question.scale_max}
-                          step={1}
-                          className="w-full"
-                        />
-                      </div>
-                    )}
 
-                    {/* Comment attachment field */}
-                    {question.has_comment_field && (
-                      <div className="mt-4 pt-4 border-t border-border/50">
-                        <Label 
-                          htmlFor={`comment-${question.id}`}
-                          className={cn(
-                            "text-sm text-muted-foreground",
-                            question.comment_field_required && "after:content-['*'] after:ml-0.5 after:text-red-500"
-                          )}
-                        >
-                          {question.comment_field_label || 'Comentário'}
-                        </Label>
-                        {question.comment_field_type === 'short' ? (
+                        {question.question_type === 'short_text' && (
                           <Input
-                            id={`comment-${question.id}`}
-                            value={comments[question.id] || ''}
-                            onChange={(e) => handleCommentChange(question.id, e.target.value)}
-                            placeholder="Seu comentário..."
-                            className="mt-2"
-                          />
-                        ) : (
-                          <Textarea
-                            id={`comment-${question.id}`}
-                            value={comments[question.id] || ''}
-                            onChange={(e) => handleCommentChange(question.id, e.target.value)}
-                            placeholder="Seu comentário..."
-                            rows={3}
-                            className="mt-2"
+                            value={answers[question.id] || ''}
+                            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                            placeholder="Sua resposta..."
                           />
                         )}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
 
-          {/* Submit */}
-          <div className="mt-6">
-            <Button
-              type="submit"
-              className="w-full"
-              size="lg"
-              disabled={submitting}
-            >
-              {submitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Enviar Check-in
-                </>
-              )}
-            </Button>
-          </div>
+                        {question.question_type === 'long_text' && (
+                          <Textarea
+                            value={answers[question.id] || ''}
+                            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                            placeholder="Sua resposta..."
+                            rows={4}
+                          />
+                        )}
+
+                        {question.question_type === 'multiple_choice' && question.options && (
+                          <RadioGroup
+                            value={answers[question.id] || ''}
+                            onValueChange={(value) => handleAnswerChange(question.id, value)}
+                          >
+                            {(question.options as string[]).map((option, i) => (
+                              <div key={i} className="flex items-center space-x-2">
+                                <RadioGroupItem value={option} id={`${question.id}-${i}`} />
+                                <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
+                                  {option}
+                                </Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        )}
+
+                        {question.question_type === 'checkbox' && question.options && (
+                          <div className="space-y-2">
+                            {(question.options as string[]).map((option, i) => (
+                              <div key={i} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`${question.id}-${i}`}
+                                  checked={(answers[question.id] || []).includes(option)}
+                                  onCheckedChange={(checked) => handleCheckboxChange(question.id, option, checked as boolean)}
+                                />
+                                <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
+                                  {option}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {question.question_type === 'scale' && (
+                          <div className="space-y-4">
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                              <span>{question.scale_min}</span>
+                              <span className="font-medium text-foreground">{answers[question.id]}</span>
+                              <span>{question.scale_max}</span>
+                            </div>
+                            <Slider
+                              value={[answers[question.id] || question.scale_min]}
+                              onValueChange={([value]) => handleAnswerChange(question.id, value)}
+                              min={question.scale_min}
+                              max={question.scale_max}
+                              step={1}
+                              className="w-full"
+                            />
+                          </div>
+                        )}
+
+                        {/* Comment attachment field */}
+                        {question.has_comment_field && (
+                          <div className="mt-4 pt-4 border-t border-border/50">
+                            <Label 
+                              htmlFor={`comment-${question.id}`}
+                              className={cn(
+                                "text-sm text-muted-foreground",
+                                question.comment_field_required && "after:content-['*'] after:ml-0.5 after:text-red-500"
+                              )}
+                            >
+                              {question.comment_field_label || 'Comentário'}
+                            </Label>
+                            {question.comment_field_type === 'short' ? (
+                              <Input
+                                id={`comment-${question.id}`}
+                                value={comments[question.id] || ''}
+                                onChange={(e) => handleCommentChange(question.id, e.target.value)}
+                                placeholder="Seu comentário..."
+                                className="mt-2"
+                              />
+                            ) : (
+                              <Textarea
+                                id={`comment-${question.id}`}
+                                value={comments[question.id] || ''}
+                                onChange={(e) => handleCommentChange(question.id, e.target.value)}
+                                placeholder="Seu comentário..."
+                                rows={3}
+                                className="mt-2"
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Submit */}
+              <div className="mt-6">
+                <Button
+                  type="submit"
+                  className="w-full"
+                  size="lg"
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Enviar Check-in
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">
+                  Confirme seu telefone acima para liberar o formulário.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </form>
       </div>
     </div>
