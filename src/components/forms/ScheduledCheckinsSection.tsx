@@ -10,7 +10,8 @@ import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { useWhatsAppTemplates } from '@/hooks/useWhatsAppTemplates';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns';
+import { format, parseISO, isAfter, isBefore, addDays, startOfDay } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 import { ptBR } from 'date-fns/locale';
 import { Loader2, Calendar, ClipboardCheck, ChevronDown, ChevronRight, User, Check, MessageCircle, Pause, Play, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -252,8 +253,11 @@ export function ScheduledCheckinsSection() {
     );
   }
 
-  const today = new Date();
-  const next7Days = addDays(today, 7);
+  // Use São Paulo timezone to determine "today"
+  const SAO_PAULO_TZ = 'America/Sao_Paulo';
+  const nowInSaoPaulo = toZonedTime(new Date(), SAO_PAULO_TZ);
+  const todayStart = startOfDay(nowInSaoPaulo);
+  const next7Days = addDays(todayStart, 7);
 
   // Group checkins by client
   const checkinsByClient = checkins.reduce((acc, checkin) => {
@@ -281,10 +285,10 @@ export function ScheduledCheckinsSection() {
 
   // Count stats
   const pendingCheckins = checkins.filter(c => c.status === 'pending');
-  const overdueCount = pendingCheckins.filter(c => isBefore(parseISO(c.scheduled_send_date), today)).length;
+  const overdueCount = pendingCheckins.filter(c => isBefore(parseISO(c.scheduled_send_date), todayStart)).length;
   const upcomingCount = pendingCheckins.filter(c => {
     const date = parseISO(c.scheduled_send_date);
-    return isAfter(date, today) && isBefore(date, next7Days);
+    return isAfter(date, todayStart) && isBefore(date, next7Days);
   }).length;
 
   return (
@@ -336,7 +340,7 @@ export function ScheduledCheckinsSection() {
               const allRelevant = [...pending, ...skipped].sort(
                 (a, b) => parseISO(a.scheduled_send_date).getTime() - parseISO(b.scheduled_send_date).getTime()
               );
-              const overdue = pending.filter(c => isBefore(parseISO(c.scheduled_send_date), today));
+              const overdue = pending.filter(c => isBefore(parseISO(c.scheduled_send_date), todayStart));
               const isOpen = openClients.has(clientId);
 
               return (
@@ -391,8 +395,8 @@ export function ScheduledCheckinsSection() {
                     <div className="ml-8 mt-2 space-y-2 pb-2">
                       {allRelevant.map((checkin) => {
                         const checkinDate = parseISO(checkin.scheduled_send_date);
-                        const isOverdue = checkin.status === 'pending' && isBefore(checkinDate, today);
-                        const isUpcoming = checkin.status === 'pending' && isAfter(checkinDate, today) && isBefore(checkinDate, next7Days);
+                        const isOverdue = checkin.status === 'pending' && isBefore(checkinDate, todayStart);
+                        const isUpcoming = checkin.status === 'pending' && isAfter(checkinDate, todayStart) && isBefore(checkinDate, next7Days);
                         const isPaused = checkin.status === 'skipped';
                         const isSending = sendingCheckins.has(checkin.id);
 
