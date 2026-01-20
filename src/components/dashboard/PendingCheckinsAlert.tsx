@@ -107,8 +107,7 @@ export function PendingCheckinsAlert() {
 
   return (
     <Card 
-      className={`${totalPending > 0 ? "border-orange-500/30 cursor-pointer hover:border-orange-500/50 transition-colors" : ""}`}
-      onClick={totalPending > 0 ? () => navigate('/checkin') : undefined}
+      className={`${totalPending > 0 ? "border-orange-500/30" : ""}`}
     >
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -137,7 +136,10 @@ export function PendingCheckinsAlert() {
         ) : (
           <div className="space-y-3">
             {responsesWithoutFeedback > 0 && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+              <div 
+                className="flex items-center justify-between p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 cursor-pointer hover:bg-orange-500/20 transition-colors"
+                onClick={() => navigate('/forms?tab=reviews')}
+              >
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-orange-500/20 flex items-center justify-center">
                     <MessageSquare className="h-5 w-5 text-orange-500" />
@@ -151,6 +153,7 @@ export function PendingCheckinsAlert() {
                     </p>
                   </div>
                 </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
             )}
 
