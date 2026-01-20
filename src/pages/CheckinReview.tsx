@@ -198,9 +198,9 @@ export default function CheckinReview() {
     },
   });
 
-  // Mutation to approve feedback
+  // Mutation to approve feedback (with optional WhatsApp send)
   const approveMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ sendWhatsApp = false }: { sendWhatsApp?: boolean } = {}) => {
       if (!feedback?.id) {
         // Create feedback if doesn't exist
         const { error } = await supabase
@@ -210,7 +210,7 @@ export default function CheckinReview() {
             client_id: checkinResponse?.client_id,
             ai_analysis_id: aiAnalysis?.id,
             suggested_feedback: aiAnalysis?.suggested_feedback,
-            final_feedback: editedFeedback,
+            final_feedback: editedFeedback || null,
             status: 'approved',
             approved_at: new Date().toISOString(),
           });
@@ -220,9 +220,60 @@ export default function CheckinReview() {
         const { error } = await supabase
           .from('checkin_feedbacks')
           .update({
-            final_feedback: editedFeedback,
+            final_feedback: editedFeedback || feedback.final_feedback || null,
             status: 'approved',
             approved_at: new Date().toISOString(),
+          })
+          .eq('id', feedback.id);
+        if (error) throw error;
+      }
+      return { sendWhatsApp };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
+      queryClient.invalidateQueries({ queryKey: ['pending_checkin_reviews'] });
+      queryClient.invalidateQueries({ queryKey: ['pending_checkins_dashboard'] });
+      if (data?.sendWhatsApp) {
+        toast.success('Feedback aprovado! Pronto para envio.');
+      } else {
+        toast.success('Check-in conferido com sucesso!');
+      }
+    },
+    onError: (error) => {
+      console.error('Error approving:', error);
+      toast.error('Erro ao aprovar feedback');
+    },
+  });
+
+  // Mutation to mark as reviewed without sending (just finalize)
+  const markAsReviewedMutation = useMutation({
+    mutationFn: async () => {
+      if (!feedback?.id) {
+        // Create feedback with 'sent' status to mark as finalized without actually sending
+        const { error } = await supabase
+          .from('checkin_feedbacks')
+          .insert({
+            checkin_response_id: responseId,
+            client_id: checkinResponse?.client_id,
+            ai_analysis_id: aiAnalysis?.id,
+            suggested_feedback: aiAnalysis?.suggested_feedback || null,
+            final_feedback: editedFeedback || null,
+            status: 'sent',
+            approved_at: new Date().toISOString(),
+            sent_at: new Date().toISOString(),
+            sent_via: 'manual_review',
+          });
+        if (error) throw error;
+      } else {
+        // Update existing feedback to 'sent' status
+        const { error } = await supabase
+          .from('checkin_feedbacks')
+          .update({
+            final_feedback: editedFeedback || feedback.final_feedback || null,
+            status: 'sent',
+            approved_at: feedback.approved_at || new Date().toISOString(),
+            sent_at: new Date().toISOString(),
+            sent_via: 'manual_review',
           })
           .eq('id', feedback.id);
         if (error) throw error;
@@ -230,11 +281,13 @@ export default function CheckinReview() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
-      toast.success('Feedback aprovado! Pronto para envio.');
+      queryClient.invalidateQueries({ queryKey: ['pending_checkin_reviews'] });
+      queryClient.invalidateQueries({ queryKey: ['pending_checkins_dashboard'] });
+      toast.success('Check-in finalizado sem envio de WhatsApp');
     },
     onError: (error) => {
-      console.error('Error approving:', error);
-      toast.error('Erro ao aprovar feedback');
+      console.error('Error marking as reviewed:', error);
+      toast.error('Erro ao finalizar check-in');
     },
   });
 
@@ -544,26 +597,49 @@ export default function CheckinReview() {
                   </p>
                 </div>
 
-                <div className="flex gap-2 justify-end">
+                <div className="flex flex-wrap gap-2 justify-end">
                   {feedback?.status !== 'sent' && (
-                    <Button
-                      variant="outline"
-                      onClick={() => approveMutation.mutate()}
-                      disabled={approveMutation.isPending || !editedFeedback.trim()}
-                      className="gap-2"
-                    >
-                      {approveMutation.isPending ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                          Aprovando...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="h-4 w-4" />
-                          {feedback?.status === 'approved' ? 'Atualizar Aprovação' : 'Aprovar Feedback'}
-                        </>
-                      )}
-                    </Button>
+                    <>
+                      {/* Finalizar sem enviar WhatsApp */}
+                      <Button
+                        variant="ghost"
+                        onClick={() => markAsReviewedMutation.mutate()}
+                        disabled={markAsReviewedMutation.isPending || approveMutation.isPending}
+                        className="gap-2 text-muted-foreground hover:text-foreground"
+                      >
+                        {markAsReviewedMutation.isPending ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Finalizando...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="h-4 w-4" />
+                            Conferir sem enviar
+                          </>
+                        )}
+                      </Button>
+
+                      {/* Aprovar para depois enviar */}
+                      <Button
+                        variant="outline"
+                        onClick={() => approveMutation.mutate({ sendWhatsApp: true })}
+                        disabled={approveMutation.isPending || !editedFeedback.trim() || markAsReviewedMutation.isPending}
+                        className="gap-2"
+                      >
+                        {approveMutation.isPending ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            Aprovando...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="h-4 w-4" />
+                            {feedback?.status === 'approved' ? 'Atualizar Aprovação' : 'Aprovar Feedback'}
+                          </>
+                        )}
+                      </Button>
+                    </>
                   )}
 
                   {feedback?.status === 'approved' && (
