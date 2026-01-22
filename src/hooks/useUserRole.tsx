@@ -29,6 +29,8 @@ export function useUserRole() {
       return data as UserRole | null;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 10, // 10 minutes - role rarely changes
+    gcTime: 1000 * 60 * 30, // 30 minutes
   });
 
   return {
@@ -87,6 +89,8 @@ export function useAthleteClient() {
       return null;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 30,
   });
 }
 
@@ -110,6 +114,7 @@ export function useCheckinResponses(clientId: string | undefined) {
       return data;
     },
     enabled: !!clientId,
+    staleTime: 1000 * 60 * 3, // 3 minutes
   });
 }
 
@@ -130,6 +135,7 @@ export function useCheckinQuestions(formId: string | undefined) {
       return data;
     },
     enabled: !!formId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -150,5 +156,6 @@ export function useAthleteProfile(clientId: string | undefined) {
       return data;
     },
     enabled: !!clientId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

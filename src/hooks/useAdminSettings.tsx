@@ -38,6 +38,7 @@ export function useAdminSettings() {
       return data as AdminSettings;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 10, // 10 minutes - rarely changes
   });
 }
 

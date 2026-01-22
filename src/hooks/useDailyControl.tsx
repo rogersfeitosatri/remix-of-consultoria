@@ -37,6 +37,7 @@ export function useActiveCycle(clientId?: string) {
       return data as DailyControlCycle | null;
     },
     enabled: !!clientId,
+    staleTime: 1000 * 60 * 3, // 3 minutes
   });
 }
 
@@ -55,6 +56,7 @@ export function useAllCycles(clientId?: string) {
       return data as DailyControlCycle[];
     },
     enabled: !!clientId,
+    staleTime: 1000 * 60 * 3, // 3 minutes
   });
 }
 
@@ -142,6 +144,7 @@ export function useCycleEntries(cycleId?: string) {
       return data as DailyControlEntry[];
     },
     enabled: !!cycleId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 

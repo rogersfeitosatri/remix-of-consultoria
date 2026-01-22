@@ -34,6 +34,7 @@ export function useChallengeActivities() {
       if (error) throw error;
       return data as ChallengeActivity[];
     },
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -50,6 +51,7 @@ export function useAthleteChallengeActivities() {
       if (error) throw error;
       return data as ChallengeActivity[];
     },
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -152,6 +154,7 @@ export function useAthleteWeeklyMarks(clientId?: string) {
       return data as WeeklyMark[];
     },
     enabled: !!clientId,
+    staleTime: 1000 * 60 * 3, // 3 minutes
   });
 }
 

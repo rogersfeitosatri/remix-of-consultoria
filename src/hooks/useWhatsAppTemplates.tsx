@@ -161,6 +161,7 @@ export function useWhatsAppTemplates() {
       return data as WhatsAppTemplate[];
     },
     enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -271,6 +272,7 @@ export function useWhatsAppMessageLogs(limit = 50) {
       return data as WhatsAppMessageLog[];
     },
     enabled: !!user?.id,
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 
@@ -290,6 +292,7 @@ export function useAthleteWhatsAppSettings(clientId?: string) {
       return data as AthleteWhatsAppSettings | null;
     },
     enabled: !!clientId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
