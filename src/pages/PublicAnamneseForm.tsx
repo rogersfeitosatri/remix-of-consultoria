@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PersonStanding, Send, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -78,7 +79,7 @@ export default function PublicAnamneseForm() {
         const initialAnswers: Record<string, any> = {};
         const initialComments: Record<string, string> = {};
         typedQuestions.forEach((q) => {
-          if (q.question_type === 'checkbox') {
+          if (q.question_type === 'checkbox' || q.question_type === 'multiselect') {
             initialAnswers[q.id] = [];
           } else if (q.question_type === 'scale') {
             initialAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
@@ -334,6 +335,41 @@ export default function PublicAnamneseForm() {
                         placeholder="Sua resposta..."
                         rows={4}
                       />
+                    )}
+
+                    {question.question_type === 'select' && question.options && (
+                      <Select
+                        value={answers[question.id] || ''}
+                        onValueChange={(value) => handleAnswerChange(question.id, value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma opção" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(question.options as string[]).map((option, i) => (
+                            <SelectItem key={i} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {question.question_type === 'multiselect' && question.options && (
+                      <div className="space-y-2">
+                        {(question.options as string[]).map((option, i) => (
+                          <div key={i} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${question.id}-${i}`}
+                              checked={(answers[question.id] || []).includes(option)}
+                              onCheckedChange={(checked) => handleCheckboxChange(question.id, option, checked as boolean)}
+                            />
+                            <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
+                              {option}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     )}
 
                     {question.question_type === 'multiple_choice' && question.options && (
