@@ -90,6 +90,7 @@ export function useMessageTemplates() {
       return data as MessageTemplate[];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 

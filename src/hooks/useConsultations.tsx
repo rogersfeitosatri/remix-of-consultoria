@@ -90,6 +90,7 @@ export function useBookingLinks() {
       return data as (BookingLink & { client: { name: string; email: string; phone: string } })[];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 3, // 3 minutes
   });
 }
 
@@ -195,6 +196,7 @@ export function useConsultationRules() {
       return data;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 3, // 3 minutes
   });
 }
 
@@ -232,6 +234,7 @@ export function useConsultAutomationSettings() {
       return data as ConsultAutomationSettings | null;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -308,6 +311,7 @@ export function useAvailabilityRules() {
       return data as AvailabilityRule[];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -422,6 +426,7 @@ export function useGoogleCalendarConnection() {
       return data as GoogleCalendarConnection | null;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -490,6 +495,7 @@ export function usePremiumClients() {
       return data;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 3, // 3 minutes
   });
 }
 
@@ -513,6 +519,7 @@ export function useConsultationAppointments() {
       return data;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 

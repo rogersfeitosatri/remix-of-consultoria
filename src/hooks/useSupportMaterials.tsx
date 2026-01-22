@@ -61,6 +61,7 @@ export function useSupportMaterials(category?: string) {
       return data as SupportMaterial[];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -86,6 +87,7 @@ export function useAthleteSupportMaterials(category?: string) {
       return data as SupportMaterial[];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -179,6 +181,7 @@ export function useDietAppConfig() {
       return data as DietAppConfig | null;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -199,6 +202,7 @@ export function useAthleteDietAppConfig() {
       return data as DietAppConfig | null;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 

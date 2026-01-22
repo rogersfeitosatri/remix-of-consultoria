@@ -67,6 +67,7 @@ export function useQuestionTemplates(section?: string) {
       return data as QuestionTemplate[];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 

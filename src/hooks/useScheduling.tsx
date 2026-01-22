@@ -63,6 +63,7 @@ export function useSchedulingSettings() {
       return null;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -89,6 +90,7 @@ export function useSchedulingSettingsBySlug(slug: string | undefined) {
       return null;
     },
     enabled: !!slug,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -109,6 +111,7 @@ export function useSchedulingBlocks(userId?: string) {
       return data as SchedulingBlock[];
     },
     enabled: !!targetUserId,
+    staleTime: 1000 * 60 * 3, // 3 minutes
   });
 }
 
@@ -133,6 +136,7 @@ export function useAppointments() {
       })) as (Appointment & { client_name: string })[];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 
@@ -151,6 +155,7 @@ export function useAppointmentsByDate(userId: string, date: string) {
       return data as Appointment[];
     },
     enabled: !!userId && !!date,
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }
 

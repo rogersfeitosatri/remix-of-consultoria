@@ -30,6 +30,7 @@ export function useLinkBioItems() {
       return data as LinkBioItem[];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
@@ -52,7 +53,7 @@ export function usePublicLinkBioItems() {
       
       return (data || []) as LinkBioItem[];
     },
-    staleTime: 0, // Always fetch fresh data
+    staleTime: 1000 * 60 * 2, // 2 minutes - public page cache
   });
 }
 

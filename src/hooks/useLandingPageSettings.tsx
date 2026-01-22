@@ -32,6 +32,7 @@ export function useLandingPageSettings() {
       };
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 10, // 10 minutes - rarely changes
   });
 }
 
@@ -64,6 +65,7 @@ export function usePublicLandingPageSettings() {
         plans_consultas_whatsapp_url: settings.plans_consultas_whatsapp_url || DEFAULT_PLANS_LINKS.plans_consultas_whatsapp_url,
       };
     },
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
 
