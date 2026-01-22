@@ -68,7 +68,6 @@ export default function PublicAnamneseForm() {
           .from('anamnese_questions')
           .select('*')
           .eq('form_id', formId)
-          .order('section')
           .order('order_index', { ascending: true });
 
         if (questionsError) throw questionsError;
@@ -159,22 +158,14 @@ export default function PublicAnamneseForm() {
     setSubmitting(true);
 
     try {
-      // Find client by email
-      const { data: clients, error: clientError } = await supabase
+      // Try to find client by email (optional - form is now open)
+      const { data: clients } = await supabase
         .from('clients')
         .select('id')
         .eq('email', athleteEmail.toLowerCase().trim())
         .limit(1);
 
-      if (clientError) throw clientError;
-
-      if (!clients || clients.length === 0) {
-        toast.error('Email não encontrado. Verifique se está usando o email cadastrado pelo seu assessor.');
-        setSubmitting(false);
-        return;
-      }
-
-      const clientId = clients[0].id;
+      const clientId = clients && clients.length > 0 ? clients[0].id : null;
 
       // Prepare responses with comments
       const responsesWithComments: Record<string, any> = {};
@@ -185,12 +176,15 @@ export default function PublicAnamneseForm() {
         };
       });
 
-      // Submit response
-      const { error: submitError } = await supabase
-        .from('anamnese_responses')
+      // Submit response - can be without client_id (will be linked later by admin)
+      // Cast to any since new columns may not be in types yet
+      const { error: submitError } = await (supabase
+        .from('anamnese_responses') as any)
         .insert({
           form_id: formId,
           client_id: clientId,
+          respondent_name: athleteName.trim(),
+          respondent_email: athleteEmail.toLowerCase().trim(),
           responses: responsesWithComments,
         });
 
@@ -206,9 +200,13 @@ export default function PublicAnamneseForm() {
     }
   };
 
-  // Group questions by section
+  // Group questions by section while preserving order_index order
+  const orderedSections: string[] = [];
   const questionsBySection = questions.reduce((acc, q) => {
-    if (!acc[q.section]) acc[q.section] = [];
+    if (!acc[q.section]) {
+      acc[q.section] = [];
+      orderedSections.push(q.section);
+    }
     acc[q.section].push(q);
     return acc;
   }, {} as Record<string, Question[]>);
@@ -303,14 +301,14 @@ export default function PublicAnamneseForm() {
             </CardContent>
           </Card>
 
-          {/* Questions by Section */}
-          {Object.entries(questionsBySection).map(([section, sectionQuestions]) => (
+          {/* Questions by Section - maintaining order_index order */}
+          {orderedSections.map((section) => (
             <Card key={section} className="mb-6">
               <CardHeader>
                 <CardTitle className="text-lg capitalize">{section.replace(/_/g, ' ')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {sectionQuestions.map((question, index) => (
+                {questionsBySection[section].map((question, index) => (
                   <div key={question.id} className="space-y-4">
                     <div className="flex items-start gap-2">
                       <span className="text-muted-foreground font-medium">{index + 1}.</span>

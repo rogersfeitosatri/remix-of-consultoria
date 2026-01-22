@@ -194,27 +194,33 @@ export type Database = {
         Row: {
           ai_analysis: Json | null
           ai_analyzed_at: string | null
-          client_id: string
+          client_id: string | null
           form_id: string
           id: string
+          respondent_email: string | null
+          respondent_name: string | null
           responses: Json
           submitted_at: string
         }
         Insert: {
           ai_analysis?: Json | null
           ai_analyzed_at?: string | null
-          client_id: string
+          client_id?: string | null
           form_id: string
           id?: string
+          respondent_email?: string | null
+          respondent_name?: string | null
           responses: Json
           submitted_at?: string
         }
         Update: {
           ai_analysis?: Json | null
           ai_analyzed_at?: string | null
-          client_id?: string
+          client_id?: string | null
           form_id?: string
           id?: string
+          respondent_email?: string | null
+          respondent_name?: string | null
           responses?: Json
           submitted_at?: string
         }
