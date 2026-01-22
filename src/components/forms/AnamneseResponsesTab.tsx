@@ -4,12 +4,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, FileText, Eye, User } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Search, FileText, Eye, User, Link2, AlertCircle } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from 'sonner';
 
 interface AnamneseListItem {
   id: string;
@@ -21,12 +37,25 @@ interface AnamneseListItem {
   has_ai_analysis: boolean;
 }
 
+interface UnlinkedResponse {
+  id: string;
+  form_id: string;
+  form_title: string;
+  respondent_name: string | null;
+  respondent_email: string | null;
+  submitted_at: string;
+}
+
 export function AnamneseResponsesTab() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [selectedUnlinked, setSelectedUnlinked] = useState<UnlinkedResponse | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
 
-  // Fetch all anamnese responses with client info
+  // Fetch all anamnese responses with client info (linked responses)
   const { data: anamneseResponses = [], isLoading } = useQuery({
     queryKey: ['all_anamnese_responses', user?.id],
     queryFn: async () => {
@@ -69,6 +98,118 @@ export function AnamneseResponsesTab() {
       })) as AnamneseListItem[];
     },
     enabled: !!user,
+  });
+
+  // Fetch unlinked responses (no client_id) for admin's forms
+  const { data: unlinkedResponses = [] } = useQuery({
+    queryKey: ['unlinked_anamnese_responses', user?.id],
+    queryFn: async () => {
+      // Get admin's form IDs first
+      const { data: forms, error: formsError } = await supabase
+        .from('anamnese_forms')
+        .select('id, title')
+        .eq('user_id', user?.id);
+
+      if (formsError) throw formsError;
+      if (!forms || forms.length === 0) return [];
+
+      const formIds = forms.map(f => f.id);
+      const formTitleMap = forms.reduce((acc, f) => {
+        acc[f.id] = f.title;
+        return acc;
+      }, {} as Record<string, string>);
+
+      // Get responses without client_id for these forms
+      // Use select('*') and cast - new columns may not be in types yet
+      // @ts-ignore - respondent_name and respondent_email are new columns
+      const queryResult = await supabase
+        .from('anamnese_responses')
+        .select('*')
+        .in('form_id', formIds)
+        .is('client_id', null)
+        .order('submitted_at', { ascending: false });
+
+      if (queryResult.error) throw queryResult.error;
+      
+      // @ts-ignore
+      const responses: any[] = queryResult.data || [];
+
+      return responses.map((r) => ({
+        id: r.id,
+        form_id: r.form_id,
+        form_title: formTitleMap[r.form_id] || 'Formulário',
+        respondent_name: r.respondent_name,
+        respondent_email: r.respondent_email,
+        submitted_at: r.submitted_at,
+      })) as UnlinkedResponse[];
+    },
+    enabled: !!user,
+  });
+
+  // Fetch clients for linking dialog
+  const { data: clientsForLinking = [] } = useQuery({
+    queryKey: ['clients_for_linking', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name, email')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && linkDialogOpen,
+  });
+
+  // Mutation to link response to client
+  const linkToClientMutation = useMutation({
+    mutationFn: async ({ responseId, clientId }: { responseId: string; clientId: string }) => {
+      const { error } = await supabase
+        .from('anamnese_responses')
+        .update({ client_id: clientId })
+        .eq('id', responseId);
+
+      if (error) throw error;
+
+      // Update athlete_profiles to mark anamnese as completed
+      const { error: profileError } = await supabase
+        .from('athlete_profiles')
+        .update({ 
+          anamnese_completed: true,
+          anamnese_submitted_at: new Date().toISOString()
+        })
+        .eq('client_id', clientId);
+
+      if (profileError) {
+        console.warn('Could not update athlete profile:', profileError);
+      }
+
+      // Update client status if pending_anamnese
+      const { error: clientError } = await supabase
+        .from('clients')
+        .update({ athlete_status: 'active' })
+        .eq('id', clientId)
+        .eq('athlete_status', 'pending_anamnese');
+
+      if (clientError) {
+        console.warn('Could not update client status:', clientError);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all_anamnese_responses'] });
+      queryClient.invalidateQueries({ queryKey: ['unlinked_anamnese_responses'] });
+      queryClient.invalidateQueries({ queryKey: ['pending_anamnese_for_list'] });
+      toast.success('Anamnese vinculada ao atleta com sucesso!');
+      setLinkDialogOpen(false);
+      setSelectedUnlinked(null);
+      setSelectedClientId('');
+    },
+    onError: (error) => {
+      console.error('Error linking response:', error);
+      toast.error('Erro ao vincular anamnese');
+    },
   });
 
   // Also fetch clients without anamnese (pending)
@@ -115,6 +256,17 @@ export function AnamneseResponsesTab() {
     );
   }, [anamneseResponses, searchTerm]);
 
+  // Filter unlinked responses based on search
+  const filteredUnlinked = useMemo(() => {
+    if (!searchTerm.trim()) return unlinkedResponses;
+    
+    const term = searchTerm.toLowerCase();
+    return unlinkedResponses.filter(
+      r => (r.respondent_name && r.respondent_name.toLowerCase().includes(term)) ||
+           (r.respondent_email && r.respondent_email.toLowerCase().includes(term))
+    );
+  }, [unlinkedResponses, searchTerm]);
+
   // Filter pending clients based on search
   const filteredPending = useMemo(() => {
     if (!searchTerm.trim()) return pendingClients;
@@ -125,6 +277,20 @@ export function AnamneseResponsesTab() {
            (c.email && c.email.toLowerCase().includes(term))
     );
   }, [pendingClients, searchTerm]);
+
+  const openLinkDialog = (response: UnlinkedResponse) => {
+    setSelectedUnlinked(response);
+    setSelectedClientId('');
+    setLinkDialogOpen(true);
+  };
+
+  const handleLinkToClient = () => {
+    if (!selectedUnlinked || !selectedClientId) return;
+    linkToClientMutation.mutate({
+      responseId: selectedUnlinked.id,
+      clientId: selectedClientId,
+    });
+  };
 
   if (isLoading) {
     return (
@@ -163,6 +329,74 @@ export function AnamneseResponsesTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Unlinked Responses - Need to be attached */}
+      {filteredUnlinked.length > 0 && (
+        <Card className="border-orange-500/30">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-500" />
+              Aguardando Vínculo
+              <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20">
+                {filteredUnlinked.length}
+              </Badge>
+            </CardTitle>
+            <CardDescription>
+              Respostas de anamnese que precisam ser vinculadas a um atleta cadastrado
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              {filteredUnlinked.map((response) => (
+                <div
+                  key={response.id}
+                  className="flex items-center justify-between p-4 rounded-lg border border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10 transition-colors"
+                >
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                      <FileText className="h-5 w-5 text-orange-500" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{response.respondent_name || 'Sem nome'}</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {response.respondent_email || 'Sem email'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 flex-shrink-0">
+                    <div className="text-right hidden sm:block">
+                      <p className="text-sm text-muted-foreground">
+                        {format(parseISO(response.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{response.form_title}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => navigate(`/anamnese-response/${response.id}`)}
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span className="hidden sm:inline">Ver</span>
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="gap-2 bg-orange-500 hover:bg-orange-600"
+                        onClick={() => openLinkDialog(response)}
+                      >
+                        <Link2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Vincular</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Submitted Responses */}
       {filteredResponses.length > 0 && (
@@ -275,7 +509,7 @@ export function AnamneseResponsesTab() {
       )}
 
       {/* Empty State */}
-      {filteredResponses.length === 0 && filteredPending.length === 0 && (
+      {filteredResponses.length === 0 && filteredPending.length === 0 && filteredUnlinked.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
@@ -290,6 +524,61 @@ export function AnamneseResponsesTab() {
           </CardContent>
         </Card>
       )}
+
+      {/* Link Dialog */}
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vincular Anamnese a Atleta</DialogTitle>
+            <DialogDescription>
+              Selecione o atleta para vincular esta resposta de anamnese.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedUnlinked && (
+            <div className="py-4 space-y-4">
+              <div className="p-4 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">Resposta de:</p>
+                <p className="font-medium">{selectedUnlinked.respondent_name || 'Sem nome'}</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedUnlinked.respondent_email || 'Sem email'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Enviada em {format(parseISO(selectedUnlinked.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Vincular ao atleta:</label>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um atleta..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clientsForLinking.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name} {client.email ? `(${client.email})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleLinkToClient} 
+              disabled={!selectedClientId || linkToClientMutation.isPending}
+            >
+              {linkToClientMutation.isPending ? 'Vinculando...' : 'Vincular'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
