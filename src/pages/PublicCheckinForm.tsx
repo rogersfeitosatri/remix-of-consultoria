@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
-import { PersonStanding, Send, CheckCircle2, Phone } from 'lucide-react';
+import { PersonStanding, Send, CheckCircle2, Phone, Clock, MessageCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -130,6 +130,7 @@ export default function PublicCheckinForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [linkExpired, setLinkExpired] = useState(false);
 
   const [athletePhone, setAthletePhone] = useState('');
   const [verifiedClientId, setVerifiedClientId] = useState<string | null>(null);
@@ -280,6 +281,28 @@ export default function PublicCheckinForm() {
         return;
       }
 
+      // Check if link has expired (24h after sent_at)
+      const { data: scheduledCheckin } = await supabase
+        .from('scheduled_checkins')
+        .select('sent_at')
+        .eq('client_id', data.clientId)
+        .eq('form_id', formId)
+        .eq('status', 'sent')
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (scheduledCheckin?.sent_at) {
+        const sentAt = new Date(scheduledCheckin.sent_at);
+        const now = new Date();
+        const hoursSinceSent = (now.getTime() - sentAt.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursSinceSent > 24) {
+          setLinkExpired(true);
+          return;
+        }
+      }
+
       setVerifiedClientId(data.clientId);
       toast.success('Telefone confirmado!');
     } catch (err: any) {
@@ -388,6 +411,33 @@ export default function PublicCheckinForm() {
           </p>
           <Button variant="outline" onClick={() => window.close()}>
             Fechar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (linkExpired) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full text-center">
+          <div className="rounded-full bg-orange-500/10 p-4 w-fit mx-auto mb-6">
+            <Clock className="h-12 w-12 text-orange-500" />
+          </div>
+          <h1 className="text-2xl font-bold mb-2">Prazo Expirado</h1>
+          <p className="text-muted-foreground mb-4">
+            O prazo de 24 horas para preencher este check-in já passou.
+          </p>
+          <p className="text-muted-foreground mb-6">
+            Caso queira enviar um feedback de como está se sentindo com o plano, entre em contato com o suporte.
+          </p>
+          <Button 
+            variant="default" 
+            onClick={() => window.open('https://wa.me/5599984817697', '_blank')}
+            className="gap-2"
+          >
+            <MessageCircle className="h-4 w-4" />
+            Entrar em contato
           </Button>
         </div>
       </div>
