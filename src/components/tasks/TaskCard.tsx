@@ -3,7 +3,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { GripVertical, Pin, Calendar, Pencil, Archive, Trash2 } from 'lucide-react';
+import { GripVertical, Pin, Calendar, Pencil, Archive, Trash2, Clock } from 'lucide-react';
 import { TaskWithLabels } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -80,10 +80,20 @@ export function TaskCard({ task, onEdit, onArchive, onDelete, onTogglePin }: Tas
             </div>
           )}
 
-          {task.due_date && (
-            <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-              <Calendar className="h-3 w-3" />
-              {format(new Date(task.due_date), 'dd MMM', { locale: ptBR })}
+          {(task.due_date || task.due_time) && (
+            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+              {task.due_date && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(task.due_date), 'dd MMM', { locale: ptBR })}
+                </span>
+              )}
+              {task.due_time && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {task.due_time.slice(0, 5)}
+                </span>
+              )}
             </div>
           )}
 

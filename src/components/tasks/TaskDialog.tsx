@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, X } from 'lucide-react';
+import { CalendarIcon, Plus, X, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -51,6 +51,7 @@ interface TaskDialogProps {
     description?: string;
     day_of_week: number;
     due_date?: string;
+    due_time?: string;
     label_ids: string[];
   }) => void;
 }
@@ -67,6 +68,7 @@ export function TaskDialog({
   const [description, setDescription] = useState('');
   const [dayOfWeek, setDayOfWeek] = useState(defaultDayOfWeek);
   const [dueDate, setDueDate] = useState<Date | undefined>();
+  const [dueTime, setDueTime] = useState('');
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [showNewLabel, setShowNewLabel] = useState(false);
   const [newLabelName, setNewLabelName] = useState('');
@@ -81,12 +83,14 @@ export function TaskDialog({
       setDescription(task.description || '');
       setDayOfWeek(task.day_of_week);
       setDueDate(task.due_date ? new Date(task.due_date) : undefined);
+      setDueTime(task.due_time ? task.due_time.slice(0, 5) : '');
       setSelectedLabels(task.labels.map((l) => l.id));
     } else {
       setTitle('');
       setDescription('');
       setDayOfWeek(defaultDayOfWeek);
       setDueDate(undefined);
+      setDueTime('');
       setSelectedLabels([]);
     }
     setShowNewLabel(false);
@@ -102,6 +106,7 @@ export function TaskDialog({
       description: description.trim() || undefined,
       day_of_week: dayOfWeek,
       due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : undefined,
+      due_time: dueTime || undefined,
       label_ids: selectedLabels,
     });
 
@@ -213,6 +218,30 @@ export function TaskDialog({
                   )}
                 </PopoverContent>
               </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="due-time">Horário (opcional)</Label>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="due-time"
+                  type="time"
+                  value={dueTime}
+                  onChange={(e) => setDueTime(e.target.value)}
+                  className="w-32"
+                />
+                {dueTime && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDueTime('')}
+                  >
+                    Limpar
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">

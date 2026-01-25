@@ -18,6 +18,7 @@ export interface Task {
   description: string | null;
   day_of_week: number;
   due_date: string | null;
+  due_time: string | null;
   is_pinned: boolean;
   is_archived: boolean;
   order_index: number;
@@ -111,6 +112,7 @@ export function useCreateTask() {
       description?: string;
       day_of_week: number;
       due_date?: string;
+      due_time?: string;
       label_ids?: string[];
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
@@ -123,6 +125,7 @@ export function useCreateTask() {
           description: data.description || null,
           day_of_week: data.day_of_week,
           due_date: data.due_date || null,
+          due_time: data.due_time || null,
         })
         .select()
         .single();
@@ -164,6 +167,7 @@ export function useUpdateTask() {
       description?: string;
       day_of_week?: number;
       due_date?: string | null;
+      due_time?: string | null;
       is_pinned?: boolean;
       is_archived?: boolean;
       order_index?: number;
