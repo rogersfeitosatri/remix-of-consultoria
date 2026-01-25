@@ -22,62 +22,97 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 }); // Position in pixels
+  // center position in normalized image coords (0..1)
+  const [center, setCenter] = useState({ x: 0.5, y: 0.5 });
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dragStartRef = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const dragStartRef = useRef({ x: 0, y: 0, centerX: 0.5, centerY: 0.5 });
 
-  // Calculate the scaled image dimensions
-  const getScaledDimensions = useCallback(() => {
-    if (imageSize.width === 0 || imageSize.height === 0) {
-      return { width: CONTAINER_SIZE, height: CONTAINER_SIZE };
+  const getBaseScale = useCallback(() => {
+    const w = imageSize.width;
+    const h = imageSize.height;
+    if (!w || !h) return 1;
+    return Math.max(CONTAINER_SIZE / w, CONTAINER_SIZE / h);
+  }, [imageSize.height, imageSize.width]);
+
+  const getDisplayScale = useCallback(() => {
+    return getBaseScale() * zoom;
+  }, [getBaseScale, zoom]);
+
+  const clampCenter = useCallback(
+    (x: number, y: number) => {
+      const w = imageSize.width;
+      const h = imageSize.height;
+      if (!w || !h) return { x: 0.5, y: 0.5 };
+
+      const displayScale = getDisplayScale();
+      const sourceW = CONTAINER_SIZE / displayScale;
+      const sourceH = CONTAINER_SIZE / displayScale;
+
+      const minX = sourceW / 2 / w;
+      const maxX = 1 - minX;
+      const minY = sourceH / 2 / h;
+      const maxY = 1 - minY;
+
+      return {
+        x: Math.max(minX, Math.min(maxX, x)),
+        y: Math.max(minY, Math.min(maxY, y)),
+      };
+    },
+    [getDisplayScale, imageSize.height, imageSize.width],
+  );
+
+  const getCropRect = useCallback(() => {
+    const w = imageSize.width;
+    const h = imageSize.height;
+    if (!w || !h) {
+      return { sx: 0, sy: 0, sWidth: 1, sHeight: 1 };
     }
 
-    // Scale image to cover container (smallest dimension fits container)
-    // Then apply zoom on top of that
-    const aspectRatio = imageSize.width / imageSize.height;
-    let baseWidth, baseHeight;
+    const displayScale = getDisplayScale();
+    const sWidth = CONTAINER_SIZE / displayScale;
+    const sHeight = CONTAINER_SIZE / displayScale;
 
-    if (aspectRatio > 1) {
-      // Landscape image: height fits container exactly, width extends beyond
-      baseHeight = CONTAINER_SIZE;
-      baseWidth = CONTAINER_SIZE * aspectRatio;
-    } else {
-      // Portrait image: width fits container exactly, height extends beyond
-      baseWidth = CONTAINER_SIZE;
-      baseHeight = CONTAINER_SIZE / aspectRatio;
-    }
+    const cx = center.x * w;
+    const cy = center.y * h;
 
-    // Apply zoom proportionally to both dimensions
-    return {
-      width: Math.round(baseWidth * zoom),
-      height: Math.round(baseHeight * zoom),
-    };
-  }, [imageSize, zoom]);
+    const sx = Math.max(0, Math.min(w - sWidth, cx - sWidth / 2));
+    const sy = Math.max(0, Math.min(h - sHeight, cy - sHeight / 2));
 
-  // Calculate max position bounds
-  const getPositionBounds = useCallback(() => {
-    const scaled = getScaledDimensions();
-    return {
-      maxX: Math.max(0, scaled.width - CONTAINER_SIZE),
-      maxY: Math.max(0, scaled.height - CONTAINER_SIZE),
-    };
-  }, [getScaledDimensions]);
+    return { sx, sy, sWidth, sHeight };
+  }, [center.x, center.y, getDisplayScale, imageSize.height, imageSize.width]);
 
-  // Clamp position within bounds
-  const clampPosition = useCallback((x: number, y: number) => {
-    const bounds = getPositionBounds();
-    return {
-      x: Math.max(0, Math.min(bounds.maxX, x)),
-      y: Math.max(0, Math.min(bounds.maxY, y)),
-    };
-  }, [getPositionBounds]);
+  const drawPreview = useCallback(() => {
+    const canvas = previewCanvasRef.current;
+    const img = imageRef.current;
+    if (!canvas || !img || !imageSize.width || !imageSize.height) return;
 
-  // Reset position when zoom changes to keep it in bounds
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(CONTAINER_SIZE * dpr);
+    canvas.height = Math.round(CONTAINER_SIZE * dpr);
+    canvas.style.width = `${CONTAINER_SIZE}px`;
+    canvas.style.height = `${CONTAINER_SIZE}px`;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, CONTAINER_SIZE, CONTAINER_SIZE);
+
+    const { sx, sy, sWidth, sHeight } = getCropRect();
+    ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, CONTAINER_SIZE, CONTAINER_SIZE);
+  }, [getCropRect, imageSize.height, imageSize.width]);
+
   useEffect(() => {
-    setPosition(prev => clampPosition(prev.x, prev.y));
-  }, [zoom, clampPosition]);
+    // keep center clamped as zoom changes
+    setCenter((c) => clampCenter(c.x, c.y));
+  }, [zoom, clampCenter]);
+
+  useEffect(() => {
+    drawPreview();
+  }, [drawPreview]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -90,12 +125,13 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setZoom(1);
-      setPosition({ x: 0, y: 0 });
+      setCenter({ x: 0.5, y: 0.5 });
 
       // Get image dimensions
       const img = new Image();
       img.onload = () => {
-        setImageSize({ width: img.width, height: img.height });
+        imageRef.current = img;
+        setImageSize({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
       };
       img.src = url;
     }
@@ -107,8 +143,8 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
     dragStartRef.current = {
       x: e.clientX,
       y: e.clientY,
-      posX: position.x,
-      posY: position.y,
+      centerX: center.x,
+      centerY: center.y,
     };
   };
 
@@ -117,15 +153,23 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
     
     const deltaX = e.clientX - dragStartRef.current.x;
     const deltaY = e.clientY - dragStartRef.current.y;
-    
-    // Invert delta because dragging right should move the crop area left (show more of right side)
-    const newPos = clampPosition(
-      dragStartRef.current.posX - deltaX,
-      dragStartRef.current.posY - deltaY
+
+    const w = imageSize.width;
+    const h = imageSize.height;
+    if (!w || !h) return;
+
+    const displayScale = getDisplayScale();
+    const deltaOriginalX = deltaX / displayScale;
+    const deltaOriginalY = deltaY / displayScale;
+
+    // dragging right moves image right => center moves left
+    const next = clampCenter(
+      dragStartRef.current.centerX - deltaOriginalX / w,
+      dragStartRef.current.centerY - deltaOriginalY / h,
     );
-    
-    setPosition(newPos);
-  }, [isDragging, clampPosition]);
+
+    setCenter(next);
+  }, [clampCenter, getDisplayScale, imageSize.height, imageSize.width, isDragging]);
 
   const handleMouseUp = () => {
     setIsDragging(false);
@@ -139,8 +183,8 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
     dragStartRef.current = {
       x: touch.clientX,
       y: touch.clientY,
-      posX: position.x,
-      posY: position.y,
+      centerX: center.x,
+      centerY: center.y,
     };
   };
 
@@ -150,14 +194,22 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
     
     const deltaX = touch.clientX - dragStartRef.current.x;
     const deltaY = touch.clientY - dragStartRef.current.y;
-    
-    const newPos = clampPosition(
-      dragStartRef.current.posX - deltaX,
-      dragStartRef.current.posY - deltaY
+
+    const w = imageSize.width;
+    const h = imageSize.height;
+    if (!w || !h) return;
+
+    const displayScale = getDisplayScale();
+    const deltaOriginalX = deltaX / displayScale;
+    const deltaOriginalY = deltaY / displayScale;
+
+    const next = clampCenter(
+      dragStartRef.current.centerX - deltaOriginalX / w,
+      dragStartRef.current.centerY - deltaOriginalY / h,
     );
-    
-    setPosition(newPos);
-  }, [isDragging, clampPosition]);
+
+    setCenter(next);
+  }, [clampCenter, getDisplayScale, imageSize.height, imageSize.width, isDragging]);
 
   const handleTouchEnd = () => {
     setIsDragging(false);
@@ -173,43 +225,14 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Could not get canvas context');
 
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = previewUrl;
-      });
+      const img = imageRef.current;
+      if (!img) throw new Error('Image not loaded');
 
       canvas.width = OUTPUT_SIZE;
       canvas.height = OUTPUT_SIZE;
 
-      // Calculate the source rectangle from the original image
-      const scaled = getScaledDimensions();
-      
-      // Scale factor from original image to scaled display
-      const scaleFactorX = img.width / scaled.width;
-      const scaleFactorY = img.height / scaled.height;
-
-      // Source coordinates in original image pixels
-      const sourceX = position.x * scaleFactorX;
-      const sourceY = position.y * scaleFactorY;
-      const sourceWidth = CONTAINER_SIZE * scaleFactorX;
-      const sourceHeight = CONTAINER_SIZE * scaleFactorY;
-
-      // Draw the cropped portion to the canvas
-      ctx.drawImage(
-        img,
-        sourceX,
-        sourceY,
-        sourceWidth,
-        sourceHeight,
-        0,
-        0,
-        OUTPUT_SIZE,
-        OUTPUT_SIZE
-      );
+      const { sx, sy, sWidth, sHeight } = getCropRect();
+      ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
 
       // Convert to blob
       const blob = await new Promise<Blob>((resolve, reject) => {
@@ -255,15 +278,14 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
     setPreviewUrl(null);
     setImageSize({ width: 0, height: 0 });
     setZoom(1);
-    setPosition({ x: 0, y: 0 });
+    setCenter({ x: 0.5, y: 0.5 });
+    imageRef.current = null;
   };
 
   const handleClose = () => {
     resetState();
     onOpenChange(false);
   };
-
-  const scaled = getScaledDimensions();
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -297,7 +319,6 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
               <div className="space-y-3">
                 <div className="flex items-center justify-center">
                   <div 
-                    ref={containerRef}
                     className="relative rounded-lg overflow-hidden border-2 border-primary cursor-move select-none"
                     style={{ width: CONTAINER_SIZE, height: CONTAINER_SIZE }}
                     onMouseDown={handleMouseDown}
@@ -308,17 +329,7 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                   >
-                    <img
-                      src={previewUrl}
-                      alt="Preview"
-                      className="absolute pointer-events-none"
-                      style={{
-                        width: scaled.width,
-                        height: scaled.height,
-                        transform: `translate(${-position.x}px, ${-position.y}px)`,
-                      }}
-                      draggable={false}
-                    />
+                    <canvas ref={previewCanvasRef} className="absolute inset-0 pointer-events-none" />
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <Move className="h-8 w-8 text-white/50 drop-shadow-lg" />
                     </div>
@@ -355,7 +366,8 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
                     setPreviewUrl(null);
                     setImageSize({ width: 0, height: 0 });
                     setZoom(1);
-                    setPosition({ x: 0, y: 0 });
+                    setCenter({ x: 0.5, y: 0.5 });
+                    imageRef.current = null;
                   }}
                 >
                   Trocar imagem
