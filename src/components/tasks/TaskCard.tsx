@@ -1,0 +1,144 @@
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { GripVertical, Pin, Calendar, Pencil, Archive, Trash2 } from 'lucide-react';
+import { TaskWithLabels } from '@/hooks/useTasks';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+interface TaskCardProps {
+  task: TaskWithLabels;
+  onEdit: (task: TaskWithLabels) => void;
+  onArchive: (task: TaskWithLabels) => void;
+  onDelete: (task: TaskWithLabels) => void;
+  onTogglePin: (task: TaskWithLabels) => void;
+}
+
+export function TaskCard({ task, onEdit, onArchive, onDelete, onTogglePin }: TaskCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'p-3 cursor-pointer hover:border-primary/50 transition-colors group',
+        isDragging && 'opacity-50 shadow-lg',
+        task.is_pinned && 'border-primary/30 bg-primary/5'
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <button
+          {...attributes}
+          {...listeners}
+          className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
+            {task.is_pinned && (
+              <Pin className="h-3 w-3 text-primary flex-shrink-0" />
+            )}
+          </div>
+
+          {task.description && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+              {task.description}
+            </p>
+          )}
+
+          {task.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {task.labels.map((label) => (
+                <Badge
+                  key={label.id}
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0"
+                  style={{ backgroundColor: label.color + '30', color: label.color }}
+                >
+                  {label.name}
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {task.due_date && (
+            <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              {format(new Date(task.due_date), 'dd MMM', { locale: ptBR })}
+            </div>
+          )}
+
+          <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePin(task);
+              }}
+              title={task.is_pinned ? 'Desafixar' : 'Fixar'}
+            >
+              <Pin className={cn('h-3 w-3', task.is_pinned && 'fill-current')} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(task);
+              }}
+              title="Editar"
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchive(task);
+              }}
+              title="Arquivar"
+            >
+              <Archive className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive hover:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(task);
+              }}
+              title="Excluir"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
