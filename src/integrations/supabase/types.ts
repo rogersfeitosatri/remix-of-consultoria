@@ -2188,6 +2188,7 @@ export type Database = {
           day_of_week: number
           description: string | null
           due_date: string | null
+          due_time: string | null
           id: string
           is_archived: boolean
           is_pinned: boolean
@@ -2201,6 +2202,7 @@ export type Database = {
           day_of_week: number
           description?: string | null
           due_date?: string | null
+          due_time?: string | null
           id?: string
           is_archived?: boolean
           is_pinned?: boolean
@@ -2214,6 +2216,7 @@ export type Database = {
           day_of_week?: number
           description?: string | null
           due_date?: string | null
+          due_time?: string | null
           id?: string
           is_archived?: boolean
           is_pinned?: boolean

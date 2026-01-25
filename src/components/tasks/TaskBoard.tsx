@@ -171,6 +171,7 @@ export function TaskBoard() {
     description?: string;
     day_of_week: number;
     due_date?: string;
+    due_time?: string;
     label_ids: string[];
   }) => {
     if (editingTask) {
