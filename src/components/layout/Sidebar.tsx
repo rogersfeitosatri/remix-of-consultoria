@@ -1,11 +1,12 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, PersonStanding, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText, Link } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, PersonStanding, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText, Link, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/tasks', icon: CheckSquare, label: 'Tarefas' },
   { to: '/clients', icon: Users, label: 'Atletas' },
   { to: '/financial', icon: Wallet, label: 'Financeiro' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendário' },

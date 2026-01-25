@@ -39,6 +39,7 @@ const QuestionBank = lazy(() => import("./pages/QuestionBank"));
 const AppointmentDetail = lazy(() => import("./pages/AppointmentDetail"));
 const AnamneseResponseDetail = lazy(() => import("./pages/AnamneseResponseDetail"));
 const PlansLanding = lazy(() => import("./pages/PlansLanding"));
+const Tasks = lazy(() => import("./pages/Tasks"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -118,6 +119,7 @@ function AppRoutes() {
         <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
         <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
+        <Route path="/tasks" element={<ProtectedRoute adminOnly><Tasks /></ProtectedRoute>} />
         <Route path="/clients" element={<ProtectedRoute adminOnly><Clients /></ProtectedRoute>} />
         <Route path="/financial" element={<ProtectedRoute adminOnly><Financial /></ProtectedRoute>} />
         <Route path="/calendar" element={<ProtectedRoute adminOnly><CalendarPage /></ProtectedRoute>} />

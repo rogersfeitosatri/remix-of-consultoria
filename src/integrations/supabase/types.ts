@@ -2122,6 +2122,108 @@ export type Database = {
         }
         Relationships: []
       }
+      task_label_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          label_id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label_id: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label_id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_label_assignments_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "task_labels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_label_assignments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_labels: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          description: string | null
+          due_date: string | null
+          id: string
+          is_archived: boolean
+          is_pinned: boolean
+          order_index: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_archived?: boolean
+          is_pinned?: boolean
+          order_index?: number
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_archived?: boolean
+          is_pinned?: boolean
+          order_index?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
