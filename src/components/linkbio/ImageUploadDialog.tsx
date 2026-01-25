@@ -34,23 +34,25 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
       return { width: CONTAINER_SIZE, height: CONTAINER_SIZE };
     }
 
-    // Scale image to fit container (cover behavior) then apply zoom
+    // Scale image to cover container (smallest dimension fits container)
+    // Then apply zoom on top of that
     const aspectRatio = imageSize.width / imageSize.height;
     let baseWidth, baseHeight;
 
     if (aspectRatio > 1) {
-      // Landscape: height fits container, width extends
+      // Landscape image: height fits container exactly, width extends beyond
       baseHeight = CONTAINER_SIZE;
       baseWidth = CONTAINER_SIZE * aspectRatio;
     } else {
-      // Portrait: width fits container, height extends
+      // Portrait image: width fits container exactly, height extends beyond
       baseWidth = CONTAINER_SIZE;
       baseHeight = CONTAINER_SIZE / aspectRatio;
     }
 
+    // Apply zoom proportionally to both dimensions
     return {
-      width: baseWidth * zoom,
-      height: baseHeight * zoom,
+      width: Math.round(baseWidth * zoom),
+      height: Math.round(baseHeight * zoom),
     };
   }, [imageSize, zoom]);
 
