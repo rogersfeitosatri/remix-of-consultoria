@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -14,15 +14,68 @@ interface ImageUploadDialogProps {
   currentImageUrl?: string;
 }
 
+const CONTAINER_SIZE = 192; // Size of the preview container
+const OUTPUT_SIZE = 400; // Size of the output image
+
 export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, currentImageUrl }: ImageUploadDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(1);
-  const [position, setPosition] = useState({ x: 50, y: 50 });
+  const [position, setPosition] = useState({ x: 0, y: 0 }); // Position in pixels
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
+
+  // Calculate the scaled image dimensions
+  const getScaledDimensions = useCallback(() => {
+    if (imageSize.width === 0 || imageSize.height === 0) {
+      return { width: CONTAINER_SIZE, height: CONTAINER_SIZE };
+    }
+
+    // Scale image to fit container (cover behavior) then apply zoom
+    const aspectRatio = imageSize.width / imageSize.height;
+    let baseWidth, baseHeight;
+
+    if (aspectRatio > 1) {
+      // Landscape: height fits container, width extends
+      baseHeight = CONTAINER_SIZE;
+      baseWidth = CONTAINER_SIZE * aspectRatio;
+    } else {
+      // Portrait: width fits container, height extends
+      baseWidth = CONTAINER_SIZE;
+      baseHeight = CONTAINER_SIZE / aspectRatio;
+    }
+
+    return {
+      width: baseWidth * zoom,
+      height: baseHeight * zoom,
+    };
+  }, [imageSize, zoom]);
+
+  // Calculate max position bounds
+  const getPositionBounds = useCallback(() => {
+    const scaled = getScaledDimensions();
+    return {
+      maxX: Math.max(0, scaled.width - CONTAINER_SIZE),
+      maxY: Math.max(0, scaled.height - CONTAINER_SIZE),
+    };
+  }, [getScaledDimensions]);
+
+  // Clamp position within bounds
+  const clampPosition = useCallback((x: number, y: number) => {
+    const bounds = getPositionBounds();
+    return {
+      x: Math.max(0, Math.min(bounds.maxX, x)),
+      y: Math.max(0, Math.min(bounds.maxY, y)),
+    };
+  }, [getPositionBounds]);
+
+  // Reset position when zoom changes to keep it in bounds
+  useEffect(() => {
+    setPosition(prev => clampPosition(prev.x, prev.y));
+  }, [zoom, clampPosition]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,7 +88,14 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
       const url = URL.createObjectURL(file);
       setPreviewUrl(url);
       setZoom(1);
-      setPosition({ x: 50, y: 50 });
+      setPosition({ x: 0, y: 0 });
+
+      // Get image dimensions
+      const img = new Image();
+      img.onload = () => {
+        setImageSize({ width: img.width, height: img.height });
+      };
+      img.src = url;
     }
   };
 
@@ -56,25 +116,57 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
     const deltaX = e.clientX - dragStartRef.current.x;
     const deltaY = e.clientY - dragStartRef.current.y;
     
-    const sensitivity = 0.3 / zoom;
+    // Invert delta because dragging right should move the crop area left (show more of right side)
+    const newPos = clampPosition(
+      dragStartRef.current.posX - deltaX,
+      dragStartRef.current.posY - deltaY
+    );
     
-    setPosition({
-      x: Math.max(0, Math.min(100, dragStartRef.current.posX - deltaX * sensitivity)),
-      y: Math.max(0, Math.min(100, dragStartRef.current.posY - deltaY * sensitivity)),
-    });
-  }, [isDragging, zoom]);
+    setPosition(newPos);
+  }, [isDragging, clampPosition]);
 
   const handleMouseUp = () => {
     setIsDragging(false);
   };
 
+  // Touch support
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      posX: position.x,
+      posY: position.y,
+    };
+  };
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const touch = e.touches[0];
+    
+    const deltaX = touch.clientX - dragStartRef.current.x;
+    const deltaY = touch.clientY - dragStartRef.current.y;
+    
+    const newPos = clampPosition(
+      dragStartRef.current.posX - deltaX,
+      dragStartRef.current.posY - deltaY
+    );
+    
+    setPosition(newPos);
+  }, [isDragging, clampPosition]);
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !previewUrl) return;
 
     setIsUploading(true);
     
     try {
-      // Create canvas to crop image
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Could not get canvas context');
@@ -85,32 +177,36 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
       await new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
-        img.src = previewUrl!;
+        img.src = previewUrl;
       });
 
-      // Output size (square)
-      const outputSize = 400;
-      canvas.width = outputSize;
-      canvas.height = outputSize;
+      canvas.width = OUTPUT_SIZE;
+      canvas.height = OUTPUT_SIZE;
 
-      // Calculate crop dimensions
-      const scaledWidth = img.width * zoom;
-      const scaledHeight = img.height * zoom;
+      // Calculate the source rectangle from the original image
+      const scaled = getScaledDimensions();
       
-      const cropX = (position.x / 100) * (scaledWidth - outputSize);
-      const cropY = (position.y / 100) * (scaledHeight - outputSize);
+      // Scale factor from original image to scaled display
+      const scaleFactorX = img.width / scaled.width;
+      const scaleFactorY = img.height / scaled.height;
 
-      // Draw cropped image
+      // Source coordinates in original image pixels
+      const sourceX = position.x * scaleFactorX;
+      const sourceY = position.y * scaleFactorY;
+      const sourceWidth = CONTAINER_SIZE * scaleFactorX;
+      const sourceHeight = CONTAINER_SIZE * scaleFactorY;
+
+      // Draw the cropped portion to the canvas
       ctx.drawImage(
         img,
-        cropX / zoom,
-        cropY / zoom,
-        outputSize / zoom,
-        outputSize / zoom,
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
         0,
         0,
-        outputSize,
-        outputSize
+        OUTPUT_SIZE,
+        OUTPUT_SIZE
       );
 
       // Convert to blob
@@ -140,10 +236,7 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
       toast.success('Imagem carregada com sucesso!');
       
       // Reset state
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      setZoom(1);
-      setPosition({ x: 50, y: 50 });
+      resetState();
     } catch (error: any) {
       console.error('Upload error:', error);
       toast.error('Erro ao fazer upload da imagem');
@@ -152,16 +245,23 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
     }
   };
 
-  const handleClose = () => {
+  const resetState = () => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
     setSelectedFile(null);
     setPreviewUrl(null);
+    setImageSize({ width: 0, height: 0 });
     setZoom(1);
-    setPosition({ x: 50, y: 50 });
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const handleClose = () => {
+    resetState();
     onOpenChange(false);
   };
+
+  const scaled = getScaledDimensions();
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -196,19 +296,24 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
                 <div className="flex items-center justify-center">
                   <div 
                     ref={containerRef}
-                    className="relative w-48 h-48 rounded-lg overflow-hidden border-2 border-primary cursor-move"
+                    className="relative rounded-lg overflow-hidden border-2 border-primary cursor-move select-none"
+                    style={{ width: CONTAINER_SIZE, height: CONTAINER_SIZE }}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                   >
                     <img
                       src={previewUrl}
                       alt="Preview"
-                      className="absolute w-full h-full object-cover pointer-events-none"
+                      className="absolute pointer-events-none"
                       style={{
-                        transform: `scale(${zoom})`,
-                        transformOrigin: `${position.x}% ${position.y}%`,
+                        width: scaled.width,
+                        height: scaled.height,
+                        transform: `translate(${-position.x}px, ${-position.y}px)`,
                       }}
                       draggable={false}
                     />
@@ -233,7 +338,7 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
                   onValueChange={([value]) => setZoom(value)}
                   min={1}
                   max={3}
-                  step={0.1}
+                  step={0.05}
                   className="w-full"
                 />
               </div>
@@ -246,8 +351,9 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
                     if (previewUrl) URL.revokeObjectURL(previewUrl);
                     setSelectedFile(null);
                     setPreviewUrl(null);
+                    setImageSize({ width: 0, height: 0 });
                     setZoom(1);
-                    setPosition({ x: 50, y: 50 });
+                    setPosition({ x: 0, y: 0 });
                   }}
                 >
                   Trocar imagem
