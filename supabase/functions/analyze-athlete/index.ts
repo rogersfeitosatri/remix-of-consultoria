@@ -34,7 +34,19 @@ Deno.serve(async (req) => {
 
     console.log('Analyzing athlete for client:', clientId);
 
-    // Fetch athlete profile
+    // Fetch client data first (required)
+    const { data: client, error: clientError } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', clientId)
+      .single();
+
+    if (clientError || !client) {
+      console.error('Error fetching client:', clientError);
+      throw new Error('Failed to fetch client data');
+    }
+
+    // Fetch athlete profile (optional - some athletes only have anamnese)
     const { data: profile, error: profileError } = await supabase
       .from('athlete_profiles')
       .select('*')
@@ -42,27 +54,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (profileError) {
-      console.error('Error fetching profile:', profileError);
-      throw new Error('Failed to fetch athlete profile');
+      console.error('Error fetching profile (non-critical):', profileError);
     }
 
-    if (!profile) {
-      throw new Error('Athlete profile not found');
-    }
-
-    // Fetch client data
-    const { data: client, error: clientError } = await supabase
-      .from('clients')
-      .select('*')
-      .eq('id', clientId)
-      .single();
-
-    if (clientError) {
-      console.error('Error fetching client:', clientError);
-      throw new Error('Failed to fetch client data');
-    }
-
-    // Fetch anamnese responses (dynamic form)
+    // Fetch anamnese responses (dynamic form) - this is the main source of data
     const { data: anamneseResponses, error: anamneseError } = await supabase
       .from('anamnese_responses')
       .select(`
@@ -81,6 +76,11 @@ Deno.serve(async (req) => {
       console.error('Error fetching anamnese:', anamneseError);
     }
 
+    // Must have either profile or anamnese responses
+    if (!profile && !anamneseResponses) {
+      throw new Error('Nenhum dado encontrado para análise. O atleta precisa ter preenchido a anamnese ou ter um perfil cadastrado.');
+    }
+
     // Fetch anamnese questions if we have responses
     let anamneseQuestions: any[] = [];
     if (anamneseResponses?.form_id) {
@@ -93,7 +93,8 @@ Deno.serve(async (req) => {
       anamneseQuestions = questions || [];
     }
 
-    console.log('Profile fetched successfully for:', profile.full_name);
+    console.log('Client:', client.name);
+    console.log('Profile found:', !!profile);
     console.log('Anamnese responses found:', !!anamneseResponses);
 
     // Build the prompt for ChatGPT
@@ -167,7 +168,7 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`
 
     const analysisRecord = {
       client_id: clientId,
-      athlete_profile_id: profile.id,
+      athlete_profile_id: profile?.id || null,
       diagnosis: analysisData.diagnosis,
       energy_expenditure: analysisData.energy_expenditure,
       caloric_deficit: analysisData.caloric_deficit,
@@ -270,6 +271,28 @@ function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, 
     for (const [section, answers] of Object.entries(groupedBySection)) {
       anamneseSection += `\n**${section}**\n${answers.join('\n')}\n`;
     }
+  }
+
+  // If no profile exists, use only anamnese data
+  if (!profile) {
+    return `
+## DADOS DO ATLETA CORREDOR
+### Dados Pessoais
+- Nome: ${client.name}
+- Email: ${client.email || 'Não informado'}
+- Telefone: ${client.phone || 'Não informado'}
+
+${anamneseSection}
+
+Por favor, analise esses dados da anamnese e forneça:
+1. Diagnóstico completo da situação atual do atleta (pontos de atenção, objetivos, possíveis riscos ou limitações)
+2. Estimativa de gasto energético (TMB, GET, gasto com treinos) - use valores estimados baseados nas informações disponíveis
+3. Déficit calórico adequado para corredor (considerando performance e recuperação)
+4. Sugestão de macronutrientes em g/kg de peso corporal
+5. Alertas importantes e recomendações específicas
+
+IMPORTANTE: Se alguma informação essencial (peso, altura, idade) não estiver disponível nas respostas, use valores médios para estimativas mas sinalize claramente nos alertas que são estimativas.
+`;
   }
 
   return `
