@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Copy, FileText, Brain, CheckCircle, User, Mail, Calendar } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, Copy, FileText, Brain, CheckCircle, User, Mail, Calendar, RefreshCw } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,6 +25,7 @@ interface AnamneseQuestion {
 export default function AnamneseResponseDetail() {
   const { responseId } = useParams<{ responseId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('respostas');
 
   // Fetch the anamnese response with all related data
@@ -61,7 +62,42 @@ export default function AnamneseResponseDetail() {
     enabled: !!responseId,
   });
 
-  // Fetch questions for this form
+  // Fetch AI analysis from ai_analyses table
+  const { data: aiAnalysisFromTable, isLoading: loadingAiAnalysis } = useQuery({
+    queryKey: ['ai_analysis', responseData?.client_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('ai_analyses')
+        .select('*')
+        .eq('client_id', responseData?.client_id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!responseData?.client_id,
+  });
+
+  // Mutation to trigger AI analysis
+  const analyzeAthleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!responseData?.client_id) throw new Error('Client ID not found');
+      const { data, error } = await supabase.functions.invoke('analyze-athlete', {
+        body: { clientId: responseData.client_id },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Análise IA gerada com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['ai_analysis', responseData?.client_id] });
+      queryClient.invalidateQueries({ queryKey: ['anamnese_response_detail', responseId] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erro ao gerar análise');
+    },
+  });
+
   const { data: questions = [] } = useQuery({
     queryKey: ['anamnese_questions', responseData?.form_id],
     queryFn: async () => {
@@ -203,7 +239,8 @@ export default function AnamneseResponseDetail() {
 
   const client = responseData.clients as any;
   const form = responseData.anamnese_forms as any;
-  const aiAnalysis = responseData.ai_analysis as any;
+  // Use AI analysis from dedicated table (priority) or from response field
+  const aiAnalysis = aiAnalysisFromTable || (responseData.ai_analysis as any);
 
   return (
     <Layout>
@@ -268,10 +305,10 @@ export default function AnamneseResponseDetail() {
               <FileText className="h-4 w-4" />
               Respostas do Atleta
             </TabsTrigger>
-            <TabsTrigger value="ia" className="gap-2" disabled={!aiAnalysis}>
+            <TabsTrigger value="ia" className="gap-2">
               <Brain className="h-4 w-4" />
               Análise da IA
-              {!aiAnalysis && <span className="text-xs ml-1">(indisponível)</span>}
+              {!aiAnalysis && !loadingAiAnalysis && <span className="text-xs ml-1">(gerar)</span>}
             </TabsTrigger>
           </TabsList>
 
@@ -336,18 +373,41 @@ export default function AnamneseResponseDetail() {
             {aiAnalysis ? (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Brain className="h-5 w-5 text-blue-500" />
-                    Análise da Inteligência Artificial
-                  </CardTitle>
-                  <CardDescription>
-                    Análise gerada automaticamente baseada nas respostas do atleta
-                    {responseData.ai_analyzed_at && (
-                      <span className="block mt-1">
-                        Analisada em {format(parseISO(responseData.ai_analyzed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                      </span>
-                    )}
-                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Brain className="h-5 w-5 text-blue-500" />
+                        Análise da Inteligência Artificial
+                      </CardTitle>
+                      <CardDescription>
+                        Análise gerada automaticamente baseada nas respostas do atleta
+                        {aiAnalysis.updated_at && (
+                          <span className="block mt-1">
+                            Analisada em {format(parseISO(aiAnalysis.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          </span>
+                        )}
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => analyzeAthleteMutation.mutate()}
+                      disabled={analyzeAthleteMutation.isPending}
+                      className="gap-2"
+                    >
+                      {analyzeAthleteMutation.isPending ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Analisando...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4" />
+                          Reanalisar
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[500px] pr-4">
@@ -414,17 +474,27 @@ export default function AnamneseResponseDetail() {
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Brain className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Análise não disponível</h3>
-                  <p className="text-muted-foreground text-center">
+                  <p className="text-muted-foreground text-center mb-4">
                     Esta anamnese ainda não foi analisada pela IA.
                     <br />
-                    Acesse a análise do atleta para gerar a análise.
+                    Clique no botão abaixo para gerar a análise automaticamente.
                   </p>
                   <Button 
-                    variant="outline" 
-                    className="mt-4"
-                    onClick={() => navigate(`/clients/${responseData.client_id}/analysis`)}
+                    onClick={() => analyzeAthleteMutation.mutate()}
+                    disabled={analyzeAthleteMutation.isPending}
+                    className="gap-2"
                   >
-                    Ir para Análise do Atleta
+                    {analyzeAthleteMutation.isPending ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Analisando...
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="h-4 w-4" />
+                        Gerar Análise com IA
+                      </>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
