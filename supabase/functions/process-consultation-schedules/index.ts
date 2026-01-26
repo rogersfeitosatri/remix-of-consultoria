@@ -126,14 +126,7 @@ Deno.serve(async (req) => {
         client_id,
         user_id,
         send_link_date,
-        status,
-        clients (
-          id,
-          name,
-          phone,
-          email,
-          user_id
-        )
+        status
       `)
       .eq('send_link_date', todayStr)
       .in('status', ['pending', 'link_sent'])
@@ -163,11 +156,15 @@ Deno.serve(async (req) => {
     const results: { scheduleId: string; clientName: string; status: string; error?: string }[] = [];
 
     for (const schedule of schedulesToProcess) {
-      const clientsArray = schedule.clients as unknown as { id: string; name: string; phone: string; email: string; user_id: string }[] | null;
-      const clientData = clientsArray && clientsArray.length > 0 ? clientsArray[0] : null;
+      // Fetch client data separately
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('id, name, phone, email, user_id')
+        .eq('id', schedule.client_id)
+        .maybeSingle();
       
-      if (!clientData) {
-        console.log(`No client data for schedule ${schedule.id}`);
+      if (clientError || !clientData) {
+        console.log(`No client data for schedule ${schedule.id}:`, clientError);
         results.push({ scheduleId: schedule.id, clientName: 'Unknown', status: 'failed', error: 'No client data' });
         continue;
       }
