@@ -1,7 +1,7 @@
 import { Client } from '@/hooks/useClients';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Edit2, Trash2, Phone, Mail, Calendar, DollarSign, Brain, History, Zap, MessageCircle, CalendarCheck, Key, Lock } from 'lucide-react';
+import { Phone, Mail, Calendar, DollarSign, Zap, MessageCircle, CalendarCheck, Key, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -235,9 +235,10 @@ Qualquer dúvida, estou à disposição! 💪`;
           <div
             key={client.id}
             className={cn(
-              'glass-card rounded-xl p-5 transition-all hover:shadow-lg',
+              'glass-card rounded-xl p-5 transition-all hover:shadow-lg cursor-pointer hover:border-primary/50',
               !client.is_active && 'opacity-60'
             )}
+            onClick={() => navigate(`/clients/${client.id}`)}
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               {/* Client Info */}
@@ -317,14 +318,17 @@ Qualquer dúvida, estou à disposição! 💪`;
                   </p>
                 </div>
 
-                {/* Actions */}
-                <div className="flex flex-wrap gap-2">
+                {/* Actions - Apenas ações rápidas, o resto está na página de detalhe */}
+                <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                   {client.phone && (
                     <>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleSendCheckinManually(client)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSendCheckinManually(client);
+                        }}
                         disabled={sendingCheckin === client.id}
                         className="gap-1 text-xs text-primary hover:text-primary"
                         title="Enviar Check-in via WhatsApp"
@@ -335,7 +339,10 @@ Qualquer dúvida, estou à disposição! 💪`;
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleSendBookingManually(client)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSendBookingManually(client);
+                        }}
                         disabled={sendingBooking === client.id}
                         className="gap-1 text-xs text-primary hover:text-primary"
                         title="Enviar Link de Consulta via WhatsApp"
@@ -348,7 +355,10 @@ Qualquer dúvida, estou à disposição! 💪`;
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleSendCredentialsManually(client)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSendCredentialsManually(client);
+                            }}
                             disabled={sendingCredentials === client.id}
                             className="gap-1 text-xs text-primary hover:text-primary"
                             title="Enviar Credenciais de Acesso via WhatsApp"
@@ -359,7 +369,10 @@ Qualquer dúvida, estou à disposição! 💪`;
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setPasswordDialogClient(client)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPasswordDialogClient(client);
+                            }}
                             className="gap-1 text-xs text-orange-600 hover:text-orange-700"
                             title="Alterar Senha do Atleta"
                           >
@@ -370,40 +383,6 @@ Qualquer dúvida, estou à disposição! 💪`;
                       )}
                     </>
                   )}
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => navigate(`/clients/${client.id}/history`)}
-                    className="h-9 w-9 text-primary hover:text-primary"
-                    title="Histórico de Check-ins"
-                  >
-                    <History className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => navigate(`/clients/${client.id}/analysis`)}
-                    className="h-9 w-9 text-primary hover:text-primary"
-                    title="Análise IA"
-                  >
-                    <Brain className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => onEdit(client)}
-                    className="h-9 w-9 text-primary hover:text-primary"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => onDelete(client.id)}
-                    className="h-9 w-9 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
             </div>
