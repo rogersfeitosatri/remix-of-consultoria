@@ -28,7 +28,7 @@ export default function PlansLanding() {
     'Plano alimentar pra fase atual do ciclo de treino',
     'Plano suplementar com estratégias de pré, intra e pós-treino adaptados à rotina do corredor',
     'Suporte longão via Zona Nutri (sistema de ajuste estratégico de géis + pré, intra e pós)',
-    'Avaliação SEMANAL via formulário para coleta de sensações com o plano',
+    'Avaliação QUINZENAL via formulário para coleta de sensações com o plano para serem discutidas nas consultas',
     'Ajustes ilimitados no plano (basta solicitar)',
     'Dúvidas no WhatsApp diretamente com o Nutri',
   ];
