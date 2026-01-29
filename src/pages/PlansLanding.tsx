@@ -234,7 +234,7 @@ export default function PlansLanding() {
                 <h3 className="text-2xl md:text-3xl font-bold text-black">Plano Consultas</h3>
               </div>
               <p className="text-gray-600 mb-8">
-                Acompanhamento completo com consulta mensal, ajustes semanais e suporte intensivo.
+                Acompanhamento completo com consultas periódicas, ajustes semanais e suporte intensivo.
               </p>
               <ul className="space-y-4 mb-10">
                 {consultasFeatures.map((feature, index) => (
