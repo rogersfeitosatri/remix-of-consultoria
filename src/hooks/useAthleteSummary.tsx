@@ -338,6 +338,38 @@ export function useConsultationStats(clientId: string | undefined) {
   });
 }
 
+// Helper para extrair objetivo das respostas da anamnese
+function extractGoalFromResponses(responses: Record<string, any> | null): string | null {
+  if (!responses) return null;
+  
+  // Palavras-chave comuns em perguntas sobre objetivo
+  const goalKeywords = ['objetivo', 'meta', 'goal', 'melhora', 'performance', 'perda', 'ganho'];
+  
+  for (const [questionId, response] of Object.entries(responses)) {
+    if (response && typeof response === 'object' && 'answer' in response) {
+      const answer = response.answer;
+      
+      // Se a resposta for um array (múltipla escolha com objetivos)
+      if (Array.isArray(answer) && answer.length > 0) {
+        const answerStr = answer.join(', ');
+        // Verificar se parece ser um objetivo
+        if (goalKeywords.some(keyword => answerStr.toLowerCase().includes(keyword))) {
+          return answerStr;
+        }
+      }
+      
+      // Se for string e mencionar objetivos
+      if (typeof answer === 'string' && answer.length > 10) {
+        if (goalKeywords.some(keyword => answer.toLowerCase().includes(keyword))) {
+          return answer;
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
 // Hook para dados da anamnese
 export function useAnamneseData(clientId: string | undefined) {
   return useQuery({
@@ -354,10 +386,10 @@ export function useAnamneseData(clientId: string | undefined) {
       
       if (profileError) throw profileError;
       
-      // Buscar última resposta de anamnese
+      // Buscar última resposta de anamnese com as respostas completas
       const { data: anamneseResponse, error: responseError } = await supabase
         .from('anamnese_responses')
-        .select('submitted_at')
+        .select('submitted_at, responses')
         .eq('client_id', clientId)
         .order('submitted_at', { ascending: false })
         .limit(1)
@@ -365,10 +397,16 @@ export function useAnamneseData(clientId: string | undefined) {
       
       if (responseError) throw responseError;
       
+      // Tentar extrair objetivo das respostas se não existir no perfil
+      let mainGoal = profile?.main_goal || null;
+      if (!mainGoal && anamneseResponse?.responses) {
+        mainGoal = extractGoalFromResponses(anamneseResponse.responses as Record<string, any>);
+      }
+      
       return {
         hasAnamnese: !!profile?.anamnese_submitted_at || !!anamneseResponse,
         submittedAt: profile?.anamnese_submitted_at || anamneseResponse?.submitted_at || null,
-        mainGoal: profile?.main_goal || null,
+        mainGoal,
         secondaryGoal: profile?.secondary_goal || null,
       };
     },

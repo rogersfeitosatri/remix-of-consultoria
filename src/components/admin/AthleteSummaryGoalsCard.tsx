@@ -141,8 +141,11 @@ export function AthleteSummaryGoalsCard({
           <div className="p-3 rounded-lg bg-muted/50">
             <p className="text-xs text-muted-foreground mb-1">Objetivo Principal</p>
             <p className="text-sm font-medium">
-              {anamneseData?.mainGoal || 'Não informado'}
+              {anamneseData?.mainGoal || (anamneseData?.hasAnamnese ? 'Não identificado na anamnese' : '')}
             </p>
+            {!anamneseData?.mainGoal && !anamneseData?.hasAnamnese && (
+              <p className="text-sm text-muted-foreground italic">Sem anamnese preenchida</p>
+            )}
           </div>
           
           {anamneseData?.secondaryGoal && (
