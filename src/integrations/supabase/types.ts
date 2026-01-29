@@ -322,6 +322,56 @@ export type Database = {
           },
         ]
       }
+      athlete_attachments: {
+        Row: {
+          client_id: string
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          notes: string | null
+          type_tag: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          notes?: string | null
+          type_tag?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          notes?: string | null
+          type_tag?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_attachments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_challenge_progress: {
         Row: {
           client_id: string
@@ -576,6 +626,44 @@ export type Database = {
             foreignKeyName: "athlete_profiles_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      athlete_summary_audit_logs: {
+        Row: {
+          admin_id: string
+          client_id: string
+          created_at: string
+          field_changed: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+        }
+        Insert: {
+          admin_id: string
+          client_id: string
+          created_at?: string
+          field_changed: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+        }
+        Update: {
+          admin_id?: string
+          client_id?: string
+          created_at?: string
+          field_changed?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_summary_audit_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
@@ -1075,6 +1163,10 @@ export type Database = {
       }
       clients: {
         Row: {
+          admin_attention_points: string | null
+          admin_next_focus: string | null
+          admin_notes_short: string | null
+          admin_summary: string | null
           athlete_status: string | null
           athlete_user_id: string | null
           checkin_frequency: string | null
@@ -1110,6 +1202,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          admin_attention_points?: string | null
+          admin_next_focus?: string | null
+          admin_notes_short?: string | null
+          admin_summary?: string | null
           athlete_status?: string | null
           athlete_user_id?: string | null
           checkin_frequency?: string | null
@@ -1145,6 +1241,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          admin_attention_points?: string | null
+          admin_next_focus?: string | null
+          admin_notes_short?: string | null
+          admin_summary?: string | null
           athlete_status?: string | null
           athlete_user_id?: string | null
           checkin_frequency?: string | null
