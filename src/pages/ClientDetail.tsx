@@ -270,7 +270,7 @@ export default function ClientDetail() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold">{client.name}</h1>
+                  <h1 className="text-2xl font-bold text-foreground">{client.name}</h1>
                   <Badge variant={client.is_active ? 'default' : 'secondary'}>
                     {client.is_active ? 'Ativo' : 'Inativo'}
                   </Badge>
@@ -314,7 +314,7 @@ export default function ClientDetail() {
                   size="sm"
                   onClick={handleSendCheckin}
                   disabled={sendingCheckin}
-                  className="gap-1"
+                  className="gap-1 text-foreground"
                 >
                   <MessageCircle className="h-4 w-4" />
                   {sendingCheckin ? '...' : 'Enviar Check-in'}
@@ -324,7 +324,7 @@ export default function ClientDetail() {
                   size="sm"
                   onClick={handleSendBooking}
                   disabled={sendingBooking}
-                  className="gap-1"
+                  className="gap-1 text-foreground"
                 >
                   <CalendarCheck className="h-4 w-4" />
                   {sendingBooking ? '...' : 'Enviar Consulta'}
@@ -336,7 +336,7 @@ export default function ClientDetail() {
                       size="sm"
                       onClick={handleSendCredentials}
                       disabled={sendingCredentials}
-                      className="gap-1"
+                      className="gap-1 text-foreground"
                     >
                       <Key className="h-4 w-4" />
                       {sendingCredentials ? '...' : 'Enviar Senha'}
@@ -345,7 +345,7 @@ export default function ClientDetail() {
                       variant="outline"
                       size="sm"
                       onClick={() => setShowPasswordDialog(true)}
-                      className="gap-1"
+                      className="gap-1 text-foreground"
                     >
                       <Lock className="h-4 w-4" />
                       Alterar Senha
@@ -358,7 +358,7 @@ export default function ClientDetail() {
               variant="outline"
               size="sm"
               onClick={() => navigate(`/clients/${client.id}/analysis`)}
-              className="gap-1"
+              className="gap-1 text-foreground"
             >
               <Brain className="h-4 w-4" />
               Análise IA
@@ -367,7 +367,7 @@ export default function ClientDetail() {
               variant="outline"
               size="sm"
               onClick={() => setShowEditForm(true)}
-              className="gap-1"
+              className="gap-1 text-foreground"
             >
               <Edit2 className="h-4 w-4" />
               Editar
