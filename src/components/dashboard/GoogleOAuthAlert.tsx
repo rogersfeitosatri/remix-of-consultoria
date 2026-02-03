@@ -21,7 +21,28 @@ export function GoogleOAuthAlert() {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      // Check for recent appointments without Meet link
+      const isExpired = oauthConnection?.token_expires_at && 
+        new Date(oauthConnection.token_expires_at) < new Date();
+      
+      const hasNoOAuth = !oauthConnection?.access_token && !oauthConnection?.refresh_token;
+
+      // If OAuth is properly connected and not expired, no need to show alert
+      const isValidConnection = oauthConnection?.access_token && 
+        oauthConnection?.refresh_token &&
+        !isExpired;
+      
+      // Only check for failed meets if there's an OAuth issue
+      if (isValidConnection) {
+        return {
+          isConnected: true,
+          isExpired: false,
+          hasNoOAuth: false,
+          failedMeets: [],
+          needsAttention: false,
+        };
+      }
+
+      // Check for recent appointments without Meet link only if OAuth has issues
       const { data: failedMeets } = await supabase
         .from('appointments')
         .select('id, client:clients(name), appointment_date')
@@ -32,14 +53,9 @@ export function GoogleOAuthAlert() {
         .order('appointment_date', { ascending: true })
         .limit(5);
 
-      const isExpired = oauthConnection?.token_expires_at && 
-        new Date(oauthConnection.token_expires_at) < new Date();
-
-      const hasNoOAuth = !oauthConnection?.access_token && !oauthConnection?.refresh_token;
-
       return {
         isConnected: !!oauthConnection?.access_token,
-        isExpired,
+        isExpired: !!isExpired,
         hasNoOAuth,
         failedMeets: failedMeets || [],
         needsAttention: isExpired || hasNoOAuth || (failedMeets && failedMeets.length > 0),

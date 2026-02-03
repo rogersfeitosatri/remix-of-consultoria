@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { PhoneInput } from '@/components/ui/phone-input';
+import { Badge } from '@/components/ui/badge';
 import { X, AlertCircle, Calculator, Calendar, RefreshCw } from 'lucide-react';
 import { addMonths, addWeeks, parseISO, format, nextMonday, isSameMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -16,6 +17,11 @@ interface CalculatedWindow {
   windowStart: Date;
   windowEnd: Date;
   sendLinkAt: Date;
+  isCustom?: boolean; // Flag to indicate if this was manually edited
+}
+
+interface CustomScheduleDates {
+  [consultationIndex: number]: string; // consultationIndex -> custom send_link_date (YYYY-MM-DD)
 }
 
 const SERVICE_LABELS = {
@@ -110,6 +116,9 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
 
   // Manual override toggle for remaining consultations
   const [manualOverride, setManualOverride] = useState(false);
+  
+  // Custom schedule dates for continuation mode
+  const [customScheduleDates, setCustomScheduleDates] = useState<CustomScheduleDates>({});
 
   // Calculate consultation_interval_weeks from consultation_frequency
   const getConsultationIntervalWeeks = () => {
@@ -345,6 +354,20 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     // Se pular anamnese, definir status como ativo
     const athleteStatus = skipAnamnese ? 'active' : formData.athlete_status;
     
+    // Build custom schedule dates for continuation mode
+    // This array will be used to override the auto-calculated dates
+    const customSchedules = formData.onboarding_type === 'continuation' && Object.keys(customScheduleDates).length > 0
+      ? calculatedWindows.map((window, index) => {
+          const consultationNumber = (formData.last_consultation_index || 1) + index + 1;
+          const customDate = customScheduleDates[consultationNumber];
+          return {
+            consultationNumber,
+            sendLinkDate: customDate || format(window.sendLinkAt, 'yyyy-MM-dd'),
+            isCustom: !!customDate,
+          };
+        })
+      : null;
+    
     // Convert empty date strings to null for database compatibility
     const dataToSubmit = {
       ...formData,
@@ -355,6 +378,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       last_consultation_at: formData.last_consultation_at || null,
       remaining_consultations: formData.onboarding_type === 'continuation' ? formData.remaining_consultations : null,
       last_consultation_index: formData.onboarding_type === 'continuation' ? formData.last_consultation_index : null,
+      // Pass custom schedule dates if any
+      custom_schedule_dates: customSchedules,
     };
     onSubmit(dataToSubmit as any, { sendCredentials, skipAnamnese });
   };
@@ -651,27 +676,71 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                                     Atenção: apenas {calculatedWindows.length} consulta(s) cabem no período restante (limite de 3 semanas antes do fim do plano)
                                   </p>
                                 )}
-                                <div className="max-h-40 overflow-y-auto space-y-1">
+                                <div className="max-h-48 overflow-y-auto space-y-2">
                                   {calculatedWindows.map((window, index) => {
                                     const consultationNumber = (formData.last_consultation_index || 1) + index + 1;
+                                    const customDate = customScheduleDates[consultationNumber];
+                                    const displayDate = customDate ? parseISO(customDate) : window.sendLinkAt;
+                                    const isEdited = !!customDate;
+                                    
                                     return (
                                       <div 
                                         key={index}
-                                        className="flex items-center justify-between text-sm p-2 rounded bg-background/50"
+                                        className={`flex flex-col sm:flex-row sm:items-center justify-between text-sm p-2 rounded gap-2 ${isEdited ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-background/50'}`}
                                       >
                                         <div className="flex items-center gap-2">
-                                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                                          <Calendar className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                                           <span className="font-medium">
-                                            Consulta {consultationNumber}: {formatWeekRange(window.windowStart, window.windowEnd)}
+                                            Consulta {consultationNumber}
                                           </span>
+                                          {isEdited && (
+                                            <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/30">
+                                              Editado
+                                            </Badge>
+                                          )}
                                         </div>
-                                        <span className="text-xs text-muted-foreground">
-                                          Link: {format(window.sendLinkAt, "dd/MM 'às' 07:00", { locale: ptBR })}
-                                        </span>
+                                        <div className="flex items-center gap-2 ml-5 sm:ml-0">
+                                          <Label className="text-xs text-muted-foreground whitespace-nowrap">Envio:</Label>
+                                          <Input
+                                            type="date"
+                                            className="h-7 text-xs w-32"
+                                            value={customDate || format(window.sendLinkAt, 'yyyy-MM-dd')}
+                                            onChange={(e) => {
+                                              const newDates = { ...customScheduleDates };
+                                              if (e.target.value && e.target.value !== format(window.sendLinkAt, 'yyyy-MM-dd')) {
+                                                newDates[consultationNumber] = e.target.value;
+                                              } else {
+                                                delete newDates[consultationNumber];
+                                              }
+                                              setCustomScheduleDates(newDates);
+                                            }}
+                                          />
+                                          {isEdited && (
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-7 w-7 p-0"
+                                              onClick={() => {
+                                                const newDates = { ...customScheduleDates };
+                                                delete newDates[consultationNumber];
+                                                setCustomScheduleDates(newDates);
+                                              }}
+                                            >
+                                              <RefreshCw className="h-3 w-3" />
+                                            </Button>
+                                          )}
+                                        </div>
                                       </div>
                                     );
                                   })}
                                 </div>
+                                {Object.keys(customScheduleDates).length > 0 && (
+                                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" />
+                                    {Object.keys(customScheduleDates).length} data(s) editada(s) manualmente
+                                  </p>
+                                )}
                               </div>
                             </div>
                           )}
