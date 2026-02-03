@@ -78,10 +78,28 @@ export default function AthleteHistory() {
   const isLoading = loadingScheduled || loadingResponses;
   const today = startOfDay(new Date());
 
-  // Categorize scheduled checkins
-  const pastScheduled = scheduledCheckins.filter(s => 
-    isBefore(parseISO(s.scheduled_send_date), today) && s.status !== 'completed'
+  // Get all responded checkin dates to filter out from pending
+  const respondedDates = new Set(
+    checkinResponses.map(r => format(parseISO(r.submitted_at), 'yyyy-MM-dd'))
   );
+
+  // Categorize scheduled checkins
+  // Exclude any scheduled checkin where a response exists for that period
+  const pastScheduled = scheduledCheckins.filter(s => {
+    const scheduleDate = format(parseISO(s.scheduled_send_date), 'yyyy-MM-dd');
+    // If there's a response within the same week, don't show as pending
+    const hasResponseNearby = checkinResponses.some(r => {
+      const responseDate = parseISO(r.submitted_at);
+      const scheduleDateParsed = parseISO(s.scheduled_send_date);
+      // Consider as matched if response is within 7 days after schedule date
+      const diffDays = Math.abs((responseDate.getTime() - scheduleDateParsed.getTime()) / (1000 * 60 * 60 * 24));
+      return diffDays <= 7 && responseDate >= scheduleDateParsed;
+    });
+    
+    return isBefore(parseISO(s.scheduled_send_date), today) && 
+           s.status !== 'completed' && 
+           !hasResponseNearby;
+  });
   
   const upcomingScheduled = scheduledCheckins.filter(s => 
     !isBefore(parseISO(s.scheduled_send_date), today) && s.status === 'pending'

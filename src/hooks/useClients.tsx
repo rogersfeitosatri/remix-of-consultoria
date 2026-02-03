@@ -277,7 +277,8 @@ function generateContinuationConsultationSchedules(
   endDate: string,
   remainingConsultations: number,
   lastConsultationAt?: string | null,
-  lastConsultationIndex?: number | null
+  lastConsultationIndex?: number | null,
+  customScheduleDates?: Array<{ consultationNumber: number; sendLinkDate: string; isCustom: boolean }> | null
 ): ContinuationSchedule[] {
   const schedules: ContinuationSchedule[] = [];
   const planEndDate = parseISO(endDate);
@@ -329,17 +330,24 @@ function generateContinuationConsultationSchedules(
       // Only include future dates
       if (sendLinkMonday >= today) {
         const consultationNumber = startingIndex + windowsCreated;
+        
+        // Check if there's a custom date for this consultation
+        const customDateEntry = customScheduleDates?.find(c => c.consultationNumber === consultationNumber);
+        const finalSendLinkDate = customDateEntry?.isCustom 
+          ? customDateEntry.sendLinkDate 
+          : format(sendLinkMonday, 'yyyy-MM-dd');
+        
         console.debug(
-          `[Automação Consultas - Continuação] Consulta ${consultationNumber} (janela ${windowsCreated + 1}/${remainingConsultations}): baseDate=${format(currentBaseDate, 'yyyy-MM-dd')} | intervalEnd=${format(intervalEndDate, 'yyyy-MM-dd')} | sendLink=${format(sendLinkMonday, 'yyyy-MM-dd')} | window=${format(windowStart, 'yyyy-MM-dd')} a ${format(windowEnd, 'yyyy-MM-dd')}`
+          `[Automação Consultas - Continuação] Consulta ${consultationNumber} (janela ${windowsCreated + 1}/${remainingConsultations}): baseDate=${format(currentBaseDate, 'yyyy-MM-dd')} | intervalEnd=${format(intervalEndDate, 'yyyy-MM-dd')} | sendLink=${finalSendLinkDate}${customDateEntry?.isCustom ? ' (CUSTOMIZADO)' : ''} | window=${format(windowStart, 'yyyy-MM-dd')} a ${format(windowEnd, 'yyyy-MM-dd')}`
         );
 
         schedules.push({
           client_id: clientId,
           user_id: userId,
-          // The scheduled_date is the Monday of the consultation window
-          scheduled_date: format(windowStart, 'yyyy-MM-dd'),
-          // The send_link_date is the same Monday (when we send the booking link)
-          send_link_date: format(sendLinkMonday, 'yyyy-MM-dd'),
+          // The scheduled_date is the Monday of the consultation window (or custom date)
+          scheduled_date: finalSendLinkDate,
+          // The send_link_date is when we send the booking link
+          send_link_date: finalSendLinkDate,
           status: 'pending',
         });
 
@@ -394,13 +402,18 @@ export function useAddClient() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (clientData: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (clientData: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'> & { 
+      custom_schedule_dates?: Array<{ consultationNumber: number; sendLinkDate: string; isCustom: boolean }> | null 
+    }) => {
       if (!user) throw new Error('Not authenticated');
+
+      // Extract custom_schedule_dates before inserting into DB (it's not a DB column)
+      const { custom_schedule_dates, ...clientDataForDB } = clientData;
 
       const { data: client, error } = await supabase
         .from('clients')
         .insert({
-          ...clientData,
+          ...clientDataForDB,
           user_id: user.id,
         })
         .select()
@@ -418,6 +431,7 @@ export function useAddClient() {
         // Check if this is a continuation (migration) client
         if (client.onboarding_type === 'continuation' && client.remaining_consultations) {
           // Generate only future consultations for continuation clients
+          // Pass custom_schedule_dates if provided
           schedules = generateContinuationConsultationSchedules(
             user.id,
             client.id,
@@ -425,7 +439,8 @@ export function useAddClient() {
             client.end_date,
             client.remaining_consultations,
             client.last_consultation_at,
-            client.last_consultation_index
+            client.last_consultation_index,
+            custom_schedule_dates
           );
         } else if (client.first_consultation_date) {
           // Standard new client flow
