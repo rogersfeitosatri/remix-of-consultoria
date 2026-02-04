@@ -24,6 +24,7 @@ interface TaskColumnProps {
   onArchiveTask: (task: TaskWithLabels) => void;
   onDeleteTask: (task: TaskWithLabels) => void;
   onTogglePin: (task: TaskWithLabels) => void;
+  onMarkMealPlanSent?: (task: TaskWithLabels) => void;
 }
 
 export function TaskColumn({
@@ -34,6 +35,7 @@ export function TaskColumn({
   onArchiveTask,
   onDeleteTask,
   onTogglePin,
+  onMarkMealPlanSent,
 }: TaskColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column-${dayOfWeek}`,
@@ -88,6 +90,7 @@ export function TaskColumn({
               onArchive={onArchiveTask}
               onDelete={onDeleteTask}
               onTogglePin={onTogglePin}
+              onMarkMealPlanSent={onMarkMealPlanSent}
             />
           ))}
         </div>

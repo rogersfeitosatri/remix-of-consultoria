@@ -26,6 +26,9 @@ import {
   useDeleteTask,
   TaskWithLabels,
 } from '@/hooks/useTasks';
+import { useMealPlanStatus, useMarkMealPlanSent } from '@/hooks/useMealPlanStatus';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +50,8 @@ export function TaskBoard() {
 
   const { data: tasks = [], isLoading } = useTasks(showArchived);
   const { data: labels = [] } = useTaskLabels();
+  const { data: mealPlanStatuses = [] } = useMealPlanStatus();
+  const markMealPlanSent = useMarkMealPlanSent();
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -166,6 +171,24 @@ export function TaskBoard() {
     });
   };
 
+  // Handle marking meal plan as sent from task board
+  const handleMarkMealPlanSent = async (task: TaskWithLabels) => {
+    // Find the meal plan status associated with this task
+    const mealPlanStatus = mealPlanStatuses.find(mp => mp.task_id === task.id);
+    
+    if (mealPlanStatus) {
+      // Use the mutation to mark as sent (which also archives the task)
+      markMealPlanSent.mutate(mealPlanStatus.client_id);
+    } else {
+      // If no meal plan status found, just archive the task
+      updateTask.mutate({
+        id: task.id,
+        is_archived: true,
+      });
+      toast.success('Tarefa arquivada');
+    }
+  };
+
   const handleSaveTask = (data: {
     title: string;
     description?: string;
@@ -235,6 +258,7 @@ export function TaskBoard() {
                 onArchiveTask={handleArchiveTask}
                 onDeleteTask={handleDeleteTask}
                 onTogglePin={handleTogglePin}
+                onMarkMealPlanSent={handleMarkMealPlanSent}
               />
             ))}
           </div>

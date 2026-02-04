@@ -3,7 +3,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { GripVertical, Pin, Calendar, Pencil, Archive, Trash2, Clock } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { GripVertical, Pin, Calendar, Pencil, Archive, Trash2, Clock, UtensilsCrossed } from 'lucide-react';
 import { TaskWithLabels } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -15,9 +16,19 @@ interface TaskCardProps {
   onArchive: (task: TaskWithLabels) => void;
   onDelete: (task: TaskWithLabels) => void;
   onTogglePin: (task: TaskWithLabels) => void;
+  isMealPlanTask?: boolean;
+  onMarkMealPlanSent?: (task: TaskWithLabels) => void;
 }
 
-export function TaskCard({ task, onEdit, onArchive, onDelete, onTogglePin }: TaskCardProps) {
+export function TaskCard({ 
+  task, 
+  onEdit, 
+  onArchive, 
+  onDelete, 
+  onTogglePin,
+  isMealPlanTask = false,
+  onMarkMealPlanSent,
+}: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -32,6 +43,9 @@ export function TaskCard({ task, onEdit, onArchive, onDelete, onTogglePin }: Tas
     transition,
   };
 
+  // Check if this is a meal plan task based on title
+  const isMealPlan = isMealPlanTask || task.title.toLowerCase().includes('plano alimentar');
+
   return (
     <Card
       ref={setNodeRef}
@@ -39,21 +53,41 @@ export function TaskCard({ task, onEdit, onArchive, onDelete, onTogglePin }: Tas
       className={cn(
         'p-3 cursor-pointer hover:border-primary/50 transition-colors group',
         isDragging && 'opacity-50 shadow-lg',
-        task.is_pinned && 'border-primary/30 bg-primary/5'
+        task.is_pinned && 'border-primary/30 bg-primary/5',
+        isMealPlan && 'border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/20'
       )}
     >
       <div className="flex items-start gap-2">
-        <button
-          {...attributes}
-          {...listeners}
-          className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
+        {isMealPlan && onMarkMealPlanSent ? (
+          <Checkbox
+            checked={false}
+            onCheckedChange={() => onMarkMealPlanSent(task)}
+            className="mt-0.5 border-orange-400 data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600"
+            title="Marcar plano como enviado"
+          />
+        ) : (
+          <button
+            {...attributes}
+            {...listeners}
+            className="mt-0.5 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+        )}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
+            <div className="flex items-center gap-1.5">
+              {isMealPlan && (
+                <UtensilsCrossed className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+              )}
+              <h4 className={cn(
+                "font-medium text-sm leading-tight",
+                isMealPlan && "text-orange-800 dark:text-orange-200"
+              )}>
+                {task.title}
+              </h4>
+            </div>
             {task.is_pinned && (
               <Pin className="h-3 w-3 text-primary flex-shrink-0" />
             )}
