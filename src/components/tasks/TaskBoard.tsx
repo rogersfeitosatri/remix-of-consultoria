@@ -14,10 +14,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Archive, Loader2 } from 'lucide-react';
+import { Archive, Loader2, UtensilsCrossed, Plus } from 'lucide-react';
 import { TaskColumn } from './TaskColumn';
 import { TaskCard } from './TaskCard';
 import { TaskDialog } from './TaskDialog';
+import { MealPlanTaskDialog } from './MealPlanTaskDialog';
 import {
   useTasks,
   useTaskLabels,
@@ -43,6 +44,7 @@ import {
 export function TaskBoard() {
   const [showArchived, setShowArchived] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [mealPlanDialogOpen, setMealPlanDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskWithLabels | null>(null);
   const [defaultDay, setDefaultDay] = useState(1);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -225,18 +227,30 @@ export function TaskBoard() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-lg">Quadro de Tarefas</CardTitle>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="show-archived"
-              checked={showArchived}
-              onCheckedChange={setShowArchived}
-            />
-            <Label htmlFor="show-archived" className="text-sm flex items-center gap-1.5">
-              <Archive className="h-4 w-4" />
-              Mostrar arquivadas
-            </Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMealPlanDialogOpen(true)}
+              className="gap-1.5 text-orange-700 border-orange-300 hover:bg-orange-50 hover:text-orange-800 dark:text-orange-400 dark:border-orange-700 dark:hover:bg-orange-950/30"
+            >
+              <UtensilsCrossed className="h-4 w-4" />
+              <span className="hidden sm:inline">Plano Alimentar</span>
+              <Plus className="h-3 w-3" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="show-archived"
+                checked={showArchived}
+                onCheckedChange={setShowArchived}
+              />
+              <Label htmlFor="show-archived" className="text-sm flex items-center gap-1.5">
+                <Archive className="h-4 w-4" />
+                <span className="hidden sm:inline">Mostrar arquivadas</span>
+              </Label>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -285,6 +299,11 @@ export function TaskBoard() {
           defaultDayOfWeek={defaultDay}
           labels={labels}
           onSave={handleSaveTask}
+        />
+
+        <MealPlanTaskDialog
+          open={mealPlanDialogOpen}
+          onOpenChange={setMealPlanDialogOpen}
         />
 
         <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
