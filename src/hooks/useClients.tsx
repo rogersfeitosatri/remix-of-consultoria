@@ -510,6 +510,42 @@ export function useAddClient() {
         console.error('Error creating athlete profile:', profileError);
       }
 
+      // Create meal plan status (pending) and associated task
+      // This triggers the meal plan alert on dashboard
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+      
+      // Create the task first
+      const { data: taskData, error: taskError } = await supabase
+        .from('tasks')
+        .insert({
+          user_id: user.id,
+          title: `Enviar plano alimentar - ${clientData.name}`,
+          description: `Pendente: enviar plano alimentar para o atleta ${clientData.name}`,
+          day_of_week: dayOfWeek === 0 ? 1 : dayOfWeek, // Default to Monday if Sunday
+          is_pinned: true, // Pin meal plan tasks
+        })
+        .select('id')
+        .single();
+
+      if (taskError) {
+        console.error('Error creating meal plan task:', taskError);
+      }
+
+      // Create meal plan status
+      const { error: mealPlanError } = await supabase
+        .from('meal_plan_status')
+        .insert({
+          client_id: client.id,
+          user_id: user.id,
+          status: 'pending',
+          task_id: taskData?.id || null,
+        });
+
+      if (mealPlanError) {
+        console.error('Error creating meal plan status:', mealPlanError);
+      }
+
       return client;
     },
     onSuccess: () => {
@@ -517,6 +553,9 @@ export function useAddClient() {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
       queryClient.invalidateQueries({ queryKey: ['scheduled_checkins'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['meal-plan-status'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-meal-plans'] });
     },
   });
 }
