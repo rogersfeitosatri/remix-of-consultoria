@@ -220,21 +220,30 @@ Deno.serve(async (req) => {
     // Update appointment in database
     const oldDate = appointment.appointment_date;
     const oldTime = appointment.appointment_time.substring(0, 5);
+    
+    // Ensure newTime is in HH:mm format and add seconds for database
+    const formattedNewTime = newTime.substring(0, 5);
+    const newTimeWithSeconds = formattedNewTime + ':00';
 
     // Reset reminder fields so the new reminders can be sent for the rescheduled appointment
-    await supabase
+    const { error: updateError } = await supabase
       .from('appointments')
       .update({
         appointment_date: newDate,
-        appointment_time: newTime + ':00',
+        appointment_time: newTimeWithSeconds,
         google_calendar_event_id: newEventId || appointment.google_calendar_event_id,
         google_meet_link: newMeetLink,
-        notes_admin: `Remarcado de ${oldDate} ${oldTime} para ${newDate} ${newTime}`,
+        notes_admin: `Remarcado de ${oldDate} ${oldTime} para ${newDate} ${formattedNewTime}`,
         reminder_sent_at: null, // Reset 24h reminder
         reminder_15m_sent_at: null, // Reset 15min reminder
         updated_at: new Date().toISOString(),
       })
       .eq('id', appointmentId);
+    
+    if (updateError) {
+      console.error('Error updating appointment:', updateError);
+      throw new Error('Erro ao atualizar consulta: ' + updateError.message);
+    }
 
     // Send WhatsApp notification
     if (notifyClient && appointment.client.phone) {

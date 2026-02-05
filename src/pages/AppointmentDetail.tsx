@@ -242,10 +242,13 @@ export default function AppointmentDetail() {
     }
     
     try {
+      // Ensure newTime is in HH:mm format (without seconds)
+      const formattedTime = newTime.substring(0, 5);
+      
       await rescheduleAppointment.mutateAsync({
         appointmentId,
         newDate: format(newDate, 'yyyy-MM-dd'),
-        newTime: newTime + ':00',
+        newTime: formattedTime,
         notifyClient: true,
       });
       
