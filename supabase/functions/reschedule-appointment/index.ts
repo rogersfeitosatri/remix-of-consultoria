@@ -39,31 +39,15 @@ Deno.serve(async (req) => {
       throw new Error('Appointment not found');
     }
 
-    // Check 24h rule for current appointment
-    const currentAppointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
+    // Validate that the new date/time is in the future
     const now = new Date();
-    const hoursUntilAppointment = (currentAppointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    if (hoursUntilAppointment < 24) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Não é possível remarcar com menos de 24 horas de antecedência',
-          hoursRemaining: Math.round(hoursUntilAppointment),
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if new time is valid (at least 24h in future)
     const newDateTime = new Date(`${newDate}T${newTime}:00`);
-    const hoursUntilNewAppointment = (newDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
     
-    if (hoursUntilNewAppointment < 24) {
+    if (newDateTime <= now) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'O novo horário deve ser com pelo menos 24 horas de antecedência',
+          error: 'O novo horário deve ser no futuro',
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
