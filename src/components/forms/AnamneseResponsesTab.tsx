@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, FileText, Eye, User, Link2, AlertCircle } from 'lucide-react';
+import { Search, FileText, Eye, User, Link2, AlertCircle, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,6 +18,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
@@ -54,6 +64,8 @@ export function AnamneseResponsesTab() {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [selectedUnlinked, setSelectedUnlinked] = useState<UnlinkedResponse | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [responseToDelete, setResponseToDelete] = useState<UnlinkedResponse | null>(null);
 
   // Fetch all anamnese responses with client info (linked responses)
   const { data: anamneseResponses = [], isLoading } = useQuery({
@@ -212,6 +224,29 @@ export function AnamneseResponsesTab() {
     },
   });
 
+  // Mutation to delete unlinked response
+  const deleteResponseMutation = useMutation({
+    mutationFn: async (responseId: string) => {
+      const { error } = await supabase
+        .from('anamnese_responses')
+        .delete()
+        .eq('id', responseId)
+        .is('client_id', null); // Extra safety: only delete if unlinked
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unlinked_anamnese_responses'] });
+      toast.success('Anamnese excluída com sucesso!');
+      setDeleteDialogOpen(false);
+      setResponseToDelete(null);
+    },
+    onError: (error) => {
+      console.error('Error deleting response:', error);
+      toast.error('Erro ao excluir anamnese');
+    },
+  });
+
   // Also fetch clients without anamnese (pending)
   const { data: pendingClients = [] } = useQuery({
     queryKey: ['pending_anamnese_for_list', user?.id],
@@ -282,6 +317,16 @@ export function AnamneseResponsesTab() {
     setSelectedUnlinked(response);
     setSelectedClientId('');
     setLinkDialogOpen(true);
+  };
+
+  const openDeleteDialog = (response: UnlinkedResponse) => {
+    setResponseToDelete(response);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteResponse = () => {
+    if (!responseToDelete) return;
+    deleteResponseMutation.mutate(responseToDelete.id);
   };
 
   const handleLinkToClient = () => {
@@ -388,6 +433,15 @@ export function AnamneseResponsesTab() {
                       >
                         <Link2 className="h-4 w-4" />
                         <span className="hidden sm:inline">Vincular</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => openDeleteDialog(response)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Excluir</span>
                       </Button>
                     </div>
                   </div>
@@ -579,6 +633,36 @@ export function AnamneseResponsesTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir anamnese?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta anamnese? Essa ação não poderá ser desfeita.
+              {responseToDelete && (
+                <span className="block mt-2 font-medium text-foreground">
+                  {responseToDelete.respondent_name || 'Sem nome'} 
+                  {responseToDelete.respondent_email && ` (${responseToDelete.respondent_email})`}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setResponseToDelete(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteResponse}
+              disabled={deleteResponseMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteResponseMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
