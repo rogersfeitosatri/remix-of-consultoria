@@ -50,15 +50,22 @@ export function MondaySendView({ consultations, clients, onMarkAsSent, onSendLin
     return index + 1;
   };
 
-  // Group schedules by Monday (send_link_date)
+  // Group schedules by Monday (send_link_date) - ONLY FUTURE/TODAY
   const mondayGroups = useMemo(() => {
     const today = startOfDay(new Date());
     const groupMap = new Map<string, MondayGroup>();
     
-    // Filter only pending schedules (not scheduled/completed)
-    const pendingSchedules = consultations.filter(s => 
-      s.status === 'pending' || s.status === 'sent'
-    );
+    // Filter only pending schedules (not scheduled/completed) AND from today onwards
+    const pendingSchedules = consultations.filter(s => {
+      const sendDate = parseISO(s.send_link_date);
+      const sendDateStart = startOfDay(sendDate);
+      
+      // Only include if send_link_date is today or in the future
+      const isNotPast = !isBefore(sendDateStart, today);
+      const isPendingOrSent = s.status === 'pending' || s.status === 'sent';
+      
+      return isNotPast && isPendingOrSent;
+    });
 
     pendingSchedules.forEach(schedule => {
       const sendDate = parseISO(schedule.send_link_date);
@@ -78,12 +85,11 @@ export function MondaySendView({ consultations, clients, onMarkAsSent, onSendLin
       });
     });
 
-    // Sort groups by date and filter to show future + past 4 weeks
-    const fourWeeksAgo = addWeeks(today, -4);
+    // Sort groups by date and filter to show next 12 weeks
     const twelveWeeksAhead = addWeeks(today, 12);
     
     return Array.from(groupMap.values())
-      .filter(g => !isBefore(g.date, fourWeeksAgo) && isBefore(g.date, twelveWeeksAhead))
+      .filter(g => isBefore(g.date, twelveWeeksAhead))
       .sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [consultations]);
 

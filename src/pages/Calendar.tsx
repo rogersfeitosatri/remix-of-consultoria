@@ -15,7 +15,7 @@ import {
 import { useConsultationAppointments } from '@/hooks/useConsultations';
 import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2, Phone, Mail, ExternalLink } from 'lucide-react';
+import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2, Phone, Mail, ExternalLink, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -40,6 +40,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MondaySendView } from '@/components/scheduling/MondaySendView';
 import { ScheduledAppointmentsView } from '@/components/scheduling/ScheduledAppointmentsView';
+import { ConsultationHistoryView } from '@/components/scheduling/ConsultationHistoryView';
 import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -258,7 +259,7 @@ export default function CalendarPage() {
           </div>
           
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsList className="grid w-full max-w-lg grid-cols-4">
               <TabsTrigger value="calendar" className="gap-1">
                 <CalendarDays className="h-4 w-4" />
                 <span className="hidden sm:inline">Calendário</span>
@@ -270,6 +271,10 @@ export default function CalendarPage() {
               <TabsTrigger value="scheduled" className="gap-1">
                 <CalendarCheck2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Agendadas</span>
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-1">
+                <History className="h-4 w-4" />
+                <span className="hidden sm:inline">Histórico</span>
               </TabsTrigger>
             </TabsList>
             
@@ -298,6 +303,14 @@ export default function CalendarPage() {
                 </div>
                 <ScheduledAppointmentsView />
               </div>
+            </TabsContent>
+            
+            {/* Tab: History */}
+            <TabsContent value="history" className="mt-4">
+              <ConsultationHistoryView 
+                consultations={consultations}
+                clients={allClients}
+              />
             </TabsContent>
             
             <ManualBookingDialog
