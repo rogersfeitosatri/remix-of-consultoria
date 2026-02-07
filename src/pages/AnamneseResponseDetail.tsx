@@ -29,9 +29,10 @@ export default function AnamneseResponseDetail() {
   const [activeTab, setActiveTab] = useState('respostas');
 
   // Fetch the anamnese response with all related data
-  const { data: responseData, isLoading } = useQuery({
+  const { data: responseData, isLoading, isError } = useQuery({
     queryKey: ['anamnese_response_detail', responseId],
     queryFn: async () => {
+      // First try to fetch with client data (for linked responses)
       const { data: response, error } = await supabase
         .from('anamnese_responses')
         .select(`
@@ -42,24 +43,28 @@ export default function AnamneseResponseDetail() {
           submitted_at,
           ai_analysis,
           ai_analyzed_at,
-          clients!inner (
+          respondent_name,
+          respondent_email,
+          clients (
             id,
             name,
             email,
             phone
           ),
-          anamnese_forms!inner (
+          anamnese_forms (
             id,
             title
           )
         `)
         .eq('id', responseId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return response;
     },
     enabled: !!responseId,
+    retry: 2,
+    staleTime: 30000,
   });
 
   // Fetch AI analysis from ai_analyses table
@@ -222,12 +227,12 @@ export default function AnamneseResponseDetail() {
     );
   }
 
-  if (!responseData) {
+  if (!responseData && !isLoading) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center py-12">
           <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Anamnese não encontrada</h2>
+          <h2 className="text-xl font-semibold mb-2">{isError ? 'Erro ao carregar anamnese' : 'Anamnese não encontrada'}</h2>
           <Button variant="outline" onClick={() => navigate('/forms')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
@@ -237,7 +242,12 @@ export default function AnamneseResponseDetail() {
     );
   }
 
+  // Handle both linked (with client) and unlinked (with respondent_name) responses
   const client = responseData.clients as any;
+  const respondentName = (responseData as any).respondent_name;
+  const respondentEmail = (responseData as any).respondent_email;
+  const displayName = client?.name || respondentName || 'Anônimo';
+  const displayEmail = client?.email || respondentEmail || null;
   const form = responseData.anamnese_forms as any;
   // Use AI analysis from dedicated table (priority) or from response field
   const aiAnalysis = aiAnalysisFromTable || (responseData.ai_analysis as any);
@@ -248,13 +258,13 @@ export default function AnamneseResponseDetail() {
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/forms')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/forms?tab=respostas')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">Anamnese de {client?.name}</h1>
+              <h1 className="text-2xl font-bold">Anamnese de {displayName}</h1>
               <p className="text-muted-foreground">
-                {form?.title} • Enviada em {format(parseISO(responseData.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                {form?.title || 'Formulário'} • Enviada em {format(parseISO(responseData.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </p>
             </div>
           </div>
@@ -270,12 +280,17 @@ export default function AnamneseResponseDetail() {
             <div className="flex flex-wrap gap-6">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">{client?.name}</span>
+                <span className="font-medium">{displayName}</span>
+                {!client && respondentName && (
+                  <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-xs">
+                    Não vinculado
+                  </Badge>
+                )}
               </div>
-              {client?.email && (
+              {displayEmail && (
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">{client.email}</span>
+                  <span className="text-muted-foreground">{displayEmail}</span>
                 </div>
               )}
               <div className="flex items-center gap-2">
