@@ -362,7 +362,7 @@ Qualquer dúvida, estou à disposição! 💪`;
                 <div className="text-center">
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <DollarSign className="h-4 w-4" />
-                    <span>Valor Mensal</span>
+                    <span>Valor Pago</span>
                   </div>
                   <p className="mt-1 font-semibold text-card-foreground">
                     R$ {(lastPaymentMap[client.id] ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
