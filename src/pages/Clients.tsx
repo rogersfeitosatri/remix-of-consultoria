@@ -3,6 +3,7 @@ import { Layout } from '@/components/layout/Layout';
 import { ClientsList } from '@/components/clients/ClientsList';
 import { ClientForm } from '@/components/clients/ClientForm';
 import { useClients, useAddClient, useUpdateClient, useDeleteClient, Client } from '@/hooks/useClients';
+import { useAthletesWithTargetRaceAlerts } from '@/hooks/useTargetRaceAlert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Loader2, Users, UserX, Filter } from 'lucide-react';
+import { Plus, Search, Loader2, Users, UserX, Filter, Flag } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -31,8 +32,15 @@ const PLAN_OPTIONS = [
   { value: 'premium', label: 'Premium' },
 ];
 
+const TARGET_RACE_OPTIONS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'with_race', label: 'Com Prova Alvo' },
+  { value: 'needs_adjustment', label: 'Precisam Ajuste' },
+];
+
 export default function Clients() {
   const { data: clients = [], isLoading } = useClients();
+  const { data: targetRaceAlerts = [] } = useAthletesWithTargetRaceAlerts();
   const addClient = useAddClient();
   const updateClient = useUpdateClient();
   const deleteClientMutation = useDeleteClient();
@@ -43,6 +51,7 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState<Client | undefined>();
   const [serviceFilter, setServiceFilter] = useState('all');
   const [planFilter, setPlanFilter] = useState('all');
+  const [targetRaceFilter, setTargetRaceFilter] = useState('all');
   const { toast } = useToast();
 
   const activeClients = useMemo(() => {
@@ -75,17 +84,27 @@ export default function Clients() {
         return false;
       }
       
+      // Target race filter
+      if (targetRaceFilter !== 'all') {
+        const alertData = targetRaceAlerts.find(a => a.clientId === c.id);
+        if (targetRaceFilter === 'with_race') {
+          if (!alertData) return false;
+        } else if (targetRaceFilter === 'needs_adjustment') {
+          if (!alertData || !alertData.needsDietAdjustment) return false;
+        }
+      }
+      
       return true;
     });
   };
 
   const filteredActiveClients = useMemo(() => {
     return applyFilters(activeClients);
-  }, [searchQuery, activeClients, serviceFilter, planFilter]);
+  }, [searchQuery, activeClients, serviceFilter, planFilter, targetRaceFilter, targetRaceAlerts]);
 
   const filteredInactiveClients = useMemo(() => {
     return applyFilters(inactiveClients);
-  }, [searchQuery, inactiveClients, serviceFilter, planFilter]);
+  }, [searchQuery, inactiveClients, serviceFilter, planFilter, targetRaceFilter, targetRaceAlerts]);
 
   const handleSubmit = async (
     data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
@@ -254,7 +273,7 @@ export default function Clients() {
               className="pl-10"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Select value={planFilter} onValueChange={setPlanFilter}>
               <SelectTrigger className="w-[160px]">
                 <Filter className="h-4 w-4 mr-2" />
@@ -275,6 +294,19 @@ export default function Clients() {
               </SelectTrigger>
               <SelectContent>
                 {SERVICE_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={targetRaceFilter} onValueChange={setTargetRaceFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Flag className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Prova Alvo" />
+              </SelectTrigger>
+              <SelectContent>
+                {TARGET_RACE_OPTIONS.map(option => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>

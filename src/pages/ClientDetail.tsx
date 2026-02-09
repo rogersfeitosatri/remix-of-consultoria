@@ -30,6 +30,7 @@ import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AthleteSummarySection } from '@/components/admin/AthleteSummarySection';
+import { TargetRaceAlert } from '@/components/admin/TargetRaceAlert';
 import { PremiumClientDetails } from '@/components/admin/PremiumClientDetails';
 import { AnamneseResponseSection } from '@/components/admin/AnamneseResponseSection';
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
@@ -383,6 +384,9 @@ export default function ClientDetail() {
             </Button>
           </div>
         </div>
+        
+        {/* Alerta de Prova Alvo */}
+        <TargetRaceAlert clientId={client.id} clientName={client.name} />
         
         {/* Resumo do Atleta */}
         <AthleteSummarySection 
