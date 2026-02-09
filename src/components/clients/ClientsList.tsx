@@ -10,8 +10,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { useSchedulingSettings } from '@/hooks/useScheduling';
 import { useAthletesWithTargetRaceAlerts, AthleteWithTargetRaceAlert } from '@/hooks/useTargetRaceAlert';
+import { usePayments } from '@/hooks/useClients';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ChangeAthletePasswordDialog } from './ChangeAthletePasswordDialog';
 
 const SERVICE_LABELS = {
@@ -49,6 +50,17 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   const [sendingBooking, setSendingBooking] = useState<string | null>(null);
   const [sendingCredentials, setSendingCredentials] = useState<string | null>(null);
   const [passwordDialogClient, setPasswordDialogClient] = useState<Client | null>(null);
+  const { data: payments = [] } = usePayments();
+
+  // Build a map of clientId -> last payment amount
+  const lastPaymentMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    // payments are ordered by due_date asc, so later entries overwrite earlier ones
+    for (const p of payments) {
+      map[p.client_id] = p.amount;
+    }
+    return map;
+  }, [payments]);
 
   // Helper to get days label
   const getDaysLabel = (days: number | null) => {
@@ -353,7 +365,7 @@ Qualquer dúvida, estou à disposição! 💪`;
                     <span>Valor Mensal</span>
                   </div>
                   <p className="mt-1 font-semibold text-card-foreground">
-                    R$ {client.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {(lastPaymentMap[client.id] ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
 
