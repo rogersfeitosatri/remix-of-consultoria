@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   Flag, 
   Calendar, 
@@ -8,10 +11,16 @@ import {
   Check, 
   Loader2,
   TrendingUp,
-  Clock
+  Clock,
+  Edit2,
+  Plus,
+  Save,
+  X
 } from 'lucide-react';
 import { useTargetRaceAlert } from '@/hooks/useTargetRaceAlert';
 import { useMarkDietAdjustmentDone } from '@/hooks/useDietAdjustmentAlerts';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -24,6 +33,69 @@ interface TargetRaceAlertProps {
 export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) {
   const { data: alertData, isLoading } = useTargetRaceAlert(clientId);
   const markDone = useMarkDietAdjustmentDone();
+  const queryClient = useQueryClient();
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [targetRace, setTargetRace] = useState('');
+  const [targetDeadline, setTargetDeadline] = useState('');
+
+  const handleStartEdit = () => {
+    setTargetRace(alertData?.targetRace || '');
+    setTargetDeadline(alertData?.targetDeadline || '');
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setTargetRace('');
+    setTargetDeadline('');
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Check if profile exists
+      const { data: existingProfile } = await supabase
+        .from('athlete_profiles')
+        .select('id')
+        .eq('client_id', clientId)
+        .maybeSingle();
+
+      if (existingProfile) {
+        // Update existing profile
+        const { error } = await supabase
+          .from('athlete_profiles')
+          .update({
+            target_race: targetRace.trim() || null,
+            target_deadline: targetDeadline || null,
+          })
+          .eq('client_id', clientId);
+
+        if (error) throw error;
+      } else {
+        // Create new profile
+        const { error } = await supabase
+          .from('athlete_profiles')
+          .insert({
+            client_id: clientId,
+            target_race: targetRace.trim() || null,
+            target_deadline: targetDeadline || null,
+          });
+
+        if (error) throw error;
+      }
+
+      toast.success('Prova alvo salva com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['target-race-alert', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['athletes-target-race-alerts'] });
+      setIsEditing(false);
+    } catch (error: any) {
+      toast.error('Erro ao salvar: ' + (error.message || 'Tente novamente'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleMarkDone = async () => {
     try {
@@ -52,9 +124,86 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
     );
   }
 
-  // Se não tem prova alvo, não exibe nada
+  // Modo de edição
+  if (isEditing) {
+    return (
+      <Card className="border-blue-500/30 bg-blue-500/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base text-foreground">
+            <div className="flex items-center gap-2">
+              <Flag className="h-5 w-5 text-blue-500" />
+              {alertData?.hasTargetRace ? 'Editar Prova Alvo' : 'Adicionar Prova Alvo'}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="targetRace">Nome da Prova</Label>
+            <Input
+              id="targetRace"
+              placeholder="Ex: Maratona do Rio, Meia de São Paulo..."
+              value={targetRace}
+              onChange={(e) => setTargetRace(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="targetDeadline">Data da Prova</Label>
+            <Input
+              id="targetDeadline"
+              type="date"
+              value={targetDeadline}
+              onChange={(e) => setTargetDeadline(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || !targetRace.trim()}
+              className="flex-1"
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Salvar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCancelEdit}
+              disabled={isSaving}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Se não tem prova alvo, mostrar opção de adicionar
   if (!alertData?.hasTargetRace) {
-    return null;
+    return (
+      <Card className="border-dashed border-muted-foreground/30 bg-muted/10">
+        <CardContent className="py-6">
+          <div className="text-center space-y-3">
+            <Flag className="h-8 w-8 mx-auto text-muted-foreground/50" />
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Prova Alvo</p>
+              <p className="text-xs text-muted-foreground/70">
+                Adicione uma prova alvo para acompanhar a evolução da dieta
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleStartEdit}>
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Prova Alvo
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const getReasonLabel = (reason: string | null) => {
@@ -90,11 +239,11 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
 
   const isUrgent = alertData.daysToRace !== null && alertData.daysToRace <= 30;
   const borderColor = alertData.needsDietAdjustment 
-    ? isUrgent ? 'border-red-500/30 bg-red-500/5' : 'border-orange-500/30 bg-orange-500/5'
+    ? isUrgent ? 'border-destructive/30 bg-destructive/5' : 'border-orange-500/30 bg-orange-500/5'
     : 'border-blue-500/30 bg-blue-500/5';
   
   const iconColor = alertData.needsDietAdjustment 
-    ? isUrgent ? 'text-red-500' : 'text-orange-500'
+    ? isUrgent ? 'text-destructive' : 'text-orange-500'
     : 'text-blue-500';
 
   return (
@@ -105,12 +254,22 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
             <Flag className={`h-5 w-5 ${iconColor}`} />
             Prova Alvo
           </div>
-          {alertData.needsDietAdjustment && (
-            <Badge variant="destructive" className="text-xs">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              Ajuste Pendente
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {alertData.needsDietAdjustment && (
+              <Badge variant="destructive" className="text-xs">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Ajuste Pendente
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2"
+              onClick={handleStartEdit}
+            >
+              <Edit2 className="h-3 w-3" />
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
