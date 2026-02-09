@@ -1,13 +1,15 @@
 import { Client } from '@/hooks/useClients';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Phone, Mail, Calendar, DollarSign, Zap, MessageCircle, CalendarCheck, Key, Lock } from 'lucide-react';
+import { Phone, Mail, Calendar, DollarSign, Zap, MessageCircle, CalendarCheck, Key, Lock, Flag, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { useSchedulingSettings } from '@/hooks/useScheduling';
+import { useAthletesWithTargetRaceAlerts, AthleteWithTargetRaceAlert } from '@/hooks/useTargetRaceAlert';
 import { toast } from 'sonner';
 import { useState } from 'react';
 import { ChangeAthletePasswordDialog } from './ChangeAthletePasswordDialog';
@@ -42,10 +44,26 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   const navigate = useNavigate();
   const { data: checkinForms = [] } = useCheckinForms();
   const { data: schedulingSettings } = useSchedulingSettings();
+  const { data: targetRaceAlerts = [] } = useAthletesWithTargetRaceAlerts();
   const [sendingCheckin, setSendingCheckin] = useState<string | null>(null);
   const [sendingBooking, setSendingBooking] = useState<string | null>(null);
   const [sendingCredentials, setSendingCredentials] = useState<string | null>(null);
   const [passwordDialogClient, setPasswordDialogClient] = useState<Client | null>(null);
+
+  // Helper to get days label
+  const getDaysLabel = (days: number | null) => {
+    if (days === null) return null;
+    if (days < 0) return 'Realizada';
+    if (days === 0) return 'Hoje!';
+    if (days === 1) return '1 dia';
+    if (days < 7) return `${days} dias`;
+    if (days < 30) {
+      const weeks = Math.floor(days / 7);
+      return `${weeks} sem`;
+    }
+    const months = Math.floor(days / 30);
+    return `${months} ${months === 1 ? 'mês' : 'meses'}`;
+  };
 
   // Helper to format phone as access code with DDI
   const formatPhoneAsAccessCode = (phone: string | null): string => {
@@ -230,6 +248,8 @@ Qualquer dúvida, estou à disposição! 💪`;
         const daysUntilExpiry = differenceInDays(parseISO(client.end_date), new Date());
         const isExpiring = daysUntilExpiry <= 30 && daysUntilExpiry >= 0;
         const isExpired = daysUntilExpiry < 0;
+        const targetRaceAlert = targetRaceAlerts.find(a => a.clientId === client.id);
+        const isRaceUrgent = targetRaceAlert?.daysToRace !== null && targetRaceAlert?.daysToRace !== undefined && targetRaceAlert.daysToRace <= 30 && targetRaceAlert.daysToRace >= 0;
 
         return (
           <div
@@ -287,10 +307,29 @@ Qualquer dúvida, estou à disposição! 💪`;
                   )}
                   {/* Registration source badge */}
                   {client.registration_source === 'kiwify' && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 px-2.5 py-1 text-xs font-medium text-purple-500">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-accent/50 px-2.5 py-1 text-xs font-medium text-accent-foreground">
                       <Zap className="h-3 w-3" />
                       Kiwify
                     </span>
+                  )}
+                  {/* Target Race Badge */}
+                  {targetRaceAlert && (
+                    <Badge 
+                      variant={isRaceUrgent ? "destructive" : "outline"}
+                      className={cn(
+                        "gap-1 text-xs",
+                        !isRaceUrgent && "border-blue-500/50 text-blue-600 dark:text-blue-400"
+                      )}
+                    >
+                      <Flag className="h-3 w-3" />
+                      {targetRaceAlert.targetRace}
+                      {targetRaceAlert.daysToRace !== null && targetRaceAlert.daysToRace >= 0 && (
+                        <span className="ml-1 flex items-center gap-0.5">
+                          <Clock className="h-2.5 w-2.5" />
+                          {getDaysLabel(targetRaceAlert.daysToRace)}
+                        </span>
+                      )}
+                    </Badge>
                   )}
                 </div>
               </div>
