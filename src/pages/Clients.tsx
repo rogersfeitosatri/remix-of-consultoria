@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { ClientsList } from '@/components/clients/ClientsList';
 import { ClientForm } from '@/components/clients/ClientForm';
+import { ExportClientsButton } from '@/components/clients/ExportClientsButton';
 import { useClients, useAddClient, useUpdateClient, useDeleteClient, Client } from '@/hooks/useClients';
 import { useAthletesWithTargetRaceAlerts } from '@/hooks/useTargetRaceAlert';
 import { Button } from '@/components/ui/button';
@@ -330,8 +331,15 @@ export default function Clients() {
           </TabsList>
           
           <TabsContent value="active" className="mt-6">
-            <div className="mb-4 text-sm text-muted-foreground">
-              {filteredActiveClients.length} atletas ativos encontrados
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {filteredActiveClients.length} atletas ativos encontrados
+              </span>
+              <ExportClientsButton 
+                clients={filteredActiveClients} 
+                targetRaceAlerts={targetRaceAlerts}
+                filename="atletas_ativos"
+              />
             </div>
             <ClientsList
               clients={filteredActiveClients}
@@ -341,8 +349,15 @@ export default function Clients() {
           </TabsContent>
           
           <TabsContent value="inactive" className="mt-6">
-            <div className="mb-4 text-sm text-muted-foreground">
-              {filteredInactiveClients.length} atletas inativos encontrados
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {filteredInactiveClients.length} atletas inativos encontrados
+              </span>
+              <ExportClientsButton 
+                clients={filteredInactiveClients} 
+                targetRaceAlerts={targetRaceAlerts}
+                filename="atletas_inativos"
+              />
             </div>
             {filteredInactiveClients.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
