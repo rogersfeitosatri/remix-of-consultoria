@@ -370,9 +370,8 @@ export default function AppointmentDetail() {
   }
   
   const appointmentDate = parseISO(appointment.appointment_date);
-  const isPast = isBefore(appointmentDate, startOfDay(new Date()));
   const isCancelled = appointment.status === 'cancelled';
-  const canModify = !isPast && !isCancelled;
+  const canModify = !isCancelled;
   const hasMeetIssue = !appointment.google_meet_link && appointment.status !== 'cancelled';
   
   return (
