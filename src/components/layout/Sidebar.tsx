@@ -1,8 +1,9 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, PersonStanding, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText, Link, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText, Link, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import logoRF from '@/assets/logo-rf.jpg';
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
@@ -60,12 +61,10 @@ export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse
           {/* Logo */}
           <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
             <div className={cn("flex items-center gap-3", isCollapsed && "lg:justify-center lg:w-full")}>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary flex-shrink-0">
-                <PersonStanding className="h-5 w-5 text-primary-foreground" />
-              </div>
+              <img src={logoRF} alt="Rogers Feitosa" className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
               <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
-                <h1 className="text-lg font-bold text-sidebar-foreground truncate">RF Assessoria</h1>
-                <p className="text-xs text-muted-foreground">Esportiva</p>
+                <h1 className="text-lg font-bold text-sidebar-foreground truncate">Rogers Feitosa</h1>
+                <p className="text-xs text-muted-foreground">Nutrição & Treinamento</p>
               </div>
             </div>
             {/* Close button for mobile */}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import logoRF from '@/assets/logo-rf.jpg';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -449,12 +450,10 @@ export default function PublicCheckinForm() {
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <PersonStanding className="h-6 w-6 text-primary-foreground" />
-          </div>
+          <img src={logoRF} alt="Rogers Feitosa" className="h-12 w-12 rounded-xl object-cover" />
           <div>
-            <h1 className="text-xl font-bold">RF Assessoria</h1>
-            <p className="text-sm text-muted-foreground">Esportiva</p>
+            <h1 className="text-xl font-bold">Rogers Feitosa</h1>
+            <p className="text-sm text-muted-foreground">Nutrição & Treinamento</p>
           </div>
         </div>
 
