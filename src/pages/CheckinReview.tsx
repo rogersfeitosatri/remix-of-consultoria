@@ -83,6 +83,7 @@ export default function CheckinReview() {
 
   const [editedFeedback, setEditedFeedback] = useState('');
   const [feedbackInitialized, setFeedbackInitialized] = useState(false);
+  const [activeTab, setActiveTab] = useState('responses');
 
   // Fetch check-in response
   const { data: checkinResponse, isLoading: loadingResponse } = useQuery({
@@ -269,6 +270,7 @@ export default function CheckinReview() {
       } else {
         toast.success('Check-in conferido com sucesso!');
       }
+      setActiveTab('evolution');
     },
     onError: (error) => {
       console.error('Error approving:', error);
@@ -315,6 +317,7 @@ export default function CheckinReview() {
       queryClient.invalidateQueries({ queryKey: ['pending_checkin_reviews'] });
       queryClient.invalidateQueries({ queryKey: ['pending_checkins_dashboard'] });
       toast.success('Check-in finalizado sem envio de WhatsApp');
+      setActiveTab('evolution');
     },
     onError: (error) => {
       console.error('Error marking as reviewed:', error);
@@ -344,6 +347,7 @@ export default function CheckinReview() {
       queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
       queryClient.invalidateQueries({ queryKey: ['pending_checkins_dashboard'] });
       toast.success('Feedback enviado via WhatsApp!');
+      setActiveTab('evolution');
     },
     onError: (error: any) => {
       console.error('Error sending:', error);
@@ -415,7 +419,7 @@ export default function CheckinReview() {
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="responses" key={responseId} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} key={responseId} className="space-y-4">
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="responses" className="gap-2">
               <FileText className="h-4 w-4" />

@@ -208,6 +208,24 @@ IMPORTANTE:
       throw new Error('Failed to parse evolution analysis');
     }
 
+    // Save analysis to DB (upsert by client_id)
+    const { error: upsertError } = await supabase
+      .from('evolution_analyses')
+      .upsert({
+        client_id: clientId,
+        analysis: analysisResult,
+        has_target_race: hasTargetRace,
+        target_race_name: hasTargetRace ? athleteProfile.target_race : null,
+        target_race_deadline: hasTargetRace ? athleteProfile.target_deadline : null,
+      }, { onConflict: 'client_id' });
+
+    if (upsertError) {
+      console.error('Failed to save evolution analysis:', upsertError);
+      // Don't throw - still return the analysis even if save fails
+    } else {
+      console.log('Evolution analysis saved to DB');
+    }
+
     console.log('Evolution analysis completed successfully');
 
     return new Response(JSON.stringify({

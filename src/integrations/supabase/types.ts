@@ -1750,6 +1750,47 @@ export type Database = {
         }
         Relationships: []
       }
+      evolution_analyses: {
+        Row: {
+          analysis: Json
+          client_id: string
+          created_at: string
+          has_target_race: boolean
+          id: string
+          target_race_deadline: string | null
+          target_race_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          analysis: Json
+          client_id: string
+          created_at?: string
+          has_target_race?: boolean
+          id?: string
+          target_race_deadline?: string | null
+          target_race_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          analysis?: Json
+          client_id?: string
+          created_at?: string
+          has_target_race?: boolean
+          id?: string
+          target_race_deadline?: string | null
+          target_race_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evolution_analyses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number
