@@ -2,6 +2,7 @@ import { Check, MessageCircle, Target, Users, Zap, Award, ArrowRight } from 'luc
 import { Button } from '@/components/ui/button';
 import { usePublicLandingPageSettings } from '@/hooks/useLandingPageSettings';
 import PlansTestimonialsCarousel from '@/components/plans/PlansTestimonialsCarousel';
+import PlanTimeline from '@/components/plans/PlanTimeline';
 
 // Import runner images
 import runnerHero from '@/assets/runner-hero.jpg';
@@ -258,6 +259,9 @@ export default function PlansLanding() {
           </div>
         </div>
       </section>
+
+      {/* Timeline Section */}
+      <PlanTimeline />
 
       {/* Testimonials Section */}
       <PlansTestimonialsCarousel />
