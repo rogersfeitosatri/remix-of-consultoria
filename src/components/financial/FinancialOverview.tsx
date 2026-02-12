@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { DollarSign, TrendingUp, TrendingDown, Building2, User, Wallet, AlertTriangle } from 'lucide-react';
 import { useFinancialTransactions, normalizeArea } from '@/hooks/useFinancialTransactions';
 import { useFinancialDebts } from '@/hooks/useFinancialDebts';
+import { usePayments } from '@/hooks/useClients';
 import { parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 
 interface FinancialOverviewProps {
@@ -14,6 +15,7 @@ interface FinancialOverviewProps {
 export function FinancialOverview({ filterStartDate, filterEndDate }: FinancialOverviewProps) {
   const { data: transactions = [] } = useFinancialTransactions();
   const { data: debts = [] } = useFinancialDebts();
+  const { data: athletePayments = [] } = usePayments();
 
   const stats = useMemo(() => {
     const periodTxns = transactions.filter(t => {
@@ -21,8 +23,17 @@ export function FinancialOverview({ filterStartDate, filterEndDate }: FinancialO
       return isWithinInterval(d, { start: filterStartDate, end: filterEndDate });
     });
 
+    // Athlete payments (paid) count as Empresa income
+    const athleteIncome = athletePayments
+      .filter(p => {
+        if (p.status !== 'paid' || !p.paid_at) return false;
+        const paidDate = parseISO(p.paid_at);
+        return isWithinInterval(paidDate, { start: filterStartDate, end: filterEndDate });
+      })
+      .reduce((s, p) => s + Number(p.amount), 0);
+
     const incomePF = periodTxns.filter(t => t.type === 'income' && normalizeArea(t.area) === 'pessoal').reduce((s, t) => s + Number(t.amount), 0);
-    const incomeEmpresa = periodTxns.filter(t => t.type === 'income' && normalizeArea(t.area) === 'empresa').reduce((s, t) => s + Number(t.amount), 0);
+    const incomeEmpresa = periodTxns.filter(t => t.type === 'income' && normalizeArea(t.area) === 'empresa').reduce((s, t) => s + Number(t.amount), 0) + athleteIncome;
     const expensePF = periodTxns.filter(t => t.type === 'expense' && normalizeArea(t.area) === 'pessoal').reduce((s, t) => s + Number(t.amount), 0);
     const expenseEmpresa = periodTxns.filter(t => t.type === 'expense' && normalizeArea(t.area) === 'empresa').reduce((s, t) => s + Number(t.amount), 0);
 
@@ -43,7 +54,7 @@ export function FinancialOverview({ filterStartDate, filterEndDate }: FinancialO
     else if (saldoTotal < 0 || totalExpense > totalIncome) health = 'negative';
 
     return { saldoPF, saldoEmpresa, saldoTotal, totalIncome, totalExpense, debtPF, debtEmpresa, health };
-  }, [transactions, debts, filterStartDate, filterEndDate]);
+  }, [transactions, debts, athletePayments, filterStartDate, filterEndDate]);
 
   const healthConfig = {
     positive: { label: 'Saudável', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: TrendingUp },
