@@ -442,7 +442,7 @@ export default function ClientDetail() {
                 checkinResponses.map((response: any) => (
                   <div 
                     key={response.id}
-                    onClick={() => navigate(`/checkin-review/${response.id}`)}
+                    onClick={() => navigate(`/clients/${client.id}/history`)}
                     className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors flex items-center justify-between"
                   >
                     <div>
