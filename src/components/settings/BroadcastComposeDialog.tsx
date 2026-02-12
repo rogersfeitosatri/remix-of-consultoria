@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,13 +10,21 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useClients } from '@/hooks/useClients';
 import { useWhatsAppContacts, useCreateBroadcast } from '@/hooks/useBroadcasts';
-import { Send, Clock, Upload, X, Search, UserPlus, Users, Paperclip, Eye } from 'lucide-react';
+import { Send, Clock, Upload, X, Search, UserPlus, Users, Paperclip, Eye, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+
+export interface BroadcastPrefill {
+  title: string;
+  body: string;
+  media_url?: string | null;
+  media_type?: string | null;
+}
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  prefill?: BroadcastPrefill;
 }
 
 interface Recipient {
@@ -28,7 +36,7 @@ interface Recipient {
   contactId?: string;
 }
 
-export function BroadcastComposeDialog({ open, onOpenChange }: Props) {
+export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
   const { data: clients = [] } = useClients();
   const { data: contacts = [] } = useWhatsAppContacts();
   const createBroadcast = useCreateBroadcast();
@@ -47,6 +55,16 @@ export function BroadcastComposeDialog({ open, onOpenChange }: Props) {
   const [manualPhone, setManualPhone] = useState('');
   const [manualName, setManualName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Pre-fill from cancelled/failed broadcast
+  useEffect(() => {
+    if (open && prefill) {
+      setTitle(prefill.title || '');
+      setBody(prefill.body || '');
+      setMediaUrl(prefill.media_url || null);
+      setMediaType(prefill.media_type || null);
+    }
+  }, [open, prefill]);
 
   const availableClients = clients.filter(c => 
     c.phone && 
@@ -286,10 +304,18 @@ export function BroadcastComposeDialog({ open, onOpenChange }: Props) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>Destinatários ({recipients.length})</Label>
-              <Button variant="outline" size="sm" onClick={addAllActiveClients} className="gap-1">
-                <Users className="h-3 w-3" />
-                Todos ativos
-              </Button>
+              <div className="flex gap-2">
+                {recipients.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => setRecipients([])} className="gap-1 text-destructive hover:text-destructive">
+                    <Trash2 className="h-3 w-3" />
+                    Limpar todos
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={addAllActiveClients} className="gap-1">
+                  <Users className="h-3 w-3" />
+                  Todos ativos
+                </Button>
+              </div>
             </div>
 
             {/* Search & add */}

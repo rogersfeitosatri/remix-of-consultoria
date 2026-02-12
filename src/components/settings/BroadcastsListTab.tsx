@@ -3,10 +3,11 @@ import { useBroadcasts, useBroadcastRecipients, useCancelBroadcast } from '@/hoo
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, ChevronDown, ChevronRight, XCircle } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronRight, XCircle, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import type { BroadcastPrefill } from './BroadcastComposeDialog';
 
 const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   draft: { label: 'Rascunho', variant: 'outline' },
@@ -18,7 +19,11 @@ const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondar
   cancelled: { label: 'Cancelado', variant: 'outline' },
 };
 
-export function BroadcastsListTab() {
+interface BroadcastsListTabProps {
+  onResend?: (prefill: BroadcastPrefill) => void;
+}
+
+export function BroadcastsListTab({ onResend }: BroadcastsListTabProps) {
   const { data: broadcasts = [], isLoading } = useBroadcasts();
   const cancelBroadcast = useCancelBroadcast();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -71,7 +76,7 @@ export function BroadcastsListTab() {
                   <TableCell className="text-sm">
                     {format(new Date(b.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="flex gap-1">
                     {b.status === 'scheduled' && (
                       <Button
                         variant="ghost"
@@ -79,6 +84,24 @@ export function BroadcastsListTab() {
                         onClick={e => { e.stopPropagation(); cancelBroadcast.mutate(b.id); }}
                       >
                         <XCircle className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                    {(b.status === 'cancelled' || b.status === 'failed') && onResend && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Reenviar com mesmos dados"
+                        onClick={e => {
+                          e.stopPropagation();
+                          onResend({
+                            title: b.internal_title,
+                            body: b.body,
+                            media_url: b.media_url,
+                            media_type: b.media_type,
+                          });
+                        }}
+                      >
+                        <RefreshCw className="h-4 w-4 text-primary" />
                       </Button>
                     )}
                   </TableCell>

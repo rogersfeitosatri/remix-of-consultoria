@@ -10,7 +10,7 @@ import {
 import { WhatsAppTemplatesTab } from './WhatsAppTemplatesTab';
 import { WhatsAppLogsTab } from './WhatsAppLogsTab';
 import { WhatsAppScheduledTab } from './WhatsAppScheduledTab';
-import { BroadcastComposeDialog } from './BroadcastComposeDialog';
+import { BroadcastComposeDialog, type BroadcastPrefill } from './BroadcastComposeDialog';
 import { BroadcastsListTab } from './BroadcastsListTab';
 import { ContactsTab } from './ContactsTab';
 import { MessageSquare, History, Clock, Loader2, Send, Users, Radio } from 'lucide-react';
@@ -23,6 +23,17 @@ export function WhatsAppControlCenter() {
   const initializeTemplates = useInitializeWhatsAppTemplates();
   const [initialized, setInitialized] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
+  const [composePrefill, setComposePrefill] = useState<BroadcastPrefill | undefined>();
+
+  const handleNewFromBroadcast = (prefill: BroadcastPrefill) => {
+    setComposePrefill(prefill);
+    setShowCompose(true);
+  };
+
+  const handleComposeClose = (open: boolean) => {
+    setShowCompose(open);
+    if (!open) setComposePrefill(undefined);
+  };
 
   // Initialize default templates if none exist
   useEffect(() => {
@@ -90,7 +101,7 @@ export function WhatsAppControlCenter() {
           </TabsList>
           
           <TabsContent value="broadcasts" className="mt-4">
-            <BroadcastsListTab />
+            <BroadcastsListTab onResend={handleNewFromBroadcast} />
           </TabsContent>
 
           <TabsContent value="templates" className="mt-4">
@@ -114,7 +125,7 @@ export function WhatsAppControlCenter() {
         </Tabs>
       </CardContent>
 
-      <BroadcastComposeDialog open={showCompose} onOpenChange={setShowCompose} />
+      <BroadcastComposeDialog open={showCompose} onOpenChange={handleComposeClose} prefill={composePrefill} />
     </Card>
   );
 }
