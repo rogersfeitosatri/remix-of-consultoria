@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,6 +34,35 @@ export function EvolutionAnalysisTab({ clientId, clientName, responses, question
   const [hasTargetRace, setHasTargetRace] = useState(false);
   const [targetRace, setTargetRace] = useState<{ name: string; deadline: string } | null>(null);
 
+  // Load saved analysis from DB
+  const { data: savedAnalysis, isLoading: loadingSaved } = useQuery({
+    queryKey: ['evolution_analysis', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('evolution_analyses')
+        .select('*')
+        .eq('client_id', clientId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!clientId,
+  });
+
+  // Populate state from saved analysis
+  useEffect(() => {
+    if (savedAnalysis && !analysis) {
+      setAnalysis(savedAnalysis.analysis as unknown as EvolutionAnalysis);
+      setHasTargetRace(savedAnalysis.has_target_race);
+      if (savedAnalysis.has_target_race && savedAnalysis.target_race_name) {
+        setTargetRace({
+          name: savedAnalysis.target_race_name,
+          deadline: savedAnalysis.target_race_deadline || '',
+        });
+      }
+    }
+  }, [savedAnalysis, analysis]);
+
   const analyzeMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('analyze-evolution', {
@@ -54,6 +83,8 @@ export function EvolutionAnalysisTab({ clientId, clientName, responses, question
       toast.error('Erro ao gerar análise: ' + (error.message || 'Tente novamente'));
     },
   });
+
+  const isLoadingState = loadingSaved && !analysis;
 
   return (
     <div className="space-y-6">
@@ -99,7 +130,14 @@ export function EvolutionAnalysisTab({ clientId, clientName, responses, question
           </div>
         </CardHeader>
 
-        {!analysis && !analyzeMutation.isPending && (
+        {isLoadingState && (
+          <CardContent className="text-center py-8">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">Carregando análise salva...</p>
+          </CardContent>
+        )}
+
+        {!analysis && !analyzeMutation.isPending && !isLoadingState && (
           <CardContent className="text-center py-8">
             <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
             <p className="text-muted-foreground">
@@ -117,8 +155,15 @@ export function EvolutionAnalysisTab({ clientId, clientName, responses, question
           </CardContent>
         )}
 
-        {analysis && (
+        {analysis && !analyzeMutation.isPending && (
           <CardContent className="space-y-6">
+            {/* Saved analysis timestamp */}
+            {savedAnalysis?.updated_at && (
+              <p className="text-xs text-muted-foreground">
+                Última análise: {new Date(savedAnalysis.updated_at).toLocaleString('pt-BR')}
+              </p>
+            )}
+
             {/* Target Race Badge */}
             {hasTargetRace && targetRace && (
               <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
