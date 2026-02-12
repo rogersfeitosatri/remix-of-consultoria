@@ -12,6 +12,8 @@ import { ExpensesSection } from '@/components/financial/ExpensesSection';
 import { AddPaymentDialog } from '@/components/financial/AddPaymentDialog';
 import { FinancialOverview } from '@/components/financial/FinancialOverview';
 import { ManagementCharts } from '@/components/financial/ManagementCharts';
+import { ReceiptScanDialog } from '@/components/financial/ReceiptScanDialog';
+import { FinancialInsightsPanel } from '@/components/financial/FinancialInsightsPanel';
 import { TransactionsList } from '@/components/financial/TransactionsList';
 import { DebtsList } from '@/components/financial/DebtsList';
 import { Button } from '@/components/ui/button';
@@ -26,7 +28,7 @@ import {
   getExpiringPlansInPeriod,
   getExpiringPlansTotal
 } from '@/hooks/useFinancialData';
-import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet } from 'lucide-react';
+import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet, Camera } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -42,6 +44,7 @@ export default function Financial() {
   const [filterEndDate, setFilterEndDate] = useState<Date>(endOfMonth(today));
   const [filter, setFilter] = useState<'all' | 'overdue' | 'upcoming'>(initialFilter as any);
   const [showAddPayment, setShowAddPayment] = useState(false);
+  const [showReceiptScan, setShowReceiptScan] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab);
   
   const { data: clients = [], isLoading: clientsLoading } = useClients();
@@ -167,7 +170,17 @@ export default function Financial() {
           <TabsContent value="gestao" className="space-y-6 mt-4">
             <FinancialOverview filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
 
+            {/* Quick action: scan receipt */}
+            <div className="flex justify-end">
+              <Button onClick={() => setShowReceiptScan(true)} variant="outline" className="gap-2">
+                <Camera className="h-4 w-4" />
+                Escanear Comprovante com IA
+              </Button>
+            </div>
+
             <ManagementCharts filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
+
+            <FinancialInsightsPanel filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
 
             <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
               <TransactionsList filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
@@ -232,6 +245,11 @@ export default function Financial() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ReceiptScanDialog
+        open={showReceiptScan}
+        onOpenChange={setShowReceiptScan}
+      />
 
       <AddPaymentDialog
         open={showAddPayment}
