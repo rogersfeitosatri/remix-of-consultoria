@@ -8,16 +8,21 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { Suspense, lazy } from "react";
 import { Loader2 } from "lucide-react";
 
-// Eager load critical pages
+// Eager load critical pages (sidebar nav + auth)
 import Auth from "./pages/Auth";
 import LinkBio from "./pages/LinkBio";
+import Dashboard from "./pages/Index";
+import Clients from "./pages/Clients";
+import Financial from "./pages/Financial";
+import CalendarPage from "./pages/Calendar";
+import Settings from "./pages/Settings";
+import SchedulingSettings from "./pages/SchedulingSettings";
+import ContentManager from "./pages/ContentManager";
+import LinkBioManager from "./pages/LinkBioManager";
+import Forms from "./pages/Forms";
+import Tasks from "./pages/Tasks";
 
-// Lazy load all other pages for faster initial load
-const Dashboard = lazy(() => import("./pages/Index"));
-const Clients = lazy(() => import("./pages/Clients"));
-const Financial = lazy(() => import("./pages/Financial"));
-const CalendarPage = lazy(() => import("./pages/Calendar"));
-const Settings = lazy(() => import("./pages/Settings"));
+// Lazy load detail/secondary pages only
 const Checkin = lazy(() => import("./pages/Checkin"));
 const CheckinFormBuilder = lazy(() => import("./pages/CheckinFormBuilder"));
 const AnamneseFormBuilder = lazy(() => import("./pages/AnamneseFormBuilder"));
@@ -26,20 +31,15 @@ const PublicAnamneseForm = lazy(() => import("./pages/PublicAnamneseForm"));
 const AthleteDashboard = lazy(() => import("./pages/AthleteDashboard"));
 const AthleteDynamicAnamneseForm = lazy(() => import("./pages/AthleteDynamicAnamneseForm"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Forms = lazy(() => import("./pages/Forms"));
 const AthleteAnalysis = lazy(() => import("./pages/AthleteAnalysis"));
 const AthleteHistory = lazy(() => import("./pages/AthleteHistory"));
 const CheckinReview = lazy(() => import("./pages/CheckinReview"));
-const SchedulingSettings = lazy(() => import("./pages/SchedulingSettings"));
 const PublicBooking = lazy(() => import("./pages/PublicBooking"));
 const PublicBookingConsult = lazy(() => import("./pages/PublicBookingConsult"));
-const ContentManager = lazy(() => import("./pages/ContentManager"));
-const LinkBioManager = lazy(() => import("./pages/LinkBioManager"));
 const QuestionBank = lazy(() => import("./pages/QuestionBank"));
 const AppointmentDetail = lazy(() => import("./pages/AppointmentDetail"));
 const AnamneseResponseDetail = lazy(() => import("./pages/AnamneseResponseDetail"));
 const PlansLanding = lazy(() => import("./pages/PlansLanding"));
-const Tasks = lazy(() => import("./pages/Tasks"));
 const ClientDetail = lazy(() => import("./pages/ClientDetail"));
 
 const queryClient = new QueryClient({
