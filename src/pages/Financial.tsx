@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { FinancialCharts } from '@/components/financial/FinancialCharts';
 import { FinancialFilters } from '@/components/financial/FinancialFilters';
@@ -9,6 +10,9 @@ import { AthletePaymentSearch } from '@/components/financial/AthletePaymentSearc
 import { ExpiringPlansList } from '@/components/financial/ExpiringPlansList';
 import { ExpensesSection } from '@/components/financial/ExpensesSection';
 import { AddPaymentDialog } from '@/components/financial/AddPaymentDialog';
+import { FinancialOverview } from '@/components/financial/FinancialOverview';
+import { TransactionsList } from '@/components/financial/TransactionsList';
+import { DebtsList } from '@/components/financial/DebtsList';
 import { Button } from '@/components/ui/button';
 import { useClients, usePayments, getOverduePayments, useAddPayment } from '@/hooks/useClients';
 import { 
@@ -21,7 +25,7 @@ import {
   getExpiringPlansInPeriod,
   getExpiringPlansTotal
 } from '@/hooks/useFinancialData';
-import { DollarSign, CreditCard, AlertCircle, Loader2, Plus } from 'lucide-react';
+import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -29,14 +33,15 @@ export default function Financial() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialFilter = searchParams.get('filter') || 'all';
+  const initialTab = searchParams.get('tab') || 'gestao';
   
   const today = new Date();
   
-  // Filtros de período
   const [filterStartDate, setFilterStartDate] = useState<Date>(startOfMonth(today));
   const [filterEndDate, setFilterEndDate] = useState<Date>(endOfMonth(today));
-  const [filter, setFilter] = useState<'all' | 'overdue' | 'upcoming'>(initialFilter as 'all' | 'overdue' | 'upcoming');
+  const [filter, setFilter] = useState<'all' | 'overdue' | 'upcoming'>(initialFilter as any);
   const [showAddPayment, setShowAddPayment] = useState(false);
+  const [activeTab, setActiveTab] = useState(initialTab);
   
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
@@ -53,7 +58,6 @@ export default function Financial() {
     [payments, filterStartDate, filterEndDate]
   );
   
-  // Cálculos de planos expirando (end_date do cliente + valor pago do pagamento correspondente)
   const expiringPlans = useMemo(() =>
     getExpiringPlansInPeriod(clients, payments, filterStartDate, filterEndDate),
     [clients, payments, filterStartDate, filterEndDate]
@@ -64,7 +68,6 @@ export default function Financial() {
     [clients, payments, filterStartDate, filterEndDate]
   );
   
-  // Dados para gráficos - agora respeitam o período filtrado
   const dailyIncomeData = useMemo(() =>
     getDailyIncomeData(payments, filterStartDate, filterEndDate),
     [payments, filterStartDate, filterEndDate]
@@ -85,7 +88,6 @@ export default function Financial() {
     [payments, filterStartDate, filterEndDate]
   );
   
-  // Pagamentos em atraso (para o card)
   const overduePayments = getOverduePayments(payments);
 
   const handleDateChange = (start: Date, end: Date) => {
@@ -97,7 +99,7 @@ export default function Financial() {
 
   const handleFilterClick = (newFilter: 'overdue' | 'upcoming') => {
     setFilter(newFilter);
-    navigate(`/financial?filter=${newFilter}`);
+    navigate(`/financial?filter=${newFilter}&tab=atletas`);
   };
 
   const handleAddPayment = async (data: {
@@ -131,50 +133,14 @@ export default function Financial() {
 
   return (
     <Layout>
-      <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+      <div className="space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Financeiro</h1>
-            <p className="mt-1 text-sm sm:text-base text-muted-foreground">Controle de recebimentos e pagamentos</p>
-          </div>
-          <Button onClick={() => setShowAddPayment(true)} className="gap-2 w-full sm:w-auto">
-            <Plus className="h-4 w-4" />
-            Registrar Entrada
-          </Button>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Financeiro</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Controle financeiro completo</p>
         </div>
 
-        {/* Stats - Mobile: single column, Desktop: 3 columns */}
-        <div className="grid gap-3 sm:gap-4 lg:gap-4 grid-cols-1 sm:grid-cols-3">
-          <StatCard
-            title="Entradas do Período"
-            value={`R$ ${incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-            subtitle="confirmados"
-            icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />}
-            variant="success"
-          />
-          <StatCard
-            title="Planos Expirando"
-            value={`R$ ${expiringTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-            subtitle={`${expiringPlans.length} planos`}
-            icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />}
-            variant="default"
-          />
-          <button 
-            onClick={() => handleFilterClick('overdue')}
-            className="text-left transition-transform hover:scale-[1.02] h-full"
-          >
-            <StatCard
-              title="Vencidos"
-              value={overduePayments.length}
-              subtitle="pendentes"
-              icon={<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />}
-              variant="warning"
-            />
-          </button>
-        </div>
-
-        {/* Filtros de período */}
+        {/* Period filter (shared) */}
         <div className="glass-card rounded-xl p-3 sm:p-4">
           <FinancialFilters
             startDate={filterStartDate}
@@ -183,28 +149,87 @@ export default function Financial() {
           />
         </div>
 
-        {/* Gráficos */}
-        <FinancialCharts
-          dailyIncomeData={dailyIncomeData}
-          monthlyIncomeData={monthlyIncomeData}
-          dailyDueData={dailyDueData}
-          monthlyDueData={monthlyDueData}
-        />
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="gestao" className="gap-2">
+              <Wallet className="h-4 w-4" />
+              Gestão Financeira
+            </TabsTrigger>
+            <TabsTrigger value="atletas" className="gap-2">
+              <Users className="h-4 w-4" />
+              Atletas
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Busca por atleta */}
-        <AthletePaymentSearch payments={payments} />
+          {/* Gestão Financeira Tab */}
+          <TabsContent value="gestao" className="space-y-6 mt-4">
+            <FinancialOverview filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
 
-        {/* Listas detalhadas */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
-          <IncomeList payments={incomePayments} title="Entradas Confirmadas" />
-          <ExpiringPlansList clients={expiringPlans} title="Planos Expirando" />
-        </div>
+            <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+              <TransactionsList filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
+              <DebtsList />
+            </div>
+          </TabsContent>
 
-        {/* Despesas */}
-        <ExpensesSection filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
+          {/* Atletas Tab (existing) */}
+          <TabsContent value="atletas" className="space-y-6 mt-4">
+            {/* Stats */}
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+              <StatCard
+                title="Entradas do Período"
+                value={`R$ ${incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                subtitle="confirmados"
+                icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />}
+                variant="success"
+              />
+              <StatCard
+                title="Planos Expirando"
+                value={`R$ ${expiringTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                subtitle={`${expiringPlans.length} planos`}
+                icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />}
+                variant="default"
+              />
+              <button 
+                onClick={() => handleFilterClick('overdue')}
+                className="text-left transition-transform hover:scale-[1.02] h-full"
+              >
+                <StatCard
+                  title="Vencidos"
+                  value={overduePayments.length}
+                  subtitle="pendentes"
+                  icon={<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  variant="warning"
+                />
+              </button>
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={() => setShowAddPayment(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Registrar Entrada
+              </Button>
+            </div>
+
+            <FinancialCharts
+              dailyIncomeData={dailyIncomeData}
+              monthlyIncomeData={monthlyIncomeData}
+              dailyDueData={dailyDueData}
+              monthlyDueData={monthlyDueData}
+            />
+
+            <AthletePaymentSearch payments={payments} />
+
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+              <IncomeList payments={incomePayments} title="Entradas Confirmadas" />
+              <ExpiringPlansList clients={expiringPlans} title="Planos Expirando" />
+            </div>
+
+            <ExpensesSection filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* Dialog para registrar entrada */}
       <AddPaymentDialog
         open={showAddPayment}
         onOpenChange={setShowAddPayment}

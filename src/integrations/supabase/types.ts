@@ -1656,6 +1656,117 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_debts: {
+        Row: {
+          area: string
+          created_at: string
+          due_date: string | null
+          has_due_date: boolean | null
+          id: string
+          name: string
+          notes: string | null
+          priority: string
+          remaining_amount: number
+          status: string
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          area: string
+          created_at?: string
+          due_date?: string | null
+          has_due_date?: boolean | null
+          id?: string
+          name: string
+          notes?: string | null
+          priority?: string
+          remaining_amount: number
+          status?: string
+          total_amount: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          area?: string
+          created_at?: string
+          due_date?: string | null
+          has_due_date?: boolean | null
+          id?: string
+          name?: string
+          notes?: string | null
+          priority?: string
+          remaining_amount?: number
+          status?: string
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      financial_transactions: {
+        Row: {
+          amount: number
+          area: string
+          card_name: string | null
+          category: string
+          created_at: string
+          current_installment: number | null
+          date: string
+          description: string | null
+          id: string
+          installments: number | null
+          is_recurring: boolean | null
+          notes: string | null
+          origin: string | null
+          payment_method: string | null
+          receipt_method: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          area: string
+          card_name?: string | null
+          category: string
+          created_at?: string
+          current_installment?: number | null
+          date?: string
+          description?: string | null
+          id?: string
+          installments?: number | null
+          is_recurring?: boolean | null
+          notes?: string | null
+          origin?: string | null
+          payment_method?: string | null
+          receipt_method?: string | null
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          area?: string
+          card_name?: string | null
+          category?: string
+          created_at?: string
+          current_installment?: number | null
+          date?: string
+          description?: string | null
+          id?: string
+          installments?: number | null
+          is_recurring?: boolean | null
+          notes?: string | null
+          origin?: string | null
+          payment_method?: string | null
+          receipt_method?: string | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       google_calendar_connections: {
         Row: {
           calendar_id: string | null
