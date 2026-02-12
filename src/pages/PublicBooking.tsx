@@ -366,7 +366,7 @@ export default function PublicBooking() {
         <div className="flex items-center gap-3 mb-8">
           <img src={logoRF} alt="Rogers Feitosa" className="h-12 w-12 rounded-xl object-cover" />
           <div>
-            <h1 className="text-xl font-bold">Rogers Feitosa</h1>
+            <h1 className="text-xl font-bold text-foreground">Rogers Feitosa</h1>
             <p className="text-sm text-muted-foreground">Nutrição & Treinamento</p>
           </div>
         </div>
