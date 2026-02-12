@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useClients, usePayments, useAddClient, Client } from '@/hooks/useClients';
-import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock, MessageSquare, ExternalLink } from 'lucide-react';
+import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label';
 import { useAdminSettings, useSaveAdminSettings } from '@/hooks/useAdminSettings';
 import { ChangePasswordForm } from '@/components/athlete/ChangePasswordForm';
 import { MessageTemplatesSection } from '@/components/settings/MessageTemplatesSection';
-import { WhatsAppControlCenter } from '@/components/settings/WhatsAppControlCenter';
 import { LandingPageSettingsSection } from '@/components/settings/LandingPageSettingsSection';
 
 const CHECKIN_LABELS: Record<string, string> = {
@@ -1054,23 +1053,6 @@ export default function Settings() {
             </AccordionContent>
           </AccordionItem>
 
-          {/* WhatsApp Control Center */}
-          <AccordionItem value="whatsapp" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <MessageSquare className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Central de WhatsApp</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Templates, mensagens programadas e histórico de envios
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <WhatsAppControlCenter />
-            </AccordionContent>
-          </AccordionItem>
 
           {/* Landing Page Plans */}
           <AccordionItem value="landing-plans" className="border border-border rounded-lg bg-card px-4">

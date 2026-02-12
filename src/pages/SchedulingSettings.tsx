@@ -38,7 +38,8 @@ import { ConsultAutomationPanel } from '@/components/scheduling/ConsultAutomatio
 import { GoogleCalendarSettings } from '@/components/scheduling/GoogleCalendarSettings';
 import { GoogleOAuthSettings } from '@/components/scheduling/GoogleOAuthSettings';
 import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog';
-import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban, Settings, Video, UserPlus, Save } from 'lucide-react';
+import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban, Settings, Video, UserPlus, Save, MessageSquare } from 'lucide-react';
+import { WhatsAppControlCenter } from '@/components/settings/WhatsAppControlCenter';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -243,6 +244,10 @@ export default function SchedulingSettings() {
             <TabsTrigger value="google" className="gap-2">
               <Video className="h-4 w-4" />
               Google Calendar
+            </TabsTrigger>
+            <TabsTrigger value="whatsapp" className="gap-2">
+              <MessageSquare className="h-4 w-4" />
+              WhatsApp
             </TabsTrigger>
           </TabsList>
 
@@ -608,6 +613,10 @@ export default function SchedulingSettings() {
           <TabsContent value="google" className="space-y-6">
             <GoogleOAuthSettings />
             <GoogleCalendarSettings />
+          </TabsContent>
+
+          <TabsContent value="whatsapp" className="space-y-6">
+            <WhatsAppControlCenter />
           </TabsContent>
         </Tabs>
         
