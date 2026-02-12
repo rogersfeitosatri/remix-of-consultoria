@@ -27,6 +27,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { EvolutionAnalysisTab } from '@/components/checkin/EvolutionAnalysisTab';
 
 interface CheckinResponse {
   id: string;
@@ -158,10 +159,7 @@ export default function CheckinReview() {
       if (!checkinResponse?.client_id) return [];
       const { data, error } = await supabase
         .from('checkin_responses')
-        .select(`
-          *,
-          checkin_forms (title)
-        `)
+        .select(`*, checkin_forms (title)`)
         .eq('client_id', checkinResponse.client_id)
         .neq('id', responseId)
         .order('submitted_at', { ascending: false })
@@ -170,6 +168,39 @@ export default function CheckinReview() {
       return data;
     },
     enabled: !!checkinResponse?.client_id,
+  });
+
+  // Fetch ALL responses for evolution charts
+  const { data: allResponses = [] } = useQuery({
+    queryKey: ['checkin_responses', 'all', checkinResponse?.client_id],
+    queryFn: async () => {
+      if (!checkinResponse?.client_id) return [];
+      const { data, error } = await supabase
+        .from('checkin_responses')
+        .select(`*, checkin_forms (title)`)
+        .eq('client_id', checkinResponse.client_id)
+        .order('submitted_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!checkinResponse?.client_id,
+  });
+
+  // Fetch questions for evolution charts
+  const evolutionFormId = allResponses[0]?.form_id;
+  const { data: evolutionQuestions = [] } = useQuery({
+    queryKey: ['checkin_questions_evolution', evolutionFormId],
+    queryFn: async () => {
+      if (!evolutionFormId) return [];
+      const { data, error } = await supabase
+        .from('checkin_questions')
+        .select('*')
+        .eq('form_id', evolutionFormId)
+        .order('order_index', { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!evolutionFormId,
   });
 
   // Initialize feedback text
@@ -385,7 +416,7 @@ export default function CheckinReview() {
 
         {/* Main Content */}
         <Tabs defaultValue="responses" key={responseId} className="space-y-4">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="responses" className="gap-2">
               <FileText className="h-4 w-4" />
               Respostas
@@ -397,6 +428,10 @@ export default function CheckinReview() {
             <TabsTrigger value="feedback" className="gap-2">
               <MessageSquare className="h-4 w-4" />
               Feedback
+            </TabsTrigger>
+            <TabsTrigger value="evolution" className="gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Evolução
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2">
               <History className="h-4 w-4" />
@@ -670,6 +705,18 @@ export default function CheckinReview() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Evolution Tab */}
+          <TabsContent value="evolution" className="space-y-4">
+            {checkinResponse?.client_id && (
+              <EvolutionAnalysisTab
+                clientId={checkinResponse.client_id}
+                clientName={checkinResponse.clients?.name || 'Atleta'}
+                responses={allResponses}
+                questions={evolutionQuestions}
+              />
+            )}
           </TabsContent>
 
           {/* History Tab */}
