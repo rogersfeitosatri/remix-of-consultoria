@@ -56,3 +56,9 @@ verify_jwt = false
 
 [functions.analyze-finances]
 verify_jwt = false
+
+[functions.send-broadcast]
+verify_jwt = false
+
+[functions.process-checkin-dispatches]
+verify_jwt = false

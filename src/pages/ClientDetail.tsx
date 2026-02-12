@@ -36,6 +36,7 @@ import { AnamneseResponseSection } from '@/components/admin/AnamneseResponseSect
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
 import { ClientForm } from '@/components/clients/ClientForm';
 import { ChangeAthletePasswordDialog } from '@/components/clients/ChangeAthletePasswordDialog';
+import { AthleteCheckinSchedules } from '@/components/admin/AthleteCheckinSchedules';
 import { useQuery } from '@tanstack/react-query';
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -398,6 +399,9 @@ export default function ClientDetail() {
         {(client.has_agenda_access || client.plan_type === 'premium') && (
           <PremiumClientDetails clientId={client.id} clientName={client.name} />
         )}
+        
+        {/* Automação de Check-ins */}
+        <AthleteCheckinSchedules clientId={client.id} />
         
         {/* Tabs */}
         <Tabs defaultValue="anamnese" className="space-y-4">

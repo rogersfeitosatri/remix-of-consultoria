@@ -410,6 +410,75 @@ export type Database = {
           },
         ]
       }
+      athlete_checkin_schedules: {
+        Row: {
+          checkin_form_id: string
+          client_id: string
+          created_at: string
+          due_at: string | null
+          due_in_hours: number | null
+          frequency_type: string
+          id: string
+          is_active: boolean
+          last_dispatched_at: string | null
+          send_time: string
+          start_date: string
+          timezone: string
+          updated_at: string
+          user_id: string
+          weekly_days: number[] | null
+        }
+        Insert: {
+          checkin_form_id: string
+          client_id: string
+          created_at?: string
+          due_at?: string | null
+          due_in_hours?: number | null
+          frequency_type?: string
+          id?: string
+          is_active?: boolean
+          last_dispatched_at?: string | null
+          send_time?: string
+          start_date: string
+          timezone?: string
+          updated_at?: string
+          user_id: string
+          weekly_days?: number[] | null
+        }
+        Update: {
+          checkin_form_id?: string
+          client_id?: string
+          created_at?: string
+          due_at?: string | null
+          due_in_hours?: number | null
+          frequency_type?: string
+          id?: string
+          is_active?: boolean
+          last_dispatched_at?: string | null
+          send_time?: string
+          start_date?: string
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+          weekly_days?: number[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_checkin_schedules_checkin_form_id_fkey"
+            columns: ["checkin_form_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_checkin_schedules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_profiles: {
         Row: {
           anamnese_completed: boolean | null
@@ -959,6 +1028,79 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkin_dispatches: {
+        Row: {
+          checkin_form_id: string
+          client_id: string
+          created_at: string
+          dispatch_token: string | null
+          due_at: string | null
+          error_message: string | null
+          id: string
+          link_checkin: string | null
+          provider_response: Json | null
+          schedule_id: string | null
+          sent_at: string
+          status: string
+          user_id: string
+          whatsapp_log_id: string | null
+        }
+        Insert: {
+          checkin_form_id: string
+          client_id: string
+          created_at?: string
+          dispatch_token?: string | null
+          due_at?: string | null
+          error_message?: string | null
+          id?: string
+          link_checkin?: string | null
+          provider_response?: Json | null
+          schedule_id?: string | null
+          sent_at?: string
+          status?: string
+          user_id: string
+          whatsapp_log_id?: string | null
+        }
+        Update: {
+          checkin_form_id?: string
+          client_id?: string
+          created_at?: string
+          dispatch_token?: string | null
+          due_at?: string | null
+          error_message?: string | null
+          id?: string
+          link_checkin?: string | null
+          provider_response?: Json | null
+          schedule_id?: string | null
+          sent_at?: string
+          status?: string
+          user_id?: string
+          whatsapp_log_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_dispatches_checkin_form_id_fkey"
+            columns: ["checkin_form_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_dispatches_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_checkin_schedules"
             referencedColumns: ["id"]
           },
         ]
@@ -2536,6 +2678,157 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_broadcast_recipients: {
+        Row: {
+          broadcast_id: string
+          client_id: string | null
+          contact_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          idempotency_key: string | null
+          phone: string
+          provider_response: Json | null
+          recipient_name: string | null
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          broadcast_id: string
+          client_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string | null
+          phone: string
+          provider_response?: Json | null
+          recipient_name?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          broadcast_id?: string
+          client_id?: string | null
+          contact_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string | null
+          phone?: string
+          provider_response?: Json | null
+          recipient_name?: string | null
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_broadcast_recipients_broadcast_id_fkey"
+            columns: ["broadcast_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_broadcasts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_broadcast_recipients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_broadcast_recipients_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_broadcasts: {
+        Row: {
+          body: string
+          created_at: string
+          failed_count: number | null
+          id: string
+          internal_title: string
+          media_type: string | null
+          media_url: string | null
+          scheduled_at: string | null
+          send_type: string
+          sent_count: number | null
+          status: string
+          total_recipients: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          failed_count?: number | null
+          id?: string
+          internal_title: string
+          media_type?: string | null
+          media_url?: string | null
+          scheduled_at?: string | null
+          send_type?: string
+          sent_count?: number | null
+          status?: string
+          total_recipients?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          failed_count?: number | null
+          id?: string
+          internal_title?: string
+          media_type?: string | null
+          media_url?: string | null
+          scheduled_at?: string | null
+          send_type?: string
+          sent_count?: number | null
+          status?: string
+          total_recipients?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      whatsapp_contacts: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string
+          source: string | null
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone: string
+          source?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string
+          source?: string | null
+          tags?: string[] | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
