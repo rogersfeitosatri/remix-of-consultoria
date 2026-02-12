@@ -103,7 +103,7 @@ export default function Auth() {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur-sm border-b border-gray-800">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-          <Link to="/" className="font-bold text-lg text-[hsl(43,74%,49%)]">RF Assessoria</Link>
+          <Link to="/" className="font-bold text-lg text-[hsl(43,74%,49%)]">Rogers Feitosa</Link>
         </div>
       </header>
 
@@ -236,7 +236,7 @@ export default function Auth() {
 
       {/* Footer */}
       <footer className="py-4 bg-black border-t border-gray-800 text-gray-500 text-center text-xs">
-        <p>© 2026 RF Assessoria. Todos os direitos reservados.</p>
+        <p>© 2026 Rogers Feitosa. Todos os direitos reservados.</p>
       </footer>
     </div>
   );

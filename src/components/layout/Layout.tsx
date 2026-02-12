@@ -1,7 +1,8 @@
 import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Menu, Dumbbell } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import logoRF from '@/assets/logo-rf.jpg';
 
 interface LayoutProps {
   children: ReactNode;
@@ -29,10 +30,8 @@ export function Layout({ children }: LayoutProps) {
           <Menu className="h-5 w-5 text-foreground" />
         </button>
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Dumbbell className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <span className="font-semibold text-foreground">RF Assessoria</span>
+          <img src={logoRF} alt="Rogers Feitosa" className="h-8 w-8 rounded-lg object-cover" />
+          <span className="font-semibold text-foreground">Rogers Feitosa</span>
         </div>
       </header>
       

@@ -147,7 +147,7 @@ export function ExportClientsButton({ clients, targetRaceAlerts = [], filename =
               ${tableRows}
             </tbody>
           </table>
-          <p class="footer">RF Assessoria Esportiva</p>
+          <p class="footer">Rogers Feitosa - Nutrição & Treinamento</p>
         </body>
         </html>
       `;

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import logoRF from '@/assets/logo-rf.jpg';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -63,17 +64,15 @@ export function AthleteSidebar({
       </SheetTrigger>
       <SheetContent side="left" className="bg-gray-900 border-gray-800 text-white w-72 p-0">
         <SheetHeader className="p-4 border-b border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[hsl(43,74%,49%)]">
-              <PersonStanding className="h-5 w-5 text-black" />
-            </div>
-            <div className="text-left flex items-center gap-2">
-              <div>
-                <SheetTitle className="text-lg font-bold text-[hsl(43,74%,49%)]">
-                  RF Assessoria
-                </SheetTitle>
-                <p className="text-xs text-gray-400">Esportiva</p>
-              </div>
+           <div className="flex items-center gap-3">
+             <img src={logoRF} alt="Rogers Feitosa" className="h-10 w-10 rounded-lg object-cover" />
+             <div className="text-left flex items-center gap-2">
+               <div>
+                 <SheetTitle className="text-lg font-bold text-[hsl(43,74%,49%)]">
+                   Rogers Feitosa
+                 </SheetTitle>
+                 <p className="text-xs text-gray-400">Nutrição & Treinamento</p>
+               </div>
               <Badge 
                 variant="outline" 
                 className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50 text-[10px] font-bold px-1.5 py-0"

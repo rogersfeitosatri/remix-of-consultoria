@@ -153,7 +153,7 @@ export default function Clients() {
                 if (options?.sendCredentials && data.phone) {
                   // Enviar credenciais via Z-API (WhatsApp direto)
                   const baseUrl = window.location.origin;
-                  const message = `🏃 *RF Assessoria - Bem-vindo!*\n\nOlá ${data.name}!\n\nSua conta foi criada com sucesso.\n\n📧 *Login:* ${data.email}\n🔑 *Senha:* 123456\n\n🔗 Acesse: ${baseUrl}/auth\n\n⚠️ Recomendamos trocar sua senha no primeiro acesso.\n\nQualquer dúvida, estamos à disposição!`;
+                  const message = `🏃 *Rogers Feitosa - Bem-vindo!*\n\nOlá ${data.name}!\n\nSua conta foi criada com sucesso.\n\n📧 *Login:* ${data.email}\n🔑 *Senha:* 123456\n\n🔗 Acesse: ${baseUrl}/auth\n\n⚠️ Recomendamos trocar sua senha no primeiro acesso.\n\nQualquer dúvida, estamos à disposição!`;
                   
                   try {
                     const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
