@@ -193,6 +193,7 @@ export function CheckinEvolutionCharts({ responses, questions }: Props) {
                     stroke="hsl(var(--primary))" 
                     strokeWidth={2}
                     dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+                    connectNulls
                     name="Peso (kg)"
                   />
                 </LineChart>
@@ -255,7 +256,8 @@ export function CheckinEvolutionCharts({ responses, questions }: Props) {
                       dataKey="disposition" 
                       stroke="hsl(var(--chart-2))" 
                       strokeWidth={2}
-                      dot={{ r: 3 }}
+                      dot={{ r: 4 }}
+                      connectNulls
                       name="Disposição"
                     />
                   )}
@@ -265,7 +267,8 @@ export function CheckinEvolutionCharts({ responses, questions }: Props) {
                       dataKey="sleep" 
                       stroke="hsl(var(--chart-3))" 
                       strokeWidth={2}
-                      dot={{ r: 3 }}
+                      dot={{ r: 4 }}
+                      connectNulls
                       name="Sono"
                     />
                   )}
@@ -275,7 +278,8 @@ export function CheckinEvolutionCharts({ responses, questions }: Props) {
                       dataKey="training" 
                       stroke="hsl(var(--chart-4))" 
                       strokeWidth={2}
-                      dot={{ r: 3 }}
+                      dot={{ r: 4 }}
+                      connectNulls
                       name="Treinos"
                     />
                   )}
@@ -329,6 +333,7 @@ export function CheckinEvolutionCharts({ responses, questions }: Props) {
                     stroke="hsl(var(--chart-1))" 
                     strokeWidth={2}
                     dot={{ fill: 'hsl(var(--chart-1))', r: 4 }}
+                    connectNulls
                     name="Percepção"
                   />
                 </LineChart>

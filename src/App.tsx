@@ -22,7 +22,12 @@ import LinkBioManager from "./pages/LinkBioManager";
 import Forms from "./pages/Forms";
 import Tasks from "./pages/Tasks";
 
-// Lazy load detail/secondary pages only
+// Eager load frequently accessed detail pages
+import AthleteHistory from "./pages/AthleteHistory";
+import ClientDetail from "./pages/ClientDetail";
+import CheckinReview from "./pages/CheckinReview";
+
+// Lazy load remaining secondary pages
 const Checkin = lazy(() => import("./pages/Checkin"));
 const CheckinFormBuilder = lazy(() => import("./pages/CheckinFormBuilder"));
 const AnamneseFormBuilder = lazy(() => import("./pages/AnamneseFormBuilder"));
@@ -32,15 +37,12 @@ const AthleteDashboard = lazy(() => import("./pages/AthleteDashboard"));
 const AthleteDynamicAnamneseForm = lazy(() => import("./pages/AthleteDynamicAnamneseForm"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AthleteAnalysis = lazy(() => import("./pages/AthleteAnalysis"));
-const AthleteHistory = lazy(() => import("./pages/AthleteHistory"));
-const CheckinReview = lazy(() => import("./pages/CheckinReview"));
 const PublicBooking = lazy(() => import("./pages/PublicBooking"));
 const PublicBookingConsult = lazy(() => import("./pages/PublicBookingConsult"));
 const QuestionBank = lazy(() => import("./pages/QuestionBank"));
 const AppointmentDetail = lazy(() => import("./pages/AppointmentDetail"));
 const AnamneseResponseDetail = lazy(() => import("./pages/AnamneseResponseDetail"));
 const PlansLanding = lazy(() => import("./pages/PlansLanding"));
-const ClientDetail = lazy(() => import("./pages/ClientDetail"));
 
 const queryClient = new QueryClient({
   defaultOptions: {

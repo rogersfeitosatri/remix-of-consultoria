@@ -153,7 +153,7 @@ export default function AthleteHistory() {
                 <User className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-xl font-bold">{client.name}</h1>
+                <h1 className="text-xl font-bold text-foreground">{client.name}</h1>
                 <p className="text-sm text-muted-foreground">{client.email}</p>
               </div>
             </div>
