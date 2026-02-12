@@ -384,7 +384,7 @@ export default function CheckinReview() {
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="responses" className="space-y-4">
+        <Tabs defaultValue="responses" key={responseId} className="space-y-4">
           <TabsList>
             <TabsTrigger value="responses" className="gap-2">
               <FileText className="h-4 w-4" />
@@ -690,7 +690,12 @@ export default function CheckinReview() {
                   <Card 
                     key={response.id}
                     className="cursor-pointer hover:border-primary/50 transition-colors"
-                    onClick={() => navigate(`/checkin-review/${response.id}`)}
+                    onClick={() => {
+                      navigate(`/checkin-review/${response.id}`);
+                      // Force state reset for new review
+                      setFeedbackInitialized(false);
+                      setEditedFeedback('');
+                    }}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
