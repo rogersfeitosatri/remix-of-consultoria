@@ -1,11 +1,17 @@
-import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMemo, useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, TrendingUp, TrendingDown, Building2, User, Wallet, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { TrendingUp, TrendingDown, Building2, User, Wallet, AlertTriangle, Settings2, Loader2 } from 'lucide-react';
 import { useFinancialTransactions, normalizeArea } from '@/hooks/useFinancialTransactions';
 import { useFinancialDebts } from '@/hooks/useFinancialDebts';
 import { usePayments } from '@/hooks/useClients';
-import { parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import { useInitialBalances, useUpsertInitialBalance } from '@/hooks/useInitialBalances';
+import { parseISO, isWithinInterval } from 'date-fns';
+import { toast } from 'sonner';
 
 interface FinancialOverviewProps {
   filterStartDate: Date;
@@ -16,6 +22,16 @@ export function FinancialOverview({ filterStartDate, filterEndDate }: FinancialO
   const { data: transactions = [] } = useFinancialTransactions();
   const { data: debts = [] } = useFinancialDebts();
   const { data: athletePayments = [] } = usePayments();
+  const { data: initialBalances = [] } = useInitialBalances();
+  const upsertBalance = useUpsertInitialBalance();
+
+  const [showBalanceDialog, setShowBalanceDialog] = useState(false);
+  const [balanceInput, setBalanceInput] = useState('');
+
+  const initialAmount = useMemo(() => {
+    const geral = initialBalances.find(b => b.area === 'geral');
+    return geral ? Number(geral.amount) : 0;
+  }, [initialBalances]);
 
   const stats = useMemo(() => {
     const periodTxns = transactions.filter(t => {
@@ -23,7 +39,6 @@ export function FinancialOverview({ filterStartDate, filterEndDate }: FinancialO
       return isWithinInterval(d, { start: filterStartDate, end: filterEndDate });
     });
 
-    // Athlete payments (paid) count as Empresa income
     const athleteIncome = athletePayments
       .filter(p => {
         if (p.status !== 'paid' || !p.paid_at) return false;
@@ -37,24 +52,23 @@ export function FinancialOverview({ filterStartDate, filterEndDate }: FinancialO
     const expensePF = periodTxns.filter(t => t.type === 'expense' && normalizeArea(t.area) === 'pessoal').reduce((s, t) => s + Number(t.amount), 0);
     const expenseEmpresa = periodTxns.filter(t => t.type === 'expense' && normalizeArea(t.area) === 'empresa').reduce((s, t) => s + Number(t.amount), 0);
 
-    const saldoPF = incomePF - expensePF;
-    const saldoEmpresa = incomeEmpresa - expenseEmpresa;
-    const saldoTotal = saldoPF + saldoEmpresa;
+    const saldoPeriodo = (incomePF + incomeEmpresa) - (expensePF + expenseEmpresa);
+    const saldoTotal = initialAmount + saldoPeriodo;
 
     const totalIncome = incomePF + incomeEmpresa;
     const totalExpense = expensePF + expenseEmpresa;
+    const resultado = totalIncome - totalExpense;
 
     const activeDebts = debts.filter(d => d.status === 'ativa');
     const debtPF = activeDebts.filter(d => normalizeArea(d.area) === 'pessoal').reduce((s, d) => s + Number(d.remaining_amount), 0);
     const debtEmpresa = activeDebts.filter(d => normalizeArea(d.area) === 'empresa').reduce((s, d) => s + Number(d.remaining_amount), 0);
 
-    // Health indicator
     let health: 'positive' | 'neutral' | 'negative' = 'neutral';
-    if (saldoTotal > 0 && totalExpense < totalIncome * 0.8) health = 'positive';
+    if (saldoTotal > 0 && totalExpense <= totalIncome * 0.8) health = 'positive';
     else if (saldoTotal < 0 || totalExpense > totalIncome) health = 'negative';
 
-    return { saldoPF, saldoEmpresa, saldoTotal, totalIncome, totalExpense, debtPF, debtEmpresa, health };
-  }, [transactions, debts, athletePayments, filterStartDate, filterEndDate]);
+    return { saldoTotal, totalIncome, totalExpense, resultado, debtPF, debtEmpresa, health };
+  }, [transactions, debts, athletePayments, initialAmount, filterStartDate, filterEndDate]);
 
   const healthConfig = {
     positive: { label: 'Saudável', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: TrendingUp },
@@ -63,85 +77,89 @@ export function FinancialOverview({ filterStartDate, filterEndDate }: FinancialO
   };
 
   const hc = healthConfig[stats.health];
+  const fmt = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
-  const formatCurrency = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  const handleSaveBalance = async () => {
+    try {
+      await upsertBalance.mutateAsync({ area: 'geral', amount: parseFloat(balanceInput), notes: 'Saldo inicial' });
+      toast.success('Saldo atualizado!');
+      setShowBalanceDialog(false);
+    } catch { toast.error('Erro ao atualizar saldo'); }
+  };
 
   return (
     <div className="space-y-4">
-      {/* Health indicator */}
-      <div className="flex items-center gap-2">
+      {/* Health + balance edit */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <Badge className={`${hc.color} gap-1 px-3 py-1`}>
           <hc.icon className="h-3.5 w-3.5" />
           Saúde Financeira: {hc.label}
         </Badge>
+        <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground" onClick={() => { setBalanceInput(initialAmount.toString()); setShowBalanceDialog(true); }}>
+          <Settings2 className="h-3.5 w-3.5" /> Saldo Inicial: {fmt(initialAmount)}
+        </Button>
       </div>
 
-      {/* Main stats */}
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <Card className="border-blue-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/20"><User className="h-4 w-4 text-blue-400" /></div>
-              <div>
-                <p className="text-xs text-muted-foreground">Saldo Pessoa Física</p>
-                <p className={`text-lg font-bold ${stats.saldoPF >= 0 ? 'text-green-400' : 'text-red-400'}`}>{formatCurrency(stats.saldoPF)}</p>
-              </div>
+      {/* Main stat: Saldo atual */}
+      <Card className="border-primary/30">
+        <CardContent className="p-5">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-primary/20"><Wallet className="h-6 w-6 text-primary" /></div>
+            <div>
+              <p className="text-sm text-muted-foreground">Saldo Atual em Caixa</p>
+              <p className={`text-2xl font-bold ${stats.saldoTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.saldoTotal)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Base: {fmt(initialAmount)} + resultado do período</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card className="border-purple-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/20"><Building2 className="h-4 w-4 text-purple-400" /></div>
-              <div>
-                <p className="text-xs text-muted-foreground">Saldo Empresa</p>
-                <p className={`text-lg font-bold ${stats.saldoEmpresa >= 0 ? 'text-green-400' : 'text-red-400'}`}>{formatCurrency(stats.saldoEmpresa)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/20"><Wallet className="h-4 w-4 text-primary" /></div>
-              <div>
-                <p className="text-xs text-muted-foreground">Saldo Consolidado</p>
-                <p className={`text-lg font-bold ${stats.saldoTotal >= 0 ? 'text-green-400' : 'text-red-400'}`}>{formatCurrency(stats.saldoTotal)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Secondary stats */}
+      {/* Period stats */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <Card>
           <CardContent className="p-3">
-            <p className="text-[11px] text-muted-foreground">Entradas</p>
-            <p className="text-sm font-semibold text-green-400">{formatCurrency(stats.totalIncome)}</p>
+            <p className="text-[11px] text-muted-foreground">Entradas Mês</p>
+            <p className="text-sm font-semibold text-green-400">{fmt(stats.totalIncome)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
-            <p className="text-[11px] text-muted-foreground">Saídas</p>
-            <p className="text-sm font-semibold text-red-400">{formatCurrency(stats.totalExpense)}</p>
+            <p className="text-[11px] text-muted-foreground">Saídas Mês</p>
+            <p className="text-sm font-semibold text-red-400">{fmt(stats.totalExpense)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
-            <p className="text-[11px] text-muted-foreground">Dívidas PF</p>
-            <p className="text-sm font-semibold text-foreground">{formatCurrency(stats.debtPF)}</p>
+            <p className="text-[11px] text-muted-foreground">Resultado</p>
+            <p className={`text-sm font-semibold ${stats.resultado >= 0 ? 'text-green-400' : 'text-red-400'}`}>{fmt(stats.resultado)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
-            <p className="text-[11px] text-muted-foreground">Dívidas Empresa</p>
-            <p className="text-sm font-semibold text-foreground">{formatCurrency(stats.debtEmpresa)}</p>
+            <p className="text-[11px] text-muted-foreground">Dívidas Ativas</p>
+            <p className="text-sm font-semibold text-foreground">{fmt(stats.debtPF + stats.debtEmpresa)}</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Balance edit dialog */}
+      <Dialog open={showBalanceDialog} onOpenChange={setShowBalanceDialog}>
+        <DialogContent className="sm:max-w-[350px]">
+          <DialogHeader><DialogTitle className="text-foreground">Ajustar Saldo Inicial</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-foreground">Saldo em caixa (R$)</Label>
+              <Input type="number" step="0.01" value={balanceInput} onChange={(e) => setBalanceInput(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowBalanceDialog(false)}>Cancelar</Button>
+              <Button onClick={handleSaveBalance} disabled={upsertBalance.isPending}>
+                {upsertBalance.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

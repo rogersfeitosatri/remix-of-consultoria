@@ -11,6 +11,7 @@ import { ExpiringPlansList } from '@/components/financial/ExpiringPlansList';
 import { ExpensesSection } from '@/components/financial/ExpensesSection';
 import { AddPaymentDialog } from '@/components/financial/AddPaymentDialog';
 import { FinancialOverview } from '@/components/financial/FinancialOverview';
+import { ManagementCharts } from '@/components/financial/ManagementCharts';
 import { TransactionsList } from '@/components/financial/TransactionsList';
 import { DebtsList } from '@/components/financial/DebtsList';
 import { Button } from '@/components/ui/button';
@@ -165,6 +166,8 @@ export default function Financial() {
           {/* Gestão Financeira Tab */}
           <TabsContent value="gestao" className="space-y-6 mt-4">
             <FinancialOverview filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
+
+            <ManagementCharts filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
 
             <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
               <TransactionsList filterStartDate={filterStartDate} filterEndDate={filterEndDate} />

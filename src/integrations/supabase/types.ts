@@ -1704,6 +1704,39 @@ export type Database = {
         }
         Relationships: []
       }
+      financial_initial_balances: {
+        Row: {
+          amount: number
+          area: string
+          created_at: string
+          id: string
+          notes: string | null
+          reference_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          area?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          reference_date?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          area?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          reference_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       financial_transactions: {
         Row: {
           amount: number
