@@ -36,7 +36,7 @@ function FinancialChart({ dailyData, monthlyData, title, color, icon }: ChartPro
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
+    <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium text-foreground">
             {viewType === 'daily' ? `Dia ${label}` : label}
           </p>
