@@ -70,7 +70,7 @@ export default function PlansLanding() {
           </p>
           <Button
             size="lg"
-            className="bg-white text-black hover:bg-gray-200 text-lg px-8 py-6 h-auto font-semibold"
+            className="bg-white text-primary-foreground hover:bg-gray-200 text-lg px-8 py-6 h-auto font-semibold"
             onClick={() => document.getElementById('planos')?.scrollIntoView({ behavior: 'smooth' })}
           >
             Conhecer os Planos
@@ -142,7 +142,7 @@ export default function PlansLanding() {
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent rounded-3xl transform group-hover:scale-105 transition-transform duration-300" />
               <div className="relative bg-zinc-900/50 backdrop-blur-sm rounded-3xl p-8 border border-white/20 h-full">
-                <div className="absolute -top-3 -right-3 bg-white text-black text-xs font-bold px-3 py-1 rounded-full">
+                <div className="absolute -top-3 -right-3 bg-white text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
                   MAIS COMPLETO
                 </div>
                 <div className="aspect-[4/3] rounded-2xl overflow-hidden mb-8">
@@ -216,7 +216,7 @@ export default function PlansLanding() {
                 ))}
               </ul>
               <Button
-                className="w-full h-14 text-lg font-semibold bg-white text-black hover:bg-gray-200"
+                className="w-full h-14 text-lg font-semibold bg-white text-primary-foreground hover:bg-gray-200"
                 onClick={() => window.open(consultoriaUrl, '_blank')}
                 disabled={isLoading}
               >
@@ -231,8 +231,8 @@ export default function PlansLanding() {
                 MAIS POPULAR
               </div>
               <div className="flex items-center gap-3 mb-6">
-                <Award className="h-8 w-8 text-black" />
-                <h3 className="text-2xl md:text-3xl font-bold text-black">Plano Consultas</h3>
+                <Award className="h-8 w-8 text-primary-foreground" />
+                <h3 className="text-2xl md:text-3xl font-bold text-primary-foreground">Plano Consultas</h3>
               </div>
               <p className="text-gray-600 mb-8">
                 Acompanhamento completo com consultas periódicas, ajustes semanais e suporte intensivo.
@@ -241,9 +241,9 @@ export default function PlansLanding() {
                 {consultasFeatures.map((feature, index) => (
                   <li key={index} className="flex items-start gap-3">
                     <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Check className="h-4 w-4 text-black" />
+                      <Check className="h-4 w-4 text-primary-foreground" />
                     </div>
-                    <span className="text-gray-700">{feature}</span>
+                    <span className="text-gray-600">{feature}</span>
                   </li>
                 ))}
               </ul>

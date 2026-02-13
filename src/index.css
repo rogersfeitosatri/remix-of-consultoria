@@ -177,49 +177,88 @@
 }
 
 /* ============================================
-   ADMIN AREA - Global Contrast Fix
+   GLOBAL DARK MODE - Comprehensive Contrast Fix
    Ensures all text/icons are readable on dark bg
    ============================================ */
-.dark {
-  /* Buttons in admin - ensure text is visible */
-  & button:not([class*="bg-"]):not([class*="text-"]) {
-    @apply text-foreground;
-  }
-  
-  /* Ghost/outline buttons should have visible text */
-  & [data-variant="ghost"],
-  & [data-variant="outline"] {
-    @apply text-foreground;
-  }
-}
 
-/* Admin layout specific overrides */
-.dark main {
-  /* All SVG icons in admin should be visible */
-  & svg:not([class*="text-"]) {
-    @apply text-foreground;
+/* Force foreground color on all text elements that don't have explicit color */
+.dark {
+  color: hsl(var(--foreground));
+
+  /* Headings */
+  & h1:not([class*="text-"]),
+  & h2:not([class*="text-"]),
+  & h3:not([class*="text-"]),
+  & h4:not([class*="text-"]),
+  & h5:not([class*="text-"]),
+  & h6:not([class*="text-"]) {
+    color: hsl(var(--foreground));
   }
-  
-  /* Ensure link text is visible */
+
+  /* Paragraphs and spans without explicit color */
+  & p:not([class*="text-"]),
+  & span:not([class*="text-"]),
+  & li:not([class*="text-"]),
+  & td:not([class*="text-"]),
+  & th:not([class*="text-"]) {
+    color: hsl(var(--foreground));
+  }
+
+  /* Form elements */
+  & label:not([class*="text-"]) {
+    color: hsl(var(--foreground));
+  }
+
+  & input:not([class*="text-"]),
+  & textarea:not([class*="text-"]),
+  & select:not([class*="text-"]) {
+    color: hsl(var(--foreground));
+  }
+
+  /* Links */
   & a:not([class*="text-"]) {
-    @apply text-foreground hover:text-primary;
+    color: hsl(var(--foreground));
   }
-  
-  /* Badge/chip text visibility */
+  & a:not([class*="text-"]):hover {
+    color: hsl(var(--primary));
+  }
+
+  /* SVG icons */
+  & svg:not([class*="text-"]) {
+    color: hsl(var(--foreground));
+  }
+
+  /* Buttons - ghost/outline variants */
+  & button:not([class*="text-"]):not([class*="bg-"]) {
+    color: hsl(var(--foreground));
+  }
+
+  /* Badge/chip text */
   & [class*="badge"]:not([class*="text-"]),
   & [class*="chip"]:not([class*="text-"]) {
-    @apply text-foreground;
+    color: hsl(var(--foreground));
   }
-  
-  /* Table text visibility */
-  & table td:not([class*="text-"]),
-  & table th:not([class*="text-"]) {
-    @apply text-foreground;
+
+  /* Card titles and descriptions */
+  & [class*="CardTitle"]:not([class*="text-"]),
+  & [class*="card-title"]:not([class*="text-"]) {
+    color: hsl(var(--foreground));
   }
-  
-  /* Form labels visibility */
-  & label:not([class*="text-"]) {
-    @apply text-foreground;
+
+  /* Tabs */
+  & [role="tab"]:not([class*="text-"]) {
+    color: hsl(var(--foreground));
+  }
+
+  /* Breadcrumbs */
+  & nav[aria-label*="breadcrumb"] a:not([class*="text-"]),
+  & nav[aria-label*="breadcrumb"] span:not([class*="text-"]) {
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Placeholder - ensure readable on dark bg */
+  & ::placeholder {
+    color: hsl(var(--muted-foreground));
   }
 }
 

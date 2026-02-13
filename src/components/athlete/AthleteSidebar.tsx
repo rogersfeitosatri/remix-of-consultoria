@@ -100,7 +100,7 @@ export function AthleteSidebar({
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-left",
                   activeTab === item.id
-                    ? "bg-[hsl(43,74%,49%)] text-black"
+                    ? "bg-[hsl(43,74%,49%)] text-primary-foreground"
                     : "text-gray-300 hover:bg-gray-800"
                 )}
               >

@@ -84,7 +84,7 @@ export function Challenge42Section({ clientId, isPreview = false }: Challenge42S
                 <p className="text-sm text-gray-400">{totalCompleted} de {totalPossible} atividades completadas</p>
               </div>
             </div>
-            <Badge className="bg-[hsl(43,74%,49%)] text-black font-bold text-lg px-4 py-2">
+            <Badge className="bg-[hsl(43,74%,49%)] text-primary-foreground font-bold text-lg px-4 py-2">
               {progressPercentage}%
             </Badge>
           </div>

@@ -352,7 +352,7 @@ export default function PublicBookingConsult() {
               <Button
                 onClick={handleEmailVerification}
                 disabled={isVerifying || !emailInput.trim()}
-                className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold"
+                className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground font-bold"
               >
                 {isVerifying ? (
                   <>
@@ -438,7 +438,7 @@ export default function PublicBookingConsult() {
 
           <Button
             onClick={() => window.location.href = '/atleta'}
-            className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold"
+            className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground font-bold"
           >
             Voltar à largada
           </Button>
@@ -530,7 +530,7 @@ export default function PublicBookingConsult() {
                       onClick={() => setSelectedTime(slot.time)}
                       className={
                         selectedTime === slot.time
-                          ? 'bg-[hsl(43,74%,49%)] text-black hover:bg-[hsl(43,74%,40%)]'
+                          ? 'bg-[hsl(43,74%,49%)] text-primary-foreground hover:bg-[hsl(43,74%,40%)]'
                           : 'border-gray-700 text-gray-300 hover:bg-gray-800'
                       }
                     >
@@ -557,7 +557,7 @@ export default function PublicBookingConsult() {
                   <Button
                     onClick={handleConfirm}
                     disabled={isSubmitting}
-                    className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold px-8"
+                    className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground font-bold px-8"
                   >
                     {isSubmitting ? (
                       <>

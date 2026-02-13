@@ -74,14 +74,14 @@ function TimelineSteps({ steps, variant }: { steps: typeof consultasSteps; varia
           <div key={index} className="flex items-start gap-5 relative">
             {/* Icon circle */}
             <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-              isLight ? 'bg-black text-white' : 'bg-white text-black'
+              isLight ? 'bg-primary-foreground text-white' : 'bg-white text-primary-foreground'
             }`}>
               <step.icon className="h-5 w-5" />
             </div>
 
             {/* Content */}
             <div className="pt-1">
-              <h4 className={`font-semibold text-base mb-1 ${isLight ? 'text-black' : 'text-white'}`}>
+              <h4 className={`font-semibold text-base mb-1 ${isLight ? 'text-primary-foreground' : 'text-white'}`}>
                 {step.title}
               </h4>
               <p className={`text-sm leading-relaxed ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>
@@ -120,7 +120,7 @@ export default function PlanTimeline() {
             <div className="absolute -top-3 -right-3 bg-black text-white text-xs font-bold px-3 py-1 rounded-full">
               MAIS COMPLETO
             </div>
-            <h3 className="text-xl md:text-2xl font-bold text-black mb-8">
+            <h3 className="text-xl md:text-2xl font-bold text-primary-foreground mb-8">
               Plano Consultas
             </h3>
             <TimelineSteps steps={consultasSteps} variant="light" />
