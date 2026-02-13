@@ -18,7 +18,7 @@ import { NPLabExamsTab } from '@/components/periodization/NPLabExamsTab';
 import { NPDashboardTab } from '@/components/periodization/NPDashboardTab';
 
 export default function NutritionalPeriodization() {
-  const { clients } = useClients();
+  const { data: clients } = useClients();
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [selectedConsultationId, setSelectedConsultationId] = useState<string>('');
   const { consultations, loadingConsultations, saveConsultation } = useNutritionalPeriodization(selectedClientId);
