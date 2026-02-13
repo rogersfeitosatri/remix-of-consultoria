@@ -119,7 +119,7 @@ export default function Auth() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-transparent" />
           
           <div className="relative z-10 flex flex-col justify-center p-12 max-w-xl">
-            <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-black px-4 py-2 rounded-full text-sm font-bold mb-6 w-fit">
+            <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-primary-foreground px-4 py-2 rounded-full text-sm font-bold mb-6 w-fit">
               <Timer className="w-4 h-4" />
               Área Exclusiva para Membros
             </div>
@@ -134,7 +134,7 @@ export default function Auth() {
               ].map((item, index) => (
                 <div key={index} className="flex items-center gap-3">
                   <div className="flex-shrink-0 w-6 h-6 bg-[hsl(43,74%,49%)] rounded-full flex items-center justify-center">
-                    <Check className="w-4 h-4 text-black" />
+                    <Check className="w-4 h-4 text-primary-foreground" />
                   </div>
                   <span className="text-gray-300">{item}</span>
                 </div>
@@ -149,7 +149,7 @@ export default function Auth() {
             {/* Mobile header */}
             <div className="lg:hidden mb-8 text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[hsl(43,74%,49%)] to-[hsl(43,74%,35%)]">
-                <span className="text-2xl font-bold text-black">RF</span>
+                <span className="text-2xl font-bold text-primary-foreground">RF</span>
               </div>
             </div>
 
@@ -192,7 +192,7 @@ export default function Auth() {
 
               <Button 
                 type="submit" 
-                className="w-full h-12 bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold text-base" 
+                className="w-full h-12 bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground font-bold text-base" 
                 disabled={isSubmitting}
               >
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

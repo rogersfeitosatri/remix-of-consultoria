@@ -15,7 +15,7 @@ export default function LandingPage() {
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <span className="font-bold text-lg text-[hsl(43,74%,49%)]">Rogers Feitosa</span>
           <Link to="/auth">
-            <Button size="sm" className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-semibold border-0">
+            <Button size="sm" className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground font-semibold border-0">
               Área do Membro / Entrar
             </Button>
           </Link>
@@ -28,7 +28,7 @@ export default function LandingPage() {
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
             {/* Content */}
             <div className="flex-1 order-2 lg:order-1">
-              <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-black px-4 py-2 rounded-full text-sm font-bold mb-6">
+              <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-primary-foreground px-4 py-2 rounded-full text-sm font-bold mb-6">
                 <Timer className="w-4 h-4" />
                 Vagas limitadas na pré-venda por tempo determinado!
               </div>
@@ -42,7 +42,7 @@ export default function LandingPage() {
               </h2>
               
               <a href={KIWIFY_LINK} target="_blank" rel="noopener noreferrer">
-                <Button size="lg" className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black text-lg px-8 py-6 rounded-lg shadow-lg font-bold">
+                <Button size="lg" className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground text-lg px-8 py-6 rounded-lg shadow-lg font-bold">
                   QUERO CORRER MAIS LEVE!
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
@@ -78,7 +78,7 @@ export default function LandingPage() {
             ].map((item, index) => (
               <div key={index} className="flex gap-4 items-start bg-gray-900 p-5 md:p-6 rounded-xl border border-gray-800">
                 <div className="flex-shrink-0 w-8 h-8 bg-[hsl(43,74%,49%)] rounded-full flex items-center justify-center">
-                  <Check className="w-5 h-5 text-black" />
+                  <Check className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <p className="text-gray-300 text-base md:text-lg">{item}</p>
               </div>
@@ -107,7 +107,7 @@ export default function LandingPage() {
             <div className="space-y-5 md:space-y-6">
               <div className="flex gap-4 items-start">
                 <div className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 bg-[hsl(43,74%,49%)] rounded-xl flex items-center justify-center">
-                  <ClipboardCheck className="w-5 h-5 md:w-6 md:h-6 text-black" />
+                  <ClipboardCheck className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
                 </div>
                 <div>
                   <h3 className="font-bold text-base md:text-lg text-white">Plano alimentar 100% personalizado</h3>
@@ -117,7 +117,7 @@ export default function LandingPage() {
               
               <div className="flex gap-4 items-start">
                 <div className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 bg-[hsl(43,74%,49%)] rounded-xl flex items-center justify-center">
-                  <Timer className="w-5 h-5 md:w-6 md:h-6 text-black" />
+                  <Timer className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
                 </div>
                 <div>
                   <h3 className="font-bold text-base md:text-lg text-white">Entrega rápida</h3>
@@ -127,7 +127,7 @@ export default function LandingPage() {
               
               <div className="flex gap-4 items-start">
                 <div className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 bg-[hsl(43,74%,49%)] rounded-xl flex items-center justify-center">
-                  <Calendar className="w-5 h-5 md:w-6 md:h-6 text-black" />
+                  <Calendar className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
                 </div>
                 <div>
                   <h3 className="font-bold text-base md:text-lg text-white">Check-up a cada 3 semanas para ajustes</h3>
@@ -137,7 +137,7 @@ export default function LandingPage() {
               
               <div className="flex gap-4 items-start">
                 <div className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 bg-[hsl(43,74%,49%)] rounded-xl flex items-center justify-center">
-                  <MessageCircle className="w-5 h-5 md:w-6 md:h-6 text-black" />
+                  <MessageCircle className="w-5 h-5 md:w-6 md:h-6 text-primary-foreground" />
                 </div>
                 <div>
                   <h3 className="font-bold text-base md:text-lg text-white">Suporte direto com o Nutri no Daily do app</h3>
@@ -168,7 +168,7 @@ export default function LandingPage() {
               { step: "4", title: "Acompanhamento", desc: "A cada 3 semanas, faça seu check-up e receba os ajustes necessários." },
             ].map((item, index) => (
               <div key={index} className="text-center">
-                <div className="w-12 h-12 md:w-16 md:h-16 bg-[hsl(43,74%,49%)] text-black rounded-full flex items-center justify-center text-xl md:text-2xl font-bold mx-auto mb-3 md:mb-4">
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-[hsl(43,74%,49%)] text-primary-foreground rounded-full flex items-center justify-center text-xl md:text-2xl font-bold mx-auto mb-3 md:mb-4">
                   {item.step}
                 </div>
                 <h3 className="font-bold text-base md:text-lg mb-2 text-white">{item.title}</h3>
@@ -191,7 +191,7 @@ export default function LandingPage() {
           
           <div className="grid md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto">
             <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 md:p-8 rounded-2xl border-2 border-[hsl(43,74%,49%)]/50">
-              <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-black text-sm font-bold px-3 py-1 rounded-full mb-4">
+               <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-primary-foreground text-sm font-bold px-3 py-1 rounded-full mb-4">
                 <Zap className="w-4 h-4" />
                 BÔNUS 1
               </div>
@@ -202,7 +202,7 @@ export default function LandingPage() {
             </div>
             
             <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 md:p-8 rounded-2xl border-2 border-[hsl(43,74%,49%)]/50">
-              <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-black text-sm font-bold px-3 py-1 rounded-full mb-4">
+               <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-primary-foreground text-sm font-bold px-3 py-1 rounded-full mb-4">
                 <Check className="w-4 h-4" />
                 BÔNUS 2
               </div>
@@ -213,7 +213,7 @@ export default function LandingPage() {
             </div>
 
             <div className="bg-gradient-to-br from-gray-900 to-gray-950 p-6 md:p-8 rounded-2xl border-2 border-[hsl(43,74%,49%)]/50">
-              <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-black text-sm font-bold px-3 py-1 rounded-full mb-4">
+              <div className="inline-flex items-center gap-2 bg-[hsl(43,74%,49%)] text-primary-foreground text-sm font-bold px-3 py-1 rounded-full mb-4">
                 <Scale className="w-4 h-4" />
                 BÔNUS 3
               </div>
@@ -236,7 +236,7 @@ export default function LandingPage() {
           
           <div className="max-w-md mx-auto">
             <a href={KIWIFY_LINK} target="_blank" rel="noopener noreferrer">
-              <Button size="lg" className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black text-base md:text-lg py-6 rounded-lg shadow-lg mb-4 font-bold">
+              <Button size="lg" className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground text-base md:text-lg py-6 rounded-lg shadow-lg mb-4 font-bold">
                 GARANTA SUA VAGA AGORA!
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>

@@ -95,7 +95,7 @@ export default function AthleteDashboard() {
   if (isAdmin && !client) {
     return (
       <div className="min-h-screen bg-black text-white">
-        <div className="bg-[hsl(43,74%,49%)] text-black py-2 px-4 flex items-center justify-center gap-2">
+        <div className="bg-[hsl(43,74%,49%)] text-primary-foreground py-2 px-4 flex items-center justify-center gap-2">
           <Eye className="h-4 w-4" />
           <span className="text-sm font-medium">Modo Visualização</span>
           <Button variant="secondary" size="sm" className="ml-4 h-7 bg-black text-white hover:bg-gray-800" onClick={handleBackToAdmin}>
@@ -128,11 +128,11 @@ export default function AthleteDashboard() {
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-5 bg-gray-900 border border-gray-800 p-1">
-              <TabsTrigger value="inicio" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Home className="h-4 w-4" /><span className="hidden lg:inline">Início</span></TabsTrigger>
-              <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Utensils className="h-4 w-4" /><span className="hidden lg:inline">Dieta</span></TabsTrigger>
-              <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><ClipboardCheck className="h-4 w-4" /><span className="hidden lg:inline">Histórico</span></TabsTrigger>
-              <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><FileText className="h-4 w-4" /><span className="hidden lg:inline">Materiais</span></TabsTrigger>
-              <TabsTrigger value="perfil" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><User className="h-4 w-4" /><span className="hidden lg:inline">Perfil</span></TabsTrigger>
+              <TabsTrigger value="inicio" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><Home className="h-4 w-4" /><span className="hidden lg:inline">Início</span></TabsTrigger>
+              <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><Utensils className="h-4 w-4" /><span className="hidden lg:inline">Dieta</span></TabsTrigger>
+              <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><ClipboardCheck className="h-4 w-4" /><span className="hidden lg:inline">Histórico</span></TabsTrigger>
+              <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><FileText className="h-4 w-4" /><span className="hidden lg:inline">Materiais</span></TabsTrigger>
+              <TabsTrigger value="perfil" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><User className="h-4 w-4" /><span className="hidden lg:inline">Perfil</span></TabsTrigger>
             </TabsList>
 
             <TabsContent value="inicio">
@@ -275,11 +275,11 @@ export default function AthleteDashboard() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-5 bg-gray-900 border border-gray-800 p-1">
-            <TabsTrigger value="inicio" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Home className="h-4 w-4" /><span className="hidden lg:inline">Início</span></TabsTrigger>
-            <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><Utensils className="h-4 w-4" /><span className="hidden lg:inline">Dieta</span></TabsTrigger>
-            <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><ClipboardCheck className="h-4 w-4" /><span className="hidden lg:inline">Histórico</span></TabsTrigger>
-            <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><FileText className="h-4 w-4" /><span className="hidden lg:inline">Materiais</span></TabsTrigger>
-            <TabsTrigger value="perfil" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-black text-white text-xs"><User className="h-4 w-4" /><span className="hidden lg:inline">Perfil</span></TabsTrigger>
+            <TabsTrigger value="inicio" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><Home className="h-4 w-4" /><span className="hidden lg:inline">Início</span></TabsTrigger>
+            <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><Utensils className="h-4 w-4" /><span className="hidden lg:inline">Dieta</span></TabsTrigger>
+            <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><ClipboardCheck className="h-4 w-4" /><span className="hidden lg:inline">Histórico</span></TabsTrigger>
+            <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><FileText className="h-4 w-4" /><span className="hidden lg:inline">Materiais</span></TabsTrigger>
+            <TabsTrigger value="perfil" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><User className="h-4 w-4" /><span className="hidden lg:inline">Perfil</span></TabsTrigger>
           </TabsList>
 
           <TabsContent value="inicio">

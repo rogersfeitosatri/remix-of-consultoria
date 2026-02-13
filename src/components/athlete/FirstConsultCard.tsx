@@ -36,10 +36,10 @@ export function FirstConsultCard({ clientId }: FirstConsultCardProps) {
                 <CalendarCheck className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-black mb-1">
+                <h3 className="text-xl font-bold text-primary-foreground mb-1">
                   🎉 Agende sua 1ª Consulta!
                 </h3>
-                <p className="text-black/80 text-sm max-w-md">
+                <p className="text-primary-foreground/80 text-sm max-w-md">
                   Sua anamnese foi recebida! Agora é hora de agendar sua primeira consulta para iniciarmos seu acompanhamento.
                 </p>
               </div>
@@ -59,7 +59,7 @@ export function FirstConsultCard({ clientId }: FirstConsultCardProps) {
           </div>
 
           {!status.isCalendarConnected && (
-            <div className="mt-2 pt-4 border-t border-black/20 flex items-center gap-2 text-black/80 text-sm">
+            <div className="mt-2 pt-4 border-t border-primary-foreground/20 flex items-center gap-2 text-primary-foreground/80 text-sm">
               <AlertTriangle className="h-4 w-4" />
               <span>Aguardando configuração do calendário pelo assessor.</span>
             </div>

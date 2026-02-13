@@ -104,7 +104,7 @@ export function AthleteProfileSection({ clientId, clientName }: AthleteProfileSe
           <Button 
             onClick={handleSaveTargetRace} 
             disabled={saving}
-            className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black"
+            className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground"
           >
             {saving ? (
               <>
@@ -122,7 +122,7 @@ export function AthleteProfileSection({ clientId, clientName }: AthleteProfileSe
       </Card>
 
       {/* Change Password */}
-      <div className="[&_*]:text-white [&_.card]:bg-gray-900 [&_.card]:border-gray-800 [&_input]:bg-gray-800 [&_input]:border-gray-700 [&_input]:text-white [&_input]:placeholder:text-gray-500 [&_button[type='submit']]:bg-[hsl(43,74%,49%)] [&_button[type='submit']]:hover:bg-[hsl(43,74%,40%)] [&_button[type='submit']]:text-black">
+      <div className="[&_*]:text-white [&_.card]:bg-gray-900 [&_.card]:border-gray-800 [&_input]:bg-gray-800 [&_input]:border-gray-700 [&_input]:text-white [&_input]:placeholder:text-gray-500 [&_button[type='submit']]:bg-[hsl(43,74%,49%)] [&_button[type='submit']]:hover:bg-[hsl(43,74%,40%)] [&_button[type='submit']]:text-primary-foreground">
         <ChangePasswordForm />
       </div>
     </div>

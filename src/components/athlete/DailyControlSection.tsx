@@ -148,7 +148,7 @@ export function DailyControlSection({ clientId, isPreview = false }: DailyContro
             <Button 
               onClick={handleStartCycle} 
               disabled={startCycle.isPending || isPreview}
-              className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold"
+              className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground font-bold"
             >
               <Play className="h-4 w-4 mr-2" />
               Iniciar Ciclo
@@ -258,7 +258,7 @@ export function DailyControlSection({ clientId, isPreview = false }: DailyContro
                   }}
                   className={`
                     p-2 text-xs rounded-lg transition-colors
-                    ${isSelected ? 'bg-[hsl(43,74%,49%)] text-black' : ''}
+                    ${isSelected ? 'bg-[hsl(43,74%,49%)] text-primary-foreground' : ''}
                     ${isToday && !isSelected ? 'ring-1 ring-[hsl(43,74%,49%)]' : ''}
                     ${hasData && !isSelected ? 'bg-green-500/20 text-green-400' : ''}
                     ${!hasData && !isSelected ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' : ''}
@@ -309,7 +309,7 @@ export function DailyControlSection({ clientId, isPreview = false }: DailyContro
               <Button 
                 onClick={handleSaveEntry}
                 disabled={upsertEntry.isPending || (!weight && !waist)}
-                className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-black font-bold"
+                className="w-full bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground font-bold"
               >
                 Salvar Registro
               </Button>
