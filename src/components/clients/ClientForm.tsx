@@ -330,7 +330,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     if (formData.plan_type === 'premium') {
       setFormData(prev => ({ ...prev, has_consultations: true, has_agenda_access: true }));
     } else {
-      setFormData(prev => ({ ...prev, has_consultations: false, has_agenda_access: false }));
+      // For consultoria, keep has_agenda_access false but let user choose consultation config
+      setFormData(prev => ({ ...prev, has_agenda_access: false }));
     }
   }, [formData.plan_type]);
 
@@ -492,8 +493,46 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             </div>
           </div>
 
+          {/* Consultation Config for Consultoria plan */}
+          {formData.plan_type === 'consultoria' && (
+            <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
+              <h3 className="font-semibold text-foreground">Consulta (opcional)</h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="consultoriaHasConsult"
+                    checked={formData.has_consultations}
+                    onCheckedChange={(v) => setFormData({ 
+                      ...formData, 
+                      has_consultations: v, 
+                      consultation_count: v ? 1 : 0,
+                      consultation_frequency: 'once',
+                    })}
+                  />
+                  <Label htmlFor="consultoriaHasConsult">Incluir 1 consulta única</Label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {formData.has_consultations 
+                    ? '✅ O atleta terá 1 consulta incluída no plano.'
+                    : 'Sem consultas — apenas acompanhamento remoto.'}
+                </p>
+                {formData.has_consultations && (
+                  <div className="space-y-2">
+                    <Label htmlFor="firstConsultationConsultoria">Data da Consulta</Label>
+                    <Input
+                      id="firstConsultationConsultoria"
+                      type="date"
+                      value={formData.first_consultation_date}
+                      onChange={(e) => setFormData({ ...formData, first_consultation_date: e.target.value })}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Consultation Info (only for Premium) */}
-          {formData.has_consultations && (
+          {formData.plan_type === 'premium' && formData.has_consultations && (
             <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
               <h3 className="font-semibold text-foreground">Configuração de Consultas</h3>
               
