@@ -39,7 +39,7 @@ export function NPTMBTab({ consultation, consultationId }: Props) {
     if (savedActivities.length > 0) {
       setActivities(savedActivities);
     } else {
-      setActivities(defaultActivities);
+      setActivities([]);
     }
   }, [savedActivities]);
 
