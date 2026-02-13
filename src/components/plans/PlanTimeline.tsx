@@ -14,8 +14,8 @@ const consultasSteps = [
   },
   {
     icon: ClipboardList,
-    title: 'Avaliação quinzenal',
-    description: 'Formulário quinzenal para coleta de sensações e acompanhamento contínuo da evolução.',
+    title: 'Avaliação semanal',
+    description: 'Formulário semanal para coleta de sensações e acompanhamento contínuo da evolução.',
   },
   {
     icon: RefreshCw,
@@ -24,8 +24,8 @@ const consultasSteps = [
   },
   {
     icon: Dumbbell,
-    title: 'Zona Nutri semanal',
-    description: 'Acesso semanal ao sistema de estratégia suplementar para elaborar a nutrição do treino longo.',
+    title: 'Zona Nutri',
+    description: 'Acesso ao sistema de estratégia suplementar para elaborar a nutrição do treino longo.',
   },
   {
     icon: MessageCircle,
@@ -47,7 +47,7 @@ const consultoriaSteps = [
   },
   {
     icon: RefreshCw,
-    title: 'Ajustes mensais',
+    title: 'Avaliação mensal',
     description: 'Avaliação mensal via formulário para coleta de sensações e ajustes no plano se necessário.',
   },
   {

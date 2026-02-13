@@ -164,7 +164,7 @@ export default function PlansLanding() {
                 <ul className="space-y-3 text-gray-400">
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
-                    <span>Atleta que quer acompanhamento intensivo com consulta mensal e ajustes ilimitados</span>
+                    <span>Atleta que quer acompanhamento intensivo com consultas periódicas e ajustes ilimitados</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
