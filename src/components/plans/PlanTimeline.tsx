@@ -10,7 +10,7 @@ const consultasSteps = [
   {
     icon: Utensils,
     title: 'Plano alimentar e suplementar',
-    description: 'Receba seu plano alimentar personalizado com estratégias de suplementação pré, intra e pós-treino.',
+    description: 'Receba seu plano alimentar com quantidades, alimentos, porções personalizadas e substituições de preferência, além de estratégias de suplementação pré, intra e pós-treino.',
   },
   {
     icon: ClipboardList,
@@ -42,8 +42,8 @@ const consultoriaSteps = [
   },
   {
     icon: Utensils,
-    title: 'Plano alimentar',
-    description: 'Receba seu plano alimentar personalizado para a fase atual do ciclo de treino.',
+    title: 'Plano alimentar e suplementar',
+    description: 'Receba seu plano alimentar personalizado para a fase atual do ciclo de treino com estratégias de suplementação.',
   },
   {
     icon: RefreshCw,
