@@ -2244,6 +2244,588 @@ export type Database = {
         }
         Relationships: []
       }
+      np_body_assessments: {
+        Row: {
+          abdomen: number | null
+          abdominal: number | null
+          assessment_date: string
+          biceps: number | null
+          calf: number | null
+          chest: number | null
+          client_id: string
+          consultation_id: string
+          created_at: string | null
+          forearm: number | null
+          height: number | null
+          hip: number | null
+          id: string
+          left_arm: number | null
+          left_calf: number | null
+          left_thigh_max: number | null
+          right_arm: number | null
+          right_arm_contracted: number | null
+          right_calf: number | null
+          right_thigh_max: number | null
+          subscapular: number | null
+          suprailiac: number | null
+          thigh: number | null
+          triceps: number | null
+          us_abdominal: number | null
+          us_axillary: number | null
+          us_biceps: number | null
+          us_chest: number | null
+          us_fat_kg: number | null
+          us_fat_percentage: number | null
+          us_lean_mass_kg: number | null
+          us_lean_mass_percentage: number | null
+          us_subscapular: number | null
+          us_suprailiac: number | null
+          us_thigh: number | null
+          us_triceps: number | null
+          waist: number | null
+          weight: number | null
+        }
+        Insert: {
+          abdomen?: number | null
+          abdominal?: number | null
+          assessment_date?: string
+          biceps?: number | null
+          calf?: number | null
+          chest?: number | null
+          client_id: string
+          consultation_id: string
+          created_at?: string | null
+          forearm?: number | null
+          height?: number | null
+          hip?: number | null
+          id?: string
+          left_arm?: number | null
+          left_calf?: number | null
+          left_thigh_max?: number | null
+          right_arm?: number | null
+          right_arm_contracted?: number | null
+          right_calf?: number | null
+          right_thigh_max?: number | null
+          subscapular?: number | null
+          suprailiac?: number | null
+          thigh?: number | null
+          triceps?: number | null
+          us_abdominal?: number | null
+          us_axillary?: number | null
+          us_biceps?: number | null
+          us_chest?: number | null
+          us_fat_kg?: number | null
+          us_fat_percentage?: number | null
+          us_lean_mass_kg?: number | null
+          us_lean_mass_percentage?: number | null
+          us_subscapular?: number | null
+          us_suprailiac?: number | null
+          us_thigh?: number | null
+          us_triceps?: number | null
+          waist?: number | null
+          weight?: number | null
+        }
+        Update: {
+          abdomen?: number | null
+          abdominal?: number | null
+          assessment_date?: string
+          biceps?: number | null
+          calf?: number | null
+          chest?: number | null
+          client_id?: string
+          consultation_id?: string
+          created_at?: string | null
+          forearm?: number | null
+          height?: number | null
+          hip?: number | null
+          id?: string
+          left_arm?: number | null
+          left_calf?: number | null
+          left_thigh_max?: number | null
+          right_arm?: number | null
+          right_arm_contracted?: number | null
+          right_calf?: number | null
+          right_thigh_max?: number | null
+          subscapular?: number | null
+          suprailiac?: number | null
+          thigh?: number | null
+          triceps?: number | null
+          us_abdominal?: number | null
+          us_axillary?: number | null
+          us_biceps?: number | null
+          us_chest?: number | null
+          us_fat_kg?: number | null
+          us_fat_percentage?: number | null
+          us_lean_mass_kg?: number | null
+          us_lean_mass_percentage?: number | null
+          us_subscapular?: number | null
+          us_suprailiac?: number | null
+          us_thigh?: number | null
+          us_triceps?: number | null
+          waist?: number | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_body_assessments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "np_body_assessments_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "np_consultations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      np_consultations: {
+        Row: {
+          activity_factor: number | null
+          activity_factor_type: string | null
+          calorimetry_value: number | null
+          client_id: string
+          consultation_date: string
+          created_at: string | null
+          fat_kg: number | null
+          fat_percentage: number | null
+          has_training_plan: boolean | null
+          height: number | null
+          id: string
+          lean_mass_kg: number | null
+          lean_mass_percentage: number | null
+          notes: string | null
+          skinfold_sum: number | null
+          sport_goal: string | null
+          sport_modality: string | null
+          tmb_formula: string | null
+          training_type: string | null
+          updated_at: string | null
+          user_id: string
+          vct_friday: number | null
+          vct_monday: number | null
+          vct_saturday: number | null
+          vct_sunday: number | null
+          vct_thursday: number | null
+          vct_tuesday: number | null
+          vct_wednesday: number | null
+          weight: number | null
+        }
+        Insert: {
+          activity_factor?: number | null
+          activity_factor_type?: string | null
+          calorimetry_value?: number | null
+          client_id: string
+          consultation_date?: string
+          created_at?: string | null
+          fat_kg?: number | null
+          fat_percentage?: number | null
+          has_training_plan?: boolean | null
+          height?: number | null
+          id?: string
+          lean_mass_kg?: number | null
+          lean_mass_percentage?: number | null
+          notes?: string | null
+          skinfold_sum?: number | null
+          sport_goal?: string | null
+          sport_modality?: string | null
+          tmb_formula?: string | null
+          training_type?: string | null
+          updated_at?: string | null
+          user_id: string
+          vct_friday?: number | null
+          vct_monday?: number | null
+          vct_saturday?: number | null
+          vct_sunday?: number | null
+          vct_thursday?: number | null
+          vct_tuesday?: number | null
+          vct_wednesday?: number | null
+          weight?: number | null
+        }
+        Update: {
+          activity_factor?: number | null
+          activity_factor_type?: string | null
+          calorimetry_value?: number | null
+          client_id?: string
+          consultation_date?: string
+          created_at?: string | null
+          fat_kg?: number | null
+          fat_percentage?: number | null
+          has_training_plan?: boolean | null
+          height?: number | null
+          id?: string
+          lean_mass_kg?: number | null
+          lean_mass_percentage?: number | null
+          notes?: string | null
+          skinfold_sum?: number | null
+          sport_goal?: string | null
+          sport_modality?: string | null
+          tmb_formula?: string | null
+          training_type?: string | null
+          updated_at?: string | null
+          user_id?: string
+          vct_friday?: number | null
+          vct_monday?: number | null
+          vct_saturday?: number | null
+          vct_sunday?: number | null
+          vct_thursday?: number | null
+          vct_tuesday?: number | null
+          vct_wednesday?: number | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_consultations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      np_daily_activities: {
+        Row: {
+          activity_name: string
+          consultation_id: string
+          created_at: string | null
+          duration_hours: number
+          id: string
+          met_value: number
+          order_index: number | null
+        }
+        Insert: {
+          activity_name: string
+          consultation_id: string
+          created_at?: string | null
+          duration_hours?: number
+          id?: string
+          met_value?: number
+          order_index?: number | null
+        }
+        Update: {
+          activity_name?: string
+          consultation_id?: string
+          created_at?: string | null
+          duration_hours?: number
+          id?: string
+          met_value?: number
+          order_index?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_daily_activities_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "np_consultations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      np_lab_results: {
+        Row: {
+          client_id: string
+          collection_date: string | null
+          created_at: string | null
+          exam_category: string | null
+          exam_name: string
+          id: string
+          panel_name: string
+          rcv_95: number | null
+          ref_max: number | null
+          ref_min: number | null
+          result_text: string | null
+          result_value: number | null
+          unit: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          collection_date?: string | null
+          created_at?: string | null
+          exam_category?: string | null
+          exam_name: string
+          id?: string
+          panel_name: string
+          rcv_95?: number | null
+          ref_max?: number | null
+          ref_min?: number | null
+          result_text?: string | null
+          result_value?: number | null
+          unit?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          collection_date?: string | null
+          created_at?: string | null
+          exam_category?: string | null
+          exam_name?: string
+          id?: string
+          panel_name?: string
+          rcv_95?: number | null
+          ref_max?: number | null
+          ref_min?: number | null
+          result_text?: string | null
+          result_value?: number | null
+          unit?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_lab_results_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      np_periodization_weeks: {
+        Row: {
+          cho_percentage: number | null
+          client_id: string
+          competition_name: string | null
+          created_at: string | null
+          cycle_start_date: string | null
+          end_date: string | null
+          functional_supplements: string | null
+          has_competition: boolean | null
+          id: string
+          lab_exam_request: string | null
+          lipid_percentage: number | null
+          month_name: string | null
+          nutritional_plan: string | null
+          protein_percentage: number | null
+          start_date: string | null
+          sup_beta_alanine: boolean | null
+          sup_bromelain: boolean | null
+          sup_broncovaxon: boolean | null
+          sup_caffeine: boolean | null
+          sup_cherry_pure: boolean | null
+          sup_creatine: boolean | null
+          sup_curcumin: boolean | null
+          sup_ganoderma: boolean | null
+          sup_nac: boolean | null
+          sup_nitrate: boolean | null
+          sup_omega3: boolean | null
+          sup_recovery: boolean | null
+          sup_vitc_time_release: boolean | null
+          sup_vitd: boolean | null
+          supplement_notes: string | null
+          updated_at: string | null
+          user_id: string
+          week_number: number
+        }
+        Insert: {
+          cho_percentage?: number | null
+          client_id: string
+          competition_name?: string | null
+          created_at?: string | null
+          cycle_start_date?: string | null
+          end_date?: string | null
+          functional_supplements?: string | null
+          has_competition?: boolean | null
+          id?: string
+          lab_exam_request?: string | null
+          lipid_percentage?: number | null
+          month_name?: string | null
+          nutritional_plan?: string | null
+          protein_percentage?: number | null
+          start_date?: string | null
+          sup_beta_alanine?: boolean | null
+          sup_bromelain?: boolean | null
+          sup_broncovaxon?: boolean | null
+          sup_caffeine?: boolean | null
+          sup_cherry_pure?: boolean | null
+          sup_creatine?: boolean | null
+          sup_curcumin?: boolean | null
+          sup_ganoderma?: boolean | null
+          sup_nac?: boolean | null
+          sup_nitrate?: boolean | null
+          sup_omega3?: boolean | null
+          sup_recovery?: boolean | null
+          sup_vitc_time_release?: boolean | null
+          sup_vitd?: boolean | null
+          supplement_notes?: string | null
+          updated_at?: string | null
+          user_id: string
+          week_number: number
+        }
+        Update: {
+          cho_percentage?: number | null
+          client_id?: string
+          competition_name?: string | null
+          created_at?: string | null
+          cycle_start_date?: string | null
+          end_date?: string | null
+          functional_supplements?: string | null
+          has_competition?: boolean | null
+          id?: string
+          lab_exam_request?: string | null
+          lipid_percentage?: number | null
+          month_name?: string | null
+          nutritional_plan?: string | null
+          protein_percentage?: number | null
+          start_date?: string | null
+          sup_beta_alanine?: boolean | null
+          sup_bromelain?: boolean | null
+          sup_broncovaxon?: boolean | null
+          sup_caffeine?: boolean | null
+          sup_cherry_pure?: boolean | null
+          sup_creatine?: boolean | null
+          sup_curcumin?: boolean | null
+          sup_ganoderma?: boolean | null
+          sup_nac?: boolean | null
+          sup_nitrate?: boolean | null
+          sup_omega3?: boolean | null
+          sup_recovery?: boolean | null
+          sup_vitc_time_release?: boolean | null
+          sup_vitd?: boolean | null
+          supplement_notes?: string | null
+          updated_at?: string | null
+          user_id?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_periodization_weeks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      np_running_schedule: {
+        Row: {
+          consultation_id: string
+          created_at: string | null
+          day_of_week: number
+          duration_minutes: number | null
+          id: string
+          zone_id: string | null
+        }
+        Insert: {
+          consultation_id: string
+          created_at?: string | null
+          day_of_week: number
+          duration_minutes?: number | null
+          id?: string
+          zone_id?: string | null
+        }
+        Update: {
+          consultation_id?: string
+          created_at?: string | null
+          day_of_week?: number
+          duration_minutes?: number | null
+          id?: string
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_running_schedule_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "np_consultations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "np_running_schedule_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "np_running_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      np_running_zones: {
+        Row: {
+          consultation_id: string
+          created_at: string | null
+          hr_zone: string | null
+          id: string
+          met_value: number
+          order_index: number | null
+          pace: string | null
+          speed_kmh: string | null
+          zone_name: string
+        }
+        Insert: {
+          consultation_id: string
+          created_at?: string | null
+          hr_zone?: string | null
+          id?: string
+          met_value?: number
+          order_index?: number | null
+          pace?: string | null
+          speed_kmh?: string | null
+          zone_name: string
+        }
+        Update: {
+          consultation_id?: string
+          created_at?: string | null
+          hr_zone?: string | null
+          id?: string
+          met_value?: number
+          order_index?: number | null
+          pace?: string | null
+          speed_kmh?: string | null
+          zone_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_running_zones_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "np_consultations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      np_triathlon_schedule: {
+        Row: {
+          consultation_id: string
+          created_at: string | null
+          day_of_week: number
+          duration_minutes: number | null
+          id: string
+          intensity: string | null
+          met_value: number | null
+          modality: string
+        }
+        Insert: {
+          consultation_id: string
+          created_at?: string | null
+          day_of_week: number
+          duration_minutes?: number | null
+          id?: string
+          intensity?: string | null
+          met_value?: number | null
+          modality: string
+        }
+        Update: {
+          consultation_id?: string
+          created_at?: string | null
+          day_of_week?: number
+          duration_minutes?: number | null
+          id?: string
+          intensity?: string | null
+          met_value?: number | null
+          modality?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_triathlon_schedule_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "np_consultations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
