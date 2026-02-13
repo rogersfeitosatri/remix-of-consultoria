@@ -214,7 +214,7 @@ export default function PlansLanding() {
             variant="outline"
             size="lg"
             className="text-lg border-white text-white hover:bg-white hover:text-black px-8 py-6 h-auto"
-            onClick={() => window.open(consultoriaUrl, '_blank')}
+            onClick={() => window.open('https://wa.me/5599984817697', '_blank')}
             disabled={isLoading}
           >
             <MessageCircle className="h-5 w-5 mr-2" />
