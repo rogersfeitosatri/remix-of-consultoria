@@ -2401,6 +2401,7 @@ export type Database = {
           skinfold_sum: number | null
           sport_goal: string | null
           sport_modality: string | null
+          target_race_date: string | null
           tmb_formula: string | null
           training_type: string | null
           updated_at: string | null
@@ -2432,6 +2433,7 @@ export type Database = {
           skinfold_sum?: number | null
           sport_goal?: string | null
           sport_modality?: string | null
+          target_race_date?: string | null
           tmb_formula?: string | null
           training_type?: string | null
           updated_at?: string | null
@@ -2463,6 +2465,7 @@ export type Database = {
           skinfold_sum?: number | null
           sport_goal?: string | null
           sport_modality?: string | null
+          target_race_date?: string | null
           tmb_formula?: string | null
           training_type?: string | null
           updated_at?: string | null
@@ -2598,6 +2601,7 @@ export type Database = {
           lipid_percentage: number | null
           month_name: string | null
           nutritional_plan: string | null
+          phase_name: string | null
           protein_percentage: number | null
           start_date: string | null
           sup_beta_alanine: boolean | null
@@ -2633,6 +2637,7 @@ export type Database = {
           lipid_percentage?: number | null
           month_name?: string | null
           nutritional_plan?: string | null
+          phase_name?: string | null
           protein_percentage?: number | null
           start_date?: string | null
           sup_beta_alanine?: boolean | null
@@ -2668,6 +2673,7 @@ export type Database = {
           lipid_percentage?: number | null
           month_name?: string | null
           nutritional_plan?: string | null
+          phase_name?: string | null
           protein_percentage?: number | null
           start_date?: string | null
           sup_beta_alanine?: boolean | null

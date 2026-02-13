@@ -27,7 +27,7 @@ export function NPPatientDataTab({ consultation, client, onSave }: Props) {
       if (!client?.id) return null;
       const { data } = await supabase
         .from('athlete_profiles')
-        .select('target_race')
+        .select('target_race, target_deadline')
         .eq('client_id', client.id)
         .maybeSingle();
       return data;
@@ -37,9 +37,18 @@ export function NPPatientDataTab({ consultation, client, onSave }: Props) {
 
   useEffect(() => {
     if (consultation) {
-      setForm({ ...consultation });
+      const updated = { ...consultation };
+      // Auto-fill sport_goal from target_race if empty
+      if (!updated.sport_goal && athleteProfile?.target_race) {
+        updated.sport_goal = athleteProfile.target_race;
+      }
+      // Auto-fill target_race_date from athlete profile if empty
+      if (!updated.target_race_date && athleteProfile?.target_deadline) {
+        updated.target_race_date = athleteProfile.target_deadline;
+      }
+      setForm(updated);
     }
-  }, [consultation]);
+  }, [consultation, athleteProfile]);
 
   const update = (key: string, value: any) => setForm((prev: any) => ({ ...prev, [key]: value }));
 
@@ -127,6 +136,20 @@ export function NPPatientDataTab({ consultation, client, onSave }: Props) {
               </div>
               {athleteProfile?.target_race && (
                 <p className="text-xs text-muted-foreground mt-0.5">Prova alvo: {athleteProfile.target_race}</p>
+              )}
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Data da Prova</label>
+              <div className="flex gap-1">
+                <Input type="date" value={form.target_race_date || ''} onChange={e => update('target_race_date', e.target.value)} />
+                {athleteProfile?.target_deadline && !form.target_race_date && (
+                  <Button type="button" variant="outline" size="icon" className="shrink-0 h-9 w-9" title="Usar data da prova alvo do atleta" onClick={() => update('target_race_date', athleteProfile.target_deadline)}>
+                    <Target className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              {athleteProfile?.target_deadline && (
+                <p className="text-xs text-muted-foreground mt-0.5">Prazo: {new Date(athleteProfile.target_deadline + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
               )}
             </div>
           </div>
