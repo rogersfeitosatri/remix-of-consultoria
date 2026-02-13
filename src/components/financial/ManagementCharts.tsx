@@ -6,6 +6,31 @@ import { parseISO, isWithinInterval, format, eachDayOfInterval, eachMonthOfInter
 import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 
+const DarkTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+      <p className="text-sm font-medium text-foreground mb-1">{label}</p>
+      {payload.map((entry: any, i: number) => (
+        <p key={i} className="text-sm" style={{ color: entry.color }}>
+          {entry.name}: R$ {Number(entry.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+        </p>
+      ))}
+    </div>
+  );
+};
+
+const DarkPieTooltip = ({ active, payload }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+      <p className="text-sm font-medium text-foreground">{payload[0].name}</p>
+      <p className="text-sm text-primary font-semibold">
+        R$ {Number(payload[0].value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+      </p>
+    </div>
+  );
+};
 interface ManagementChartsProps {
   filterStartDate: Date;
   filterEndDate: Date;
@@ -139,7 +164,7 @@ export function ManagementCharts({ filterStartDate, filterEndDate }: ManagementC
                 <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                   {categoryData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                <Tooltip content={<DarkPieTooltip />} />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -157,7 +182,7 @@ export function ManagementCharts({ filterStartDate, filterEndDate }: ManagementC
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
               <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+              <Tooltip content={<DarkTooltip />} />
               <Legend />
               <Bar dataKey="entradas" name="Entradas" fill="#22c55e" radius={[4, 4, 0, 0]} />
               <Bar dataKey="saidas" name="Saídas" fill="#ef4444" radius={[4, 4, 0, 0]} />
@@ -177,7 +202,7 @@ export function ManagementCharts({ filterStartDate, filterEndDate }: ManagementC
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+              <Tooltip content={<DarkTooltip />} />
               <Legend />
               <Bar dataKey="entradas" name="Entradas" fill="#22c55e" radius={[2, 2, 0, 0]} />
               <Bar dataKey="saidas" name="Saídas" fill="#ef4444" radius={[2, 2, 0, 0]} />
@@ -197,7 +222,7 @@ export function ManagementCharts({ filterStartDate, filterEndDate }: ManagementC
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
               <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+              <Tooltip content={<DarkTooltip />} />
               <Legend />
               <Line type="monotone" dataKey="entradas" name="Entradas" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="saidas" name="Saídas" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
