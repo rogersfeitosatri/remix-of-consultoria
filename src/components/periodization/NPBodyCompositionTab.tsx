@@ -1,14 +1,18 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Save, Plus, Info } from 'lucide-react';
+import { Save, Plus, Info, ScanLine, Loader2 } from 'lucide-react';
 import { useNutritionalPeriodization } from '@/hooks/useNutritionalPeriodization';
 import { femalePercentiles, malePercentiles, bodyFatReference } from '@/data/bodyCompositionReference';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface Props {
   consultationId: string;
@@ -45,9 +49,67 @@ export function NPBodyCompositionTab({ consultationId, clientId }: Props) {
   const { data: assessments = [] } = fetchAssessments(consultationId);
   const [form, setForm] = useState<any>({ consultation_id: consultationId, client_id: clientId, assessment_date: new Date().toISOString().split('T')[0] });
 
+  const [scanType, setScanType] = useState<string>('bioimpedance');
+  const [scanning, setScanning] = useState(false);
+  const [scanDialogOpen, setScanDialogOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const update = (key: string, value: any) => setForm((prev: any) => ({ ...prev, [key]: value }));
 
   const skinfoldSum = skinfoldFields.reduce((sum, f) => sum + (Number(form[f.key]) || 0), 0);
+
+  const handleScan = async (file: File) => {
+    setScanning(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke('scan-body-composition', {
+        body: { imageBase64: base64, scanType },
+      });
+
+      if (error) throw error;
+
+      // Apply extracted data to form
+      const mapping: Record<string, string> = {
+        weight: 'weight',
+        fat_percentage: 'fat_percentage',
+        fat_kg: 'fat_kg',
+        lean_mass_percentage: 'lean_mass_percentage',
+        lean_mass_kg: 'lean_mass_kg',
+        bmr_kcal: 'bmr_kcal',
+      };
+
+      // For ultrasound fields
+      const usMapping: Record<string, string> = {
+        fat_percentage: 'us_fat_percentage',
+        lean_mass_percentage: 'us_lean_mass_percentage',
+        fat_kg: 'us_fat_kg',
+        lean_mass_kg: 'us_lean_mass_kg',
+      };
+
+      setForm((prev: any) => {
+        const updated = { ...prev };
+        Object.entries(data).forEach(([key, value]) => {
+          if (value != null) {
+            const formKey = mapping[key];
+            if (formKey) updated[formKey] = value;
+          }
+        });
+        return updated;
+      });
+
+      toast({ title: 'Dados extraídos com sucesso', description: 'Revise os valores antes de salvar.' });
+      setScanDialogOpen(false);
+    } catch (err: any) {
+      toast({ title: 'Erro ao escanear', description: err.message, variant: 'destructive' });
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const handleSave = () => {
     saveAssessment.mutate({ ...form, consultation_id: consultationId, client_id: clientId });
@@ -79,6 +141,61 @@ export function NPBodyCompositionTab({ consultationId, clientId }: Props) {
           </CardContent>
         </Card>
       )}
+      {/* AI Scanner */}
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  <ScanLine className="h-4 w-4" /> Escanear Exame (IA)
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Escanear Exame com IA</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Tipo de Exame</label>
+                    <Select value={scanType} onValueChange={setScanType}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bioimpedance">Bioimpedância</SelectItem>
+                        <SelectItem value="calorimetry">Calorimetria Indireta</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Foto do Exame</label>
+                    <Input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="mt-1"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleScan(file);
+                      }}
+                      disabled={scanning}
+                    />
+                  </div>
+                  {scanning && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Analisando exame com IA...
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Envie uma foto do resultado do exame. A IA irá extrair os dados automaticamente para preencher os campos.
+                  </p>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <span className="text-xs text-muted-foreground">Envie foto de bioimpedância ou calorimetria para preenchimento automático</span>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="measures">
         <TabsList>

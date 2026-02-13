@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Save, Info } from 'lucide-react';
+import { Save, Info, Target } from 'lucide-react';
 import { calculateAge, calculateTMBFA, calculateTMBCunningham, calculateTMBHarrisBenedictMale, calculateTMBHarrisBenedictFemale, calculateEnergyAvailability, dayLabels } from '@/lib/nutritionalCalcs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 interface Props {
   consultation: any;
@@ -17,6 +19,21 @@ interface Props {
 
 export function NPPatientDataTab({ consultation, client, onSave }: Props) {
   const [form, setForm] = useState<any>({});
+
+  // Fetch target_race from athlete_profiles
+  const { data: athleteProfile } = useQuery({
+    queryKey: ['athlete-profile-target-race', client?.id],
+    queryFn: async () => {
+      if (!client?.id) return null;
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('target_race')
+        .eq('client_id', client.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!client?.id,
+  });
 
   useEffect(() => {
     if (consultation) {
@@ -100,7 +117,17 @@ export function NPPatientDataTab({ consultation, client, onSave }: Props) {
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Meta Esportiva</label>
-              <Input value={form.sport_goal || ''} onChange={e => update('sport_goal', e.target.value)} placeholder="Ex: Long Distance" />
+              <div className="flex gap-1">
+                <Input value={form.sport_goal || ''} onChange={e => update('sport_goal', e.target.value)} placeholder="Ex: Long Distance" />
+                {athleteProfile?.target_race && !form.sport_goal && (
+                  <Button type="button" variant="outline" size="icon" className="shrink-0 h-9 w-9" title="Usar prova alvo do atleta" onClick={() => update('sport_goal', athleteProfile.target_race)}>
+                    <Target className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              {athleteProfile?.target_race && (
+                <p className="text-xs text-muted-foreground mt-0.5">Prova alvo: {athleteProfile.target_race}</p>
+              )}
             </div>
           </div>
 
