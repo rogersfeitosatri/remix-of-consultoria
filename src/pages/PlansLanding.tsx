@@ -185,83 +185,8 @@ export default function PlansLanding() {
         </div>
       </section>
 
-      {/* Planos Section */}
-      <section id="planos" className="py-20 md:py-28 bg-black">
-        <div className="max-w-7xl mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
-            Como funciona cada plano
-          </h2>
-          <p className="text-gray-400 text-center mb-16 max-w-2xl mx-auto">
-            Escolha o modelo de acompanhamento ideal para seu momento
-          </p>
-
-          <div className="grid md:grid-cols-2 gap-8 lg:gap-10">
-            {/* Plano Consultoria */}
-            <div className="bg-zinc-900 rounded-3xl p-8 md:p-10 border border-zinc-800 hover:border-zinc-700 transition-colors">
-              <div className="flex items-center gap-3 mb-6">
-                <Zap className="h-8 w-8 text-white" />
-                <h3 className="text-2xl md:text-3xl font-bold">Plano Consultoria</h3>
-              </div>
-              <p className="text-gray-400 mb-8">
-                Acompanhamento estratégico mensal para atletas que buscam direcionamento sem precisar de consultas frequentes.
-              </p>
-              <ul className="space-y-4 mb-10">
-                {consultoriaFeatures.map((feature, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Check className="h-4 w-4 text-white" />
-                    </div>
-                    <span className="text-gray-300">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button
-                className="w-full h-14 text-lg font-semibold bg-white text-primary-foreground hover:bg-gray-200"
-                onClick={() => window.open(consultoriaUrl, '_blank')}
-                disabled={isLoading}
-              >
-                <MessageCircle className="h-5 w-5 mr-2" />
-                Quero o Plano Consultoria
-              </Button>
-            </div>
-
-            {/* Plano Consultas */}
-            <div className="relative bg-white rounded-3xl p-8 md:p-10 border-2 border-white">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-black text-white text-sm font-bold px-4 py-1.5 rounded-full">
-                MAIS POPULAR
-              </div>
-              <div className="flex items-center gap-3 mb-6">
-                <Award className="h-8 w-8 text-primary-foreground" />
-                <h3 className="text-2xl md:text-3xl font-bold text-primary-foreground">Plano Consultas</h3>
-              </div>
-              <p className="text-gray-600 mb-8">
-                Acompanhamento completo com consultas periódicas, ajustes semanais e suporte intensivo.
-              </p>
-              <ul className="space-y-4 mb-10">
-                {consultasFeatures.map((feature, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Check className="h-4 w-4 text-primary-foreground" />
-                    </div>
-                    <span className="text-gray-600">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button
-                className="w-full h-14 text-lg font-semibold bg-black text-white hover:bg-zinc-800"
-                onClick={() => window.open(consultasUrl, '_blank')}
-                disabled={isLoading}
-              >
-                <MessageCircle className="h-5 w-5 mr-2" />
-                Quero o Plano Consultas
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Timeline Section */}
-      <PlanTimeline />
+      <PlanTimeline consultoriaUrl={consultoriaUrl} consultasUrl={consultasUrl} isLoading={isLoading} />
 
       {/* Testimonials Section */}
       <PlansTestimonialsCarousel />

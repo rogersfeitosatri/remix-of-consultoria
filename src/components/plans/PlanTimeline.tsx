@@ -1,4 +1,5 @@
 import { ClipboardList, Utensils, RefreshCw, MessageCircle, Activity, Calendar, FileText, Dumbbell } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const consultasSteps = [
   {
@@ -95,9 +96,15 @@ function TimelineSteps({ steps, variant }: { steps: typeof consultasSteps; varia
   );
 }
 
-export default function PlanTimeline() {
+interface PlanTimelineProps {
+  consultoriaUrl: string;
+  consultasUrl: string;
+  isLoading: boolean;
+}
+
+export default function PlanTimeline({ consultoriaUrl, consultasUrl, isLoading }: PlanTimelineProps) {
   return (
-    <section className="py-20 md:py-28 bg-zinc-950">
+    <section id="planos" className="py-20 md:py-28 bg-zinc-950">
       <div className="max-w-7xl mx-auto px-4">
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
           Linha do tempo do acompanhamento
@@ -113,6 +120,14 @@ export default function PlanTimeline() {
               Plano Consultoria
             </h3>
             <TimelineSteps steps={consultoriaSteps} variant="dark" />
+            <Button
+              className="w-full h-14 text-lg font-semibold bg-white text-primary-foreground hover:bg-gray-200 mt-10"
+              onClick={() => window.open(consultoriaUrl, '_blank')}
+              disabled={isLoading}
+            >
+              <MessageCircle className="h-5 w-5 mr-2" />
+              Quero o Plano Consultoria
+            </Button>
           </div>
 
           {/* Consultas Timeline */}
@@ -124,6 +139,14 @@ export default function PlanTimeline() {
               Plano Consultas
             </h3>
             <TimelineSteps steps={consultasSteps} variant="light" />
+            <Button
+              className="w-full h-14 text-lg font-semibold bg-black text-white hover:bg-zinc-800 mt-10"
+              onClick={() => window.open(consultasUrl, '_blank')}
+              disabled={isLoading}
+            >
+              <MessageCircle className="h-5 w-5 mr-2" />
+              Quero o Plano Consultas
+            </Button>
           </div>
         </div>
       </div>
