@@ -109,7 +109,7 @@ export default function Clients() {
 
   const handleSubmit = async (
     data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
-    options?: { sendCredentials: boolean; skipAnamnese: boolean }
+    options?: { sendCredentials: boolean; skipAnamnese: boolean; sendBookingLink?: boolean }
   ) => {
     // OPTIMISTIC UI: Fechar o modal IMEDIATAMENTE
     setShowForm(false);
@@ -185,8 +185,32 @@ export default function Clients() {
               console.error('Erro ao processar conta do atleta:', err);
             }
           }
+
+          // Send booking link if requested (consultoria with consultation)
+          if (options?.sendBookingLink && data.phone) {
+            try {
+              const { error: bookingError } = await supabase.functions.invoke('send-booking-link', {
+                body: { clientId: newClient.id },
+              });
+              if (bookingError) {
+                console.error('Erro ao enviar link de agendamento:', bookingError);
+                toast({
+                  title: 'Aviso',
+                  description: 'Atleta cadastrado, mas houve erro ao enviar link de agendamento.',
+                  variant: 'destructive',
+                });
+              } else {
+                toast({
+                  title: 'Link enviado',
+                  description: 'Link de agendamento enviado via WhatsApp com sucesso!',
+                });
+              }
+            } catch (err) {
+              console.error('Erro ao enviar link de agendamento:', err);
+            }
+          }
           
-          if (!options?.sendCredentials) {
+          if (!options?.sendCredentials && !options?.sendBookingLink) {
             toast({
               title: 'Atleta cadastrado',
               description: 'O novo atleta foi adicionado com sucesso.',

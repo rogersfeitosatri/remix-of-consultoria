@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Badge } from '@/components/ui/badge';
@@ -75,7 +76,7 @@ const ONBOARDING_TYPE_LABELS = {
 
 interface ClientFormProps {
   client?: Client;
-  onSubmit: (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>, options?: { sendCredentials: boolean; skipAnamnese: boolean }) => void;
+  onSubmit: (data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>, options?: { sendCredentials: boolean; skipAnamnese: boolean; sendBookingLink?: boolean }) => void;
   onClose: () => void;
 }
 
@@ -83,6 +84,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
   const { data: adminSettings } = useAdminSettings();
   const [sendCredentials, setSendCredentials] = useState(!client); // Apenas para novos cadastros
   const [skipAnamnese, setSkipAnamnese] = useState(false);
+  const [sendBookingLink, setSendBookingLink] = useState(false);
   
   const [formData, setFormData] = useState({
     name: client?.name || '',
@@ -382,7 +384,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       // Pass custom schedule dates if any
       custom_schedule_dates: customSchedules,
     };
-    onSubmit(dataToSubmit as any, { sendCredentials, skipAnamnese });
+    onSubmit(dataToSubmit as any, { sendCredentials, skipAnamnese, sendBookingLink });
   };
 
   const showContinuationOption = adminSettings?.enable_continuation_mode && formData.has_consultations;
@@ -513,18 +515,19 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {formData.has_consultations 
-                    ? '✅ O atleta terá 1 consulta incluída no plano.'
+                    ? '✅ O atleta terá 1 consulta incluída no plano. A data será agendada pelo atleta via link.'
                     : 'Sem consultas — apenas acompanhamento remoto.'}
                 </p>
                 {formData.has_consultations && (
-                  <div className="space-y-2">
-                    <Label htmlFor="firstConsultationConsultoria">Data da Consulta</Label>
-                    <Input
-                      id="firstConsultationConsultoria"
-                      type="date"
-                      value={formData.first_consultation_date}
-                      onChange={(e) => setFormData({ ...formData, first_consultation_date: e.target.value })}
+                  <div className="flex items-center gap-3 pt-2">
+                    <Checkbox
+                      id="sendBookingLinkConsultoria"
+                      checked={sendBookingLink}
+                      onCheckedChange={(v) => setSendBookingLink(!!v)}
                     />
+                    <Label htmlFor="sendBookingLinkConsultoria" className="text-sm">
+                      Enviar link de agendamento via WhatsApp ao cadastrar
+                    </Label>
                   </div>
                 )}
               </div>
