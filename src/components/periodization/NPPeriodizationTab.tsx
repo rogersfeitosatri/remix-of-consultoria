@@ -5,13 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Save, Plus, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { Save, Plus, ChevronDown, ChevronUp, Calendar, Wand2 } from 'lucide-react';
 import { useNutritionalPeriodization } from '@/hooks/useNutritionalPeriodization';
-import { addWeeks, format, startOfWeek } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { addWeeks, format, startOfWeek, differenceInWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Props {
   clientId: string;
+  client?: any;
 }
 
 const ergogenicSupplements = [
@@ -34,13 +37,27 @@ const antioxidantSupplements = [
   { key: 'sup_nac', label: 'NAC' },
 ];
 
-export function NPPeriodizationTab({ clientId }: Props) {
+export function NPPeriodizationTab({ clientId, client }: Props) {
   const { fetchPeriodizationWeeks, savePeriodizationWeek } = useNutritionalPeriodization(clientId);
   const { data: weeks = [] } = fetchPeriodizationWeeks(clientId);
   const [cycleStart, setCycleStart] = useState('');
   const [numWeeks, setNumWeeks] = useState(12);
   const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
   const [editingWeek, setEditingWeek] = useState<any>(null);
+
+  // Fetch athlete profile for target_race info
+  const { data: athleteProfile } = useQuery({
+    queryKey: ['athlete-profile-periodization', clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('target_race, target_deadline')
+        .eq('client_id', clientId)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!clientId,
+  });
 
   const generateWeeks = () => {
     if (!cycleStart) return;
@@ -61,6 +78,65 @@ export function NPPeriodizationTab({ clientId }: Props) {
       });
     }
   };
+
+  // Auto-generate cycle with training phases
+  const generateAutoPhases = () => {
+    const startDate = client?.start_date;
+    const raceDate = athleteProfile?.target_deadline;
+    if (!startDate || !raceDate) return;
+
+    const today = new Date();
+    const race = new Date(raceDate + 'T12:00:00');
+    const totalWeeks = Math.max(differenceInWeeks(race, today), 4);
+
+    // Phase distribution: Taper last 2 weeks, Competition last week overlaps
+    // Base: ~40%, Específico: ~35%, Polimento: ~15%, Competição: ~10%
+    const taperWeeks = Math.max(Math.round(totalWeeks * 0.10), 1);
+    const competitionWeeks = 1;
+    const specificWeeks = Math.max(Math.round(totalWeeks * 0.35), 2);
+    const baseWeeks = totalWeeks - specificWeeks - taperWeeks - competitionWeeks;
+
+    const phases: { name: string; weeks: number }[] = [
+      { name: 'Base / Preparação Geral', weeks: Math.max(baseWeeks, 1) },
+      { name: 'Específico / Construção', weeks: specificWeeks },
+      { name: 'Polimento / Taper', weeks: taperWeeks },
+      { name: 'Competição', weeks: competitionWeeks },
+    ];
+
+    const cycleStartDate = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    setCycleStart(cycleStartDate);
+    setNumWeeks(totalWeeks);
+
+    let weekCounter = 1;
+    const start = startOfWeek(today, { weekStartsOn: 1 });
+
+    for (const phase of phases) {
+      for (let i = 0; i < phase.weeks; i++) {
+        const weekStart = addWeeks(start, weekCounter - 1);
+        const weekEnd = addWeeks(weekStart, 1);
+        weekEnd.setDate(weekEnd.getDate() - 1);
+        const monthName = format(weekStart, 'MMMM', { locale: ptBR }).toUpperCase();
+
+        // Mark competition week
+        const isCompetition = phase.name === 'Competição';
+
+        savePeriodizationWeek.mutate({
+          client_id: clientId,
+          cycle_start_date: cycleStartDate,
+          week_number: weekCounter,
+          month_name: monthName,
+          start_date: format(weekStart, 'yyyy-MM-dd'),
+          end_date: format(weekEnd, 'yyyy-MM-dd'),
+          phase_name: phase.name,
+          has_competition: isCompetition,
+          competition_name: isCompetition && athleteProfile?.target_race ? athleteProfile.target_race : null,
+        });
+        weekCounter++;
+      }
+    }
+  };
+
+  const canAutoGenerate = !!client?.start_date && !!athleteProfile?.target_deadline;
 
   const toggleWeek = (weekNum: number) => {
     if (expandedWeek === weekNum) {
@@ -100,7 +176,22 @@ export function NPPeriodizationTab({ clientId }: Props) {
             <Calendar className="h-4 w-4" /> Gerar Ciclo de Periodização
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          {/* Auto-generate button */}
+          {canAutoGenerate && weeks.length === 0 && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <div className="flex-1">
+                <p className="text-sm font-medium">Gerar ciclo automaticamente</p>
+                <p className="text-xs text-muted-foreground">
+                  Baseado na data de hoje até a prova alvo: <strong>{athleteProfile?.target_race}</strong> em {new Date(athleteProfile!.target_deadline + 'T12:00:00').toLocaleDateString('pt-BR')}
+                </p>
+              </div>
+              <Button onClick={generateAutoPhases} size="sm" className="gap-1" variant="default">
+                <Wand2 className="h-3.5 w-3.5" /> Gerar com Fases
+              </Button>
+            </div>
+          )}
+
           <div className="flex gap-3 items-end flex-wrap">
             <div>
               <label className="text-xs font-medium text-muted-foreground">Início do Ciclo</label>
@@ -110,8 +201,8 @@ export function NPPeriodizationTab({ clientId }: Props) {
               <label className="text-xs font-medium text-muted-foreground">Nº Semanas</label>
               <Input type="number" value={numWeeks} onChange={e => setNumWeeks(Number(e.target.value))} className="w-24" />
             </div>
-            <Button onClick={generateWeeks} size="sm" className="gap-1">
-              <Plus className="h-3.5 w-3.5" /> Gerar Semanas
+            <Button onClick={generateWeeks} size="sm" className="gap-1" variant="outline">
+              <Plus className="h-3.5 w-3.5" /> Gerar Manual
             </Button>
           </div>
         </CardContent>
@@ -135,6 +226,7 @@ export function NPPeriodizationTab({ clientId }: Props) {
                     <span className="text-xs text-muted-foreground">
                       {week.start_date ? format(new Date(week.start_date + 'T12:00:00'), 'dd/MM') : ''} — {week.end_date ? format(new Date(week.end_date + 'T12:00:00'), 'dd/MM') : ''}
                     </span>
+                    {week.phase_name && <Badge className="bg-accent text-accent-foreground text-xs">{week.phase_name}</Badge>}
                     {week.has_competition && <Badge className="bg-destructive/20 text-destructive text-xs">Competição</Badge>}
                     {week.cho_percentage && <Badge variant="outline" className="text-xs">CHO: {week.cho_percentage}%</Badge>}
                   </div>
@@ -143,12 +235,18 @@ export function NPPeriodizationTab({ clientId }: Props) {
 
                 {expandedWeek === week.week_number && editingWeek && (
                   <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
-                    <div className="flex items-center gap-2">
-                      <Checkbox checked={editingWeek.has_competition || false} onCheckedChange={v => updateEditing('has_competition', v)} />
-                      <label className="text-xs">Competição</label>
-                      {editingWeek.has_competition && (
-                        <Input value={editingWeek.competition_name || ''} onChange={e => updateEditing('competition_name', e.target.value)} placeholder="Nome da competição" className="flex-1 h-7 text-xs" />
-                      )}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Fase do Treinamento</label>
+                        <Input value={editingWeek.phase_name || ''} onChange={e => updateEditing('phase_name', e.target.value)} placeholder="Ex: Base, Específico, Polimento" className="h-7 text-xs" />
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <Checkbox checked={editingWeek.has_competition || false} onCheckedChange={v => updateEditing('has_competition', v)} />
+                        <label className="text-xs">Competição</label>
+                        {editingWeek.has_competition && (
+                          <Input value={editingWeek.competition_name || ''} onChange={e => updateEditing('competition_name', e.target.value)} placeholder="Nome da competição" className="flex-1 h-7 text-xs" />
+                        )}
+                      </div>
                     </div>
 
                     <div>
