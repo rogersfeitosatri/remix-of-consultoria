@@ -25,7 +25,7 @@ const consultasSteps = [
   {
     icon: Dumbbell,
     title: 'Zona Nutri',
-    description: 'Monte sua estratégia nutricional para todo treino longo, com orientação se as quantidades estão de acordo com as principais referências científicas e suporte direto com o Nutri para dúvidas.',
+    description: 'Acesso ao sistema de estratégia suplementar para elaborar a nutrição do treino longo.',
   },
   {
     icon: MessageCircle,
@@ -53,7 +53,7 @@ const consultoriaSteps = [
   {
     icon: Activity,
     title: 'Zona Nutri',
-    description: 'Monte sua estratégia nutricional para todo treino longo, com orientação se as quantidades estão de acordo com as principais referências científicas e suporte direto com o Nutri para dúvidas.',
+    description: 'Acesso ao sistema de ajuste estratégico de géis e suplementação nos treinos de corrida.',
   },
   {
     icon: MessageCircle,
