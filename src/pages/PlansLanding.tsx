@@ -19,7 +19,7 @@ export default function PlansLanding() {
   const consultoriaFeatures = [
     'Plano alimentar pra fase atual do ciclo de treino',
     'Plano suplementar com estratégias de pré, intra e pós-treino adaptados à rotina do corredor',
-    'Suporte longão via Zona Nutri (sistema de ajuste estratégico de géis + pré, intra e pós)',
+    'Zona Nutri: monte sua estratégia nutricional para todo treino longo, com orientação baseada nas principais referências científicas e suporte direto com o Nutri',
     'Avaliação mensal via formulário para coleta de sensações e ajustes na dieta (se for preciso)',
     'Dúvidas no WhatsApp diretamente com o Nutri',
   ];
@@ -28,7 +28,7 @@ export default function PlansLanding() {
     'Consultas nutricionais a cada 6 semanas',
     'Plano alimentar pra fase atual do ciclo de treino',
     'Plano suplementar com estratégias de pré, intra e pós-treino adaptados à rotina do corredor',
-    'Suporte longão via Zona Nutri (sistema de ajuste estratégico de géis + pré, intra e pós)',
+    'Zona Nutri: monte sua estratégia nutricional para todo treino longo, com orientação baseada nas principais referências científicas e suporte direto com o Nutri',
     'Avaliação QUINZENAL via formulário para coleta de sensações com o plano para serem discutidas nas consultas',
     'Ajustes ilimitados no plano (basta solicitar)',
     'Dúvidas no WhatsApp diretamente com o Nutri',
