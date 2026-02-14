@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { usePublicLandingPageSettings } from '@/hooks/useLandingPageSettings';
 import PlansTestimonialsCarousel from '@/components/plans/PlansTestimonialsCarousel';
 import PlanTimeline from '@/components/plans/PlanTimeline';
+import ZonaNutriSection from '@/components/plans/ZonaNutriSection';
 
 // Import runner images
 import runnerHero from '@/assets/runner-hero.jpg';
@@ -19,7 +20,7 @@ export default function PlansLanding() {
   const consultoriaFeatures = [
     'Plano alimentar pra fase atual do ciclo de treino',
     'Plano suplementar com estratégias de pré, intra e pós-treino adaptados à rotina do corredor',
-    'Zona Nutri: monte sua estratégia nutricional para todo treino longo, com orientação baseada nas principais referências científicas e suporte direto com o Nutri',
+    'Suporte longão via Zona Nutri (sistema de ajuste estratégico de géis + pré, intra e pós)',
     'Avaliação mensal via formulário para coleta de sensações e ajustes na dieta (se for preciso)',
     'Dúvidas no WhatsApp diretamente com o Nutri',
   ];
@@ -28,7 +29,7 @@ export default function PlansLanding() {
     'Consultas nutricionais a cada 6 semanas',
     'Plano alimentar pra fase atual do ciclo de treino',
     'Plano suplementar com estratégias de pré, intra e pós-treino adaptados à rotina do corredor',
-    'Zona Nutri: monte sua estratégia nutricional para todo treino longo, com orientação baseada nas principais referências científicas e suporte direto com o Nutri',
+    'Suporte longão via Zona Nutri (sistema de ajuste estratégico de géis + pré, intra e pós)',
     'Avaliação QUINZENAL via formulário para coleta de sensações com o plano para serem discutidas nas consultas',
     'Ajustes ilimitados no plano (basta solicitar)',
     'Dúvidas no WhatsApp diretamente com o Nutri',
@@ -187,6 +188,9 @@ export default function PlansLanding() {
 
       {/* Timeline Section */}
       <PlanTimeline consultoriaUrl={consultoriaUrl} consultasUrl={consultasUrl} isLoading={isLoading} />
+
+      {/* Zona Nutri Section */}
+      <ZonaNutriSection />
 
       {/* Testimonials Section */}
       <PlansTestimonialsCarousel />
