@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import logoRF from '@/assets/logo-rf.jpg';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +57,7 @@ export default function PublicMetabolicScreening() {
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState('');
   const [activeCategoryIdx, setActiveCategoryIdx] = useState(0);
+  const questionsCardRef = useRef<HTMLDivElement>(null);
 
   const currentCat = metabolicCategories[activeCategoryIdx];
   const answeredInCat = currentCat.questions.filter(q => responses[q.id] !== undefined).length;
@@ -66,6 +67,11 @@ export default function PublicMetabolicScreening() {
 
   const handleScore = (questionId: string, score: number) => {
     setResponses(prev => ({ ...prev, [questionId]: score }));
+  };
+
+  const navigateCategory = (idx: number) => {
+    setActiveCategoryIdx(idx);
+    setTimeout(() => questionsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   };
 
   const handleVerifyPhone = async () => {
@@ -232,7 +238,7 @@ export default function PublicMetabolicScreening() {
             </div>
 
             {/* Questions */}
-            <Card>
+            <Card ref={questionsCardRef}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <span style={{ color: currentCat.color }}>●</span>
@@ -266,12 +272,12 @@ export default function PublicMetabolicScreening() {
 
                 <div className="flex gap-2 pt-3">
                   {activeCategoryIdx > 0 && (
-                    <Button variant="outline" size="sm" onClick={() => setActiveCategoryIdx(activeCategoryIdx - 1)}>
+                    <Button variant="outline" size="sm" onClick={() => navigateCategory(activeCategoryIdx - 1)}>
                       ← Anterior
                     </Button>
                   )}
                   {activeCategoryIdx < metabolicCategories.length - 1 && (
-                    <Button variant="outline" size="sm" className="ml-auto" onClick={() => setActiveCategoryIdx(activeCategoryIdx + 1)}>
+                    <Button variant="outline" size="sm" className="ml-auto" onClick={() => navigateCategory(activeCategoryIdx + 1)}>
                       Próxima →
                     </Button>
                   )}
