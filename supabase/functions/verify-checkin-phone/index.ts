@@ -89,16 +89,12 @@ Deno.serve(async (req) => {
     }
 
     // Fallback: find client by phone (used when link does not include ?client=...)
-    const normalizedDigits = normalizedInput.replace(/\D/g, "");
-    const withoutDDI = normalizedDigits.startsWith("55") ? normalizedDigits.slice(2) : normalizedDigits;
-    const last11 = normalizedDigits.slice(-11);
-
+    // Fetch all clients with phone and compare after normalizing
     const { data: candidates, error: candError } = await supabase
       .from("clients")
       .select("id, phone")
       .not("phone", "is", null)
-      .or(`phone.ilike.%${normalizedDigits}%,phone.ilike.%${withoutDDI}%,phone.ilike.%${last11}%`)
-      .limit(50);
+      .limit(500);
 
     if (candError || !candidates?.length) {
       return new Response(JSON.stringify({ valid: false, clientId: null }), {
