@@ -3023,6 +3023,7 @@ export type Database = {
           client_id: string
           consultation_id: string | null
           created_at: string
+          gee_snapshot: Json | null
           human_readable: string | null
           id: string
           is_active: boolean
@@ -3043,6 +3044,7 @@ export type Database = {
           client_id: string
           consultation_id?: string | null
           created_at?: string
+          gee_snapshot?: Json | null
           human_readable?: string | null
           id?: string
           is_active?: boolean
@@ -3063,6 +3065,7 @@ export type Database = {
           client_id?: string
           consultation_id?: string | null
           created_at?: string
+          gee_snapshot?: Json | null
           human_readable?: string | null
           id?: string
           is_active?: boolean

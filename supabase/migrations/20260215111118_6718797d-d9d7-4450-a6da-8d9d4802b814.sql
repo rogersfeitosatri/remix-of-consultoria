@@ -1,0 +1,1 @@
+ALTER TABLE public.periodiza_suggestions ADD COLUMN IF NOT EXISTS gee_snapshot jsonb;
