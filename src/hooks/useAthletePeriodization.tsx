@@ -48,7 +48,7 @@ export function useAthletePeriodization(clientId?: string) {
     enabled: !!athletePeriodization?.id,
   });
 
-  // Generate timeline blocks
+  // Generate timeline blocks — ensures ALL phases are always present
   const generateTimeline = (
     startDate: string,
     raceDate: string,
@@ -59,52 +59,101 @@ export function useAthletePeriodization(clientId?: string) {
     const race = parseISO(raceDate);
     const totalWeeks = Math.max(differenceInWeeks(race, start), 1);
     const blockSize = planType === '6_weeks' ? 6 : 4;
-    const numBlocks = Math.ceil(totalWeeks / blockSize);
+    const numBlocks = Math.max(Math.ceil(totalWeeks / blockSize), 1);
     const today = startOfDay(new Date());
 
     if (activePhases.length === 0) return [];
 
-    // Distribute phases: 40% first, 40% second, 20% third, last 2 weeks = taper if exists
-    const blocks: TimelineBlock[] = [];
-    const taperPhase = activePhases.find((p: any) => p.phase_name.toLowerCase().includes('transição') || p.phase_name.toLowerCase().includes('taper'));
+    // Separate taper/transition phase (goes last) from main phases
+    const taperPhase = activePhases.find((p: any) =>
+      p.phase_name.toLowerCase().includes('transição') || p.phase_name.toLowerCase().includes('taper')
+    );
     const mainPhases = activePhases.filter((p: any) => p !== taperPhase);
-
-    for (let i = 0; i < numBlocks; i++) {
-      const blockStart = addWeeks(start, i * blockSize);
-      const blockEnd = i === numBlocks - 1 ? race : addWeeks(start, (i + 1) * blockSize);
-
-      // Determine phase
-      const progress = i / numBlocks;
-      let phase;
-      if (totalWeeks <= 10) {
-        // Short cycle: skip base, go construction -> peak -> taper
-        if (progress < 0.5) phase = mainPhases[Math.min(1, mainPhases.length - 1)];
-        else if (progress < 0.85) phase = mainPhases[Math.min(2, mainPhases.length - 1)] || mainPhases[mainPhases.length - 1];
-        else phase = taperPhase || mainPhases[mainPhases.length - 1];
-      } else {
-        if (progress < 0.4) phase = mainPhases[0];
-        else if (progress < 0.8) phase = mainPhases[Math.min(1, mainPhases.length - 1)];
-        else if (progress < 0.9) phase = mainPhases[Math.min(2, mainPhases.length - 1)] || mainPhases[mainPhases.length - 1];
-        else phase = taperPhase || mainPhases[mainPhases.length - 1];
+    
+    // Build ordered phase list: all main phases + taper at end (if exists)
+    const orderedPhases = [...mainPhases];
+    if (taperPhase) orderedPhases.push(taperPhase);
+    
+    // Distribute blocks ensuring EVERY phase gets at least 1 block
+    // Default weight distribution: 40/40/20 for 3 main phases, taper gets minimum
+    const phaseCount = orderedPhases.length;
+    
+    // If fewer blocks than phases, we need at least as many blocks as phases
+    const effectiveBlocks = Math.max(numBlocks, phaseCount);
+    
+    // Calculate how many blocks each phase gets
+    const phaseBlockCounts: number[] = new Array(phaseCount).fill(1); // minimum 1 each
+    let remaining = effectiveBlocks - phaseCount;
+    
+    if (remaining > 0 && phaseCount > 0) {
+      // Distribute remaining using weights: 40/40/20 for main, taper gets 0 extra
+      const weights: number[] = [];
+      for (let i = 0; i < phaseCount; i++) {
+        if (orderedPhases[i] === taperPhase) {
+          weights.push(0); // Taper keeps minimum blocks
+        } else if (mainPhases.length === 1) {
+          weights.push(1);
+        } else if (mainPhases.length === 2) {
+          weights.push(i === 0 ? 0.5 : 0.5);
+        } else {
+          // 3+ main phases: 40/40/20 pattern
+          if (i === 0) weights.push(0.4);
+          else if (i === 1) weights.push(0.4);
+          else weights.push(0.2 / (mainPhases.length - 2));
+        }
       }
+      
+      const totalWeight = weights.reduce((a, b) => a + b, 0) || 1;
+      const normalizedWeights = weights.map(w => w / totalWeight);
+      
+      // Distribute remaining blocks by weight
+      let distributed = 0;
+      for (let i = 0; i < phaseCount; i++) {
+        const extra = Math.round(normalizedWeights[i] * remaining);
+        phaseBlockCounts[i] += extra;
+        distributed += extra;
+      }
+      // Fix rounding errors
+      const diff = remaining - distributed;
+      if (diff !== 0) {
+        // Add/remove from largest main phase
+        phaseBlockCounts[0] += diff;
+        if (phaseBlockCounts[0] < 1) phaseBlockCounts[0] = 1;
+      }
+    }
 
-      const checkpointDate = format(blockEnd, 'yyyy-MM-dd');
-      const blockStartDate = format(blockStart, 'yyyy-MM-dd');
-      const blockEndDate = format(blockEnd, 'yyyy-MM-dd');
+    // Build blocks
+    const blocks: TimelineBlock[] = [];
+    let blockIdx = 0;
+    
+    for (let pIdx = 0; pIdx < phaseCount; pIdx++) {
+      const phase = orderedPhases[pIdx];
+      const count = phaseBlockCounts[pIdx];
+      
+      for (let j = 0; j < count; j++) {
+        const blockStart = addWeeks(start, blockIdx * blockSize);
+        const isLast = blockIdx === effectiveBlocks - 1;
+        const blockEnd = isLast ? race : addWeeks(start, (blockIdx + 1) * blockSize);
 
-      let status: 'past' | 'current' | 'future' = 'future';
-      if (isAfter(today, parseISO(blockEndDate))) status = 'past';
-      else if (!isBefore(today, parseISO(blockStartDate)) && !isAfter(today, parseISO(blockEndDate))) status = 'current';
+        const blockStartDate = format(blockStart, 'yyyy-MM-dd');
+        const blockEndDate = format(blockEnd, 'yyyy-MM-dd');
+        const checkpointDate = format(blockEnd, 'yyyy-MM-dd');
 
-      blocks.push({
-        block_index: i,
-        start_date: blockStartDate,
-        end_date: blockEndDate,
-        phase_id: phase?.id || '',
-        phase_name_snapshot: phase?.phase_name || 'Sem fase',
-        adjustment_checkpoint_date: checkpointDate,
-        status,
-      });
+        let status: 'past' | 'current' | 'future' = 'future';
+        if (isAfter(today, parseISO(blockEndDate))) status = 'past';
+        else if (!isBefore(today, parseISO(blockStartDate)) && !isAfter(today, parseISO(blockEndDate))) status = 'current';
+
+        blocks.push({
+          block_index: blockIdx,
+          start_date: blockStartDate,
+          end_date: blockEndDate,
+          phase_id: phase?.id || '',
+          phase_name_snapshot: phase?.phase_name || 'Sem fase',
+          adjustment_checkpoint_date: checkpointDate,
+          status,
+        });
+        blockIdx++;
+      }
     }
 
     return blocks;
