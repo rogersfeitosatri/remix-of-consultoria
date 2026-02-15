@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Save, Info } from 'lucide-react';
+import { Save, Info, Check, Loader2 } from 'lucide-react';
 import { useNutritionalPeriodization } from '@/hooks/useNutritionalPeriodization';
 import { defaultRunningZones, dayLabels, calculateGEE } from '@/lib/nutritionalCalcs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -78,26 +78,39 @@ export function NPRunningTab({ consultation, consultationId }: Props) {
     return result;
   }, [zonesWithCalc, schedule]);
 
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async () => {
-    const savedZoneData = await saveRunningZones.mutateAsync({ consultationId, zones: zones.map(({ id, ...rest }) => rest) });
-    // Build schedule entries
-    if (savedZoneData && savedZoneData.length > 0) {
-      const scheduleEntries: any[] = [];
-      Object.entries(schedule).forEach(([zoneIdxStr, days]) => {
-        const zoneIdx = Number(zoneIdxStr);
-        const zone = savedZoneData[zoneIdx];
-        if (!zone) return;
-        Object.entries(days).forEach(([dayStr, mins]) => {
-          if (Number(mins) > 0) {
-            scheduleEntries.push({
-              zone_id: zone.id,
-              day_of_week: Number(dayStr),
-              duration_minutes: Number(mins),
-            });
-          }
+    setSaving(true);
+    setSaved(false);
+    try {
+      const savedZoneData = await saveRunningZones.mutateAsync({ consultationId, zones: zones.map(({ id, ...rest }) => rest) });
+      // Build schedule entries
+      if (savedZoneData && savedZoneData.length > 0) {
+        const scheduleEntries: any[] = [];
+        Object.entries(schedule).forEach(([zoneIdxStr, days]) => {
+          const zoneIdx = Number(zoneIdxStr);
+          const zone = savedZoneData[zoneIdx];
+          if (!zone) return;
+          Object.entries(days).forEach(([dayStr, mins]) => {
+            if (Number(mins) > 0) {
+              scheduleEntries.push({
+                zone_id: zone.id,
+                day_of_week: Number(dayStr),
+                duration_minutes: Number(mins),
+              });
+            }
+          });
         });
-      });
-      saveRunningSchedule.mutate({ consultationId, schedule: scheduleEntries });
+        await saveRunningSchedule.mutateAsync({ consultationId, schedule: scheduleEntries });
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      // error handled by mutation
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -198,8 +211,14 @@ export function NPRunningTab({ consultation, consultationId }: Props) {
               </div>
             ))}
           </div>
-          <Button onClick={handleSave} className="gap-1 mt-4">
-            <Save className="h-4 w-4" /> Salvar Treinos
+          <Button onClick={handleSave} disabled={saving} className={`gap-1 mt-4 ${saved ? 'bg-emerald-600 hover:bg-emerald-600' : ''}`}>
+            {saving ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Salvando...</>
+            ) : saved ? (
+              <><Check className="h-4 w-4" /> Salvo!</>
+            ) : (
+              <><Save className="h-4 w-4" /> Salvar Treinos</>
+            )}
           </Button>
         </CardContent>
       </Card>

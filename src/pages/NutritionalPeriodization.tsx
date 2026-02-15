@@ -167,7 +167,7 @@ export default function NutritionalPeriodization() {
               <NPTriathlonTab consultation={selectedConsultation} consultationId={selectedConsultationId} />
             </TabsContent>
             <TabsContent value="periodization">
-              <NPPeriodizationTab clientId={selectedClientId} client={selectedClient} />
+              <NPPeriodizationTab clientId={selectedClientId} client={selectedClient} consultationId={selectedConsultationId} consultation={selectedConsultation} />
             </TabsContent>
             <TabsContent value="lab">
               <NPLabExamsTab clientId={selectedClientId} />

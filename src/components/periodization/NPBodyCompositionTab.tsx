@@ -82,12 +82,23 @@ export function NPBodyCompositionTab({ consultationId, clientId, consultation, o
     });
   };
 
-  // Compute age from athlete profile
-  const age = athleteProfile?.birth_date && consultation?.consultation_date
+  // Compute age from athlete profile or manual override
+  const autoAge = athleteProfile?.birth_date && consultation?.consultation_date
     ? calculateAge(athleteProfile.birth_date, consultation.consultation_date)
     : null;
 
-  const gender = athleteProfile?.gender || '';
+  const [manualAge, setManualAge] = useState<string>('');
+  const [manualGender, setManualGender] = useState<string>('');
+
+  useEffect(() => {
+    if (consultation) {
+      setManualAge(consultation.manual_age?.toString() || '');
+      setManualGender(consultation.manual_gender || '');
+    }
+  }, [consultation]);
+
+  const age = consultation?.manual_age || autoAge;
+  const gender = consultation?.manual_gender || athleteProfile?.gender || '';
 
   const handleScan = async (file: File) => {
     setScanning(true);
@@ -143,6 +154,8 @@ export function NPBodyCompositionTab({ consultationId, clientId, consultation, o
       fat_kg: form.fat_kg ? Number(form.fat_kg) : null,
       lean_mass_percentage: form.lean_mass_percentage ? Number(form.lean_mass_percentage) : null,
       lean_mass_kg: form.lean_mass_kg ? Number(form.lean_mass_kg) : null,
+      manual_age: manualAge ? Number(manualAge) : null,
+      manual_gender: manualGender || null,
     });
   };
 
@@ -229,14 +242,33 @@ export function NPBodyCompositionTab({ consultationId, clientId, consultation, o
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Idade</label>
-              <Input value={age != null ? age : '—'} disabled className="bg-muted/30" />
-              {!athleteProfile?.birth_date && (
-                <p className="text-xs text-destructive mt-0.5">Data de nascimento não cadastrada</p>
+              {autoAge != null ? (
+                <Input value={autoAge} disabled className="bg-muted/30" />
+              ) : (
+                <Input
+                  type="number"
+                  placeholder="Inserir manualmente"
+                  value={manualAge}
+                  onChange={e => setManualAge(e.target.value)}
+                />
+              )}
+              {!athleteProfile?.birth_date && !manualAge && (
+                <p className="text-xs text-amber-500 mt-0.5">Preencha manualmente ou vincule anamnese</p>
               )}
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Sexo</label>
-              <Input value={gender === 'masculino' ? 'Masculino' : gender === 'feminino' ? 'Feminino' : gender || '—'} disabled className="bg-muted/30" />
+              {athleteProfile?.gender ? (
+                <Input value={athleteProfile.gender === 'masculino' ? 'Masculino' : athleteProfile.gender === 'feminino' ? 'Feminino' : athleteProfile.gender} disabled className="bg-muted/30" />
+              ) : (
+                <Select value={manualGender} onValueChange={setManualGender}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="masculino">Masculino</SelectItem>
+                    <SelectItem value="feminino">Feminino</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
