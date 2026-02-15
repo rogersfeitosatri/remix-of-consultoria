@@ -58,9 +58,12 @@ export default function Dashboard() {
     <Layout>
       <div className="space-y-4 sm:space-y-6 lg:space-y-8">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="mt-1 text-sm sm:text-base text-muted-foreground">Rogers Feitosa - Nutrição & Treinamento</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
+            <p className="mt-1 text-sm sm:text-base text-muted-foreground">Rogers Feitosa - Nutrição & Treinamento</p>
+          </div>
+          <GoogleOAuthAlert />
         </div>
 
         {/* Stats - Mobile: 2 columns (stacked look), Desktop: 4 columns */}
@@ -107,7 +110,6 @@ export default function Dashboard() {
 
         {/* Alerts Section */}
         <div className="space-y-4">
-          <GoogleOAuthAlert />
           <PendingMealPlansAlert />
           <PeriodizationPhaseAlert />
           <PendingCheckinsAlert />
