@@ -54,7 +54,7 @@ export function useLayoutSettings() {
     enabled: !!user?.id,
   });
 
-  // Merge saved settings with defaults (to handle new items added after save)
+  // Merge saved settings with defaults (handles new items added after user saved)
   const mergedSettings: LayoutSettings = useMemo(() => ({
     brand_name: settings?.brand_name || 'Rogers Feitosa',
     brand_subtitle: settings?.brand_subtitle || 'Nutrição & Treinamento',
