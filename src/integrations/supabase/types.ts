@@ -2397,6 +2397,8 @@ export type Database = {
           id: string
           lean_mass_kg: number | null
           lean_mass_percentage: number | null
+          manual_age: number | null
+          manual_gender: string | null
           notes: string | null
           skinfold_sum: number | null
           sport_goal: string | null
@@ -2429,6 +2431,8 @@ export type Database = {
           id?: string
           lean_mass_kg?: number | null
           lean_mass_percentage?: number | null
+          manual_age?: number | null
+          manual_gender?: string | null
           notes?: string | null
           skinfold_sum?: number | null
           sport_goal?: string | null
@@ -2461,6 +2465,8 @@ export type Database = {
           id?: string
           lean_mass_kg?: number | null
           lean_mass_percentage?: number | null
+          manual_age?: number | null
+          manual_gender?: string | null
           notes?: string | null
           skinfold_sum?: number | null
           sport_goal?: string | null
@@ -2588,21 +2594,37 @@ export type Database = {
       }
       np_periodization_weeks: {
         Row: {
+          caffeine_mg_kg: number | null
+          carb_loading_type: string | null
+          cho_gkg: number | null
           cho_percentage: number | null
           client_id: string
           competition_name: string | null
           created_at: string | null
           cycle_start_date: string | null
+          daily_strategies: Json | null
           end_date: string | null
+          energy_availability: number | null
+          fat_gkg: number | null
           functional_supplements: string | null
+          gi_tolerance_rating: number | null
           has_competition: boolean | null
+          hydration_strategy: string | null
           id: string
+          intra_cho_gh: number | null
+          is_adjustment_week: boolean | null
           lab_exam_request: string | null
           lipid_percentage: number | null
+          micro_adjustment_notes: string | null
           month_name: string | null
           nutritional_plan: string | null
           phase_name: string | null
+          phase_objectives: string | null
+          pre_training_cho_gkg: number | null
+          protein_gkg: number | null
           protein_percentage: number | null
+          race_simulation_notes: string | null
+          sodium_strategy: string | null
           start_date: string | null
           sup_beta_alanine: boolean | null
           sup_bromelain: boolean | null
@@ -2624,21 +2646,37 @@ export type Database = {
           week_number: number
         }
         Insert: {
+          caffeine_mg_kg?: number | null
+          carb_loading_type?: string | null
+          cho_gkg?: number | null
           cho_percentage?: number | null
           client_id: string
           competition_name?: string | null
           created_at?: string | null
           cycle_start_date?: string | null
+          daily_strategies?: Json | null
           end_date?: string | null
+          energy_availability?: number | null
+          fat_gkg?: number | null
           functional_supplements?: string | null
+          gi_tolerance_rating?: number | null
           has_competition?: boolean | null
+          hydration_strategy?: string | null
           id?: string
+          intra_cho_gh?: number | null
+          is_adjustment_week?: boolean | null
           lab_exam_request?: string | null
           lipid_percentage?: number | null
+          micro_adjustment_notes?: string | null
           month_name?: string | null
           nutritional_plan?: string | null
           phase_name?: string | null
+          phase_objectives?: string | null
+          pre_training_cho_gkg?: number | null
+          protein_gkg?: number | null
           protein_percentage?: number | null
+          race_simulation_notes?: string | null
+          sodium_strategy?: string | null
           start_date?: string | null
           sup_beta_alanine?: boolean | null
           sup_bromelain?: boolean | null
@@ -2660,21 +2698,37 @@ export type Database = {
           week_number: number
         }
         Update: {
+          caffeine_mg_kg?: number | null
+          carb_loading_type?: string | null
+          cho_gkg?: number | null
           cho_percentage?: number | null
           client_id?: string
           competition_name?: string | null
           created_at?: string | null
           cycle_start_date?: string | null
+          daily_strategies?: Json | null
           end_date?: string | null
+          energy_availability?: number | null
+          fat_gkg?: number | null
           functional_supplements?: string | null
+          gi_tolerance_rating?: number | null
           has_competition?: boolean | null
+          hydration_strategy?: string | null
           id?: string
+          intra_cho_gh?: number | null
+          is_adjustment_week?: boolean | null
           lab_exam_request?: string | null
           lipid_percentage?: number | null
+          micro_adjustment_notes?: string | null
           month_name?: string | null
           nutritional_plan?: string | null
           phase_name?: string | null
+          phase_objectives?: string | null
+          pre_training_cho_gkg?: number | null
+          protein_gkg?: number | null
           protein_percentage?: number | null
+          race_simulation_notes?: string | null
+          sodium_strategy?: string | null
           start_date?: string | null
           sup_beta_alanine?: boolean | null
           sup_bromelain?: boolean | null

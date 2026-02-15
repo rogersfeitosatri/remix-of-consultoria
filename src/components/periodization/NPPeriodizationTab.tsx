@@ -1,21 +1,85 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Save, Plus, ChevronDown, ChevronUp, Calendar, Wand2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Save, Plus, ChevronDown, ChevronUp, Calendar, Wand2, Info, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNutritionalPeriodization } from '@/hooks/useNutritionalPeriodization';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { addWeeks, format, startOfWeek, differenceInWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from '@/hooks/use-toast';
+import { calculateEnergyAvailability, calculateTMBCunningham, calculateTMBHarrisBenedictMale, calculateTMBHarrisBenedictFemale, calculateTMBFA, calculateAge, dayLabels } from '@/lib/nutritionalCalcs';
 
 interface Props {
   clientId: string;
   client?: any;
+  consultationId?: string;
+  consultation?: any;
 }
+
+const PHASE_COLORS: Record<string, string> = {
+  'Base Metabólica': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  'Transição / Performance': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  'Performance Máxima': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  'Taper': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+  'Competição': 'bg-red-500/20 text-red-400 border-red-500/30',
+};
+
+const DAILY_STRATEGY_OPTIONS = [
+  { key: 'low_carb', label: 'Low Carb', emoji: '🔘' },
+  { key: 'high_carb', label: 'High Carb', emoji: '🔘' },
+  { key: 'train_low', label: 'Train Low', emoji: '🔘' },
+  { key: 'recovery_support', label: 'Recovery Support', emoji: '🔘' },
+  { key: 'long_reduced_cho', label: 'Longo c/ redução de CHO', emoji: '🔘' },
+  { key: 'long_progressive_cho', label: 'Longo c/ progressão de CHO', emoji: '🔘' },
+  { key: 'strategic_fasting', label: 'Jejum Estratégico', emoji: '🔘' },
+  { key: 'reduced_intra', label: 'Intra reduzido (<30g/h)', emoji: '🔘' },
+  { key: 'full_support', label: 'Suporte total (treino chave)', emoji: '🔘' },
+];
+
+const INTRA_STRATEGIES = [
+  { key: '60', label: '60 g/h' },
+  { key: '75', label: '75 g/h' },
+  { key: '90', label: '90 g/h' },
+];
+
+const PHASE_OBJECTIVES: Record<string, string[]> = {
+  'Base Metabólica': [
+    'Aumentar eficiência metabólica',
+    'Melhorar flexibilidade metabólica',
+    'Otimizar composição corporal',
+    'Aumentar densidade mitocondrial',
+  ],
+  'Transição / Performance': [
+    'Aumentar estoque de glicogênio',
+    'Melhorar qualidade dos treinos intensos',
+    'Iniciar adaptação intestinal',
+  ],
+  'Performance Máxima': [
+    'Maximizar estoque de glicogênio',
+    'Treinar estratégia de prova',
+    'Consolidar ingestão 60-90 g/h',
+  ],
+  'Taper': [
+    'Redução do GEE',
+    'Manutenção CHO alto',
+    'Ajuste calórico para evitar ganho de peso',
+    'Monitoramento peso corporal',
+  ],
+};
+
+const PHASE_EVIDENCE_NOTES: Record<string, string> = {
+  'Base Metabólica': '📚 Burke et al. & Jeukendrup: conceito Train Low / Compete High. CHO ≤ 4 g/kg/dia, Proteína 1.8–2.2 g/kg, fibras elevadas, gorduras moderadas.',
+  'Transição / Performance': '📚 CHO 4–5 g/kg/dia. Início de carb loading 24h. Pré treino 1–2 g/kg 2–3h antes. Intra 40→60 g/h progressivo. Cafeína 3 mg/kg.',
+  'Performance Máxima': '📚 CHO ≥ 5 g/kg/dia. Pré longo 6 g/kg 24–48h. Simulação completa: café da manhã de prova, timing dos géis, cafeína e estratégia hídrica.',
+  'Taper': '📚 ≤14 dias. Redução GEE, manutenção CHO alto. Monitorar peso. Glicogênio: recuperação <8h: 1–1.2 g/kg/h; 8–24h: 5–7 g/kg.',
+};
 
 const ergogenicSupplements = [
   { key: 'sup_creatine', label: 'Creatina' },
@@ -37,21 +101,22 @@ const antioxidantSupplements = [
   { key: 'sup_nac', label: 'NAC' },
 ];
 
-export function NPPeriodizationTab({ clientId, client }: Props) {
+export function NPPeriodizationTab({ clientId, client, consultationId, consultation }: Props) {
   const { fetchPeriodizationWeeks, savePeriodizationWeek } = useNutritionalPeriodization(clientId);
   const { data: weeks = [] } = fetchPeriodizationWeeks(clientId);
   const [cycleStart, setCycleStart] = useState('');
   const [numWeeks, setNumWeeks] = useState(12);
   const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
   const [editingWeek, setEditingWeek] = useState<any>(null);
+  const [generatingAI, setGeneratingAI] = useState(false);
 
-  // Fetch athlete profile for target_race info
+  // Fetch athlete profile
   const { data: athleteProfile } = useQuery({
     queryKey: ['athlete-profile-periodization', clientId],
     queryFn: async () => {
       const { data } = await supabase
         .from('athlete_profiles')
-        .select('target_race, target_deadline')
+        .select('target_race, target_deadline, birth_date, gender, current_weight')
         .eq('client_id', clientId)
         .maybeSingle();
       return data;
@@ -59,56 +124,76 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
     enabled: !!clientId,
   });
 
-  const generateWeeks = () => {
-    if (!cycleStart) return;
-    const start = startOfWeek(new Date(cycleStart), { weekStartsOn: 1 });
-    for (let i = 0; i < numWeeks; i++) {
-      const weekStart = addWeeks(start, i);
-      const weekEnd = addWeeks(weekStart, 1);
-      weekEnd.setDate(weekEnd.getDate() - 1);
-      const monthName = format(weekStart, 'MMMM', { locale: ptBR }).toUpperCase();
+  // Cycle calculations
+  const raceDate = athleteProfile?.target_deadline || consultation?.target_race_date;
+  const cycleInfo = useMemo(() => {
+    if (!raceDate) return null;
+    const race = new Date(raceDate + 'T12:00:00');
+    const today = new Date();
+    const totalWeeks = Math.max(differenceInWeeks(race, today), 1);
+    const totalMonths = (totalWeeks / 4.33).toFixed(1);
 
-      savePeriodizationWeek.mutate({
-        client_id: clientId,
-        cycle_start_date: cycleStart,
-        week_number: i + 1,
-        month_name: monthName,
-        start_date: format(weekStart, 'yyyy-MM-dd'),
-        end_date: format(weekEnd, 'yyyy-MM-dd'),
-      });
+    // Determine current phase from weeks data
+    const todayStr = format(today, 'yyyy-MM-dd');
+    const currentWeek = weeks.find((w: any) => w.start_date <= todayStr && w.end_date >= todayStr);
+
+    return { totalWeeks, totalMonths, currentPhase: currentWeek?.phase_name || 'Não definida', raceDate: race };
+  }, [raceDate, weeks]);
+
+  // Phase distribution calculation
+  const getPhaseDistribution = (total: number) => {
+    if (total >= 20) {
+      return [
+        { name: 'Base Metabólica', pct: 30, weeks: Math.round(total * 0.30) },
+        { name: 'Transição / Performance', pct: 40, weeks: Math.round(total * 0.40) },
+        { name: 'Performance Máxima', pct: 20, weeks: Math.round(total * 0.20) },
+        { name: 'Taper', pct: 10, weeks: Math.max(Math.round(total * 0.10), 1) },
+      ];
     }
+    const taper = Math.max(Math.round(total * 0.10), 1);
+    const perf = Math.max(Math.round(total * 0.20), 1);
+    const trans = Math.max(Math.round(total * 0.35), 1);
+    const base = Math.max(total - taper - perf - trans, 1);
+    return [
+      { name: 'Base Metabólica', pct: Math.round((base / total) * 100), weeks: base },
+      { name: 'Transição / Performance', pct: Math.round((trans / total) * 100), weeks: trans },
+      { name: 'Performance Máxima', pct: Math.round((perf / total) * 100), weeks: perf },
+      { name: 'Taper', pct: Math.round((taper / total) * 100), weeks: taper },
+    ];
   };
 
-  // Auto-generate cycle with training phases
-  const generateAutoPhases = () => {
-    const startDate = client?.start_date;
-    const raceDate = athleteProfile?.target_deadline;
-    if (!startDate || !raceDate) return;
+  // Energy availability calculation
+  const weight = Number(consultation?.weight) || 0;
+  const leanMassKg = Number(consultation?.lean_mass_kg) || 0;
 
+  const getEAStatus = (ea: number) => {
+    if (ea <= 0) return { label: '—', color: '' };
+    if (ea < 30) return { label: `${ea.toFixed(1)} kcal/kg — ⚠️ Risco RED-S`, color: 'text-red-400' };
+    if (ea < 45) return { label: `${ea.toFixed(1)} kcal/kg — Zona de cautela`, color: 'text-amber-400' };
+    return { label: `${ea.toFixed(1)} kcal/kg — ✅ Ideal`, color: 'text-emerald-400' };
+  };
+
+  const generateAutoPhases = () => {
+    if (!raceDate) return;
     const today = new Date();
     const race = new Date(raceDate + 'T12:00:00');
     const totalWeeks = Math.max(differenceInWeeks(race, today), 4);
+    const phases = getPhaseDistribution(totalWeeks);
 
-    // Phase distribution: Taper last 2 weeks, Competition last week overlaps
-    // Base: ~40%, Específico: ~35%, Polimento: ~15%, Competição: ~10%
-    const taperWeeks = Math.max(Math.round(totalWeeks * 0.10), 1);
-    const competitionWeeks = 1;
-    const specificWeeks = Math.max(Math.round(totalWeeks * 0.35), 2);
-    const baseWeeks = totalWeeks - specificWeeks - taperWeeks - competitionWeeks;
-
-    const phases: { name: string; weeks: number }[] = [
-      { name: 'Base / Preparação Geral', weeks: Math.max(baseWeeks, 1) },
-      { name: 'Específico / Construção', weeks: specificWeeks },
-      { name: 'Polimento / Taper', weeks: taperWeeks },
-      { name: 'Competição', weeks: competitionWeeks },
-    ];
+    // Add competition week
+    phases.push({ name: 'Competição', pct: 0, weeks: 1 });
+    const adjustedTotal = totalWeeks + 1;
 
     const cycleStartDate = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
     setCycleStart(cycleStartDate);
-    setNumWeeks(totalWeeks);
+    setNumWeeks(adjustedTotal);
 
-    let weekCounter = 1;
     const start = startOfWeek(today, { weekStartsOn: 1 });
+    let weekCounter = 1;
+
+    // Determine plan type for micro adjustments
+    const planDuration = client?.plan_duration;
+    const consultFreq = client?.consultation_frequency;
 
     for (const phase of phases) {
       for (let i = 0; i < phase.weeks; i++) {
@@ -116,9 +201,18 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
         const weekEnd = addWeeks(weekStart, 1);
         weekEnd.setDate(weekEnd.getDate() - 1);
         const monthName = format(weekStart, 'MMMM', { locale: ptBR }).toUpperCase();
-
-        // Mark competition week
         const isCompetition = phase.name === 'Competição';
+
+        // Check if this is an adjustment week (every 4 weeks or consultation week)
+        const isAdjustment = weekCounter % 4 === 0 || (consultFreq === '6_weeks' && weekCounter % 6 === 0);
+
+        // Phase-specific macro defaults
+        let choGkg = null;
+        let proteinGkg = null;
+        if (phase.name === 'Base Metabólica') { choGkg = 4; proteinGkg = 2.0; }
+        else if (phase.name === 'Transição / Performance') { choGkg = 5; proteinGkg = 1.8; }
+        else if (phase.name === 'Performance Máxima') { choGkg = 6; proteinGkg = 1.6; }
+        else if (phase.name === 'Taper') { choGkg = 6; proteinGkg = 1.6; }
 
         savePeriodizationWeek.mutate({
           client_id: clientId,
@@ -130,13 +224,86 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
           phase_name: phase.name,
           has_competition: isCompetition,
           competition_name: isCompetition && athleteProfile?.target_race ? athleteProfile.target_race : null,
+          is_adjustment_week: isAdjustment,
+          cho_gkg: choGkg,
+          protein_gkg: proteinGkg,
+          phase_objectives: (PHASE_OBJECTIVES[phase.name] || []).join('; '),
         });
         weekCounter++;
       }
     }
+    toast({ title: 'Ciclo gerado com sucesso', description: `${adjustedTotal} semanas distribuídas em ${phases.length} fases` });
   };
 
-  const canAutoGenerate = !!client?.start_date && !!athleteProfile?.target_deadline;
+  const generateWeeks = () => {
+    if (!cycleStart) return;
+    const start = startOfWeek(new Date(cycleStart), { weekStartsOn: 1 });
+    for (let i = 0; i < numWeeks; i++) {
+      const weekStart = addWeeks(start, i);
+      const weekEnd = addWeeks(weekStart, 1);
+      weekEnd.setDate(weekEnd.getDate() - 1);
+      const monthName = format(weekStart, 'MMMM', { locale: ptBR }).toUpperCase();
+      savePeriodizationWeek.mutate({
+        client_id: clientId,
+        cycle_start_date: cycleStart,
+        week_number: i + 1,
+        month_name: monthName,
+        start_date: format(weekStart, 'yyyy-MM-dd'),
+        end_date: format(weekEnd, 'yyyy-MM-dd'),
+      });
+    }
+  };
+
+  // AI suggestion for daily strategies
+  const handleAISuggest = async (weekData: any) => {
+    if (!weekData?.phase_name) return;
+    setGeneratingAI(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-athlete', {
+        body: {
+          prompt: `Você é um nutricionista esportivo especialista em periodização nutricional para atletas de endurance.
+
+Com base nas referências de Louise Burke e Asker Jeukendrup:
+
+Fase atual: ${weekData.phase_name}
+Semana: ${weekData.week_number}
+CHO alvo: ${weekData.cho_gkg || '?'} g/kg/dia
+Proteína: ${weekData.protein_gkg || '?'} g/kg/dia
+Peso: ${weight} kg
+MLG: ${leanMassKg} kg
+Modalidade: ${consultation?.sport_modality || 'corrida'}
+
+Sugira uma distribuição de estratégias para cada dia da semana (Segunda a Domingo).
+Para cada dia, escolha UMA das estratégias: low_carb, high_carb, train_low, recovery_support, long_reduced_cho, long_progressive_cho, strategic_fasting, reduced_intra, full_support.
+
+Responda APENAS em JSON no formato:
+{"monday":"strategy_key","tuesday":"strategy_key","wednesday":"strategy_key","thursday":"strategy_key","friday":"strategy_key","saturday":"strategy_key","sunday":"strategy_key"}`,
+        },
+      });
+
+      if (error) throw error;
+
+      // Try to parse JSON from AI response
+      const responseText = typeof data === 'string' ? data : (data?.diagnosis || data?.raw_response || JSON.stringify(data));
+      const jsonMatch = responseText.match(/\{[^}]+\}/);
+      if (jsonMatch) {
+        const strategies = JSON.parse(jsonMatch[0]);
+        const dayMap = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        const dailyStrategies: Record<string, string> = {};
+        dayMap.forEach((day, i) => {
+          if (strategies[day]) dailyStrategies[i.toString()] = strategies[day];
+        });
+        setEditingWeek((prev: any) => prev ? { ...prev, daily_strategies: dailyStrategies } : prev);
+        toast({ title: 'Estratégias sugeridas pela IA', description: 'Revise e ajuste conforme necessário.' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro ao gerar sugestões', description: err.message, variant: 'destructive' });
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
+
+  const canAutoGenerate = !!raceDate;
 
   const toggleWeek = (weekNum: number) => {
     if (expandedWeek === weekNum) {
@@ -145,12 +312,27 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
     } else {
       setExpandedWeek(weekNum);
       const week = weeks.find((w: any) => w.week_number === weekNum);
-      setEditingWeek(week ? { ...week } : null);
+      setEditingWeek(week ? { ...week, daily_strategies: week.daily_strategies || {} } : null);
     }
   };
 
   const updateEditing = (key: string, value: any) => {
     setEditingWeek((prev: any) => prev ? { ...prev, [key]: value } : null);
+  };
+
+  const updateDailyStrategy = (dayIndex: number, strategy: string) => {
+    setEditingWeek((prev: any) => {
+      if (!prev) return null;
+      const current = prev.daily_strategies || {};
+      const dayKey = dayIndex.toString();
+      const newStrategies = { ...current };
+      if (current[dayKey] === strategy) {
+        delete newStrategies[dayKey];
+      } else {
+        newStrategies[dayKey] = strategy;
+      }
+      return { ...prev, daily_strategies: newStrategies };
+    });
   };
 
   const saveWeek = () => {
@@ -159,7 +341,15 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
     }
   };
 
-  // Group weeks by month
+  // Group weeks by phase
+  const weeksByPhase: Record<string, any[]> = {};
+  weeks.forEach((w: any) => {
+    const phase = w.phase_name || 'Sem Fase';
+    if (!weeksByPhase[phase]) weeksByPhase[phase] = [];
+    weeksByPhase[phase].push(w);
+  });
+
+  // Group weeks by month for flat view
   const weeksByMonth: Record<string, any[]> = {};
   weeks.forEach((w: any) => {
     const month = w.month_name || 'SEM MÊS';
@@ -169,7 +359,72 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Generate weeks */}
+      {/* Cycle Info Banner */}
+      {cycleInfo && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Prova</p>
+                  <p className="text-sm font-bold">{athleteProfile?.target_race || '—'}</p>
+                </div>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Semanas restantes</p>
+                <p className="text-xl font-bold text-primary">{cycleInfo.totalWeeks}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Meses</p>
+                <p className="text-xl font-bold">{cycleInfo.totalMonths}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Fase atual</p>
+                <Badge className={PHASE_COLORS[cycleInfo.currentPhase] || 'bg-muted text-muted-foreground'}>
+                  {cycleInfo.currentPhase}
+                </Badge>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Data da Prova</p>
+                <p className="text-sm font-semibold">{format(cycleInfo.raceDate, 'dd/MM/yyyy')}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Phase Timeline */}
+      {weeks.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Linha do Tempo</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-1 h-8 rounded-lg overflow-hidden">
+              {Object.entries(weeksByPhase).map(([phase, phaseWeeks]) => {
+                const pct = (phaseWeeks.length / weeks.length) * 100;
+                const colors = PHASE_COLORS[phase] || 'bg-muted';
+                return (
+                  <Tooltip key={phase}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={`flex items-center justify-center text-xs font-medium cursor-default border ${colors}`}
+                        style={{ width: `${pct}%`, minWidth: '30px' }}
+                      >
+                        {pct > 12 ? `${phase.split(' ')[0]}` : ''}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{phase} — {phaseWeeks.length} semanas ({pct.toFixed(0)}%)</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Generate Cycle */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -177,16 +432,20 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Auto-generate button */}
           {canAutoGenerate && weeks.length === 0 && (
             <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
               <div className="flex-1">
                 <p className="text-sm font-medium">Gerar ciclo automaticamente</p>
                 <p className="text-xs text-muted-foreground">
-                  Baseado na data de hoje até a prova alvo: <strong>{athleteProfile?.target_race}</strong> em {new Date(athleteProfile!.target_deadline + 'T12:00:00').toLocaleDateString('pt-BR')}
+                  BASE → TRANSIÇÃO → PERFORMANCE → TAPER → PROVA
                 </p>
+                {cycleInfo && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {cycleInfo.totalWeeks} semanas até <strong>{athleteProfile?.target_race}</strong>
+                  </p>
+                )}
               </div>
-              <Button onClick={generateAutoPhases} size="sm" className="gap-1" variant="default">
+              <Button onClick={generateAutoPhases} size="sm" className="gap-1">
                 <Wand2 className="h-3.5 w-3.5" /> Gerar com Fases
               </Button>
             </div>
@@ -208,68 +467,225 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
         </CardContent>
       </Card>
 
-      {/* Weeks list */}
-      {Object.entries(weeksByMonth).map(([month, monthWeeks]) => (
-        <Card key={month}>
+      {/* Weeks by Phase */}
+      {Object.entries(weeksByPhase).map(([phase, phaseWeeks]) => (
+        <Card key={phase}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">{month}</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge className={PHASE_COLORS[phase] || 'bg-muted'}>{phase}</Badge>
+                <span className="text-xs text-muted-foreground">{phaseWeeks.length} semanas</span>
+              </div>
+            </div>
+            {/* Phase evidence note */}
+            {PHASE_EVIDENCE_NOTES[phase] && (
+              <p className="text-xs text-muted-foreground mt-2 p-2 rounded bg-muted/30 border border-border">
+                {PHASE_EVIDENCE_NOTES[phase]}
+              </p>
+            )}
           </CardHeader>
           <CardContent className="space-y-1">
-            {monthWeeks.map((week: any) => (
+            {phaseWeeks.map((week: any) => (
               <div key={week.id} className="border border-border rounded-lg">
                 <button
                   onClick={() => toggleWeek(week.week_number)}
                   className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/30 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className="text-xs">S{week.week_number}</Badge>
                     <span className="text-xs text-muted-foreground">
                       {week.start_date ? format(new Date(week.start_date + 'T12:00:00'), 'dd/MM') : ''} — {week.end_date ? format(new Date(week.end_date + 'T12:00:00'), 'dd/MM') : ''}
                     </span>
-                    {week.phase_name && <Badge className="bg-accent text-accent-foreground text-xs">{week.phase_name}</Badge>}
-                    {week.has_competition && <Badge className="bg-destructive/20 text-destructive text-xs">Competição</Badge>}
-                    {week.cho_percentage && <Badge variant="outline" className="text-xs">CHO: {week.cho_percentage}%</Badge>}
+                    {week.has_competition && <Badge className="bg-red-500/20 text-red-400 text-xs">🏁 Prova</Badge>}
+                    {week.is_adjustment_week && <Badge className="bg-amber-500/20 text-amber-400 text-xs">🔧 Ajuste</Badge>}
+                    {week.cho_gkg && <Badge variant="outline" className="text-xs">CHO: {week.cho_gkg} g/kg</Badge>}
+                    {week.protein_gkg && <Badge variant="outline" className="text-xs">PTN: {week.protein_gkg} g/kg</Badge>}
                   </div>
                   {expandedWeek === week.week_number ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </button>
 
                 {expandedWeek === week.week_number && editingWeek && (
-                  <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
-                    <div className="grid grid-cols-2 gap-3">
+                  <div className="px-3 pb-3 space-y-4 border-t border-border pt-3">
+                    {/* Phase & Macro Targets */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground">Fase do Treinamento</label>
-                        <Input value={editingWeek.phase_name || ''} onChange={e => updateEditing('phase_name', e.target.value)} placeholder="Ex: Base, Específico, Polimento" className="h-7 text-xs" />
+                        <label className="text-xs font-medium text-muted-foreground">Fase</label>
+                        <Select value={editingWeek.phase_name || ''} onValueChange={v => updateEditing('phase_name', v)}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Base Metabólica">Base Metabólica</SelectItem>
+                            <SelectItem value="Transição / Performance">Transição / Performance</SelectItem>
+                            <SelectItem value="Performance Máxima">Performance Máxima</SelectItem>
+                            <SelectItem value="Taper">Taper</SelectItem>
+                            <SelectItem value="Competição">Competição</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <div className="flex items-end gap-2">
-                        <Checkbox checked={editingWeek.has_competition || false} onCheckedChange={v => updateEditing('has_competition', v)} />
-                        <label className="text-xs">Competição</label>
-                        {editingWeek.has_competition && (
-                          <Input value={editingWeek.competition_name || ''} onChange={e => updateEditing('competition_name', e.target.value)} placeholder="Nome da competição" className="flex-1 h-7 text-xs" />
-                        )}
+                      <div>
+                        <label className="text-xs text-muted-foreground">CHO (g/kg)</label>
+                        <Input type="number" step="0.5" value={editingWeek.cho_gkg || ''} onChange={e => updateEditing('cho_gkg', Number(e.target.value) || null)} className="h-8 text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Proteína (g/kg)</label>
+                        <Input type="number" step="0.1" value={editingWeek.protein_gkg || ''} onChange={e => updateEditing('protein_gkg', Number(e.target.value) || null)} className="h-8 text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Gordura (g/kg)</label>
+                        <Input type="number" step="0.1" value={editingWeek.fat_gkg || ''} onChange={e => updateEditing('fat_gkg', Number(e.target.value) || null)} className="h-8 text-xs" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Intra CHO (g/h)</label>
+                        <Select value={editingWeek.intra_cho_gh?.toString() || ''} onValueChange={v => updateEditing('intra_cho_gh', Number(v))}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                          <SelectContent>
+                            {INTRA_STRATEGIES.map(s => (
+                              <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
 
+                    {/* Phase 2/3 specific fields */}
+                    {(editingWeek.phase_name === 'Transição / Performance' || editingWeek.phase_name === 'Performance Máxima') && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-2 rounded bg-muted/20 border border-border">
+                        <div>
+                          <label className="text-xs text-muted-foreground">Pré treino (g/kg)</label>
+                          <Input type="number" step="0.5" value={editingWeek.pre_training_cho_gkg || ''} onChange={e => updateEditing('pre_training_cho_gkg', Number(e.target.value) || null)} className="h-8 text-xs" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Cafeína (mg/kg)</label>
+                          <Input type="number" step="0.5" value={editingWeek.caffeine_mg_kg || ''} onChange={e => updateEditing('caffeine_mg_kg', Number(e.target.value) || null)} className="h-8 text-xs" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Carb Loading</label>
+                          <Select value={editingWeek.carb_loading_type || ''} onValueChange={v => updateEditing('carb_loading_type', v)}>
+                            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="24h">24h</SelectItem>
+                              <SelectItem value="48h">48h</SelectItem>
+                              <SelectItem value="none">Nenhum</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Tolerância GI (1-5)</label>
+                          <Input type="number" min={1} max={5} value={editingWeek.gi_tolerance_rating || ''} onChange={e => updateEditing('gi_tolerance_rating', Number(e.target.value) || null)} className="h-8 text-xs" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Daily Strategies */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-medium text-muted-foreground">Estratégias Diárias</label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 text-xs h-7"
+                          onClick={() => handleAISuggest(editingWeek)}
+                          disabled={generatingAI}
+                        >
+                          {generatingAI ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                          Sugerir com IA
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-7 gap-1">
+                        {dayLabels.map((day, di) => {
+                          const currentStrategy = (editingWeek.daily_strategies || {})[di.toString()];
+                          return (
+                            <div key={di} className="space-y-1">
+                              <p className="text-xs font-medium text-center">{day.slice(0, 3)}</p>
+                              <Select value={currentStrategy || ''} onValueChange={v => updateDailyStrategy(di, v)}>
+                                <SelectTrigger className="h-7 text-xs px-1">
+                                  <SelectValue placeholder="—" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {DAILY_STRATEGY_OPTIONS.map(opt => (
+                                    <SelectItem key={opt.key} value={opt.key} className="text-xs">
+                                      {opt.emoji} {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Energy Availability */}
+                    {weight > 0 && leanMassKg > 0 && editingWeek.energy_availability != null && (
+                      <div className="p-2 rounded border border-border bg-muted/20">
+                        <p className="text-xs font-medium text-muted-foreground">Disponibilidade Energética</p>
+                        <p className={`text-sm font-bold ${getEAStatus(editingWeek.energy_availability || 0).color}`}>
+                          {getEAStatus(editingWeek.energy_availability || 0).label}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Competition & Adjustment */}
+                    <div className="flex gap-4">
+                      <div className="flex items-center gap-2">
+                        <Checkbox checked={editingWeek.has_competition || false} onCheckedChange={v => updateEditing('has_competition', v)} />
+                        <label className="text-xs">Competição</label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox checked={editingWeek.is_adjustment_week || false} onCheckedChange={v => updateEditing('is_adjustment_week', v)} />
+                        <label className="text-xs">Semana de Ajuste</label>
+                      </div>
+                    </div>
+                    {editingWeek.has_competition && (
+                      <Input value={editingWeek.competition_name || ''} onChange={e => updateEditing('competition_name', e.target.value)} placeholder="Nome da competição" className="h-8 text-xs" />
+                    )}
+
+                    {/* Race Simulation (Performance Máxima) */}
+                    {editingWeek.phase_name === 'Performance Máxima' && (
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Simulação de Prova</label>
+                        <Textarea
+                          value={editingWeek.race_simulation_notes || ''}
+                          onChange={e => updateEditing('race_simulation_notes', e.target.value)}
+                          rows={3}
+                          className="text-xs"
+                          placeholder="Café da manhã de prova, timing dos géis, timing cafeína, estratégia hídrica, sódio..."
+                        />
+                      </div>
+                    )}
+
+                    {/* Hydration & Sodium Strategy */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground">Estratégia Hídrica</label>
+                        <Input value={editingWeek.hydration_strategy || ''} onChange={e => updateEditing('hydration_strategy', e.target.value)} className="h-8 text-xs" placeholder="Ex: 500ml/h" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Estratégia de Sódio</label>
+                        <Input value={editingWeek.sodium_strategy || ''} onChange={e => updateEditing('sodium_strategy', e.target.value)} className="h-8 text-xs" placeholder="Ex: 500-700mg/h" />
+                      </div>
+                    </div>
+
+                    {/* Nutritional Plan Notes */}
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">Planejamento Nutricional</label>
                       <Textarea value={editingWeek.nutritional_plan || ''} onChange={e => updateEditing('nutritional_plan', e.target.value)} rows={2} className="text-xs" />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-xs text-muted-foreground">% CHO</label>
-                        <Input type="number" value={editingWeek.cho_percentage || ''} onChange={e => updateEditing('cho_percentage', Number(e.target.value))} className="h-7 text-xs" />
+                    {/* Micro Adjustment Notes */}
+                    {editingWeek.is_adjustment_week && (
+                      <div className="p-2 rounded border border-amber-500/30 bg-amber-500/5">
+                        <label className="text-xs font-medium text-amber-400">Notas do Ajuste</label>
+                        <Textarea
+                          value={editingWeek.micro_adjustment_notes || ''}
+                          onChange={e => updateEditing('micro_adjustment_notes', e.target.value)}
+                          rows={2}
+                          className="text-xs mt-1"
+                          placeholder="Reavaliação de composição corporal, ajuste de CHO (+0.5 g/kg), mudança de estratégia intra..."
+                        />
                       </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">% Proteína</label>
-                        <Input type="number" value={editingWeek.protein_percentage || ''} onChange={e => updateEditing('protein_percentage', Number(e.target.value))} className="h-7 text-xs" />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">% Lipídeos</label>
-                        <Input type="number" value={editingWeek.lipid_percentage || ''} onChange={e => updateEditing('lipid_percentage', Number(e.target.value))} className="h-7 text-xs" />
-                      </div>
-                    </div>
+                    )}
 
-                    {/* Ergogenic Supplements */}
+                    {/* Supplements */}
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">Recursos Ergogênicos</label>
                       <div className="flex flex-wrap gap-3 mt-1">
@@ -282,7 +698,6 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
                       </div>
                     </div>
 
-                    {/* Antioxidant Supplements */}
                     <div>
                       <label className="text-xs font-medium text-muted-foreground">Suplementação Antioxidante e Reparo</label>
                       <div className="flex flex-wrap gap-3 mt-1">
@@ -301,11 +716,6 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-muted-foreground">Ajustes Nutricionais / Suplementos Funcionais</label>
-                      <Textarea value={editingWeek.functional_supplements || ''} onChange={e => updateEditing('functional_supplements', e.target.value)} rows={1} className="text-xs" />
-                    </div>
-
-                    <div>
                       <label className="text-xs font-medium text-muted-foreground">Solicitação de Exames</label>
                       <Textarea value={editingWeek.lab_exam_request || ''} onChange={e => updateEditing('lab_exam_request', e.target.value)} rows={1} className="text-xs" />
                     </div>
@@ -320,6 +730,33 @@ export function NPPeriodizationTab({ clientId, client }: Props) {
           </CardContent>
         </Card>
       ))}
+
+      {/* Glycogen Reference */}
+      {weeks.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Info className="h-4 w-4" /> Referências de Glicogênio (Burke & Jeukendrup)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="p-2 rounded bg-muted/30 border border-border">
+                <p className="font-medium">Recuperação &lt;8h</p>
+                <p className="text-muted-foreground">1–1.2 g/kg/h de CHO</p>
+              </div>
+              <div className="p-2 rounded bg-muted/30 border border-border">
+                <p className="font-medium">Recuperação 8–24h</p>
+                <p className="text-muted-foreground">5–7 g/kg de CHO</p>
+              </div>
+              <div className="p-2 rounded bg-muted/30 border border-border">
+                <p className="font-medium">High Training</p>
+                <p className="text-muted-foreground">6–10 g/kg de CHO</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {weeks.length === 0 && (
         <Card>
