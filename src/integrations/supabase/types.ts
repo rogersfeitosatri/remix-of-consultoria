@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_layout_settings: {
+        Row: {
+          avatar_url: string | null
+          brand_name: string | null
+          brand_subtitle: string | null
+          created_at: string
+          id: string
+          logo_url: string | null
+          sidebar_items: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          brand_name?: string | null
+          brand_subtitle?: string | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          sidebar_items?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          brand_name?: string | null
+          brand_subtitle?: string | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          sidebar_items?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_settings: {
         Row: {
           created_at: string | null

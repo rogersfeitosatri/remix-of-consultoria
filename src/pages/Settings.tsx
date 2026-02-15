@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useClients, usePayments, useAddClient, Client } from '@/hooks/useClients';
-import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock, ExternalLink } from 'lucide-react';
+import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock, ExternalLink, Palette } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -16,6 +16,7 @@ import { useAdminSettings, useSaveAdminSettings } from '@/hooks/useAdminSettings
 import { ChangePasswordForm } from '@/components/athlete/ChangePasswordForm';
 import { MessageTemplatesSection } from '@/components/settings/MessageTemplatesSection';
 import { LandingPageSettingsSection } from '@/components/settings/LandingPageSettingsSection';
+import { LayoutCustomizationSection } from '@/components/settings/LayoutCustomizationSection';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
@@ -572,6 +573,24 @@ export default function Settings() {
 
         {/* Accordion for all sections */}
         <Accordion type="single" collapsible className="space-y-4">
+          {/* Layout Customization - First item */}
+          <AccordionItem value="layout" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <Palette className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Personalização do Layout</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Reordene o menu, oculte abas, renomeie títulos e altere logo/avatar
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <LayoutCustomizationSection />
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Export Card */}
           <AccordionItem value="export" className="border border-border rounded-lg bg-card px-4">
             <AccordionTrigger className="hover:no-underline py-4">
