@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,9 +20,13 @@ import { NPDashboardTab } from '@/components/periodization/NPDashboardTab';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function NutritionalPeriodization() {
+  const [searchParams] = useSearchParams();
+  const initialClient = searchParams.get('client') || '';
+  const initialTab = searchParams.get('tab') || 'patient';
   const { data: clients } = useClients();
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [selectedClientId, setSelectedClientId] = useState<string>(initialClient);
   const [selectedConsultationId, setSelectedConsultationId] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
   const { consultations, loadingConsultations, saveConsultation } = useNutritionalPeriodization(selectedClientId);
 
   const activeClients = (clients || []).filter((c: any) => c.is_active);
@@ -129,7 +134,7 @@ export default function NutritionalPeriodization() {
         </Card>
 
         {selectedClientId && selectedConsultationId && selectedConsultation && (
-          <Tabs defaultValue="patient" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="w-full flex-wrap h-auto gap-1 bg-muted/50 p-1">
               <TabsTrigger value="patient" className="gap-1 text-xs"><User className="h-3.5 w-3.5" />Dados</TabsTrigger>
               <TabsTrigger value="body" className="gap-1 text-xs"><Heart className="h-3.5 w-3.5" />Composição</TabsTrigger>

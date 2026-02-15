@@ -105,7 +105,7 @@ export function PeriodizationPhaseAlert() {
         {athletesInPhase.map(a => (
           <button
             key={a.clientId}
-            onClick={() => navigate(`/periodization?client=${a.clientId}`)}
+            onClick={() => navigate(`/periodization?client=${a.clientId}&tab=periodization`)}
             className="w-full flex items-center justify-between gap-3 rounded-lg border border-border p-2.5 hover:bg-muted/50 transition-colors text-left"
           >
             <div className="flex items-center gap-2.5 min-w-0">
