@@ -112,7 +112,7 @@ export default function NutritionalPeriodization() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Periodização Nutricional</h1>
-            <p className="text-sm text-muted-foreground">Planejamento nutricional e de treino para atletas de endurance</p>
+            <p className="text-sm text-muted-foreground">Planejamento nutricional para atletas de endurance</p>
           </div>
         </div>
 
