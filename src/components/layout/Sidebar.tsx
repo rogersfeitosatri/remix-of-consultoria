@@ -3,22 +3,23 @@ import { LayoutDashboard, Users, Wallet, X, LogOut, CalendarDays, Settings, Chev
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import logoRF from '@/assets/logo-rf.jpg';
+import { useLayoutSettings } from '@/hooks/useLayoutSettings';
+import logoRFDefault from '@/assets/logo-rf.jpg';
 
-const navItems = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/tasks', icon: CheckSquare, label: 'Tarefas' },
-  { to: '/clients', icon: Users, label: 'Atletas' },
-  { to: '/periodization', icon: Activity, label: 'Periodização' },
-  { to: '/metabolic-web', icon: Network, label: 'Interconexão Metabólica' },
-  { to: '/financial', icon: Wallet, label: 'Financeiro' },
-  { to: '/calendar', icon: CalendarDays, label: 'Calendário' },
-  { to: '/scheduling', icon: Clock, label: 'Agendamento' },
-  { to: '/content', icon: FileText, label: 'Conteúdo Atleta' },
-  { to: '/link-bio', icon: Link, label: 'Link da Bio' },
-  { to: '/forms', icon: ClipboardList, label: 'Formulários' },
-  { to: '/settings', icon: Settings, label: 'Configurações' },
-];
+const iconMap: Record<string, any> = {
+  '/admin': LayoutDashboard,
+  '/tasks': CheckSquare,
+  '/clients': Users,
+  '/periodization': Activity,
+  '/metabolic-web': Network,
+  '/financial': Wallet,
+  '/calendar': CalendarDays,
+  '/scheduling': Clock,
+  '/content': FileText,
+  '/link-bio': Link,
+  '/forms': ClipboardList,
+  '/settings': Settings,
+};
 
 interface SidebarProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
+  const { settings } = useLayoutSettings();
 
   const handleSignOut = async () => {
     await signOut();
@@ -39,6 +41,9 @@ export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse
   const handleViewAsAthlete = () => {
     navigate('/athlete');
   };
+
+  const logoSrc = settings.logo_url || logoRFDefault;
+  const visibleItems = settings.sidebar_items.filter(item => item.visible);
 
   return (
     <>
@@ -63,10 +68,10 @@ export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse
           {/* Logo */}
           <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
             <div className={cn("flex items-center gap-3", isCollapsed && "lg:justify-center lg:w-full")}>
-              <img src={logoRF} alt="Rogers Feitosa" className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
+              <img src={logoSrc} alt={settings.brand_name} className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
               <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
-                <h1 className="text-lg font-bold text-sidebar-foreground truncate">Rogers Feitosa</h1>
-                <p className="text-xs text-muted-foreground">Nutrição & Treinamento</p>
+                <h1 className="text-lg font-bold text-sidebar-foreground truncate">{settings.brand_name}</h1>
+                <p className="text-xs text-muted-foreground">{settings.brand_subtitle}</p>
               </div>
             </div>
             {/* Close button for mobile */}
@@ -93,12 +98,13 @@ export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-4">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.to;
+            {visibleItems.map((item) => {
+              const isActive = location.pathname === item.key;
+              const Icon = iconMap[item.key] || LayoutDashboard;
               return (
                 <NavLink
-                  key={item.to}
-                  to={item.to}
+                  key={item.key}
+                  to={item.key}
                   onClick={onClose}
                   title={isCollapsed ? item.label : undefined}
                   className={cn(
@@ -109,7 +115,7 @@ export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse
                     isCollapsed && 'lg:justify-center lg:px-2'
                   )}
                 >
-                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  <Icon className="h-5 w-5 flex-shrink-0" />
                   <span className={cn("truncate", isCollapsed && "lg:hidden")}>{item.label}</span>
                 </NavLink>
               );
