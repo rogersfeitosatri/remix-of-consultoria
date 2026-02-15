@@ -22,6 +22,7 @@ import LinkBioManager from "./pages/LinkBioManager";
 import Forms from "./pages/Forms";
 import Tasks from "./pages/Tasks";
 import NutritionalPeriodization from "./pages/NutritionalPeriodization";
+import MetabolicWeb from "./pages/MetabolicWeb";
 
 // Eager load frequently accessed detail pages
 import AthleteHistory from "./pages/AthleteHistory";
@@ -126,6 +127,7 @@ function AppRoutes() {
         <Route path="/tasks" element={<ProtectedRoute adminOnly><Tasks /></ProtectedRoute>} />
         <Route path="/clients" element={<ProtectedRoute adminOnly><Clients /></ProtectedRoute>} />
         <Route path="/periodization" element={<ProtectedRoute adminOnly><NutritionalPeriodization /></ProtectedRoute>} />
+        <Route path="/metabolic-web" element={<ProtectedRoute adminOnly><MetabolicWeb /></ProtectedRoute>} />
         <Route path="/clients/:clientId" element={<ProtectedRoute adminOnly><ClientDetail /></ProtectedRoute>} />
         <Route path="/financial" element={<ProtectedRoute adminOnly><Financial /></ProtectedRoute>} />
         <Route path="/calendar" element={<ProtectedRoute adminOnly><CalendarPage /></ProtectedRoute>} />

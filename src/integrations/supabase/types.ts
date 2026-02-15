@@ -2340,6 +2340,74 @@ export type Database = {
         }
         Relationships: []
       }
+      metabolic_screening_responses: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          responses: Json
+          score_assimilacao: number | null
+          score_biotransformacao: number | null
+          score_comunicacao: number | null
+          score_defesa_reparo: number | null
+          score_energia: number | null
+          score_integridade_estrutural: number | null
+          score_mental_emocional: number | null
+          score_total: number | null
+          score_transporte: number | null
+          screening_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          responses?: Json
+          score_assimilacao?: number | null
+          score_biotransformacao?: number | null
+          score_comunicacao?: number | null
+          score_defesa_reparo?: number | null
+          score_energia?: number | null
+          score_integridade_estrutural?: number | null
+          score_mental_emocional?: number | null
+          score_total?: number | null
+          score_transporte?: number | null
+          screening_date?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          responses?: Json
+          score_assimilacao?: number | null
+          score_biotransformacao?: number | null
+          score_comunicacao?: number | null
+          score_defesa_reparo?: number | null
+          score_energia?: number | null
+          score_integridade_estrutural?: number | null
+          score_mental_emocional?: number | null
+          score_total?: number | null
+          score_transporte?: number | null
+          screening_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metabolic_screening_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       np_body_assessments: {
         Row: {
           abdomen: number | null
