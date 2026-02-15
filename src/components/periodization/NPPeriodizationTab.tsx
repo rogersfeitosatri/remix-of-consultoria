@@ -340,7 +340,8 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
           is_active: true,
           periodization_start_date: periodStartDate || format(new Date(), 'yyyy-MM-dd'),
           plan_adjustment_type: planType,
-        });
+          gee_snapshot: geePerDay,
+        } as any);
 
       if (insertError) throw insertError;
 
@@ -401,6 +402,13 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
   };
 
   const blocks = (activePeriodization?.blocks as any[]) || [];
+
+  // Detect GEE changes since last generation
+  const geeChanged = useMemo(() => {
+    const snapshot = (activePeriodization as any)?.gee_snapshot as number[] | null;
+    if (!snapshot || snapshot.length !== 7) return false;
+    return geePerDay.some((v, i) => Math.abs(v - snapshot[i]) > 5);
+  }, [geePerDay, activePeriodization]);
 
   // Cycle status
   const cycleStatus = useMemo(() => {
@@ -506,6 +514,28 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
                 </span>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* GEE Changed Alert */}
+      {geeChanged && blocks.length > 0 && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="pt-3 pb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-amber-400">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>Os estímulos de treino (GEE) foram alterados desde a última geração. A periodização pode estar desatualizada.</span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleGenerate('recalculate')}
+              disabled={generating}
+              className="gap-1 text-xs h-7 shrink-0 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+            >
+              {generating && generationType === 'recalculate' ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              Recalcular
+            </Button>
           </CardContent>
         </Card>
       )}
