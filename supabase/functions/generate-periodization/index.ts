@@ -45,6 +45,16 @@ REGRAS OBRIGATÓRIAS:
 9. Sempre calcular/sugerir meta de EA por fase e alertar se EA <30.
 10. Se EA <30, corrigir antes de aumentar train-low.
 
+REGRA CRÍTICA — ESTRUTURA SEMANAL BASEADA NOS ESTÍMULOS REAIS:
+11. O campo "agenda_treinos_semanal" contém os ESTÍMULOS REAIS de treino do atleta por dia da semana, incluindo zona/intensidade, duração e GEE (Gasto Energético do Exercício) em kcal.
+12. A weeklyStructure de CADA FASE deve ser alinhada com esses estímulos reais:
+    - Dias com GEE alto (treinos-chave, longão, tiros) → type: "high" com suporte total de CHO, pré-treino adequado e intra-treino.
+    - Dias com GEE baixo/moderado (rodagens leves, musculação leve) → type: "low", elegíveis para train-low/jejum estratégico conforme a fase.
+    - Dias SEM treino (GEE = 0) → type: "recovery".
+13. Nos "notes" de cada dia, REFERENCIE os estímulos específicos do atleta (ex: "Longão MODERADO 90min — GEE 1480kcal → suporte total, intra 60g/h").
+14. Adapte a distribuição de CHO intra-dia conforme a demanda energética: dias com GEE > 800 kcal precisam de mais suporte que dias com GEE < 300 kcal.
+15. Use o "gee_total_semanal_kcal" para calcular EA semanal e sugerir VCT mínimo por fase.
+
 INSTRUÇÕES DO ADMIN (prioridade alta):
 ${adminInstructions || 'Nenhuma diretriz definida.'}
 
