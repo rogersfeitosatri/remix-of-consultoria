@@ -82,7 +82,7 @@ const antioxidantSupplements = [
 ];
 
 export function NPPeriodizationTab({ clientId, client, consultationId, consultation }: Props) {
-  const { fetchPeriodizationWeeks, savePeriodizationWeek } = useNutritionalPeriodization(clientId);
+  const { fetchPeriodizationWeeks, savePeriodizationWeek, fetchRunningZones, fetchRunningSchedule, fetchTriathlonSchedule } = useNutritionalPeriodization(clientId);
   const { data: weeks = [] } = fetchPeriodizationWeeks(clientId);
   const [cycleStart, setCycleStart] = useState('');
   const [numWeeks, setNumWeeks] = useState(12);
@@ -103,6 +103,11 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
     },
     enabled: !!clientId,
   });
+
+  // Fetch training schedule data for AI context
+  const { data: runningZones = [] } = fetchRunningZones(consultationId || '');
+  const { data: runningSchedule = [] } = fetchRunningSchedule(consultationId || '');
+  const { data: triathlonSchedule = [] } = fetchTriathlonSchedule(consultationId || '');
 
   // Cycle calculations
   const raceDate = athleteProfile?.target_deadline || consultation?.target_race_date;
@@ -290,6 +295,9 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
             athleteProfile={athleteProfile}
             client={client}
             weeks={weeks}
+            runningZones={runningZones}
+            runningSchedule={runningSchedule}
+            triathlonSchedule={triathlonSchedule}
           />
         </TabsContent>
 

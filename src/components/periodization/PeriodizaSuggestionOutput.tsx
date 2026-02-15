@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { dayLabels, triathlonMets, calculateGEE } from '@/lib/nutritionalCalcs';
 import { Textarea } from '@/components/ui/textarea';
 import { Sparkles, Loader2, Save, RefreshCw, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Calendar, Zap, ListChecks, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,6 +19,9 @@ interface Props {
   athleteProfile: any;
   client: any;
   weeks: any[];
+  runningZones?: any[];
+  runningSchedule?: any[];
+  triathlonSchedule?: any[];
 }
 
 const DAY_MAP: Record<string, string> = { Mon: 'Seg', Tue: 'Ter', Wed: 'Qua', Thu: 'Qui', Fri: 'Sex', Sat: 'Sáb', Sun: 'Dom' };
@@ -27,7 +31,7 @@ const TYPE_COLORS: Record<string, string> = {
   recovery: 'bg-emerald-500/20 text-emerald-400',
 };
 
-export function PeriodizaSuggestionOutput({ clientId, consultationId, consultation, athleteProfile, client, weeks }: Props) {
+export function PeriodizaSuggestionOutput({ clientId, consultationId, consultation, athleteProfile, client, weeks, runningZones = [], runningSchedule = [], triathlonSchedule = [] }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [generating, setGenerating] = useState(false);
@@ -86,10 +90,63 @@ export function PeriodizaSuggestionOutput({ clientId, consultationId, consultati
     const raceDate = athleteProfile?.target_deadline || consultation?.target_race_date;
     const weight = Number(consultation?.weight) || Number(athleteProfile?.current_weight) || 0;
     const leanMassKg = Number(consultation?.lean_mass_kg) || 0;
+    const modality = consultation?.sport_modality || consultation?.training_type || '—';
+
+    // Build weekly training schedule with GEE from running or triathlon data
+    const weekDays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+    let trainingScheduleByDay: Record<string, { stimuli: string[]; duration_min: number; gee_kcal: number }> = {};
+
+    const isTriathlon = modality.toLowerCase().includes('triath') || modality.toLowerCase().includes('tri');
+
+    if (isTriathlon && triathlonSchedule.length > 0) {
+      // Triathlon: multiple modalities per day
+      for (let d = 0; d < 7; d++) {
+        const dayEntries = triathlonSchedule.filter((s: any) => s.day_of_week === d && Number(s.duration_minutes) > 0);
+        if (dayEntries.length > 0) {
+          const stimuli: string[] = [];
+          let totalDuration = 0;
+          let totalGee = 0;
+          dayEntries.forEach((entry: any) => {
+            const met = Number(entry.met_value) || (triathlonMets[entry.modality]?.[entry.intensity] || 7);
+            const dur = Number(entry.duration_minutes);
+            const gee = calculateGEE(met, weight, dur);
+            const modLabel = entry.modality === 'natacao' ? 'Natação' : entry.modality === 'corrida' ? 'Corrida' : entry.modality === 'bike' ? 'Bike' : entry.modality === 'musculacao' ? 'Musculação' : entry.modality;
+            stimuli.push(`${modLabel} ${entry.intensity} ${dur}min (MET ${met})`);
+            totalDuration += dur;
+            totalGee += gee;
+          });
+          trainingScheduleByDay[weekDays[d]] = { stimuli, duration_min: totalDuration, gee_kcal: Math.round(totalGee) };
+        }
+      }
+    } else if (runningZones.length > 0 && runningSchedule.length > 0) {
+      // Running: zones mapped to schedule
+      for (let d = 0; d < 7; d++) {
+        const dayEntries = runningSchedule.filter((s: any) => s.day_of_week === d && Number(s.duration_minutes) > 0);
+        if (dayEntries.length > 0) {
+          const stimuli: string[] = [];
+          let totalDuration = 0;
+          let totalGee = 0;
+          dayEntries.forEach((entry: any) => {
+            const zone = runningZones.find((z: any) => z.id === entry.zone_id);
+            const zoneName = zone?.zone_name || 'Zona desconhecida';
+            const met = Number(zone?.met_value) || Number(entry.met_value) || 10;
+            const dur = Number(entry.duration_minutes);
+            const gee = calculateGEE(met, weight, dur);
+            stimuli.push(`${zoneName} ${dur}min (MET ${met})`);
+            totalDuration += dur;
+            totalGee += gee;
+          });
+          trainingScheduleByDay[weekDays[d]] = { stimuli, duration_min: totalDuration, gee_kcal: Math.round(totalGee) };
+        }
+      }
+    }
+
+    // Calculate total weekly GEE
+    const totalWeeklyGEE = Object.values(trainingScheduleByDay).reduce((sum, d) => sum + d.gee_kcal, 0);
 
     return {
       nome: client?.name || '—',
-      modalidade: consultation?.sport_modality || consultation?.training_type || '—',
+      modalidade: modality,
       objetivo: athleteProfile?.main_goal || consultation?.sport_goal || '—',
       prova_alvo: athleteProfile?.target_race || '—',
       data_prova: raceDate || null,
@@ -108,6 +165,9 @@ export function PeriodizaSuggestionOutput({ clientId, consultationId, consultati
       plano_atleta: client?.plan_duration || client?.plan_type || null,
       frequencia_consulta: client?.consultation_frequency || null,
       fases_existentes: weeks.length > 0 ? [...new Set(weeks.map((w: any) => w.phase_name))].join(', ') : 'Nenhuma',
+      // Training schedule with stimuli and GEE
+      agenda_treinos_semanal: Object.keys(trainingScheduleByDay).length > 0 ? trainingScheduleByDay : 'Não cadastrada',
+      gee_total_semanal_kcal: totalWeeklyGEE || null,
     };
   };
 
