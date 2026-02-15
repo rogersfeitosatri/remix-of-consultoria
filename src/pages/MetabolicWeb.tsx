@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
-import { Network, ClipboardList, BarChart3, Search, ChevronsUpDown, Check, Trash2 } from 'lucide-react';
+import { Network, ClipboardList, BarChart3, Search, ChevronsUpDown, Check, Trash2, Link2, Copy } from 'lucide-react';
+import { toast } from 'sonner';
 import { useClients } from '@/hooks/useClients';
 import { useMetabolicScreening } from '@/hooks/useMetabolicScreening';
 import { MetabolicQuestionnaire } from '@/components/metabolic/MetabolicQuestionnaire';
@@ -61,9 +62,26 @@ export default function MetabolicWeb() {
   return (
     <Layout>
       <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Interconexão Metabólica</h1>
-          <p className="text-sm text-muted-foreground">Rastreamento metabólico e teia de interconexões para atletas</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Interconexão Metabólica</h1>
+            <p className="text-sm text-muted-foreground">Rastreamento metabólico e teia de interconexões para atletas</p>
+          </div>
+          {selectedClientId && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                const url = `${window.location.origin}/metabolic-screening?client=${selectedClientId}`;
+                navigator.clipboard.writeText(url);
+                toast.success('Link copiado! Envie ao atleta pelo WhatsApp.');
+              }}
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              Copiar Link
+            </Button>
+          )}
         </div>
 
         {/* Athlete selector */}

@@ -45,6 +45,7 @@ const QuestionBank = lazy(() => import("./pages/QuestionBank"));
 const AppointmentDetail = lazy(() => import("./pages/AppointmentDetail"));
 const AnamneseResponseDetail = lazy(() => import("./pages/AnamneseResponseDetail"));
 const PlansLanding = lazy(() => import("./pages/PlansLanding"));
+const PublicMetabolicScreening = lazy(() => import("./pages/PublicMetabolicScreening"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -121,6 +122,7 @@ function AppRoutes() {
         <Route path="/anamnese-form/:formId" element={<PublicAnamneseForm />} />
         <Route path="/agendar/:slug" element={<PublicBooking />} />
         <Route path="/booking/:token" element={<PublicBookingConsult />} />
+        <Route path="/metabolic-screening" element={<PublicMetabolicScreening />} />
         <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
         <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
