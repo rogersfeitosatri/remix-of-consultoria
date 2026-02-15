@@ -3019,6 +3019,7 @@ export type Database = {
       }
       periodiza_suggestions: {
         Row: {
+          blocks: Json | null
           client_id: string
           consultation_id: string | null
           created_at: string
@@ -3028,7 +3029,9 @@ export type Database = {
           manual_edits: Json | null
           monthly_adjustments: Json | null
           nutritionist_notes: Json | null
+          periodization_start_date: string | null
           phase_plan: Json | null
+          plan_adjustment_type: string | null
           suggestion_type: string
           taper_protocol: Json | null
           updated_at: string
@@ -3036,6 +3039,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          blocks?: Json | null
           client_id: string
           consultation_id?: string | null
           created_at?: string
@@ -3045,7 +3049,9 @@ export type Database = {
           manual_edits?: Json | null
           monthly_adjustments?: Json | null
           nutritionist_notes?: Json | null
+          periodization_start_date?: string | null
           phase_plan?: Json | null
+          plan_adjustment_type?: string | null
           suggestion_type?: string
           taper_protocol?: Json | null
           updated_at?: string
@@ -3053,6 +3059,7 @@ export type Database = {
           version?: number
         }
         Update: {
+          blocks?: Json | null
           client_id?: string
           consultation_id?: string | null
           created_at?: string
@@ -3062,7 +3069,9 @@ export type Database = {
           manual_edits?: Json | null
           monthly_adjustments?: Json | null
           nutritionist_notes?: Json | null
+          periodization_start_date?: string | null
           phase_plan?: Json | null
+          plan_adjustment_type?: string | null
           suggestion_type?: string
           taper_protocol?: Json | null
           updated_at?: string
