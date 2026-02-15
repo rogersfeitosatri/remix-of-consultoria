@@ -1,62 +1,93 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Save, Plus, Info, ScanLine, Loader2 } from 'lucide-react';
 import { useNutritionalPeriodization } from '@/hooks/useNutritionalPeriodization';
 import { femalePercentiles, malePercentiles, bodyFatReference } from '@/data/bodyCompositionReference';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { calculateAge } from '@/lib/nutritionalCalcs';
 
 interface Props {
   consultationId: string;
   clientId: string;
+  consultation: any;
+  onSaveConsultation: (data: any) => void;
 }
 
-const circumferenceFields = [
-  { key: 'chest', label: 'Peitoral' },
-  { key: 'waist', label: 'Cintura' },
-  { key: 'abdomen', label: 'Abdômen' },
-  { key: 'hip', label: 'Quadril' },
-  { key: 'right_arm', label: 'Braço D' },
-  { key: 'left_arm', label: 'Braço E' },
-  { key: 'right_arm_contracted', label: 'Braço D Contraído' },
-  { key: 'forearm', label: 'Antebraço' },
-  { key: 'right_thigh_max', label: 'Coxa max D' },
-  { key: 'left_thigh_max', label: 'Coxa max E' },
-  { key: 'right_calf', label: 'Panturrilha D' },
-  { key: 'left_calf', label: 'Panturrilha E' },
-];
-
-const skinfoldFields = [
-  { key: 'triceps', label: 'Tríceps' },
-  { key: 'subscapular', label: 'Subescapular' },
-  { key: 'biceps', label: 'Bíceps' },
-  { key: 'suprailiac', label: 'Supra-ilíaca' },
-  { key: 'abdominal', label: 'Abdominal' },
-  { key: 'thigh', label: 'Coxa' },
-  { key: 'calf', label: 'Panturrilha' },
-];
-
-export function NPBodyCompositionTab({ consultationId, clientId }: Props) {
+export function NPBodyCompositionTab({ consultationId, clientId, consultation, onSaveConsultation }: Props) {
   const { fetchAssessments, saveAssessment } = useNutritionalPeriodization(clientId);
   const { data: assessments = [] } = fetchAssessments(consultationId);
-  const [form, setForm] = useState<any>({ consultation_id: consultationId, client_id: clientId, assessment_date: new Date().toISOString().split('T')[0] });
 
+  // Fetch athlete profile for age/sex
+  const { data: athleteProfile } = useQuery({
+    queryKey: ['athlete-profile-body-comp', clientId],
+    queryFn: async () => {
+      if (!clientId) return null;
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('birth_date, gender, current_weight, height')
+        .eq('client_id', clientId)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!clientId,
+  });
+
+  const [form, setForm] = useState<any>({});
   const [scanType, setScanType] = useState<string>('bioimpedance');
   const [scanning, setScanning] = useState(false);
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const update = (key: string, value: any) => setForm((prev: any) => ({ ...prev, [key]: value }));
+  // Initialize form from consultation data
+  useEffect(() => {
+    if (consultation) {
+      setForm({
+        weight: consultation.weight || '',
+        height: consultation.height || '',
+        fat_percentage: consultation.fat_percentage || '',
+        fat_kg: consultation.fat_kg || '',
+        lean_mass_percentage: consultation.lean_mass_percentage || '',
+        lean_mass_kg: consultation.lean_mass_kg || '',
+      });
+    }
+  }, [consultation]);
 
-  const skinfoldSum = skinfoldFields.reduce((sum, f) => sum + (Number(form[f.key]) || 0), 0);
+  const update = (key: string, value: any) => {
+    setForm((prev: any) => {
+      const next = { ...prev, [key]: value };
+      const weight = Number(next.weight) || 0;
+      const fatPct = Number(next.fat_percentage) || 0;
+
+      // Auto-calculate derived fields when weight and fat% are available
+      if (weight > 0 && fatPct > 0) {
+        const fatKg = (weight * fatPct) / 100;
+        const leanPct = 100 - fatPct;
+        const leanKg = weight - fatKg;
+        next.fat_kg = fatKg.toFixed(1);
+        next.lean_mass_percentage = leanPct.toFixed(1);
+        next.lean_mass_kg = leanKg.toFixed(1);
+      }
+
+      return next;
+    });
+  };
+
+  // Compute age from athlete profile
+  const age = athleteProfile?.birth_date && consultation?.consultation_date
+    ? calculateAge(athleteProfile.birth_date, consultation.consultation_date)
+    : null;
+
+  const gender = athleteProfile?.gender || '';
 
   const handleScan = async (file: File) => {
     setScanning(true);
@@ -73,32 +104,23 @@ export function NPBodyCompositionTab({ consultationId, clientId }: Props) {
 
       if (error) throw error;
 
-      // Apply extracted data to form
-      const mapping: Record<string, string> = {
-        weight: 'weight',
-        fat_percentage: 'fat_percentage',
-        fat_kg: 'fat_kg',
-        lean_mass_percentage: 'lean_mass_percentage',
-        lean_mass_kg: 'lean_mass_kg',
-        bmr_kcal: 'bmr_kcal',
-      };
-
-      // For ultrasound fields
-      const usMapping: Record<string, string> = {
-        fat_percentage: 'us_fat_percentage',
-        lean_mass_percentage: 'us_lean_mass_percentage',
-        fat_kg: 'us_fat_kg',
-        lean_mass_kg: 'us_lean_mass_kg',
-      };
-
       setForm((prev: any) => {
         const updated = { ...prev };
-        Object.entries(data).forEach(([key, value]) => {
-          if (value != null) {
-            const formKey = mapping[key];
-            if (formKey) updated[formKey] = value;
-          }
-        });
+        if (data.weight != null) updated.weight = data.weight;
+        if (data.fat_percentage != null) updated.fat_percentage = data.fat_percentage;
+        if (data.fat_kg != null) updated.fat_kg = data.fat_kg;
+        if (data.lean_mass_percentage != null) updated.lean_mass_percentage = data.lean_mass_percentage;
+        if (data.lean_mass_kg != null) updated.lean_mass_kg = data.lean_mass_kg;
+
+        // Recalculate derived fields
+        const weight = Number(updated.weight) || 0;
+        const fatPct = Number(updated.fat_percentage) || 0;
+        if (weight > 0 && fatPct > 0) {
+          updated.fat_kg = ((weight * fatPct) / 100).toFixed(1);
+          updated.lean_mass_percentage = (100 - fatPct).toFixed(1);
+          updated.lean_mass_kg = (weight - Number(updated.fat_kg)).toFixed(1);
+        }
+
         return updated;
       });
 
@@ -112,35 +134,20 @@ export function NPBodyCompositionTab({ consultationId, clientId }: Props) {
   };
 
   const handleSave = () => {
-    saveAssessment.mutate({ ...form, consultation_id: consultationId, client_id: clientId });
-  };
-
-  const loadAssessment = (assessment: any) => {
-    setForm({ ...assessment });
+    // Save to consultation (syncs with TMB tab and dashboard)
+    onSaveConsultation({
+      id: consultationId,
+      weight: form.weight ? Number(form.weight) : null,
+      height: form.height ? Number(form.height) : null,
+      fat_percentage: form.fat_percentage ? Number(form.fat_percentage) : null,
+      fat_kg: form.fat_kg ? Number(form.fat_kg) : null,
+      lean_mass_percentage: form.lean_mass_percentage ? Number(form.lean_mass_percentage) : null,
+      lean_mass_kg: form.lean_mass_kg ? Number(form.lean_mass_kg) : null,
+    });
   };
 
   return (
     <div className="space-y-4">
-      {/* Previous assessments */}
-      {assessments.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Avaliações Anteriores</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2 flex-wrap">
-              {assessments.map((a: any) => (
-                <Button key={a.id} variant="outline" size="sm" onClick={() => loadAssessment(a)}>
-                  {new Date(a.assessment_date).toLocaleDateString('pt-BR')}
-                </Button>
-              ))}
-              <Button variant="ghost" size="sm" onClick={() => setForm({ consultation_id: consultationId, client_id: clientId, assessment_date: new Date().toISOString().split('T')[0] })}>
-                <Plus className="h-3.5 w-3.5 mr-1" /> Nova
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
       {/* AI Scanner */}
       <Card>
         <CardContent className="pt-4 pb-4">
@@ -148,7 +155,7 @@ export function NPBodyCompositionTab({ consultationId, clientId }: Props) {
             <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1">
-                  <ScanLine className="h-4 w-4" /> Escanear Exame (IA)
+                  <ScanLine className="h-4 w-4" /> Escanear Bioimpedância (IA)
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -187,91 +194,109 @@ export function NPBodyCompositionTab({ consultationId, clientId }: Props) {
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    Envie uma foto do resultado do exame. A IA irá extrair os dados automaticamente para preencher os campos.
+                    Envie uma foto do resultado do exame. A IA irá extrair os dados automaticamente.
                   </p>
                 </div>
               </DialogContent>
             </Dialog>
-            <span className="text-xs text-muted-foreground">Envie foto de bioimpedância ou calorimetria para preenchimento automático</span>
+            <span className="text-xs text-muted-foreground">Envie foto de bioimpedância para preenchimento automático dos dados</span>
           </div>
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="measures">
+      {/* Main Body Composition */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            Composição Corporal
+            <Tooltip>
+              <TooltipTrigger><Info className="h-4 w-4 text-muted-foreground" /></TooltipTrigger>
+              <TooltipContent className="max-w-sm">
+                Insira peso e % de gordura. Os campos %MLG e MLG (kg) são calculados automaticamente.
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Peso (kg)</label>
+              <Input type="number" step="0.1" value={form.weight || ''} onChange={e => update('weight', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Estatura (cm)</label>
+              <Input type="number" value={form.height || ''} onChange={e => update('height', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Idade</label>
+              <Input value={age != null ? age : '—'} disabled className="bg-muted/30" />
+              {!athleteProfile?.birth_date && (
+                <p className="text-xs text-destructive mt-0.5">Data de nascimento não cadastrada</p>
+              )}
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Sexo</label>
+              <Input value={gender === 'masculino' ? 'Masculino' : gender === 'feminino' ? 'Feminino' : gender || '—'} disabled className="bg-muted/30" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">% Gordura</label>
+              <Input type="number" step="0.1" value={form.fat_percentage || ''} onChange={e => update('fat_percentage', e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">% MLG</label>
+              <Input type="number" step="0.1" value={form.lean_mass_percentage || ''} disabled className="bg-muted/30" />
+              <p className="text-xs text-muted-foreground mt-0.5">Auto-calculado</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Gordura (kg)</label>
+              <Input type="number" step="0.1" value={form.fat_kg || ''} disabled className="bg-muted/30" />
+              <p className="text-xs text-muted-foreground mt-0.5">Auto-calculado</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">MLG (kg)</label>
+              <Input type="number" step="0.1" value={form.lean_mass_kg || ''} disabled className="bg-muted/30" />
+              <p className="text-xs text-muted-foreground mt-0.5">Auto-calculado</p>
+            </div>
+          </div>
+
+          <Button onClick={handleSave} className="gap-1">
+            <Save className="h-4 w-4" /> Salvar Composição Corporal
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Reference Tables */}
+      <Tabs defaultValue="fatref">
         <TabsList>
-          <TabsTrigger value="measures">Medidas</TabsTrigger>
-          <TabsTrigger value="ultrasound">Ultrassom</TabsTrigger>
-          <TabsTrigger value="percentiles">Percentis</TabsTrigger>
           <TabsTrigger value="fatref">% Gordura Ref.</TabsTrigger>
+          <TabsTrigger value="percentiles">Percentis Σ7</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="measures">
+        <TabsContent value="fatref">
           <Card>
-            <CardContent className="pt-4 space-y-4">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Data da Avaliação</label>
-                <Input type="date" value={form.assessment_date || ''} onChange={e => update('assessment_date', e.target.value)} className="w-48" />
-              </div>
-
-              <div>
-                <h4 className="text-sm font-semibold text-muted-foreground mb-2">Circunferências (cm) - ISAK</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {circumferenceFields.map(f => (
-                    <div key={f.key}>
-                      <label className="text-xs text-muted-foreground">{f.label}</label>
-                      <Input type="number" step="0.1" value={form[f.key] || ''} onChange={e => update(f.key, e.target.value)} />
-                    </div>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">% Gordura por Modalidade Esportiva (Endurance)</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Esporte</TableHead>
+                    <TableHead className="text-xs text-center">Homens</TableHead>
+                    <TableHead className="text-xs text-center">Mulheres</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {bodyFatReference.map(r => (
+                    <TableRow key={r.sport}>
+                      <TableCell className="text-xs py-1">{r.sport}</TableCell>
+                      <TableCell className="text-xs text-center py-1">{r.male}</TableCell>
+                      <TableCell className="text-xs text-center py-1">{r.female}</TableCell>
+                    </TableRow>
                   ))}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-1">
-                  Dobras Cutâneas (mm) - ISAK
-                  <Badge className="bg-primary/20 text-primary ml-2">Σ7: {skinfoldSum.toFixed(1)} mm</Badge>
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {skinfoldFields.map(f => (
-                    <div key={f.key}>
-                      <label className="text-xs text-muted-foreground">{f.label}</label>
-                      <Input type="number" step="0.1" value={form[f.key] || ''} onChange={e => update(f.key, e.target.value)} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <Button onClick={handleSave} className="gap-1">
-                <Save className="h-4 w-4" /> Salvar Avaliação
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="ultrasound">
-          <Card>
-            <CardContent className="pt-4 space-y-4">
-              <h4 className="text-sm font-semibold text-muted-foreground">Dados do Ultrassom</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground">% Gordura</label>
-                  <Input type="number" step="0.1" value={form.us_fat_percentage || ''} onChange={e => update('us_fat_percentage', e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">% MLG</label>
-                  <Input type="number" step="0.1" value={form.us_lean_mass_percentage || ''} onChange={e => update('us_lean_mass_percentage', e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">Gordura (kg)</label>
-                  <Input type="number" step="0.1" value={form.us_fat_kg || ''} onChange={e => update('us_fat_kg', e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">MLG (kg)</label>
-                  <Input type="number" step="0.1" value={form.us_lean_mass_kg || ''} onChange={e => update('us_lean_mass_kg', e.target.value)} />
-                </div>
-              </div>
-              <Button onClick={handleSave} className="gap-1">
-                <Save className="h-4 w-4" /> Salvar
-              </Button>
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
@@ -337,32 +362,6 @@ export function NPBodyCompositionTab({ consultationId, clientId }: Props) {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="fatref">
-          <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm">% Gordura por Modalidade Esportiva</CardTitle></CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Esporte</TableHead>
-                    <TableHead className="text-xs text-center">Homens</TableHead>
-                    <TableHead className="text-xs text-center">Mulheres</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bodyFatReference.map(r => (
-                    <TableRow key={r.sport}>
-                      <TableCell className="text-xs py-1">{r.sport}</TableCell>
-                      <TableCell className="text-xs text-center py-1">{r.male}</TableCell>
-                      <TableCell className="text-xs text-center py-1">{r.female}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>

@@ -4,9 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { Save, Info, Target } from 'lucide-react';
-import { calculateAge, calculateTMBFA, calculateTMBCunningham, calculateTMBHarrisBenedictMale, calculateTMBHarrisBenedictFemale, calculateEnergyAvailability, dayLabels } from '@/lib/nutritionalCalcs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -27,7 +25,7 @@ export function NPPatientDataTab({ consultation, client, onSave }: Props) {
       if (!client?.id) return null;
       const { data } = await supabase
         .from('athlete_profiles')
-        .select('target_race, target_deadline')
+        .select('target_race, target_deadline, current_weight, height, gender, birth_date')
         .eq('client_id', client.id)
         .maybeSingle();
       return data;
@@ -46,41 +44,19 @@ export function NPPatientDataTab({ consultation, client, onSave }: Props) {
       if (!updated.target_race_date && athleteProfile?.target_deadline) {
         updated.target_race_date = athleteProfile.target_deadline;
       }
+      // Auto-fill weight from athlete profile if empty
+      if (!updated.weight && athleteProfile?.current_weight) {
+        updated.weight = athleteProfile.current_weight;
+      }
+      // Auto-fill height from athlete profile if empty
+      if (!updated.height && athleteProfile?.height) {
+        updated.height = athleteProfile.height;
+      }
       setForm(updated);
     }
   }, [consultation, athleteProfile]);
 
   const update = (key: string, value: any) => setForm((prev: any) => ({ ...prev, [key]: value }));
-
-  const age = form.consultation_date && client?.phone
-    ? null // will use birth_date from athlete_profiles if available
-    : null;
-
-  // Calculate TMB based on selected formula
-  const weight = Number(form.weight) || 0;
-  const height = Number(form.height) || 0;
-  const leanMassKg = Number(form.lean_mass_kg) || 0;
-  const fa = Number(form.activity_factor) || 1.25;
-
-  let tmb = 0;
-  switch (form.tmb_formula) {
-    case 'calorimetry':
-      tmb = Number(form.calorimetry_value) || 0;
-      break;
-    case 'cunningham':
-      tmb = calculateTMBCunningham(leanMassKg);
-      break;
-    case 'harris_benedict_female':
-      tmb = calculateTMBHarrisBenedictFemale(weight, height, 30); // age placeholder
-      break;
-    default:
-      tmb = calculateTMBHarrisBenedictMale(weight, height, 30);
-  }
-
-  const tmbFa = calculateTMBFA(tmb, fa);
-
-  // VCT and energy availability
-  const vctKeys = ['vct_monday', 'vct_tuesday', 'vct_wednesday', 'vct_thursday', 'vct_friday', 'vct_saturday', 'vct_sunday'];
 
   const handleSave = () => {
     onSave(form);
@@ -95,7 +71,7 @@ export function NPPatientDataTab({ consultation, client, onSave }: Props) {
             <Tooltip>
               <TooltipTrigger><Info className="h-4 w-4 text-muted-foreground" /></TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                Cadastro do atleta com dados para cálculos de composição corporal e gasto energético.
+                Cadastro básico do atleta. Dados de composição corporal e energia ficam nas respectivas abas.
               </TooltipContent>
             </Tooltip>
           </CardTitle>
@@ -155,14 +131,6 @@ export function NPPatientDataTab({ consultation, client, onSave }: Props) {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Peso (kg)</label>
-              <Input type="number" step="0.1" value={form.weight || ''} onChange={e => update('weight', e.target.value)} />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Estatura (cm)</label>
-              <Input type="number" value={form.height || ''} onChange={e => update('height', e.target.value)} />
-            </div>
             <div className="flex items-end gap-2">
               <Checkbox checked={form.has_training_plan || false} onCheckedChange={v => update('has_training_plan', v)} id="plan" />
               <label htmlFor="plan" className="text-sm">Planilha de Treino</label>
@@ -176,67 +144,6 @@ export function NPPatientDataTab({ consultation, client, onSave }: Props) {
                   <SelectItem value="triathlon">Triatlo</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </div>
-
-          {/* Body Composition */}
-          <div className="border-t border-border pt-3">
-            <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Composição Corporal</h4>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Σ Dobras (mm)</label>
-                <Input type="number" step="0.1" value={form.skinfold_sum || ''} onChange={e => update('skinfold_sum', e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">% Gordura</label>
-                <Input type="number" step="0.1" value={form.fat_percentage || ''} onChange={e => update('fat_percentage', e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Gordura (kg)</label>
-                <Input type="number" step="0.1" value={form.fat_kg || ''} onChange={e => update('fat_kg', e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">% MLG</label>
-                <Input type="number" step="0.1" value={form.lean_mass_percentage || ''} onChange={e => update('lean_mass_percentage', e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">MLG (kg)</label>
-                <Input type="number" step="0.1" value={form.lean_mass_kg || ''} onChange={e => update('lean_mass_kg', e.target.value)} />
-              </div>
-            </div>
-          </div>
-
-          {/* Energy Summary */}
-          <div className="border-t border-border pt-3">
-            <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Resumo Energético</h4>
-            <div className="flex gap-3 flex-wrap mb-3">
-              <Badge variant="outline">TMB: {tmb.toFixed(0)} kcal</Badge>
-              <Badge variant="outline">FA: {fa}</Badge>
-              <Badge className="bg-primary/20 text-primary">TMB×FA+5%: {tmbFa.toFixed(0)} kcal</Badge>
-            </div>
-          </div>
-
-          {/* VCT per day */}
-          <div className="border-t border-border pt-3">
-            <h4 className="text-sm font-semibold mb-2 text-muted-foreground flex items-center gap-1">
-              VCT Planejado (kcal/dia)
-              <Tooltip>
-                <TooltipTrigger><Info className="h-3.5 w-3.5 text-muted-foreground" /></TooltipTrigger>
-                <TooltipContent>Valor Calórico Total planejado para a dieta de cada dia.</TooltipContent>
-              </Tooltip>
-            </h4>
-            <div className="grid grid-cols-7 gap-2">
-              {dayLabels.map((day, i) => (
-                <div key={day}>
-                  <label className="text-xs text-muted-foreground text-center block">{day.slice(0, 3)}</label>
-                  <Input
-                    type="number"
-                    className="text-center text-xs"
-                    value={form[vctKeys[i]] || ''}
-                    onChange={e => update(vctKeys[i], Number(e.target.value))}
-                  />
-                </div>
-              ))}
             </div>
           </div>
 
