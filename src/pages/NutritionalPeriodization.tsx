@@ -33,13 +33,20 @@ export default function NutritionalPeriodization() {
   const selectedClient = activeClients.find((c: any) => c.id === selectedClientId);
   const selectedConsultation = consultations.find((c: any) => c.id === selectedConsultationId);
 
+  // Auto-select latest consultation when consultations load
   useEffect(() => {
     if (consultations.length > 0 && !selectedConsultationId) {
       setSelectedConsultationId(consultations[0].id);
     }
-  }, [consultations]);
+  }, [consultations, selectedConsultationId]);
 
+  // Reset consultation when client changes (except initial load from URL)
+  const [initialLoad, setInitialLoad] = useState(true);
   useEffect(() => {
+    if (initialLoad) {
+      setInitialLoad(false);
+      return;
+    }
     setSelectedConsultationId('');
   }, [selectedClientId]);
 
