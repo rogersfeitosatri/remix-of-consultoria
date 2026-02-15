@@ -16,6 +16,7 @@ import { NPTriathlonTab } from '@/components/periodization/NPTriathlonTab';
 import { NPPeriodizationTab } from '@/components/periodization/NPPeriodizationTab';
 import { NPLabExamsTab } from '@/components/periodization/NPLabExamsTab';
 import { NPDashboardTab } from '@/components/periodization/NPDashboardTab';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function NutritionalPeriodization() {
   const { data: clients } = useClients();
@@ -37,22 +38,45 @@ export default function NutritionalPeriodization() {
     setSelectedConsultationId('');
   }, [selectedClientId]);
 
-  const handleNewConsultation = () => {
+  const handleNewConsultation = async () => {
     if (!selectedClientId) return;
+
+    // Fetch athlete profile data for auto-fill
+    let profileData: any = {};
+    try {
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('current_weight, height, target_race, target_deadline')
+        .eq('client_id', selectedClientId)
+        .maybeSingle();
+      if (data) {
+        profileData = data;
+      }
+    } catch (e) {
+      // Continue without profile data
+    }
+
+    // Determine sport modality from client info or profile
     const client = activeClients.find((c: any) => c.id === selectedClientId);
+
     saveConsultation.mutate({
       client_id: selectedClientId,
       consultation_date: new Date().toISOString().split('T')[0],
-      weight: null,
-      height: null,
+      weight: profileData.current_weight || null,
+      height: profileData.height || null,
       sport_modality: '',
-      sport_goal: '',
+      sport_goal: profileData.target_race || '',
+      target_race_date: profileData.target_deadline || null,
       training_type: 'running',
     }, {
       onSuccess: (data: any) => {
         setSelectedConsultationId(data.id);
       }
     });
+  };
+
+  const handleSaveConsultation = (data: any) => {
+    saveConsultation.mutate(data);
   };
 
   return (
@@ -110,12 +134,12 @@ export default function NutritionalPeriodization() {
               <TabsTrigger value="patient" className="gap-1 text-xs"><User className="h-3.5 w-3.5" />Dados</TabsTrigger>
               <TabsTrigger value="body" className="gap-1 text-xs"><Heart className="h-3.5 w-3.5" />Composição</TabsTrigger>
               <TabsTrigger value="tmb" className="gap-1 text-xs"><Flame className="h-3.5 w-3.5" />TMB</TabsTrigger>
-              <TabsTrigger value="met" className="gap-1 text-xs"><BookOpen className="h-3.5 w-3.5" />Compêndio</TabsTrigger>
               <TabsTrigger value="running" className="gap-1 text-xs"><Timer className="h-3.5 w-3.5" />Corrida</TabsTrigger>
               <TabsTrigger value="triathlon" className="gap-1 text-xs"><Bike className="h-3.5 w-3.5" />Triatlo</TabsTrigger>
               <TabsTrigger value="periodization" className="gap-1 text-xs"><Calendar className="h-3.5 w-3.5" />Periodização</TabsTrigger>
               <TabsTrigger value="lab" className="gap-1 text-xs"><FlaskConical className="h-3.5 w-3.5" />Exames</TabsTrigger>
               <TabsTrigger value="dashboard" className="gap-1 text-xs"><BarChart3 className="h-3.5 w-3.5" />Dashboard</TabsTrigger>
+              <TabsTrigger value="met" className="gap-1 text-xs"><BookOpen className="h-3.5 w-3.5" />Compêndio</TabsTrigger>
             </TabsList>
 
             <TabsContent value="patient">
@@ -126,13 +150,15 @@ export default function NutritionalPeriodization() {
               />
             </TabsContent>
             <TabsContent value="body">
-              <NPBodyCompositionTab consultationId={selectedConsultationId} clientId={selectedClientId} />
+              <NPBodyCompositionTab
+                consultationId={selectedConsultationId}
+                clientId={selectedClientId}
+                consultation={selectedConsultation}
+                onSaveConsultation={handleSaveConsultation}
+              />
             </TabsContent>
             <TabsContent value="tmb">
               <NPTMBTab consultation={selectedConsultation} consultationId={selectedConsultationId} />
-            </TabsContent>
-            <TabsContent value="met">
-              <NPMETCompendiumTab />
             </TabsContent>
             <TabsContent value="running">
               <NPRunningTab consultation={selectedConsultation} consultationId={selectedConsultationId} />
@@ -147,7 +173,15 @@ export default function NutritionalPeriodization() {
               <NPLabExamsTab clientId={selectedClientId} />
             </TabsContent>
             <TabsContent value="dashboard">
-              <NPDashboardTab clientId={selectedClientId} consultationId={selectedConsultationId} consultation={selectedConsultation} />
+              <NPDashboardTab
+                clientId={selectedClientId}
+                consultationId={selectedConsultationId}
+                consultation={selectedConsultation}
+                onSaveConsultation={handleSaveConsultation}
+              />
+            </TabsContent>
+            <TabsContent value="met">
+              <NPMETCompendiumTab />
             </TabsContent>
           </Tabs>
         )}

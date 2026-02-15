@@ -1,17 +1,23 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Info, TrendingUp, Zap, Scale } from 'lucide-react';
+import { Info, TrendingUp, Zap, Scale, Save } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useNutritionalPeriodization } from '@/hooks/useNutritionalPeriodization';
-import { calculateTMBFA, calculateTMBCunningham, calculateTMBHarrisBenedictMale, calculateTMBHarrisBenedictFemale, calculateEnergyAvailability, dayLabels } from '@/lib/nutritionalCalcs';
+import { calculateTMBFA, calculateTMBCunningham, calculateTMBHarrisBenedictMale, calculateTMBHarrisBenedictFemale, calculateAge, dayLabels } from '@/lib/nutritionalCalcs';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line } from 'recharts';
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 
 interface Props {
   clientId: string;
   consultationId: string;
   consultation: any;
+  onSaveConsultation: (data: any) => void;
 }
 
 const DarkTooltip = ({ active, payload, label }: any) => {
@@ -28,7 +34,7 @@ const DarkTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export function NPDashboardTab({ clientId, consultationId, consultation }: Props) {
+export function NPDashboardTab({ clientId, consultationId, consultation, onSaveConsultation }: Props) {
   const { consultations, fetchAssessments, fetchLabResults, fetchRunningZones, fetchRunningSchedule, fetchTriathlonSchedule } = useNutritionalPeriodization(clientId);
   const { data: assessments = [] } = fetchAssessments(consultationId);
   const { data: labResults = [] } = fetchLabResults(clientId);
@@ -36,28 +42,63 @@ export function NPDashboardTab({ clientId, consultationId, consultation }: Props
   const { data: runningSchedule = [] } = fetchRunningSchedule(consultationId);
   const { data: triathlonSchedule = [] } = fetchTriathlonSchedule(consultationId);
 
-  const weight = Number(consultation?.weight) || 74;
-  const height = Number(consultation?.height) || 183;
-  const leanMassKg = Number(consultation?.lean_mass_kg) || 68;
+  const { data: athleteProfile } = useQuery({
+    queryKey: ['athlete-profile-dashboard', clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('birth_date, gender')
+        .eq('client_id', clientId)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!clientId,
+  });
+
+  const weight = Number(consultation?.weight) || 0;
+  const height = Number(consultation?.height) || 0;
+  const leanMassKg = Number(consultation?.lean_mass_kg) || 0;
   const fa = Number(consultation?.activity_factor) || 1.25;
+  const age = athleteProfile?.birth_date && consultation?.consultation_date
+    ? calculateAge(athleteProfile.birth_date, consultation.consultation_date)
+    : 30;
 
   // Calculate TMB
   let tmb = 0;
   switch (consultation?.tmb_formula) {
     case 'calorimetry': tmb = Number(consultation?.calorimetry_value) || 0; break;
-    case 'cunningham': tmb = calculateTMBCunningham(leanMassKg); break;
-    case 'harris_benedict_female': tmb = calculateTMBHarrisBenedictFemale(weight, height, 30); break;
-    default: tmb = calculateTMBHarrisBenedictMale(weight, height, 30);
+    case 'cunningham': tmb = leanMassKg > 0 ? calculateTMBCunningham(leanMassKg) : 0; break;
+    case 'harris_benedict_female': tmb = calculateTMBHarrisBenedictFemale(weight, height, age); break;
+    default: tmb = calculateTMBHarrisBenedictMale(weight, height, age);
   }
   const tmbFa = calculateTMBFA(tmb, fa);
 
   const vctKeys = ['vct_monday', 'vct_tuesday', 'vct_wednesday', 'vct_thursday', 'vct_friday', 'vct_saturday', 'vct_sunday'];
 
+  // VCT form state
+  const [vctValues, setVctValues] = useState<Record<string, number | string>>({});
+
+  useEffect(() => {
+    if (consultation) {
+      const vals: Record<string, number | string> = {};
+      vctKeys.forEach(k => { vals[k] = consultation[k] || ''; });
+      setVctValues(vals);
+    }
+  }, [consultation]);
+
+  const updateVct = (key: string, value: string) => {
+    setVctValues(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveVct = () => {
+    const data: any = { id: consultationId };
+    vctKeys.forEach(k => { data[k] = vctValues[k] ? Number(vctValues[k]) : null; });
+    onSaveConsultation(data);
+  };
+
   // Calculate GEE per day from running schedule
   const geePerDay = useMemo(() => {
     const result = [0, 0, 0, 0, 0, 0, 0];
-
-    // Running GEE
     if (runningZones.length > 0 && runningSchedule.length > 0) {
       runningSchedule.forEach((s: any) => {
         const zone = runningZones.find((z: any) => z.id === s.zone_id);
@@ -67,8 +108,6 @@ export function NPDashboardTab({ clientId, consultationId, consultation }: Props
         }
       });
     }
-
-    // Triathlon GEE
     if (triathlonSchedule.length > 0) {
       triathlonSchedule.forEach((s: any) => {
         if (s.duration_minutes > 0 && s.met_value) {
@@ -77,22 +116,20 @@ export function NPDashboardTab({ clientId, consultationId, consultation }: Props
         }
       });
     }
-
     return result;
   }, [runningZones, runningSchedule, triathlonSchedule, weight]);
 
   // Weekly energy table data
   const weeklyEnergyData = useMemo(() => {
     return dayLabels.map((day, i) => {
-      const vct = Number(consultation?.[vctKeys[i]]) || 0;
+      const vct = Number(vctValues[vctKeys[i]]) || 0;
       const gee = geePerDay[i];
       const get = tmbFa + gee;
       const de = leanMassKg > 0 ? (vct - gee) / leanMassKg : 0;
       return { day: day.slice(0, 3), tmbFa, gee, get, vct, de };
     });
-  }, [consultation, geePerDay, tmbFa, leanMassKg]);
+  }, [vctValues, geePerDay, tmbFa, leanMassKg]);
 
-  // Chart data
   const energyChartData = weeklyEnergyData.map(d => ({
     name: d.day,
     'TMB×FA+5%': d.tmbFa,
@@ -101,7 +138,6 @@ export function NPDashboardTab({ clientId, consultationId, consultation }: Props
     VCT: d.vct,
   }));
 
-  // Body composition evolution from all consultations
   const bodyEvolution = useMemo(() => {
     return consultations
       .filter((c: any) => c.weight)
@@ -114,7 +150,6 @@ export function NPDashboardTab({ clientId, consultationId, consultation }: Props
       }));
   }, [consultations]);
 
-  // Lab results for key exams
   const keyExams = ['Hemoglobina', 'Ferritina', 'CK', 'Testosterona total', 'Cortisol (6-10h)', '25(OH) Vitamina D'];
 
   return (
@@ -127,7 +162,7 @@ export function NPDashboardTab({ clientId, consultationId, consultation }: Props
               <Scale className="h-4 w-4 text-primary" />
               <span className="text-xs text-muted-foreground">Peso</span>
             </div>
-            <p className="text-xl font-bold">{weight} kg</p>
+            <p className="text-xl font-bold">{weight || '—'} kg</p>
           </CardContent>
         </Card>
         <Card>
@@ -136,7 +171,7 @@ export function NPDashboardTab({ clientId, consultationId, consultation }: Props
               <TrendingUp className="h-4 w-4 text-emerald-400" />
               <span className="text-xs text-muted-foreground">MLG</span>
             </div>
-            <p className="text-xl font-bold">{leanMassKg} kg</p>
+            <p className="text-xl font-bold">{leanMassKg || '—'} kg</p>
           </CardContent>
         </Card>
         <Card>
@@ -158,6 +193,37 @@ export function NPDashboardTab({ clientId, consultationId, consultation }: Props
           </CardContent>
         </Card>
       </div>
+
+      {/* VCT Planned */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            VCT Planejado (kcal/dia)
+            <UITooltip>
+              <TooltipTrigger><Info className="h-4 w-4 text-muted-foreground" /></TooltipTrigger>
+              <TooltipContent>Valor Calórico Total planejado para a dieta de cada dia.</TooltipContent>
+            </UITooltip>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-7 gap-2">
+            {dayLabels.map((day, i) => (
+              <div key={day}>
+                <label className="text-xs text-muted-foreground text-center block">{day.slice(0, 3)}</label>
+                <Input
+                  type="number"
+                  className="text-center text-xs"
+                  value={vctValues[vctKeys[i]] || ''}
+                  onChange={e => updateVct(vctKeys[i], e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+          <Button size="sm" onClick={handleSaveVct} className="gap-1">
+            <Save className="h-3.5 w-3.5" /> Salvar VCT
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Weekly Energy Table */}
       <Card>
@@ -202,19 +268,15 @@ export function NPDashboardTab({ clientId, consultationId, consultation }: Props
                     <TableCell key={i} className="text-xs text-center py-1.5 font-semibold">{d.get.toFixed(0)}</TableCell>
                   ))}
                 </TableRow>
-                <TableRow>
-                  <TableCell className="text-xs py-2" colSpan={8}></TableCell>
-                </TableRow>
+                <TableRow><TableCell className="text-xs py-2" colSpan={8}></TableCell></TableRow>
                 <TableRow className="bg-primary/5">
                   <TableCell className="text-xs font-bold py-1.5">VCT planejado</TableCell>
                   {weeklyEnergyData.map((d, i) => (
                     <TableCell key={i} className="text-xs text-center py-1.5 font-semibold">{d.vct > 0 ? d.vct.toFixed(0) : '—'}</TableCell>
                   ))}
                 </TableRow>
-                <TableRow>
-                  <TableCell className="text-xs py-2" colSpan={8}></TableCell>
-                </TableRow>
-                <TableRow className={`font-semibold`}>
+                <TableRow><TableCell className="text-xs py-2" colSpan={8}></TableCell></TableRow>
+                <TableRow className="font-semibold">
                   <TableCell className="text-xs font-bold py-1.5 whitespace-nowrap">DISPONIBILIDADE ENERG.</TableCell>
                   {weeklyEnergyData.map((d, i) => {
                     const isLow = d.de > 0 && d.de < 30;

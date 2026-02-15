@@ -5,35 +5,41 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Save, Plus, Trash2, Info } from 'lucide-react';
+import { Save, Plus, Trash2, Info, AlertTriangle } from 'lucide-react';
 import { useNutritionalPeriodization } from '@/hooks/useNutritionalPeriodization';
-import { calculateTMBCunningham, calculateTMBHarrisBenedictMale, calculateTMBHarrisBenedictFemale, calculateTMBFA, activityFactors } from '@/lib/nutritionalCalcs';
-import { metCompendium } from '@/data/metCompendium';
+import { calculateTMBCunningham, calculateTMBHarrisBenedictMale, calculateTMBHarrisBenedictFemale, calculateTMBFA, calculateAge } from '@/lib/nutritionalCalcs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 interface Props {
   consultation: any;
   consultationId: string;
 }
 
-const defaultActivities = [
-  { activity_name: 'Sono', met_value: 0.9, duration_hours: 7 },
-  { activity_name: 'Deitado', met_value: 1.1, duration_hours: 1.5 },
-  { activity_name: 'Sentado', met_value: 1.2, duration_hours: 1 },
-  { activity_name: 'Trabalho Sentado', met_value: 1.3, duration_hours: 8 },
-  { activity_name: 'Caminhar', met_value: 2.9, duration_hours: 0.5 },
-  { activity_name: 'Lavar Louça', met_value: 1.7, duration_hours: 0.5 },
-  { activity_name: 'Tempo Restante', met_value: 1.4, duration_hours: 5.5 },
-];
-
 export function NPTMBTab({ consultation, consultationId }: Props) {
   const { fetchActivities, saveActivities, saveConsultation } = useNutritionalPeriodization();
   const { data: savedActivities = [] } = fetchActivities(consultationId);
   const [activities, setActivities] = useState<any[]>([]);
-  const [tmbFormula, setTmbFormula] = useState(consultation?.tmb_formula || 'harris_benedict_male');
+  const [tmbFormula, setTmbFormula] = useState(consultation?.tmb_formula || '');
   const [calorimetryValue, setCalorimetryValue] = useState(consultation?.calorimetry_value || '');
   const [faType, setFaType] = useState(consultation?.activity_factor_type || 'manual');
   const [manualFa, setManualFa] = useState(consultation?.activity_factor || 1.25);
+
+  // Fetch athlete profile for age/sex
+  const { data: athleteProfile } = useQuery({
+    queryKey: ['athlete-profile-tmb', consultation?.client_id],
+    queryFn: async () => {
+      if (!consultation?.client_id) return null;
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('birth_date, gender')
+        .eq('client_id', consultation.client_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!consultation?.client_id,
+  });
 
   useEffect(() => {
     if (savedActivities.length > 0) {
@@ -43,15 +49,33 @@ export function NPTMBTab({ consultation, consultationId }: Props) {
     }
   }, [savedActivities]);
 
-  const weight = Number(consultation?.weight) || 74;
-  const height = Number(consultation?.height) || 183;
-  const leanMassKg = Number(consultation?.lean_mass_kg) || 68;
+  const weight = Number(consultation?.weight) || 0;
+  const height = Number(consultation?.height) || 0;
+  const leanMassKg = Number(consultation?.lean_mass_kg) || 0;
+  const hasMLG = leanMassKg > 0;
+  const gender = athleteProfile?.gender || '';
+  const age = athleteProfile?.birth_date && consultation?.consultation_date
+    ? calculateAge(athleteProfile.birth_date, consultation.consultation_date)
+    : 30;
+
+  // Smart default formula selection
+  useEffect(() => {
+    if (!tmbFormula && weight > 0) {
+      if (hasMLG) {
+        setTmbFormula('cunningham');
+      } else if (gender === 'feminino') {
+        setTmbFormula('harris_benedict_female');
+      } else {
+        setTmbFormula('harris_benedict_male');
+      }
+    }
+  }, [weight, hasMLG, gender, tmbFormula]);
 
   // Calculate TMBs
   const tmbCalorimetry = Number(calorimetryValue) || 0;
-  const tmbCunningham = calculateTMBCunningham(leanMassKg);
-  const tmbHarrisMale = calculateTMBHarrisBenedictMale(weight, height, 30);
-  const tmbHarrisFemale = calculateTMBHarrisBenedictFemale(weight, height, 30);
+  const tmbCunningham = hasMLG ? calculateTMBCunningham(leanMassKg) : 0;
+  const tmbHarrisMale = weight > 0 ? calculateTMBHarrisBenedictMale(weight, height, age) : 0;
+  const tmbHarrisFemale = weight > 0 ? calculateTMBHarrisBenedictFemale(weight, height, age) : 0;
 
   const tmbValues: Record<string, number> = {
     calorimetry: tmbCalorimetry,
@@ -60,7 +84,7 @@ export function NPTMBTab({ consultation, consultationId }: Props) {
     harris_benedict_female: tmbHarrisFemale,
   };
 
-  const selectedTmb = tmbValues[tmbFormula] || tmbHarrisMale;
+  const selectedTmb = tmbValues[tmbFormula] || 0;
 
   // Calculate FA from activities
   const totalHours = activities.reduce((s, a) => s + (Number(a.duration_hours) || 0), 0);
@@ -69,9 +93,9 @@ export function NPTMBTab({ consultation, consultationId }: Props) {
 
   const calculatedFA: Record<string, number> = {
     calorimetry: tmbCalorimetry ? totalGEWeight / tmbCalorimetry : 0,
-    cunningham: totalGEWeight / tmbCunningham,
-    harris_benedict_male: totalGEWeight / tmbHarrisMale,
-    harris_benedict_female: totalGEWeight / tmbHarrisFemale,
+    cunningham: tmbCunningham ? totalGEWeight / tmbCunningham : 0,
+    harris_benedict_male: tmbHarrisMale ? totalGEWeight / tmbHarrisMale : 0,
+    harris_benedict_female: tmbHarrisFemale ? totalGEWeight / tmbHarrisFemale : 0,
   };
 
   const fa = faType === 'calculated' ? (calculatedFA[tmbFormula] || 1.25) : Number(manualFa) || 1.25;
@@ -102,6 +126,16 @@ export function NPTMBTab({ consultation, consultationId }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Data availability warning */}
+      {weight === 0 && (
+        <Card className="border-destructive">
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 text-sm text-destructive">
+            <AlertTriangle className="h-4 w-4" />
+            Preencha os dados de composição corporal (peso, altura) na aba "Composição" antes de calcular a TMB.
+          </CardContent>
+        </Card>
+      )}
+
       {/* TMB Formulas */}
       <Card>
         <CardHeader className="pb-2">
@@ -110,9 +144,17 @@ export function NPTMBTab({ consultation, consultationId }: Props) {
             <Tooltip>
               <TooltipTrigger><Info className="h-4 w-4 text-muted-foreground" /></TooltipTrigger>
               <TooltipContent className="max-w-sm">
-                Compare diferentes fórmulas de TMB. Cunningham: 500 + 22 × MLG. Harris-Benedict usa peso, altura e idade.
+                {hasMLG
+                  ? 'Com dados de MLG disponíveis, Cunningham é priorizado. Calorimetria também disponível caso o atleta tenha.'
+                  : 'Sem dados de bioimpedância (MLG), priorizando Harris-Benedict que usa peso, altura, idade e sexo.'}
               </TooltipContent>
             </Tooltip>
+            {!hasMLG && (
+              <Badge variant="outline" className="text-xs">Sem MLG — usando peso/altura/idade</Badge>
+            )}
+            {hasMLG && (
+              <Badge variant="outline" className="text-xs bg-primary/10 text-primary">MLG disponível</Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -126,6 +168,46 @@ export function NPTMBTab({ consultation, consultationId }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* Harris-Benedict always visible */}
+              <TableRow className={tmbFormula === 'harris_benedict_male' ? 'bg-primary/10' : ''}>
+                <TableCell className="text-xs py-2">
+                  <div className="flex items-center gap-2">
+                    <input type="radio" checked={tmbFormula === 'harris_benedict_male'} onChange={() => setTmbFormula('harris_benedict_male')} />
+                    Harris-Benedict (Homens)
+                  </div>
+                </TableCell>
+                <TableCell className="text-xs text-center py-2">{tmbHarrisMale ? tmbHarrisMale.toFixed(0) : '—'}</TableCell>
+                <TableCell className="text-xs text-center py-2">{fa.toFixed(2)}</TableCell>
+                <TableCell className="text-xs text-center py-2">{tmbHarrisMale ? calculateTMBFA(tmbHarrisMale, fa).toFixed(0) : '—'}</TableCell>
+              </TableRow>
+              <TableRow className={tmbFormula === 'harris_benedict_female' ? 'bg-primary/10' : ''}>
+                <TableCell className="text-xs py-2">
+                  <div className="flex items-center gap-2">
+                    <input type="radio" checked={tmbFormula === 'harris_benedict_female'} onChange={() => setTmbFormula('harris_benedict_female')} />
+                    Harris-Benedict (Mulheres)
+                  </div>
+                </TableCell>
+                <TableCell className="text-xs text-center py-2">{tmbHarrisFemale ? tmbHarrisFemale.toFixed(0) : '—'}</TableCell>
+                <TableCell className="text-xs text-center py-2">{fa.toFixed(2)}</TableCell>
+                <TableCell className="text-xs text-center py-2">{tmbHarrisFemale ? calculateTMBFA(tmbHarrisFemale, fa).toFixed(0) : '—'}</TableCell>
+              </TableRow>
+
+              {/* Cunningham only when MLG available */}
+              {hasMLG && (
+                <TableRow className={tmbFormula === 'cunningham' ? 'bg-primary/10' : ''}>
+                  <TableCell className="text-xs py-2">
+                    <div className="flex items-center gap-2">
+                      <input type="radio" checked={tmbFormula === 'cunningham'} onChange={() => setTmbFormula('cunningham')} />
+                      Cunningham (500 + 22×MLG)
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-xs text-center py-2">{tmbCunningham.toFixed(0)}</TableCell>
+                  <TableCell className="text-xs text-center py-2">{fa.toFixed(2)}</TableCell>
+                  <TableCell className="text-xs text-center py-2">{calculateTMBFA(tmbCunningham, fa).toFixed(0)}</TableCell>
+                </TableRow>
+              )}
+
+              {/* Calorimetry always available as option */}
               <TableRow className={tmbFormula === 'calorimetry' ? 'bg-primary/10' : ''}>
                 <TableCell className="text-xs py-2">
                   <div className="flex items-center gap-2">
@@ -138,41 +220,20 @@ export function NPTMBTab({ consultation, consultationId }: Props) {
                 <TableCell className="text-xs text-center py-2">{fa.toFixed(2)}</TableCell>
                 <TableCell className="text-xs text-center py-2">{tmbCalorimetry ? calculateTMBFA(tmbCalorimetry, fa).toFixed(0) : '—'}</TableCell>
               </TableRow>
-              <TableRow className={tmbFormula === 'cunningham' ? 'bg-primary/10' : ''}>
-                <TableCell className="text-xs py-2">
-                  <div className="flex items-center gap-2">
-                    <input type="radio" checked={tmbFormula === 'cunningham'} onChange={() => setTmbFormula('cunningham')} />
-                    Cunningham (500 + 22×MLG)
-                  </div>
-                </TableCell>
-                <TableCell className="text-xs text-center py-2">{tmbCunningham.toFixed(0)}</TableCell>
-                <TableCell className="text-xs text-center py-2">{fa.toFixed(2)}</TableCell>
-                <TableCell className="text-xs text-center py-2">{calculateTMBFA(tmbCunningham, fa).toFixed(0)}</TableCell>
-              </TableRow>
-              <TableRow className={tmbFormula === 'harris_benedict_male' ? 'bg-primary/10' : ''}>
-                <TableCell className="text-xs py-2">
-                  <div className="flex items-center gap-2">
-                    <input type="radio" checked={tmbFormula === 'harris_benedict_male'} onChange={() => setTmbFormula('harris_benedict_male')} />
-                    Harris-Benedict (Homens)
-                  </div>
-                </TableCell>
-                <TableCell className="text-xs text-center py-2">{tmbHarrisMale.toFixed(0)}</TableCell>
-                <TableCell className="text-xs text-center py-2">{fa.toFixed(2)}</TableCell>
-                <TableCell className="text-xs text-center py-2">{calculateTMBFA(tmbHarrisMale, fa).toFixed(0)}</TableCell>
-              </TableRow>
-              <TableRow className={tmbFormula === 'harris_benedict_female' ? 'bg-primary/10' : ''}>
-                <TableCell className="text-xs py-2">
-                  <div className="flex items-center gap-2">
-                    <input type="radio" checked={tmbFormula === 'harris_benedict_female'} onChange={() => setTmbFormula('harris_benedict_female')} />
-                    Harris-Benedict (Mulheres)
-                  </div>
-                </TableCell>
-                <TableCell className="text-xs text-center py-2">{tmbHarrisFemale.toFixed(0)}</TableCell>
-                <TableCell className="text-xs text-center py-2">{fa.toFixed(2)}</TableCell>
-                <TableCell className="text-xs text-center py-2">{calculateTMBFA(tmbHarrisFemale, fa).toFixed(0)}</TableCell>
-              </TableRow>
             </TableBody>
           </Table>
+
+          {/* Energy Summary */}
+          <div className="border-t border-border pt-3">
+            <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Resumo Energético</h4>
+            <div className="flex gap-3 flex-wrap">
+              <Badge variant="outline">TMB: {selectedTmb.toFixed(0)} kcal</Badge>
+              <Badge variant="outline">FA: {fa.toFixed(2)}</Badge>
+              <Badge className="bg-primary/20 text-primary">TMB×FA+5% = {tmbFaResult.toFixed(0)} kcal</Badge>
+              {hasMLG && <Badge variant="outline">MLG: {leanMassKg} kg</Badge>}
+              <Badge variant="outline">Peso: {weight} kg</Badge>
+            </div>
+          </div>
 
           {/* FA Selection */}
           <div className="flex items-center gap-3 flex-wrap">
@@ -194,7 +255,6 @@ export function NPTMBTab({ consultation, consultationId }: Props) {
                 </SelectContent>
               </Select>
             )}
-            <Badge className="bg-primary/20 text-primary">TMB×FA+5% = {tmbFaResult.toFixed(0)} kcal</Badge>
           </div>
         </CardContent>
       </Card>
@@ -254,10 +314,10 @@ export function NPTMBTab({ consultation, consultationId }: Props) {
 
           {faType === 'calculated' && (
             <div className="text-xs text-muted-foreground space-y-1">
-              <p>FA (Calorimetria) = {calculatedFA.calorimetry.toFixed(2)}</p>
-              <p>FA (Cunningham) = {calculatedFA.cunningham.toFixed(2)}</p>
               <p>FA (Harris Homens) = {calculatedFA.harris_benedict_male.toFixed(2)}</p>
               <p>FA (Harris Mulheres) = {calculatedFA.harris_benedict_female.toFixed(2)}</p>
+              {hasMLG && <p>FA (Cunningham) = {calculatedFA.cunningham.toFixed(2)}</p>}
+              {tmbCalorimetry > 0 && <p>FA (Calorimetria) = {calculatedFA.calorimetry.toFixed(2)}</p>}
             </div>
           )}
 
