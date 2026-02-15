@@ -2942,6 +2942,150 @@ export type Database = {
           },
         ]
       }
+      periodiza_admin_instructions: {
+        Row: {
+          created_at: string
+          id: string
+          instructions: string
+          is_default: boolean
+          preset_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instructions?: string
+          is_default?: boolean
+          preset_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instructions?: string
+          is_default?: boolean
+          preset_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      periodiza_knowledge_base: {
+        Row: {
+          active: boolean
+          collection: string | null
+          content: string
+          created_at: string
+          id: string
+          priority: number
+          source_reference: string | null
+          source_type: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          collection?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          priority?: number
+          source_reference?: string | null
+          source_type?: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          collection?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          priority?: number
+          source_reference?: string | null
+          source_type?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      periodiza_suggestions: {
+        Row: {
+          client_id: string
+          consultation_id: string | null
+          created_at: string
+          human_readable: string | null
+          id: string
+          is_active: boolean
+          manual_edits: Json | null
+          monthly_adjustments: Json | null
+          nutritionist_notes: Json | null
+          phase_plan: Json | null
+          suggestion_type: string
+          taper_protocol: Json | null
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          client_id: string
+          consultation_id?: string | null
+          created_at?: string
+          human_readable?: string | null
+          id?: string
+          is_active?: boolean
+          manual_edits?: Json | null
+          monthly_adjustments?: Json | null
+          nutritionist_notes?: Json | null
+          phase_plan?: Json | null
+          suggestion_type?: string
+          taper_protocol?: Json | null
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          client_id?: string
+          consultation_id?: string | null
+          created_at?: string
+          human_readable?: string | null
+          id?: string
+          is_active?: boolean
+          manual_edits?: Json | null
+          monthly_adjustments?: Json | null
+          nutritionist_notes?: Json | null
+          phase_plan?: Json | null
+          suggestion_type?: string
+          taper_protocol?: Json | null
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "periodiza_suggestions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "periodiza_suggestions_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "np_consultations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
