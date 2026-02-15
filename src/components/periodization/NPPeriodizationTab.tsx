@@ -3,22 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Calendar, Sparkles, Loader2, RefreshCw, AlertTriangle, Clock, Zap, Target, TrendingUp
+  Calendar, Target, Clock, Zap, AlertTriangle, ChevronRight, Plus, Save,
+  BookOpen, CheckCircle2, XCircle, Pill, Dumbbell, Utensils, StickyNote,
+  Trash2, RefreshCw, Settings2
 } from 'lucide-react';
-import { useNutritionalPeriodization } from '@/hooks/useNutritionalPeriodization';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePeriodizationMethod } from '@/hooks/usePeriodizationMethod';
+import { useAthletePeriodization } from '@/hooks/useAthletePeriodization';
+import { MethodEditor } from './MethodEditor';
+import { differenceInDays, differenceInWeeks, format, parseISO } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { differenceInWeeks, format, isAfter, isBefore, parseISO } from 'date-fns';
-import { toast } from '@/hooks/use-toast';
-import {
-  dayLabels, calculateTMBCunningham, calculateTMBHarrisBenedictMale,
-  calculateTMBHarrisBenedictFemale, calculateTMBFA, calculateAge, calculateGEE, triathlonMets
-} from '@/lib/nutritionalCalcs';
-import { PeriodizaBlockCard } from './PeriodizaBlockCard';
 
 interface Props {
   clientId: string;
@@ -27,24 +27,44 @@ interface Props {
   consultation?: any;
 }
 
+const PHASE_BG: Record<string, string> = {
+  'Base': 'bg-blue-500/20 border-blue-500/40 text-blue-400',
+  'Construção': 'bg-amber-500/20 border-amber-500/40 text-amber-400',
+  'Pico': 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400',
+  'Transição': 'bg-purple-500/20 border-purple-500/40 text-purple-400',
+};
+
+const getPhaseStyle = (name: string) =>
+  Object.entries(PHASE_BG).find(([k]) => name.includes(k))?.[1] || 'bg-muted border-border text-muted-foreground';
+
+const STATUS_COLORS: Record<string, string> = {
+  past: 'opacity-50',
+  current: 'ring-2 ring-primary scale-[1.02]',
+  future: '',
+};
+
 export function NPPeriodizationTab({ clientId, client, consultationId, consultation }: Props) {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const { fetchRunningZones, fetchRunningSchedule, fetchTriathlonSchedule } = useNutritionalPeriodization(clientId);
+  const { method, activePhases, loadingMethod, createMethod } = usePeriodizationMethod();
+  const {
+    athletePeriodization, notes, generateTimeline, savePeriodization, updateBlock, addNote, deleteNote
+  } = useAthletePeriodization(clientId);
 
-  const [expandedBlock, setExpandedBlock] = useState<number | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [generationType, setGenerationType] = useState('full');
-  const [periodStartDate, setPeriodStartDate] = useState('');
+  const [activeView, setActiveView] = useState<'athlete' | 'method'>('athlete');
+  const [startDate, setStartDate] = useState('');
   const [planType, setPlanType] = useState<'monthly' | '6_weeks'>('monthly');
+  const [selectedBlockIdx, setSelectedBlockIdx] = useState<number | null>(null);
+  const [noteText, setNoteText] = useState('');
+  const [overrideDialog, setOverrideDialog] = useState(false);
+  const [overrideBlockIdx, setOverrideBlockIdx] = useState<number | null>(null);
+  const [overridePhaseId, setOverridePhaseId] = useState('');
 
-  // Fetch athlete profile
+  // Fetch athlete profile for race_date
   const { data: athleteProfile } = useQuery({
     queryKey: ['athlete-profile-periodization', clientId],
     queryFn: async () => {
       const { data } = await supabase
         .from('athlete_profiles')
-        .select('*')
+        .select('target_race, target_deadline')
         .eq('client_id', clientId)
         .maybeSingle();
       return data;
@@ -52,525 +72,545 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
     enabled: !!clientId,
   });
 
-  // Fetch training data
-  const { data: runningZones = [] } = fetchRunningZones(consultationId || '');
-  const { data: runningSchedule = [] } = fetchRunningSchedule(consultationId || '');
-  const { data: triathlonSchedule = [] } = fetchTriathlonSchedule(consultationId || '');
-
-  // Fetch active periodization
-  const { data: activePeriodization, refetch: refetchPeriodization } = useQuery({
-    queryKey: ['periodiza-active', clientId],
+  // Fetch pending checkins for badge
+  const { data: pendingCheckins = [] } = useQuery({
+    queryKey: ['pending-checkins-periodization', clientId],
     queryFn: async () => {
       const { data } = await supabase
-        .from('periodiza_suggestions')
-        .select('*')
+        .from('checkin_dispatches')
+        .select('id')
         .eq('client_id', clientId)
-        .eq('is_active', true)
-        .order('version', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!clientId,
-  });
-
-  // Fetch admin instructions for AI
-  const { data: adminInstructions } = useQuery({
-    queryKey: ['periodiza-admin-instructions', user?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('periodiza_admin_instructions')
-        .select('instructions')
-        .eq('user_id', user!.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data?.instructions || '';
-    },
-    enabled: !!user?.id,
-  });
-
-  // Fetch active knowledge base
-  const { data: knowledgeBase } = useQuery({
-    queryKey: ['periodiza-kb-active', user?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('periodiza_knowledge_base')
-        .select('title, tags, content, priority')
-        .eq('user_id', user!.id)
-        .eq('active', true)
-        .order('priority', { ascending: false });
+        .eq('status', 'sent')
+        .limit(5);
       return data || [];
     },
-    enabled: !!user?.id,
+    enabled: !!clientId,
   });
 
-  // Derived data
   const raceDate = athleteProfile?.target_deadline || consultation?.target_race_date;
-  const weight = Number(consultation?.weight) || Number(athleteProfile?.current_weight) || 0;
-  const height = Number(consultation?.height) || Number(athleteProfile?.height) || 0;
-  const leanMassKg = Number(consultation?.lean_mass_kg) || 0;
-  const fa = Number(consultation?.activity_factor) || 1.25;
+  const raceName = athleteProfile?.target_race || '';
 
-  const age = useMemo(() => {
-    const bd = athleteProfile?.birth_date;
-    const cd = consultation?.consultation_date;
-    return bd && cd ? calculateAge(bd, cd) : (consultation?.manual_age || 30);
-  }, [athleteProfile, consultation]);
-
-  const tmb = useMemo(() => {
-    switch (consultation?.tmb_formula) {
-      case 'calorimetry': return Number(consultation?.calorimetry_value) || 0;
-      case 'cunningham': return leanMassKg > 0 ? calculateTMBCunningham(leanMassKg) : 0;
-      case 'harris_benedict_female': return calculateTMBHarrisBenedictFemale(weight, height, age);
-      default: return calculateTMBHarrisBenedictMale(weight, height, age);
+  // Init from athlete periodization or defaults
+  useEffect(() => {
+    if (athletePeriodization) {
+      setStartDate(athletePeriodization.start_date);
+      setPlanType(athletePeriodization.plan_adjustment_type as 'monthly' | '6_weeks');
+    } else if (client?.start_date) {
+      setStartDate(client.start_date);
+      if (client.consultation_frequency === '6_weeks') setPlanType('6_weeks');
     }
-  }, [consultation, leanMassKg, weight, height, age]);
+  }, [athletePeriodization, client]);
 
-  const tmbFa = calculateTMBFA(tmb, fa);
-
-  // GEE per day
-  const geePerDay = useMemo(() => {
-    const result = [0, 0, 0, 0, 0, 0, 0];
-    const modality = consultation?.sport_modality || consultation?.training_type || '';
-    const isTriathlon = modality.toLowerCase().includes('tri');
-
-    if (isTriathlon && triathlonSchedule.length > 0) {
-      triathlonSchedule.forEach((s: any) => {
-        if (s.duration_minutes > 0 && s.met_value) {
-          result[s.day_of_week] += calculateGEE(Number(s.met_value), weight, Number(s.duration_minutes));
-        }
-      });
-    } else if (runningZones.length > 0 && runningSchedule.length > 0) {
-      runningSchedule.forEach((s: any) => {
-        const zone = runningZones.find((z: any) => z.id === s.zone_id);
-        if (zone && s.duration_minutes > 0) {
-          result[s.day_of_week] += calculateGEE(Number(zone.met_value), weight, Number(s.duration_minutes));
-        }
+  // Timeline blocks
+  const blocks = useMemo(() => {
+    if (athletePeriodization?.timeline_blocks) {
+      // Recalculate statuses
+      const today = new Date();
+      return (athletePeriodization.timeline_blocks as any[]).map((b: any) => {
+        const s = parseISO(b.start_date);
+        const e = parseISO(b.end_date);
+        let status: 'past' | 'current' | 'future' = 'future';
+        if (today > e) status = 'past';
+        else if (today >= s && today <= e) status = 'current';
+        return { ...b, status };
       });
     }
-    return result;
-  }, [runningZones, runningSchedule, triathlonSchedule, weight, consultation]);
+    return [];
+  }, [athletePeriodization]);
 
-  // VCT per day
-  const vctPerDay = useMemo(() => {
-    const keys = ['vct_monday', 'vct_tuesday', 'vct_wednesday', 'vct_thursday', 'vct_friday', 'vct_saturday', 'vct_sunday'];
-    return keys.map(k => Number(consultation?.[k]) || 0);
-  }, [consultation]);
+  const currentBlock = blocks.find((b: any) => b.status === 'current');
+  const currentBlockIdx = currentBlock ? blocks.indexOf(currentBlock) : -1;
+  const nextBlock = currentBlockIdx >= 0 && currentBlockIdx < blocks.length - 1 ? blocks[currentBlockIdx + 1] : null;
 
-  // Training stimuli labels
-  const trainingStimuli = useMemo(() => {
-    const result: Record<number, string[]> = {};
-    const modality = consultation?.sport_modality || consultation?.training_type || '';
-    const isTriathlon = modality.toLowerCase().includes('tri');
+  // Get phase details from method
+  const getPhaseDetails = (phaseId: string) => activePhases.find((p: any) => p.id === phaseId);
+  const currentPhase = currentBlock ? getPhaseDetails(currentBlock.phase_id) : null;
+  const nextPhase = nextBlock ? getPhaseDetails(nextBlock.phase_id) : null;
 
-    if (isTriathlon && triathlonSchedule.length > 0) {
-      for (let d = 0; d < 7; d++) {
-        const entries = triathlonSchedule.filter((s: any) => s.day_of_week === d && Number(s.duration_minutes) > 0);
-        if (entries.length > 0) {
-          result[d] = entries.map((e: any) => {
-            const mod = e.modality === 'natacao' ? 'Nat.' : e.modality === 'corrida' ? 'Corr.' : e.modality === 'bike' ? 'Bike' : e.modality;
-            return `${mod} ${e.duration_minutes}min`;
-          });
-        }
-      }
-    } else if (runningZones.length > 0 && runningSchedule.length > 0) {
-      for (let d = 0; d < 7; d++) {
-        const entries = runningSchedule.filter((s: any) => s.day_of_week === d && Number(s.duration_minutes) > 0);
-        if (entries.length > 0) {
-          result[d] = entries.map((e: any) => {
-            const zone = runningZones.find((z: any) => z.id === e.zone_id);
-            return `${zone?.zone_name || '?'} ${e.duration_minutes}min`;
-          });
-        }
-      }
-    }
-    return result;
-  }, [runningZones, runningSchedule, triathlonSchedule, consultation]);
+  // Notes for current phase
+  const currentPhaseNotes = currentPhase
+    ? notes.filter((n: any) => n.phase_id === currentPhase.id)
+    : [];
 
-  // Cycle calculations
-  const cycleInfo = useMemo(() => {
-    if (!raceDate) return null;
-    const race = new Date(raceDate + 'T12:00:00');
-    const startRef = periodStartDate ? new Date(periodStartDate + 'T12:00:00') : new Date();
-    const weeksToRace = Math.max(differenceInWeeks(race, startRef), 1);
-    const blockSize = planType === '6_weeks' ? 6 : 4;
-    const numBlocks = Math.ceil(weeksToRace / blockSize);
-    return { weeksToRace, numBlocks, blockSize, raceDate: race };
-  }, [raceDate, periodStartDate, planType]);
+  // Cycle info
+  const weeksToRace = raceDate ? Math.max(differenceInWeeks(parseISO(raceDate), new Date()), 0) : null;
+  const daysToRace = raceDate ? Math.max(differenceInDays(parseISO(raceDate), new Date()), 0) : null;
 
-  // Set defaults
-  useEffect(() => {
-    if (client?.start_date && !periodStartDate) setPeriodStartDate(client.start_date);
-    if (client?.consultation_frequency === '6_weeks') setPlanType('6_weeks');
-  }, [client]);
-
-  useEffect(() => {
-    if (activePeriodization) {
-      if (activePeriodization.periodization_start_date) setPeriodStartDate(activePeriodization.periodization_start_date);
-      if (activePeriodization.plan_adjustment_type) setPlanType(activePeriodization.plan_adjustment_type as 'monthly' | '6_weeks');
-    }
-  }, [activePeriodization]);
-
-  const blocks = (activePeriodization?.blocks as any[]) || [];
-
-  // Current block index
-  const currentBlockIndex = useMemo(() => {
-    const today = new Date();
-    return blocks.findIndex((b: any) => {
-      if (!b.date_start || !b.date_end) return false;
-      const start = parseISO(b.date_start);
-      const end = parseISO(b.date_end);
-      return !isBefore(today, start) && !isAfter(today, end);
-    });
+  // Next checkpoint
+  const nextCheckpoint = useMemo(() => {
+    const future = blocks.filter((b: any) => b.status === 'current' || b.status === 'future');
+    return future.length > 0 ? future[0].adjustment_checkpoint_date : null;
   }, [blocks]);
 
-  // Detect GEE changes
-  const geeChanged = useMemo(() => {
-    const snapshot = (activePeriodization as any)?.gee_snapshot as number[] | null;
-    if (!snapshot || snapshot.length !== 7) return false;
-    return geePerDay.some((v, i) => Math.abs(v - snapshot[i]) > 5);
-  }, [geePerDay, activePeriodization]);
+  const daysToCheckpoint = nextCheckpoint ? differenceInDays(parseISO(nextCheckpoint), new Date()) : null;
 
-  // Build athlete context for AI
-  const buildAthleteContext = () => {
-    const weekDays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
-    const trainingByDay: Record<string, any> = {};
-    for (let d = 0; d < 7; d++) {
-      trainingByDay[weekDays[d]] = {
-        stimuli: trainingStimuli[d] || ['Descanso'],
-        gee_kcal: Math.round(geePerDay[d]),
-        tmbFa_kcal: Math.round(tmbFa),
-        get_kcal: Math.round(tmbFa + geePerDay[d]),
-        vct_planejado: vctPerDay[d] || null,
-        ea: leanMassKg > 0 && vctPerDay[d] > 0 ? Number(((vctPerDay[d] - geePerDay[d]) / leanMassKg).toFixed(1)) : null,
-      };
-    }
-
-    return {
-      nome: client?.name || '—',
-      modalidade: consultation?.sport_modality || consultation?.training_type || '—',
-      objetivo: athleteProfile?.main_goal || consultation?.sport_goal || '—',
-      prova_alvo: athleteProfile?.target_race || '—',
-      data_prova: raceDate || null,
-      semanas_ate_prova: cycleInfo?.weeksToRace || null,
-      peso_kg: weight,
-      altura_cm: height,
-      mlg_kg: leanMassKg,
-      gordura_pct: Number(consultation?.fat_percentage) || 0,
-      tmb_kcal: Math.round(tmb),
-      tmbFa_kcal: Math.round(tmbFa),
-      fator_atividade: fa,
-      plano_tipo: planType === '6_weeks' ? 'Consultas a cada 6 semanas' : 'Consultoria mensal (4 semanas)',
-      bloco_semanas: cycleInfo?.blockSize || 4,
-      restricoes_alimentares: athleteProfile?.food_allergies || 'Nenhuma',
-      intolerancia_lactose: athleteProfile?.lactose_intolerance || null,
-      intolerancia_gluten: athleteProfile?.gluten_intolerance || null,
-      agenda_treinos_semanal: trainingByDay,
-      gee_total_semanal_kcal: geePerDay.reduce((s, v) => s + v, 0),
-    };
+  // Generate / Regenerate timeline
+  const handleGenerateTimeline = () => {
+    if (!raceDate || !startDate || !method) return;
+    const newBlocks = generateTimeline(startDate, raceDate, planType, activePhases);
+    savePeriodization.mutate({
+      start_date: startDate,
+      race_date: raceDate,
+      plan_adjustment_type: planType,
+      method_id: method.id,
+      timeline_blocks: newBlocks,
+    });
   };
 
-  // Generate periodization
-  const handleGenerate = async (type: string) => {
-    if (!raceDate) {
-      toast({ title: 'Data da prova não definida', variant: 'destructive' });
-      return;
+  // Handle phase override
+  const handleOverride = () => {
+    if (overrideBlockIdx === null || !overridePhaseId) return;
+    const phase = activePhases.find((p: any) => p.id === overridePhaseId);
+    if (phase) {
+      updateBlock.mutate({ blockIndex: overrideBlockIdx, phaseId: overridePhaseId, phaseName: phase.phase_name });
     }
-    setGenerating(true);
-    setGenerationType(type);
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-periodization', {
-        body: {
-          athleteContext: buildAthleteContext(),
-          adminInstructions: adminInstructions || '',
-          knowledgeBase: knowledgeBase || [],
-          generationType: type,
-          planType,
-          blockSize: cycleInfo?.blockSize || 4,
-          weeksToRace: cycleInfo?.weeksToRace || 12,
-          periodStartDate: periodStartDate || format(new Date(), 'yyyy-MM-dd'),
-        },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      const nextVersion = (activePeriodization?.version || 0) + 1;
-
-      if (activePeriodization?.id) {
-        await supabase
-          .from('periodiza_suggestions')
-          .update({ is_active: false })
-          .eq('id', activePeriodization.id);
-      }
-
-      const { error: insertError } = await supabase
-        .from('periodiza_suggestions')
-        .insert({
-          user_id: user!.id,
-          client_id: clientId,
-          consultation_id: consultationId || null,
-          version: nextVersion,
-          suggestion_type: type,
-          blocks: data.blocks,
-          nutritionist_notes: data.nutritionistNotes || null,
-          human_readable: data.humanReadable || null,
-          is_active: true,
-          periodization_start_date: periodStartDate || format(new Date(), 'yyyy-MM-dd'),
-          plan_adjustment_type: planType,
-          gee_snapshot: geePerDay,
-        } as any);
-
-      if (insertError) throw insertError;
-
-      queryClient.invalidateQueries({ queryKey: ['periodiza-active'] });
-      toast({ title: 'Periodização gerada!', description: `v${nextVersion} — ${data.blocks?.length || 0} blocos` });
-    } catch (err: any) {
-      toast({ title: 'Erro ao gerar', description: err.message, variant: 'destructive' });
-    } finally {
-      setGenerating(false);
-    }
+    setOverrideDialog(false);
   };
 
-  // Save a single block edit
-  const handleSaveBlock = async (blockIndex: number, updatedBlock: any) => {
-    if (!activePeriodization?.id) return;
-    const newBlocks = [...blocks];
-    newBlocks[blockIndex] = updatedBlock;
-    const { error } = await supabase
-      .from('periodiza_suggestions')
-      .update({ blocks: newBlocks, updated_at: new Date().toISOString() })
-      .eq('id', activePeriodization.id);
-    if (error) {
-      toast({ title: 'Erro ao salvar bloco', description: error.message, variant: 'destructive' });
-    } else {
-      queryClient.invalidateQueries({ queryKey: ['periodiza-active'] });
-      toast({ title: `Bloco ${blockIndex + 1} salvo com sucesso` });
-    }
+  // Handle add note
+  const handleAddNote = () => {
+    if (!noteText.trim() || !currentPhase) return;
+    addNote.mutate({ phaseId: currentPhase.id, blockIndex: currentBlockIdx, noteText });
+    setNoteText('');
   };
+
+  // Auto-select current block
+  useEffect(() => {
+    if (currentBlockIdx >= 0 && selectedBlockIdx === null) {
+      setSelectedBlockIdx(currentBlockIdx);
+    }
+  }, [currentBlockIdx]);
+
+  // If no method yet, prompt creation
+  if (!loadingMethod && !method) {
+    return (
+      <div className="space-y-4">
+        <MethodEditor />
+      </div>
+    );
+  }
+
+  const selectedBlock = selectedBlockIdx !== null ? blocks[selectedBlockIdx] : null;
+  const selectedPhase = selectedBlock ? getPhaseDetails(selectedBlock.phase_id) : null;
+  const selectedBlockNotes = selectedBlock && selectedPhase
+    ? notes.filter((n: any) => n.phase_id === selectedPhase.id && (n.block_index === null || n.block_index === selectedBlockIdx))
+    : [];
 
   return (
     <div className="space-y-4">
-      {/* Overview Header */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="pt-3 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Target className="h-4 w-4 text-primary" />
-              <span className="text-[10px] text-muted-foreground uppercase">Prova</span>
-            </div>
-            <p className="text-sm font-bold truncate">{athleteProfile?.target_race || '—'}</p>
-            <p className="text-[10px] text-muted-foreground">{raceDate ? format(new Date(raceDate + 'T12:00:00'), 'dd/MM/yyyy') : 'Não definida'}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-4 w-4 text-amber-400" />
-              <span className="text-[10px] text-muted-foreground uppercase">Contagem</span>
-            </div>
-            <p className="text-xl font-bold text-primary">{cycleInfo?.weeksToRace || '—'}</p>
-            <p className="text-[10px] text-muted-foreground">semanas restantes</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Zap className="h-4 w-4 text-emerald-400" />
-              <span className="text-[10px] text-muted-foreground uppercase">Fase Atual</span>
-            </div>
-            <p className="text-sm font-bold">{currentBlockIndex >= 0 ? blocks[currentBlockIndex]?.phase_name : 'Não iniciada'}</p>
-            <p className="text-[10px] text-muted-foreground">{currentBlockIndex >= 0 ? `Bloco ${currentBlockIndex + 1} de ${blocks.length}` : '—'}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-3 pb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-blue-400" />
-              <span className="text-[10px] text-muted-foreground uppercase">Energia</span>
-            </div>
-            <p className="text-sm font-bold">{Math.round(tmbFa)} kcal</p>
-            <p className="text-[10px] text-muted-foreground">TMB×FA · MLG {leanMassKg ? `${leanMassKg.toFixed(1)}kg` : 'N/D'}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Tabs value={activeView} onValueChange={(v: any) => setActiveView(v)}>
+        <TabsList className="h-8">
+          <TabsTrigger value="athlete" className="text-xs gap-1"><Calendar className="h-3 w-3" /> Periodização do Atleta</TabsTrigger>
+          <TabsTrigger value="method" className="text-xs gap-1"><Settings2 className="h-3 w-3" /> Manual do Método</TabsTrigger>
+        </TabsList>
 
-      {/* Config + Generation */}
-      <Card>
-        <CardContent className="pt-4 pb-4 space-y-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div>
-              <label className="text-[10px] font-medium text-muted-foreground block mb-1">Início</label>
-              <Input type="date" value={periodStartDate} onChange={e => setPeriodStartDate(e.target.value)} className="h-8 text-xs" />
-            </div>
-            <div>
-              <label className="text-[10px] font-medium text-muted-foreground block mb-1">Periodicidade</label>
-              <Select value={planType} onValueChange={(v: 'monthly' | '6_weeks') => setPlanType(v)}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Mensal (4 sem.)</SelectItem>
-                  <SelectItem value="6_weeks">6 semanas</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end gap-2 col-span-2">
-              <Button size="sm" onClick={() => handleGenerate('full')} disabled={generating || !raceDate} className="gap-1 text-xs h-8">
-                {generating && generationType === 'full' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                {blocks.length > 0 ? 'Nova versão' : 'Gerar Periodização'}
-              </Button>
-              {blocks.length > 0 && (
-                <Button variant="outline" size="sm" onClick={() => handleGenerate('recalculate')} disabled={generating} className="gap-1 text-xs h-8">
-                  {generating && generationType === 'recalculate' ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                  Recalcular
-                </Button>
-              )}
-              {activePeriodization && (
-                <Badge variant="outline" className="text-[10px] h-8 flex items-center">v{activePeriodization.version}</Badge>
-              )}
-            </div>
+        <TabsContent value="method" className="mt-4">
+          <MethodEditor />
+        </TabsContent>
+
+        <TabsContent value="athlete" className="mt-4 space-y-4">
+          {/* A) Header do Ciclo */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <Card>
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Target className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-[10px] text-muted-foreground uppercase">Prova Alvo</span>
+                </div>
+                <p className="text-sm font-bold truncate">{raceName || '—'}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {raceDate ? format(parseISO(raceDate), 'dd/MM/yyyy') : 'Não definida'}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Clock className="h-3.5 w-3.5 text-amber-400" />
+                  <span className="text-[10px] text-muted-foreground uppercase">Tempo Restante</span>
+                </div>
+                <p className="text-xl font-bold text-primary">{weeksToRace ?? '—'}</p>
+                <p className="text-[10px] text-muted-foreground">{daysToRace != null ? `${daysToRace} dias (${weeksToRace} sem)` : '—'}</p>
+              </CardContent>
+            </Card>
+
+            <Card className={currentPhase ? '' : ''}>
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Zap className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="text-[10px] text-muted-foreground uppercase">Fase Atual</span>
+                </div>
+                <p className="text-sm font-bold">{currentBlock?.phase_name_snapshot || 'Não iniciada'}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {currentBlock ? `Bloco ${currentBlockIdx + 1} de ${blocks.length}` : '—'}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Calendar className="h-3.5 w-3.5 text-blue-400" />
+                  <span className="text-[10px] text-muted-foreground uppercase">Próx. Checkpoint</span>
+                </div>
+                <p className="text-sm font-bold">
+                  {nextCheckpoint ? format(parseISO(nextCheckpoint), 'dd/MM') : '—'}
+                </p>
+                {daysToCheckpoint != null && daysToCheckpoint < 7 && (
+                  <Badge className="text-[9px] bg-destructive/20 text-destructive border-destructive/30 mt-0.5">
+                    <AlertTriangle className="h-2.5 w-2.5 mr-0.5" /> {daysToCheckpoint}d restantes
+                  </Badge>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-3 pb-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] text-muted-foreground uppercase">Ajustes</span>
+                </div>
+                <p className="text-sm font-bold">{planType === '6_weeks' ? '6 semanas' : 'Mensal'}</p>
+                {pendingCheckins.length > 0 && (
+                  <Badge className="text-[9px] bg-amber-500/20 text-amber-400 border-amber-500/30 mt-0.5">
+                    {pendingCheckins.length} check-in pendente
+                  </Badge>
+                )}
+              </CardContent>
+            </Card>
           </div>
-          {!leanMassKg && (
-            <p className="text-[10px] text-destructive flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> MLG não disponível — Disponibilidade Energética não será calculada.
-            </p>
+
+          {/* Config bar */}
+          <Card>
+            <CardContent className="pt-3 pb-3">
+              <div className="flex flex-col sm:flex-row gap-2 items-end">
+                <div className="flex-1 min-w-[140px]">
+                  <label className="text-[10px] font-medium text-muted-foreground block mb-1">Início do Ciclo</label>
+                  <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 text-xs" />
+                </div>
+                <div className="min-w-[140px]">
+                  <label className="text-[10px] font-medium text-muted-foreground block mb-1">Periodicidade</label>
+                  <Select value={planType} onValueChange={(v: any) => setPlanType(v)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Mensal (4 sem.)</SelectItem>
+                      <SelectItem value="6_weeks">6 semanas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleGenerateTimeline}
+                  disabled={!raceDate || !startDate || !method}
+                  className="gap-1 text-xs h-8"
+                >
+                  {blocks.length > 0 ? <RefreshCw className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                  {blocks.length > 0 ? 'Regenerar Timeline' : 'Gerar Timeline'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* B) Timeline Visual (Roadmap) */}
+          {blocks.length > 0 && (
+            <Card>
+              <CardContent className="pt-3 pb-3">
+                <p className="text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wide">Linha do Tempo</p>
+                <div className="flex gap-1 overflow-x-auto pb-1">
+                  {blocks.map((block: any, i: number) => {
+                    const style = getPhaseStyle(block.phase_name_snapshot);
+                    const isSelected = selectedBlockIdx === i;
+                    return (
+                      <Tooltip key={i}>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => setSelectedBlockIdx(i)}
+                            className={`flex-1 min-w-[70px] p-2 rounded-lg border transition-all text-center ${style} ${STATUS_COLORS[block.status]} ${isSelected ? 'ring-2 ring-foreground/30' : ''}`}
+                          >
+                            <p className="text-[10px] font-bold">B{i + 1}</p>
+                            <p className="text-[9px] truncate">{block.phase_name_snapshot.split(' ')[0]}</p>
+                            <p className="text-[8px] mt-0.5 opacity-70">
+                              {format(parseISO(block.start_date), 'dd/MM')} → {format(parseISO(block.end_date), 'dd/MM')}
+                            </p>
+                            {block.status === 'current' && (
+                              <Badge className="text-[7px] bg-primary/30 text-primary border-primary/40 mt-0.5">ATUAL</Badge>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs font-medium">{block.phase_name_snapshot}</p>
+                          <p className="text-[10px]">{block.start_date} → {block.end_date}</p>
+                          <p className="text-[10px]">Checkpoint: {format(parseISO(block.adjustment_checkpoint_date), 'dd/MM/yyyy')}</p>
+                          {block.phase_override && <p className="text-[10px] text-amber-400">⚠️ Fase alterada manualmente</p>}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+                {/* Legend */}
+                <div className="flex gap-3 mt-2 justify-center flex-wrap">
+                  {activePhases.map((p: any) => (
+                    <div key={p.id} className="flex items-center gap-1">
+                      <div className={`w-2 h-2 rounded-sm ${getPhaseStyle(p.phase_name).split(' ')[0]}`} />
+                      <span className="text-[9px] text-muted-foreground">{p.phase_name}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
 
-      {/* GEE Changed Alert */}
-      {geeChanged && blocks.length > 0 && (
-        <Card className="border-amber-500/50 bg-amber-500/5">
-          <CardContent className="pt-3 pb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-amber-400">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>Treinos alterados desde a última geração. Periodização pode estar desatualizada.</span>
-            </div>
-            <Button
-              size="sm" variant="outline"
-              onClick={() => handleGenerate('recalculate')}
-              disabled={generating}
-              className="gap-1 text-xs h-7 shrink-0 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-            >
-              <RefreshCw className="h-3 w-3" /> Recalcular
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+          {/* Check-in context badge */}
+          {pendingCheckins.length > 0 && currentBlock && (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardContent className="pt-3 pb-3 flex items-center gap-2 text-xs">
+                <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+                <span>
+                  Você está no checkpoint do <strong>Bloco {currentBlockIdx + 1}</strong> — Fase atual: <strong>{currentBlock.phase_name_snapshot}</strong>
+                  {nextBlock && <> — Próxima fase recomendada: <strong>{nextBlock.phase_name_snapshot}</strong></>}
+                </span>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Visual Timeline */}
-      {blocks.length > 0 && (
-        <Card>
-          <CardContent className="pt-3 pb-3">
-            <p className="text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wide">Visão Geral do Ciclo</p>
-            <div className="flex gap-0.5 h-10 rounded-lg overflow-hidden">
-              {blocks.map((block: any, i: number) => {
-                const phase = block.phase_name || '';
-                const PHASE_BG: Record<string, string> = {
-                  'Base Metabólica': 'bg-blue-500/30 hover:bg-blue-500/40 border-blue-500/40',
-                  'Transição': 'bg-amber-500/30 hover:bg-amber-500/40 border-amber-500/40',
-                  'Performance': 'bg-emerald-500/30 hover:bg-emerald-500/40 border-emerald-500/40',
-                  'Taper': 'bg-purple-500/30 hover:bg-purple-500/40 border-purple-500/40',
-                };
-                const colors = Object.entries(PHASE_BG).find(([k]) => phase.includes(k))?.[1] || 'bg-muted hover:bg-muted/80 border-border';
-                const isCurrent = i === currentBlockIndex;
-
-                return (
-                  <Tooltip key={i}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => setExpandedBlock(expandedBlock === i ? null : i)}
-                        className={`flex flex-col items-center justify-center text-[9px] font-medium border transition-all rounded-sm ${colors} ${isCurrent ? 'ring-2 ring-primary scale-105 z-10' : ''} ${expandedBlock === i ? 'ring-1 ring-foreground/30' : ''}`}
-                        style={{ flex: 1, minWidth: '28px' }}
-                      >
-                        <span className="font-bold">B{i + 1}</span>
-                        <span className="text-[8px] opacity-70">{phase.split(' ')[0]?.slice(0, 4)}</span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-xs font-medium">{block.phase_name}</p>
-                      <p className="text-[10px] text-muted-foreground">{block.date_start} → {block.date_end}</p>
-                      {block.phase_targets?.cho_gkg && <p className="text-[10px]">CHO: {block.phase_targets.cho_gkg} g/kg</p>}
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </div>
-            {/* Legend */}
-            <div className="flex gap-3 mt-2 justify-center">
-              {['Base Metabólica', 'Transição', 'Performance', 'Taper'].map(phase => {
-                const colors: Record<string, string> = {
-                  'Base Metabólica': 'bg-blue-500/30',
-                  'Transição': 'bg-amber-500/30',
-                  'Performance': 'bg-emerald-500/30',
-                  'Taper': 'bg-purple-500/30',
-                };
-                return (
-                  <div key={phase} className="flex items-center gap-1">
-                    <div className={`w-2 h-2 rounded-sm ${colors[phase]}`} />
-                    <span className="text-[9px] text-muted-foreground">{phase}</span>
+          {/* C) Painel da fase selecionada / atual */}
+          {selectedPhase && selectedBlock && (
+            <Card className={`border-l-4 ${Object.entries(PHASE_BG).find(([k]) => selectedPhase.phase_name.includes(k))?.[1]?.split(' ').find(c => c.startsWith('border-')) || 'border-l-border'}`}>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    {selectedPhase.phase_name}
+                    {selectedBlock.status === 'current' && <Badge className="text-[9px] bg-primary/20 text-primary">FASE ATUAL</Badge>}
+                    {selectedBlock.phase_override && <Badge variant="outline" className="text-[9px] text-amber-400">Override</Badge>}
+                  </CardTitle>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline" size="sm" className="text-[10px] h-6 gap-0.5"
+                      onClick={() => {
+                        setOverrideBlockIdx(selectedBlockIdx);
+                        setOverridePhaseId('');
+                        setOverrideDialog(true);
+                      }}
+                    >
+                      Forçar fase
+                    </Button>
                   </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* 1) Objetivo */}
+                <div>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase mb-1 flex items-center gap-1">
+                    <Target className="h-3 w-3" /> Objetivo da Fase (Método)
+                  </p>
+                  <p className="text-xs">{selectedPhase.phase_goal}</p>
+                </div>
 
-      {/* Block Cards */}
-      {blocks.length > 0 ? (
-        <div className="space-y-2">
-          {blocks.map((block: any, i: number) => (
-            <PeriodizaBlockCard
-              key={i}
-              block={block}
-              index={i}
-              isExpanded={expandedBlock === i}
-              isCurrent={i === currentBlockIndex}
-              onToggle={() => setExpandedBlock(expandedBlock === i ? null : i)}
-              onSave={(updated) => handleSaveBlock(i, updated)}
-              trainingStimuli={trainingStimuli}
-              geePerDay={geePerDay}
-            />
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Sparkles className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-            <h3 className="text-sm font-semibold">Nenhuma periodização gerada</h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              Configure as datas e clique em "Gerar Periodização" para criar os blocos.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+                {/* 2) O que fazer */}
+                {Array.isArray(selectedPhase.do_checklist) && selectedPhase.do_checklist.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase mb-1 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-400" /> O que fazer agora
+                    </p>
+                    <div className="space-y-0.5">
+                      {(selectedPhase.do_checklist as string[]).map((item: string, i: number) => (
+                        <p key={i} className="text-xs flex items-start gap-1.5">
+                          <span className="text-emerald-400 mt-0.5">•</span> {item}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-      {/* AI Notes */}
-      {activePeriodization?.nutritionist_notes && (activePeriodization.nutritionist_notes as string[]).length > 0 && (
-        <Card className="border-amber-500/20">
-          <CardContent className="pt-3 pb-3 space-y-1">
-            <p className="text-xs font-medium text-amber-400 flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> Notas e Alertas da IA
-            </p>
-            {(activePeriodization.nutritionist_notes as string[]).map((note: string, i: number) => (
-              <p key={i} className="text-xs text-muted-foreground">• {note}</p>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+                {/* 3) Macronutrientes */}
+                {Array.isArray(selectedPhase.macro_targets) && selectedPhase.macro_targets.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase mb-1 flex items-center gap-1">
+                      <Utensils className="h-3 w-3" /> Diretrizes Nutricionais
+                    </p>
+                    {(selectedPhase.macro_targets as string[]).map((t: string, i: number) => (
+                      <p key={i} className="text-xs">• {t}</p>
+                    ))}
+                  </div>
+                )}
 
-      {/* Human-readable summary */}
-      {activePeriodization?.human_readable && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs text-muted-foreground">Resumo da IA</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs whitespace-pre-wrap text-muted-foreground">{activePeriodization.human_readable}</p>
-          </CardContent>
-        </Card>
-      )}
+                {/* 4) Suplementação */}
+                {Array.isArray(selectedPhase.supplementation_daily) && selectedPhase.supplementation_daily.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase mb-1 flex items-center gap-1">
+                      <Pill className="h-3 w-3" /> Suplementação Base
+                    </p>
+                    {(selectedPhase.supplementation_daily as string[]).map((s: string, i: number) => (
+                      <p key={i} className="text-xs">• {s}</p>
+                    ))}
+                  </div>
+                )}
+
+                {/* 5) Estratégia longão */}
+                {selectedPhase.pre_intra_long_run && (
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase mb-1 flex items-center gap-1">
+                      <Dumbbell className="h-3 w-3" /> Estratégia Longão / Treino
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['pre', 'intra', 'post'].map(k => (
+                        <div key={k} className="p-2 rounded bg-muted/30 border border-border">
+                          <p className="text-[10px] text-muted-foreground font-medium capitalize">
+                            {k === 'pre' ? 'Pré' : k === 'intra' ? 'Durante' : 'Pós'}
+                          </p>
+                          <p className="text-xs mt-1">{(selectedPhase.pre_intra_long_run as any)?.[k] || '—'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 6) Nutrição funcional */}
+                {Array.isArray(selectedPhase.functional_support) && selectedPhase.functional_support.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase mb-1">Nutrição Funcional</p>
+                    <div className="flex flex-wrap gap-1">
+                      {(selectedPhase.functional_support as string[]).map((s: string, i: number) => (
+                        <Badge key={i} variant="outline" className="text-[10px]">{s}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 7) O que evitar */}
+                {Array.isArray(selectedPhase.avoid_checklist) && selectedPhase.avoid_checklist.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase mb-1 flex items-center gap-1">
+                      <XCircle className="h-3 w-3 text-destructive" /> O que evitar
+                    </p>
+                    {(selectedPhase.avoid_checklist as string[]).map((a: string, i: number) => (
+                      <p key={i} className="text-xs text-destructive/80">• {a}</p>
+                    ))}
+                  </div>
+                )}
+
+                {/* 8) Notas do nutricionista para ESTE atleta */}
+                <div className="border-t border-border pt-3">
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase mb-2 flex items-center gap-1">
+                    <StickyNote className="h-3 w-3" /> Notas do Nutricionista (este atleta)
+                  </p>
+                  {selectedBlockNotes.length > 0 && (
+                    <div className="space-y-1.5 mb-2">
+                      {selectedBlockNotes.map((n: any) => (
+                        <div key={n.id} className="flex items-start gap-2 p-2 rounded bg-muted/20 border border-border">
+                          <p className="text-xs flex-1">{n.note_text}</p>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[9px] text-muted-foreground">{format(parseISO(n.created_at), 'dd/MM')}</span>
+                            <Button variant="ghost" size="sm" onClick={() => deleteNote.mutate(n.id)} className="h-5 w-5 p-0 text-destructive">
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Textarea
+                      value={noteText}
+                      onChange={e => setNoteText(e.target.value)}
+                      placeholder="Observação específica para este atleta nesta fase..."
+                      rows={2}
+                      className="text-xs flex-1"
+                    />
+                    <Button size="sm" onClick={handleAddNote} disabled={!noteText.trim()} className="gap-1 text-xs h-auto self-end">
+                      <Plus className="h-3 w-3" /> Nota
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* D) Painel Próxima Fase */}
+          {nextPhase && currentPhase && nextPhase.id !== currentPhase.id && (
+            <Card className="border-dashed">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <ChevronRight className="h-4 w-4" /> Próxima Fase: {nextPhase.phase_name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-xs text-muted-foreground">{nextPhase.phase_goal}</p>
+
+                {/* Comparison */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase mb-1">Macros (Atual)</p>
+                    {(Array.isArray(currentPhase.macro_targets) ? currentPhase.macro_targets : []).map((t: string, i: number) => (
+                      <p key={i} className="text-[10px]">• {t}</p>
+                    ))}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase mb-1">Macros (Próxima)</p>
+                    {(Array.isArray(nextPhase.macro_targets) ? nextPhase.macro_targets : []).map((t: string, i: number) => (
+                      <p key={i} className="text-[10px] font-semibold">• {t}</p>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Supplement changes */}
+                <div>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase mb-1">Mudanças em Suplementos</p>
+                  {(() => {
+                    const curr = new Set((Array.isArray(currentPhase.supplementation_daily) ? currentPhase.supplementation_daily : []).map((s: string) => s.split(':')[0].trim()));
+                    const next = new Set((Array.isArray(nextPhase.supplementation_daily) ? nextPhase.supplementation_daily : []).map((s: string) => s.split(':')[0].trim()));
+                    const entering = [...next].filter(s => !curr.has(s));
+                    const leaving = [...curr].filter(s => !next.has(s));
+                    return (
+                      <div className="flex flex-wrap gap-1">
+                        {entering.map(s => <Badge key={s} className="text-[9px] bg-emerald-500/20 text-emerald-400">+ {s}</Badge>)}
+                        {leaving.map(s => <Badge key={s} className="text-[9px] bg-destructive/20 text-destructive">- {s}</Badge>)}
+                        {entering.length === 0 && leaving.length === 0 && <span className="text-[10px] text-muted-foreground">Sem mudanças significativas</span>}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Empty state */}
+          {blocks.length === 0 && (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <h3 className="text-sm font-semibold">Nenhuma timeline gerada</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Configure a data de início e clique em "Gerar Timeline" para criar os blocos de periodização.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Override Dialog */}
+          <Dialog open={overrideDialog} onOpenChange={setOverrideDialog}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="text-sm">Forçar Fase do Bloco {overrideBlockIdx !== null ? overrideBlockIdx + 1 : ''}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">Selecione a fase que deseja atribuir a este bloco (apenas para este atleta).</p>
+                <Select value={overridePhaseId} onValueChange={setOverridePhaseId}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione uma fase" /></SelectTrigger>
+                  <SelectContent>
+                    {activePhases.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>{p.phase_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={handleOverride} disabled={!overridePhaseId} className="w-full gap-1 text-xs">
+                  <Save className="h-3 w-3" /> Confirmar Override
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -479,6 +479,102 @@ export type Database = {
           },
         ]
       }
+      athlete_periodization: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          method_id: string
+          plan_adjustment_type: string
+          race_date: string
+          start_date: string
+          timeline_blocks: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          method_id: string
+          plan_adjustment_type?: string
+          race_date: string
+          start_date: string
+          timeline_blocks?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          method_id?: string
+          plan_adjustment_type?: string
+          race_date?: string
+          start_date?: string
+          timeline_blocks?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_periodization_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_periodization_method_id_fkey"
+            columns: ["method_id"]
+            isOneToOne: false
+            referencedRelation: "periodization_method"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      athlete_periodization_notes: {
+        Row: {
+          athlete_periodization_id: string
+          block_index: number | null
+          created_at: string
+          id: string
+          note_text: string
+          phase_id: string
+        }
+        Insert: {
+          athlete_periodization_id: string
+          block_index?: number | null
+          created_at?: string
+          id?: string
+          note_text: string
+          phase_id: string
+        }
+        Update: {
+          athlete_periodization_id?: string
+          block_index?: number | null
+          created_at?: string
+          id?: string
+          note_text?: string
+          phase_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_periodization_notes_athlete_periodization_id_fkey"
+            columns: ["athlete_periodization_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_periodization"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_periodization_notes_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "periodization_method_phases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_profiles: {
         Row: {
           anamnese_completed: boolean | null
@@ -3094,6 +3190,127 @@ export type Database = {
             columns: ["consultation_id"]
             isOneToOne: false
             referencedRelation: "np_consultations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      periodization_method: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          method_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          method_name?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          method_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      periodization_method_log: {
+        Row: {
+          change_description: string
+          changed_by: string
+          created_at: string
+          id: string
+          method_id: string
+          snapshot: Json | null
+        }
+        Insert: {
+          change_description: string
+          changed_by: string
+          created_at?: string
+          id?: string
+          method_id: string
+          snapshot?: Json | null
+        }
+        Update: {
+          change_description?: string
+          changed_by?: string
+          created_at?: string
+          id?: string
+          method_id?: string
+          snapshot?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "periodization_method_log_method_id_fkey"
+            columns: ["method_id"]
+            isOneToOne: false
+            referencedRelation: "periodization_method"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      periodization_method_phases: {
+        Row: {
+          avoid_checklist: Json | null
+          created_at: string
+          do_checklist: Json | null
+          functional_support: Json | null
+          id: string
+          is_active: boolean
+          macro_targets: Json | null
+          method_id: string
+          phase_goal: string | null
+          phase_name: string
+          phase_order: number
+          pre_intra_long_run: Json | null
+          supplementation_daily: Json | null
+          updated_at: string
+        }
+        Insert: {
+          avoid_checklist?: Json | null
+          created_at?: string
+          do_checklist?: Json | null
+          functional_support?: Json | null
+          id?: string
+          is_active?: boolean
+          macro_targets?: Json | null
+          method_id: string
+          phase_goal?: string | null
+          phase_name: string
+          phase_order?: number
+          pre_intra_long_run?: Json | null
+          supplementation_daily?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          avoid_checklist?: Json | null
+          created_at?: string
+          do_checklist?: Json | null
+          functional_support?: Json | null
+          id?: string
+          is_active?: boolean
+          macro_targets?: Json | null
+          method_id?: string
+          phase_goal?: string | null
+          phase_name?: string
+          phase_order?: number
+          pre_intra_long_run?: Json | null
+          supplementation_daily?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "periodization_method_phases_method_id_fkey"
+            columns: ["method_id"]
+            isOneToOne: false
+            referencedRelation: "periodization_method"
             referencedColumns: ["id"]
           },
         ]
