@@ -1,13 +1,13 @@
 import { Layout } from '@/components/layout/Layout';
 import { StatCard } from '@/components/dashboard/StatCard';
-import { ConsultationCalendar } from '@/components/dashboard/ConsultationCalendar';
+
 import { PendingCheckinsAlert } from '@/components/dashboard/PendingCheckinsAlert';
 import { DietAdjustmentAlert } from '@/components/dashboard/DietAdjustmentAlert';
 import { GoogleOAuthAlert } from '@/components/dashboard/GoogleOAuthAlert';
 import { PendingMealPlansAlert } from '@/components/dashboard/PendingMealPlansAlert';
 import { PeriodizationPhaseAlert } from '@/components/dashboard/PeriodizationPhaseAlert';
 import { PeriodizationOverview } from '@/components/dashboard/PeriodizationOverview';
-import { useClients, usePayments, useConsultationSchedules, getExpiringThisMonth } from '@/hooks/useClients';
+import { useClients, usePayments, getExpiringThisMonth } from '@/hooks/useClients';
 import { getMonthlyIncomeByPaidAt, getDueAmountInPeriod } from '@/hooks/useFinancialData';
 import { Users, DollarSign, AlertTriangle, Loader2, CreditCard } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
@@ -18,7 +18,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
-  const { data: consultations = [], isLoading: consultationsLoading } = useConsultationSchedules();
+  
 
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -43,7 +43,7 @@ export default function Dashboard() {
     [payments, monthStart, monthEnd]
   );
 
-  const isLoading = clientsLoading || paymentsLoading || consultationsLoading;
+  const isLoading = clientsLoading || paymentsLoading;
 
   if (isLoading) {
     return (
@@ -119,11 +119,6 @@ export default function Dashboard() {
 
         {/* Periodization Control Panel */}
         <PeriodizationOverview />
-
-        {/* Calendar Only */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-1">
-          <ConsultationCalendar consultations={consultations} clients={activeClients} />
-        </div>
       </div>
     </Layout>
   );
