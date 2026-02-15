@@ -33,7 +33,7 @@ export default function MetabolicWeb() {
     return activeClients.filter((c: any) => c.name.toLowerCase().includes(q));
   }, [activeClients, searchQuery]);
 
-  const { screenings, isLoading, saveScreening, deleteScreening } = useMetabolicScreening(selectedClientId);
+  const { screenings, isLoading, saveScreening, deleteScreening, analyzeScreening } = useMetabolicScreening(selectedClientId);
 
   const selectedScreening = screenings.find((s: any) => s.id === selectedScreeningId) || screenings[0];
 
@@ -169,7 +169,11 @@ export default function MetabolicWeb() {
                       <Trash2 className="h-3.5 w-3.5" /> Excluir
                     </Button>
                   </div>
-                  <MetabolicWebChart screening={selectedScreening} />
+                  <MetabolicWebChart 
+                    screening={selectedScreening} 
+                    onReanalyze={() => analyzeScreening.mutate(selectedScreening.id)}
+                    isAnalyzing={analyzeScreening.isPending}
+                  />
                 </div>
               ) : (
                 <Card>

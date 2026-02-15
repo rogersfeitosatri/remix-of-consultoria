@@ -23,6 +23,25 @@ export function useMetabolicScreening(clientId?: string) {
     enabled: !!clientId,
   });
 
+  const analyzeScreening = useMutation({
+    mutationFn: async (screeningId: string) => {
+      const { data, error } = await supabase.functions.invoke('analyze-metabolic-screening', {
+        body: { screeningId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['metabolic-screenings', clientId] });
+      toast({ title: 'Análise de IA gerada com sucesso!' });
+    },
+    onError: (err: any) => {
+      console.error('AI analysis error:', err);
+      toast({ title: 'Erro na análise de IA', description: err.message, variant: 'destructive' });
+    },
+  });
+
   const saveScreening = useMutation({
     mutationFn: async (input: {
       client_id: string;
@@ -67,9 +86,13 @@ export function useMetabolicScreening(clientId?: string) {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['metabolic-screenings', clientId] });
       toast({ title: 'Rastreamento salvo com sucesso' });
+      // Auto-trigger AI analysis
+      if (data?.id) {
+        analyzeScreening.mutate(data.id);
+      }
     },
     onError: (err: any) => {
       toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' });
@@ -87,5 +110,5 @@ export function useMetabolicScreening(clientId?: string) {
     },
   });
 
-  return { screenings, isLoading, saveScreening, deleteScreening };
+  return { screenings, isLoading, saveScreening, deleteScreening, analyzeScreening };
 }

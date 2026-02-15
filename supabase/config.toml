@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.generate-periodization]
 verify_jwt = false
+
+[functions.analyze-metabolic-screening]
+verify_jwt = false
