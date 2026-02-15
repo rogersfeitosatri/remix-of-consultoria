@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -54,7 +55,7 @@ export function useLayoutSettings() {
   });
 
   // Merge saved settings with defaults (to handle new items added after save)
-  const mergedSettings: LayoutSettings = {
+  const mergedSettings: LayoutSettings = useMemo(() => ({
     brand_name: settings?.brand_name || 'Rogers Feitosa',
     brand_subtitle: settings?.brand_subtitle || 'Nutrição & Treinamento',
     logo_url: settings?.logo_url || null,
@@ -62,12 +63,11 @@ export function useLayoutSettings() {
     sidebar_items: (() => {
       const saved = (settings?.sidebar_items || []) as unknown as SidebarItemConfig[];
       if (saved.length === 0) return DEFAULT_SIDEBAR_ITEMS;
-      // Merge: keep saved order + add any new defaults not in saved
       const savedKeys = new Set(saved.map(s => s.key));
       const newItems = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedKeys.has(d.key));
       return [...saved, ...newItems];
     })(),
-  };
+  }), [settings]);
 
   const saveSettings = useMutation({
     mutationFn: async (input: Partial<LayoutSettings>) => {
