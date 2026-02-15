@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,6 +21,12 @@ export function MetabolicQuestionnaire({ onSubmit, isSubmitting }: Props) {
     setResponses(prev => ({ ...prev, [questionId]: score }));
   };
 
+  const navigateCategory = (idx: number) => {
+    setActiveCategoryIdx(idx);
+    setTimeout(() => cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
+  const cardRef = useRef<HTMLDivElement>(null);
   const currentCat = metabolicCategories[activeCategoryIdx];
   const answeredInCat = currentCat.questions.filter(q => responses[q.id] !== undefined).length;
   const totalAnswered = Object.keys(responses).length;
@@ -66,7 +72,7 @@ export function MetabolicQuestionnaire({ onSubmit, isSubmitting }: Props) {
       </div>
 
       {/* Questions for active category */}
-      <Card>
+      <Card ref={cardRef}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <span style={{ color: currentCat.color }}>●</span>
@@ -101,12 +107,12 @@ export function MetabolicQuestionnaire({ onSubmit, isSubmitting }: Props) {
           {/* Navigation buttons */}
           <div className="flex gap-2 pt-3">
             {activeCategoryIdx > 0 && (
-              <Button variant="outline" size="sm" onClick={() => setActiveCategoryIdx(activeCategoryIdx - 1)}>
+              <Button variant="outline" size="sm" onClick={() => navigateCategory(activeCategoryIdx - 1)}>
                 ← Anterior
               </Button>
             )}
             {activeCategoryIdx < metabolicCategories.length - 1 && (
-              <Button variant="outline" size="sm" className="ml-auto" onClick={() => setActiveCategoryIdx(activeCategoryIdx + 1)}>
+              <Button variant="outline" size="sm" className="ml-auto" onClick={() => navigateCategory(activeCategoryIdx + 1)}>
                 Próxima →
               </Button>
             )}
