@@ -6,6 +6,7 @@ import { DietAdjustmentAlert } from '@/components/dashboard/DietAdjustmentAlert'
 import { GoogleOAuthAlert } from '@/components/dashboard/GoogleOAuthAlert';
 import { PendingMealPlansAlert } from '@/components/dashboard/PendingMealPlansAlert';
 import { PeriodizationPhaseAlert } from '@/components/dashboard/PeriodizationPhaseAlert';
+import { PeriodizationOverview } from '@/components/dashboard/PeriodizationOverview';
 import { useClients, usePayments, useConsultationSchedules, getExpiringThisMonth } from '@/hooks/useClients';
 import { getMonthlyIncomeByPaidAt, getDueAmountInPeriod } from '@/hooks/useFinancialData';
 import { Users, DollarSign, AlertTriangle, Loader2, CreditCard } from 'lucide-react';
@@ -115,6 +116,9 @@ export default function Dashboard() {
           <PendingCheckinsAlert />
           <DietAdjustmentAlert />
         </div>
+
+        {/* Periodization Control Panel */}
+        <PeriodizationOverview />
 
         {/* Calendar Only */}
         <div className="grid gap-4 sm:gap-6 grid-cols-1">
