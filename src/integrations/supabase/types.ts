@@ -2342,6 +2342,8 @@ export type Database = {
       }
       metabolic_screening_responses: {
         Row: {
+          ai_analysis: Json | null
+          ai_analyzed_at: string | null
           client_id: string
           created_at: string
           id: string
@@ -2361,6 +2363,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_analysis?: Json | null
+          ai_analyzed_at?: string | null
           client_id: string
           created_at?: string
           id?: string
@@ -2380,6 +2384,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_analysis?: Json | null
+          ai_analyzed_at?: string | null
           client_id?: string
           created_at?: string
           id?: string
