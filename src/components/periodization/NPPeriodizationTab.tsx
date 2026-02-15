@@ -2,24 +2,26 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Plus, ChevronDown, ChevronUp, Calendar, Wand2, Info, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Calendar, Sparkles, Loader2, ChevronDown, ChevronUp, Save, RefreshCw,
+  Copy, Check, Zap, Info, AlertTriangle, Plus, Clock
+} from 'lucide-react';
 import { useNutritionalPeriodization } from '@/hooks/useNutritionalPeriodization';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { addWeeks, format, startOfWeek, differenceInWeeks } from 'date-fns';
+import { useAuth } from '@/hooks/useAuth';
+import { differenceInWeeks, format, addWeeks, startOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
-import { dayLabels } from '@/lib/nutritionalCalcs';
-import { PeriodizaAthleteDataCard } from './PeriodizaAthleteDataCard';
-import { PeriodizaAdminDirectives } from './PeriodizaAdminDirectives';
-import { PeriodizaSuggestionOutput } from './PeriodizaSuggestionOutput';
-import { PeriodizaKnowledgeBase } from './PeriodizaKnowledgeBase';
+import {
+  dayLabels, calculateTMBCunningham, calculateTMBHarrisBenedictMale,
+  calculateTMBHarrisBenedictFemale, calculateTMBFA, calculateAge, calculateGEE, triathlonMets
+} from '@/lib/nutritionalCalcs';
 
 interface Props {
   clientId: string;
@@ -30,68 +32,33 @@ interface Props {
 
 const PHASE_COLORS: Record<string, string> = {
   'Base Metabólica': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  'Transição / Performance': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  'Performance Máxima': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  'Transição': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  'Performance': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   'Taper': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  'Competição': 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
-const DAILY_STRATEGY_OPTIONS = [
-  { key: 'low_carb', label: 'Low Carb', emoji: '🔘' },
-  { key: 'high_carb', label: 'High Carb', emoji: '🔘' },
-  { key: 'train_low', label: 'Train Low', emoji: '🔘' },
-  { key: 'recovery_support', label: 'Recovery Support', emoji: '🔘' },
-  { key: 'long_reduced_cho', label: 'Longo c/ redução de CHO', emoji: '🔘' },
-  { key: 'long_progressive_cho', label: 'Longo c/ progressão de CHO', emoji: '🔘' },
-  { key: 'strategic_fasting', label: 'Jejum Estratégico', emoji: '🔘' },
-  { key: 'reduced_intra', label: 'Intra reduzido (<30g/h)', emoji: '🔘' },
-  { key: 'full_support', label: 'Suporte total (treino chave)', emoji: '🔘' },
-];
-
-const INTRA_STRATEGIES = [
-  { key: '60', label: '60 g/h' },
-  { key: '75', label: '75 g/h' },
-  { key: '90', label: '90 g/h' },
-];
-
-const PHASE_EVIDENCE_NOTES: Record<string, string> = {
-  'Base Metabólica': '📚 Burke et al. & Jeukendrup: conceito Train Low / Compete High. CHO ≤ 4 g/kg/dia, Proteína 1.8–2.2 g/kg, fibras elevadas, gorduras moderadas.',
-  'Transição / Performance': '📚 CHO 4–5 g/kg/dia. Início de carb loading 24h. Pré treino 1–2 g/kg 2–3h antes. Intra 40→60 g/h progressivo. Cafeína 3 mg/kg.',
-  'Performance Máxima': '📚 CHO ≥ 5 g/kg/dia. Pré longo 6 g/kg 24–48h. Simulação completa: café da manhã de prova, timing dos géis, cafeína e estratégia hídrica.',
-  'Taper': '📚 ≤14 dias. Redução GEE, manutenção CHO alto. Monitorar peso. Glicogênio: recuperação <8h: 1–1.2 g/kg/h; 8–24h: 5–7 g/kg.',
+const DAY_TYPE_COLORS: Record<string, string> = {
+  low: 'bg-blue-500/15 text-blue-400',
+  moderate: 'bg-amber-500/15 text-amber-400',
+  high: 'bg-emerald-500/15 text-emerald-400',
+  recovery: 'bg-muted text-muted-foreground',
 };
-
-const ergogenicSupplements = [
-  { key: 'sup_creatine', label: 'Creatina' },
-  { key: 'sup_beta_alanine', label: 'Beta-alanina' },
-  { key: 'sup_caffeine', label: 'Cafeína' },
-  { key: 'sup_nitrate', label: 'Nitrato' },
-  { key: 'sup_recovery', label: 'Recovery 4:1' },
-];
-
-const antioxidantSupplements = [
-  { key: 'sup_omega3', label: 'Ômega-3' },
-  { key: 'sup_cherry_pure', label: 'Cherry Pure' },
-  { key: 'sup_curcumin', label: 'Curcumina' },
-  { key: 'sup_bromelain', label: 'Bromelina' },
-  { key: 'sup_ganoderma', label: 'Ganoderma' },
-  { key: 'sup_vitc_time_release', label: 'Vit. C Time Release' },
-  { key: 'sup_vitd', label: 'Vitamina D' },
-  { key: 'sup_broncovaxon', label: 'Broncovaxon' },
-  { key: 'sup_nac', label: 'NAC' },
-];
 
 export function NPPeriodizationTab({ clientId, client, consultationId, consultation }: Props) {
-  const { fetchPeriodizationWeeks, savePeriodizationWeek, fetchRunningZones, fetchRunningSchedule, fetchTriathlonSchedule } = useNutritionalPeriodization(clientId);
-  const { data: weeks = [] } = fetchPeriodizationWeeks(clientId);
-  const [cycleStart, setCycleStart] = useState('');
-  const [numWeeks, setNumWeeks] = useState(12);
-  const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
-  const [editingWeek, setEditingWeek] = useState<any>(null);
-  const [mainTab, setMainTab] = useState('agent');
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { fetchRunningZones, fetchRunningSchedule, fetchTriathlonSchedule } = useNutritionalPeriodization(clientId);
+
+  const [expandedBlock, setExpandedBlock] = useState<number | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generationType, setGenerationType] = useState('full');
+  const [periodStartDate, setPeriodStartDate] = useState('');
+  const [planType, setPlanType] = useState<'monthly' | '6_weeks'>('monthly');
+  const [copiedBlock, setCopiedBlock] = useState<number | null>(null);
+  const [editingNotes, setEditingNotes] = useState<Record<number, string>>({});
 
   // Fetch athlete profile
-  const { data: athleteProfile, refetch: refetchProfile } = useQuery({
+  const { data: athleteProfile } = useQuery({
     queryKey: ['athlete-profile-periodization', clientId],
     queryFn: async () => {
       const { data } = await supabase
@@ -104,580 +71,731 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
     enabled: !!clientId,
   });
 
-  // Fetch training schedule data for AI context
+  // Fetch training data
   const { data: runningZones = [] } = fetchRunningZones(consultationId || '');
   const { data: runningSchedule = [] } = fetchRunningSchedule(consultationId || '');
   const { data: triathlonSchedule = [] } = fetchTriathlonSchedule(consultationId || '');
 
-  // Cycle calculations
+  // Fetch active periodization
+  const { data: activePeriodization, refetch: refetchPeriodization } = useQuery({
+    queryKey: ['periodiza-active', clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('periodiza_suggestions')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('is_active', true)
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!clientId,
+  });
+
+  // Fetch admin instructions for AI
+  const { data: adminInstructions } = useQuery({
+    queryKey: ['periodiza-admin-instructions', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('periodiza_admin_instructions')
+        .select('instructions')
+        .eq('user_id', user!.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data?.instructions || '';
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch active knowledge base
+  const { data: knowledgeBase } = useQuery({
+    queryKey: ['periodiza-kb-active', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('periodiza_knowledge_base')
+        .select('title, tags, content, priority')
+        .eq('user_id', user!.id)
+        .eq('active', true)
+        .order('priority', { ascending: false });
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Derived data
   const raceDate = athleteProfile?.target_deadline || consultation?.target_race_date;
+  const weight = Number(consultation?.weight) || Number(athleteProfile?.current_weight) || 0;
+  const height = Number(consultation?.height) || Number(athleteProfile?.height) || 0;
+  const leanMassKg = Number(consultation?.lean_mass_kg) || 0;
+  const fa = Number(consultation?.activity_factor) || 1.25;
+
+  const age = useMemo(() => {
+    const bd = athleteProfile?.birth_date;
+    const cd = consultation?.consultation_date;
+    return bd && cd ? calculateAge(bd, cd) : (consultation?.manual_age || 30);
+  }, [athleteProfile, consultation]);
+
+  // TMB
+  const tmb = useMemo(() => {
+    switch (consultation?.tmb_formula) {
+      case 'calorimetry': return Number(consultation?.calorimetry_value) || 0;
+      case 'cunningham': return leanMassKg > 0 ? calculateTMBCunningham(leanMassKg) : 0;
+      case 'harris_benedict_female': return calculateTMBHarrisBenedictFemale(weight, height, age);
+      default: return calculateTMBHarrisBenedictMale(weight, height, age);
+    }
+  }, [consultation, leanMassKg, weight, height, age]);
+
+  const tmbFa = calculateTMBFA(tmb, fa);
+
+  // GEE per day
+  const geePerDay = useMemo(() => {
+    const result = [0, 0, 0, 0, 0, 0, 0];
+    const modality = consultation?.sport_modality || consultation?.training_type || '';
+    const isTriathlon = modality.toLowerCase().includes('tri');
+
+    if (isTriathlon && triathlonSchedule.length > 0) {
+      triathlonSchedule.forEach((s: any) => {
+        if (s.duration_minutes > 0 && s.met_value) {
+          result[s.day_of_week] += calculateGEE(Number(s.met_value), weight, Number(s.duration_minutes));
+        }
+      });
+    } else if (runningZones.length > 0 && runningSchedule.length > 0) {
+      runningSchedule.forEach((s: any) => {
+        const zone = runningZones.find((z: any) => z.id === s.zone_id);
+        if (zone && s.duration_minutes > 0) {
+          result[s.day_of_week] += calculateGEE(Number(zone.met_value), weight, Number(s.duration_minutes));
+        }
+      });
+    }
+    return result;
+  }, [runningZones, runningSchedule, triathlonSchedule, weight, consultation]);
+
+  // VCT per day
+  const vctPerDay = useMemo(() => {
+    const keys = ['vct_monday', 'vct_tuesday', 'vct_wednesday', 'vct_thursday', 'vct_friday', 'vct_saturday', 'vct_sunday'];
+    return keys.map(k => Number(consultation?.[k]) || 0);
+  }, [consultation]);
+
+  // GET and EA per day
+  const weeklyEnergy = useMemo(() => {
+    return dayLabels.map((day, i) => {
+      const gee = geePerDay[i];
+      const get = tmbFa + gee;
+      const vct = vctPerDay[i];
+      const ea = leanMassKg > 0 && vct > 0 ? (vct - gee) / leanMassKg : 0;
+      return { day: day.slice(0, 3), tmbFa: Math.round(tmbFa), gee: Math.round(gee), get: Math.round(get), vct, ea };
+    });
+  }, [tmbFa, geePerDay, vctPerDay, leanMassKg]);
+
+  // Training stimuli labels per day
+  const trainingStimuli = useMemo(() => {
+    const result: Record<number, string[]> = {};
+    const modality = consultation?.sport_modality || consultation?.training_type || '';
+    const isTriathlon = modality.toLowerCase().includes('tri');
+
+    if (isTriathlon && triathlonSchedule.length > 0) {
+      for (let d = 0; d < 7; d++) {
+        const entries = triathlonSchedule.filter((s: any) => s.day_of_week === d && Number(s.duration_minutes) > 0);
+        if (entries.length > 0) {
+          result[d] = entries.map((e: any) => {
+            const mod = e.modality === 'natacao' ? 'Natação' : e.modality === 'corrida' ? 'Corrida' : e.modality === 'bike' ? 'Bike' : e.modality;
+            return `${mod} ${e.intensity} ${e.duration_minutes}min`;
+          });
+        }
+      }
+    } else if (runningZones.length > 0 && runningSchedule.length > 0) {
+      for (let d = 0; d < 7; d++) {
+        const entries = runningSchedule.filter((s: any) => s.day_of_week === d && Number(s.duration_minutes) > 0);
+        if (entries.length > 0) {
+          result[d] = entries.map((e: any) => {
+            const zone = runningZones.find((z: any) => z.id === e.zone_id);
+            return `${zone?.zone_name || '?'} ${e.duration_minutes}min`;
+          });
+        }
+      }
+    }
+    return result;
+  }, [runningZones, runningSchedule, triathlonSchedule, consultation]);
+
+  // Cycle calculations
   const cycleInfo = useMemo(() => {
     if (!raceDate) return null;
     const race = new Date(raceDate + 'T12:00:00');
-    const today = new Date();
-    const totalWeeks = Math.max(differenceInWeeks(race, today), 1);
-    const totalMonths = (totalWeeks / 4.33).toFixed(1);
-    const todayStr = format(today, 'yyyy-MM-dd');
-    const currentWeek = weeks.find((w: any) => w.start_date <= todayStr && w.end_date >= todayStr);
-    return { totalWeeks, totalMonths, currentPhase: currentWeek?.phase_name || 'Não definida', raceDate: race };
-  }, [raceDate, weeks]);
+    const startRef = periodStartDate ? new Date(periodStartDate + 'T12:00:00') : new Date();
+    const weeksToRace = Math.max(differenceInWeeks(race, startRef), 1);
+    const blockSize = planType === '6_weeks' ? 6 : 4;
+    const numBlocks = Math.ceil(weeksToRace / blockSize);
+    return { weeksToRace, numBlocks, blockSize, raceDate: race };
+  }, [raceDate, periodStartDate, planType]);
 
-  const getPhaseDistribution = (total: number) => {
-    if (total >= 20) {
-      return [
-        { name: 'Base Metabólica', pct: 30, weeks: Math.round(total * 0.30) },
-        { name: 'Transição / Performance', pct: 40, weeks: Math.round(total * 0.40) },
-        { name: 'Performance Máxima', pct: 20, weeks: Math.round(total * 0.20) },
-        { name: 'Taper', pct: 10, weeks: Math.max(Math.round(total * 0.10), 1) },
-      ];
+  // Set defaults
+  useEffect(() => {
+    if (client?.start_date && !periodStartDate) {
+      setPeriodStartDate(client.start_date);
     }
-    const taper = Math.max(Math.round(total * 0.10), 1);
-    const perf = Math.max(Math.round(total * 0.20), 1);
-    const trans = Math.max(Math.round(total * 0.35), 1);
-    const base = Math.max(total - taper - perf - trans, 1);
-    return [
-      { name: 'Base Metabólica', pct: Math.round((base / total) * 100), weeks: base },
-      { name: 'Transição / Performance', pct: Math.round((trans / total) * 100), weeks: trans },
-      { name: 'Performance Máxima', pct: Math.round((perf / total) * 100), weeks: perf },
-      { name: 'Taper', pct: Math.round((taper / total) * 100), weeks: taper },
-    ];
-  };
+    if (client?.consultation_frequency === '6_weeks') {
+      setPlanType('6_weeks');
+    }
+  }, [client]);
 
-  const weight = Number(consultation?.weight) || 0;
-  const leanMassKg = Number(consultation?.lean_mass_kg) || 0;
-
-  const getEAStatus = (ea: number) => {
-    if (ea <= 0) return { label: '—', color: '' };
-    if (ea < 30) return { label: `${ea.toFixed(1)} kcal/kg — ⚠️ Risco RED-S`, color: 'text-destructive' };
-    if (ea < 45) return { label: `${ea.toFixed(1)} kcal/kg — Zona de cautela`, color: 'text-amber-400' };
-    return { label: `${ea.toFixed(1)} kcal/kg — ✅ Ideal`, color: 'text-emerald-400' };
-  };
-
-  const generateAutoPhases = () => {
-    if (!raceDate) return;
-    const today = new Date();
-    const race = new Date(raceDate + 'T12:00:00');
-    const totalWeeks = Math.max(differenceInWeeks(race, today), 4);
-    const phases = getPhaseDistribution(totalWeeks);
-    phases.push({ name: 'Competição', pct: 0, weeks: 1 });
-    const adjustedTotal = totalWeeks + 1;
-    const cycleStartDate = format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-    setCycleStart(cycleStartDate);
-    setNumWeeks(adjustedTotal);
-    const start = startOfWeek(today, { weekStartsOn: 1 });
-    let weekCounter = 1;
-    const consultFreq = client?.consultation_frequency;
-
-    for (const phase of phases) {
-      for (let i = 0; i < phase.weeks; i++) {
-        const weekStart = addWeeks(start, weekCounter - 1);
-        const weekEnd = addWeeks(weekStart, 1);
-        weekEnd.setDate(weekEnd.getDate() - 1);
-        const monthName = format(weekStart, 'MMMM', { locale: ptBR }).toUpperCase();
-        const isCompetition = phase.name === 'Competição';
-        const isAdjustment = weekCounter % 4 === 0 || (consultFreq === '6_weeks' && weekCounter % 6 === 0);
-
-        let choGkg = null;
-        let proteinGkg = null;
-        if (phase.name === 'Base Metabólica') { choGkg = 4; proteinGkg = 2.0; }
-        else if (phase.name === 'Transição / Performance') { choGkg = 5; proteinGkg = 1.8; }
-        else if (phase.name === 'Performance Máxima') { choGkg = 6; proteinGkg = 1.6; }
-        else if (phase.name === 'Taper') { choGkg = 6; proteinGkg = 1.6; }
-
-        savePeriodizationWeek.mutate({
-          client_id: clientId,
-          cycle_start_date: cycleStartDate,
-          week_number: weekCounter,
-          month_name: monthName,
-          start_date: format(weekStart, 'yyyy-MM-dd'),
-          end_date: format(weekEnd, 'yyyy-MM-dd'),
-          phase_name: phase.name,
-          has_competition: isCompetition,
-          competition_name: isCompetition && athleteProfile?.target_race ? athleteProfile.target_race : null,
-          is_adjustment_week: isAdjustment,
-          cho_gkg: choGkg,
-          protein_gkg: proteinGkg,
-        });
-        weekCounter++;
+  // Load existing periodization settings
+  useEffect(() => {
+    if (activePeriodization) {
+      if (activePeriodization.periodization_start_date) {
+        setPeriodStartDate(activePeriodization.periodization_start_date);
+      }
+      if (activePeriodization.plan_adjustment_type) {
+        setPlanType(activePeriodization.plan_adjustment_type as 'monthly' | '6_weeks');
       }
     }
-    toast({ title: 'Ciclo gerado com sucesso', description: `${adjustedTotal} semanas distribuídas em ${phases.length} fases` });
+  }, [activePeriodization]);
+
+  // Build athlete context for AI
+  const buildAthleteContext = () => {
+    const weekDays = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+    const trainingByDay: Record<string, any> = {};
+    for (let d = 0; d < 7; d++) {
+      trainingByDay[weekDays[d]] = {
+        stimuli: trainingStimuli[d] || ['Descanso'],
+        gee_kcal: Math.round(geePerDay[d]),
+        tmbFa_kcal: Math.round(tmbFa),
+        get_kcal: Math.round(tmbFa + geePerDay[d]),
+        vct_planejado: vctPerDay[d] || null,
+        ea: leanMassKg > 0 && vctPerDay[d] > 0 ? Number(((vctPerDay[d] - geePerDay[d]) / leanMassKg).toFixed(1)) : null,
+      };
+    }
+
+    return {
+      nome: client?.name || '—',
+      modalidade: consultation?.sport_modality || consultation?.training_type || '—',
+      objetivo: athleteProfile?.main_goal || consultation?.sport_goal || '—',
+      prova_alvo: athleteProfile?.target_race || '—',
+      data_prova: raceDate || null,
+      semanas_ate_prova: cycleInfo?.weeksToRace || null,
+      peso_kg: weight,
+      altura_cm: height,
+      mlg_kg: leanMassKg,
+      gordura_pct: Number(consultation?.fat_percentage) || 0,
+      tmb_kcal: Math.round(tmb),
+      tmbFa_kcal: Math.round(tmbFa),
+      fator_atividade: fa,
+      plano_tipo: planType === '6_weeks' ? 'Consultas a cada 6 semanas' : 'Consultoria mensal (4 semanas)',
+      bloco_semanas: cycleInfo?.blockSize || 4,
+      restricoes_alimentares: athleteProfile?.food_allergies || 'Nenhuma',
+      intolerancia_lactose: athleteProfile?.lactose_intolerance || null,
+      intolerancia_gluten: athleteProfile?.gluten_intolerance || null,
+      agenda_treinos_semanal: trainingByDay,
+      gee_total_semanal_kcal: geePerDay.reduce((s, v) => s + v, 0),
+    };
   };
 
-  const generateWeeks = () => {
-    if (!cycleStart) return;
-    const start = startOfWeek(new Date(cycleStart), { weekStartsOn: 1 });
-    for (let i = 0; i < numWeeks; i++) {
-      const weekStart = addWeeks(start, i);
-      const weekEnd = addWeeks(weekStart, 1);
-      weekEnd.setDate(weekEnd.getDate() - 1);
-      const monthName = format(weekStart, 'MMMM', { locale: ptBR }).toUpperCase();
-      savePeriodizationWeek.mutate({
-        client_id: clientId,
-        cycle_start_date: cycleStart,
-        week_number: i + 1,
-        month_name: monthName,
-        start_date: format(weekStart, 'yyyy-MM-dd'),
-        end_date: format(weekEnd, 'yyyy-MM-dd'),
+  // Generate periodization
+  const handleGenerate = async (type: string) => {
+    if (!raceDate) {
+      toast({ title: 'Data da prova não definida', variant: 'destructive' });
+      return;
+    }
+    setGenerating(true);
+    setGenerationType(type);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-periodization', {
+        body: {
+          athleteContext: buildAthleteContext(),
+          adminInstructions: adminInstructions || '',
+          knowledgeBase: knowledgeBase || [],
+          generationType: type,
+          planType,
+          blockSize: cycleInfo?.blockSize || 4,
+          weeksToRace: cycleInfo?.weeksToRace || 12,
+          periodStartDate: periodStartDate || format(new Date(), 'yyyy-MM-dd'),
+        },
       });
-    }
-  };
 
-  const canAutoGenerate = !!raceDate;
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-  const toggleWeek = (weekNum: number) => {
-    if (expandedWeek === weekNum) {
-      setExpandedWeek(null);
-      setEditingWeek(null);
-    } else {
-      setExpandedWeek(weekNum);
-      const week = weeks.find((w: any) => w.week_number === weekNum);
-      setEditingWeek(week ? { ...week, daily_strategies: week.daily_strategies || {} } : null);
-    }
-  };
+      const nextVersion = (activePeriodization?.version || 0) + 1;
 
-  const updateEditing = (key: string, value: any) => {
-    setEditingWeek((prev: any) => prev ? { ...prev, [key]: value } : null);
-  };
-
-  const updateDailyStrategy = (dayIndex: number, strategy: string) => {
-    setEditingWeek((prev: any) => {
-      if (!prev) return null;
-      const current = prev.daily_strategies || {};
-      const dayKey = dayIndex.toString();
-      const newStrategies = { ...current };
-      if (current[dayKey] === strategy) {
-        delete newStrategies[dayKey];
-      } else {
-        newStrategies[dayKey] = strategy;
+      // Deactivate previous
+      if (activePeriodization?.id) {
+        await supabase
+          .from('periodiza_suggestions')
+          .update({ is_active: false })
+          .eq('id', activePeriodization.id);
       }
-      return { ...prev, daily_strategies: newStrategies };
-    });
-  };
 
-  const saveWeek = () => {
-    if (editingWeek) {
-      savePeriodizationWeek.mutate(editingWeek);
+      const { error: insertError } = await supabase
+        .from('periodiza_suggestions')
+        .insert({
+          user_id: user!.id,
+          client_id: clientId,
+          consultation_id: consultationId || null,
+          version: nextVersion,
+          suggestion_type: type,
+          blocks: data.blocks,
+          nutritionist_notes: data.nutritionistNotes || null,
+          human_readable: data.humanReadable || null,
+          is_active: true,
+          periodization_start_date: periodStartDate || format(new Date(), 'yyyy-MM-dd'),
+          plan_adjustment_type: planType,
+        });
+
+      if (insertError) throw insertError;
+
+      queryClient.invalidateQueries({ queryKey: ['periodiza-active'] });
+      toast({ title: 'Periodização gerada!', description: `Versão ${nextVersion} — ${data.blocks?.length || 0} blocos` });
+    } catch (err: any) {
+      toast({ title: 'Erro ao gerar', description: err.message, variant: 'destructive' });
+    } finally {
+      setGenerating(false);
     }
   };
 
-  const weeksByPhase: Record<string, any[]> = {};
-  weeks.forEach((w: any) => {
-    const phase = w.phase_name || 'Sem Fase';
-    if (!weeksByPhase[phase]) weeksByPhase[phase] = [];
-    weeksByPhase[phase].push(w);
-  });
+  // Save admin notes for a block
+  const saveBlockNotes = async (blockIndex: number) => {
+    if (!activePeriodization?.id) return;
+    const blocks = [...(activePeriodization.blocks as any[] || [])];
+    if (blocks[blockIndex]) {
+      blocks[blockIndex].notes_admin = editingNotes[blockIndex] || '';
+      await supabase
+        .from('periodiza_suggestions')
+        .update({ blocks, updated_at: new Date().toISOString() })
+        .eq('id', activePeriodization.id);
+      queryClient.invalidateQueries({ queryKey: ['periodiza-active'] });
+      toast({ title: 'Notas salvas' });
+    }
+  };
+
+  // Apply as official plan
+  const applyPlan = async () => {
+    if (!activePeriodization?.id) return;
+    toast({ title: 'Periodização aplicada como plano oficial!' });
+  };
+
+  // Copy block text
+  const copyBlockText = (block: any, index: number) => {
+    const lines = [
+      `📋 ${block.phase_name} (${block.date_start} a ${block.date_end})`,
+      '',
+      `CHO: ${block.phase_targets?.cho_gkg || '—'} g/kg/dia`,
+      `Proteína: ${block.phase_targets?.protein_gkg || '—'} g/kg/dia`,
+      `Gorduras: ${block.phase_targets?.fat_guidance || '—'}`,
+      `Fibras: ${block.phase_targets?.fiber_guidance || '—'}`,
+      '',
+      '📦 Suplementação diária:',
+      ...(block.supplements_daily || []).map((s: any) => `  • ${s.name} ${s.dose} (${s.timing})`),
+      '',
+      '🏃 Estratégia do Longão:',
+      `  Pré: ${block.long_run_strategy?.pre || '—'}`,
+      `  Intra: ${block.long_run_strategy?.intra || '—'}`,
+      `  Pós: ${block.long_run_strategy?.post || '—'}`,
+      '',
+      '📅 Tabela Semanal:',
+      ...(block.weekly_table || []).map((d: any) => `  ${d.day}: [${d.type?.toUpperCase()}] CHO ${d.cho_gkg}g/kg — ${d.note || ''}`),
+    ];
+    navigator.clipboard.writeText(lines.join('\n'));
+    setCopiedBlock(index);
+    setTimeout(() => setCopiedBlock(null), 2000);
+  };
+
+  const blocks = (activePeriodization?.blocks as any[]) || [];
+
+  // Cycle status
+  const cycleStatus = useMemo(() => {
+    if (!cycleInfo) return '—';
+    if (cycleInfo.weeksToRace <= 2) return 'Taper / Pré-prova';
+    if (cycleInfo.weeksToRace <= 4) return 'Pré-prova';
+    return 'Em andamento';
+  }, [cycleInfo]);
 
   return (
     <div className="space-y-4">
-      {/* Main Mode Tabs */}
-      <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
-        <TabsList className="w-full h-auto flex-wrap gap-1 bg-muted/50 p-1">
-          <TabsTrigger value="agent" className="gap-1 text-xs"><Sparkles className="h-3.5 w-3.5" />🤖 Agente Periodiza</TabsTrigger>
-          <TabsTrigger value="manual" className="gap-1 text-xs"><Calendar className="h-3.5 w-3.5" />Ciclo Manual</TabsTrigger>
-          <TabsTrigger value="knowledge" className="gap-1 text-xs"><Info className="h-3.5 w-3.5" />Base de Conhecimento</TabsTrigger>
-        </TabsList>
-
-        {/* Agent Tab */}
-        <TabsContent value="agent" className="space-y-4">
-          <PeriodizaAthleteDataCard
-            client={client}
-            consultation={consultation}
-            athleteProfile={athleteProfile}
-            weeks={weeks}
-            onRefresh={() => refetchProfile()}
-          />
-          <PeriodizaAdminDirectives />
-          <PeriodizaSuggestionOutput
-            clientId={clientId}
-            consultationId={consultationId}
-            consultation={consultation}
-            athleteProfile={athleteProfile}
-            client={client}
-            weeks={weeks}
-            runningZones={runningZones}
-            runningSchedule={runningSchedule}
-            triathlonSchedule={triathlonSchedule}
-          />
-        </TabsContent>
-
-        {/* Manual Cycle Tab */}
-        <TabsContent value="manual" className="space-y-4">
-          {/* Cycle Info Banner */}
-          {cycleInfo && (
-            <Card className="border-primary/30 bg-primary/5">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Prova</p>
-                      <p className="text-sm font-bold">{athleteProfile?.target_race || '—'}</p>
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Semanas restantes</p>
-                    <p className="text-xl font-bold text-primary">{cycleInfo.totalWeeks}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Meses</p>
-                    <p className="text-xl font-bold">{cycleInfo.totalMonths}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Fase atual</p>
-                    <Badge className={PHASE_COLORS[cycleInfo.currentPhase] || 'bg-muted text-muted-foreground'}>
-                      {cycleInfo.currentPhase}
-                    </Badge>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">Data da Prova</p>
-                    <p className="text-sm font-semibold">{format(cycleInfo.raceDate, 'dd/MM/yyyy')}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Phase Timeline */}
-          {weeks.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Linha do Tempo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-1 h-8 rounded-lg overflow-hidden">
-                  {Object.entries(weeksByPhase).map(([phase, phaseWeeks]) => {
-                    const pct = (phaseWeeks.length / weeks.length) * 100;
-                    const colors = PHASE_COLORS[phase] || 'bg-muted';
-                    return (
-                      <Tooltip key={phase}>
-                        <TooltipTrigger asChild>
-                          <div
-                            className={`flex items-center justify-center text-xs font-medium cursor-default border ${colors}`}
-                            style={{ width: `${pct}%`, minWidth: '30px' }}
-                          >
-                            {pct > 12 ? `${phase.split(' ')[0]}` : ''}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>{phase} — {phaseWeeks.length} semanas ({pct.toFixed(0)}%)</TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Generate Cycle */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Calendar className="h-4 w-4" /> Gerar Ciclo de Periodização
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {canAutoGenerate && weeks.length === 0 && (
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Gerar ciclo automaticamente</p>
-                    <p className="text-xs text-muted-foreground">BASE → TRANSIÇÃO → PERFORMANCE → TAPER → PROVA</p>
-                    {cycleInfo && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {cycleInfo.totalWeeks} semanas até <strong>{athleteProfile?.target_race}</strong>
-                      </p>
-                    )}
-                  </div>
-                  <Button onClick={generateAutoPhases} size="sm" className="gap-1">
-                    <Wand2 className="h-3.5 w-3.5" /> Gerar com Fases
-                  </Button>
-                </div>
-              )}
-
-              <div className="flex gap-3 items-end flex-wrap">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Início do Ciclo</label>
-                  <Input type="date" value={cycleStart} onChange={e => setCycleStart(e.target.value)} className="w-48" />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Nº Semanas</label>
-                  <Input type="number" value={numWeeks} onChange={e => setNumWeeks(Number(e.target.value))} className="w-24" />
-                </div>
-                <Button onClick={generateWeeks} size="sm" className="gap-1" variant="outline">
-                  <Plus className="h-3.5 w-3.5" /> Gerar Manual
-                </Button>
+      {/* Config Panel */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Calendar className="h-4 w-4" /> Configuração da Periodização
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">Início da periodização</label>
+              <Input
+                type="date"
+                value={periodStartDate}
+                onChange={e => setPeriodStartDate(e.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">Prova-alvo</label>
+              <div className="h-8 flex items-center text-xs font-medium px-3 rounded-md border border-border bg-muted/30">
+                {raceDate ? `${athleteProfile?.target_race || ''} — ${format(new Date(raceDate + 'T12:00:00'), 'dd/MM/yyyy')}` : 'Não definida'}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">Semanas até prova</label>
+              <div className="h-8 flex items-center text-xs font-bold text-primary px-3 rounded-md border border-border bg-primary/5">
+                {cycleInfo?.weeksToRace || '—'} semanas
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">Periodicidade</label>
+              <Select value={planType} onValueChange={(v: 'monthly' | '6_weeks') => setPlanType(v)}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Mensal (4 semanas)</SelectItem>
+                  <SelectItem value="6_weeks">6 semanas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">Status</label>
+              <Badge variant="outline" className="text-xs h-8 flex items-center">
+                <Clock className="h-3 w-3 mr-1" /> {cycleStatus}
+              </Badge>
+            </div>
+          </div>
 
-          {/* Weeks by Phase */}
-          {Object.entries(weeksByPhase).map(([phase, phaseWeeks]) => (
-            <Card key={phase}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge className={PHASE_COLORS[phase] || 'bg-muted'}>{phase}</Badge>
-                    <span className="text-xs text-muted-foreground">{phaseWeeks.length} semanas</span>
-                  </div>
-                </div>
-                {PHASE_EVIDENCE_NOTES[phase] && (
-                  <p className="text-xs text-muted-foreground mt-2 p-2 rounded bg-muted/30 border border-border">
-                    {PHASE_EVIDENCE_NOTES[phase]}
-                  </p>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-1">
-                {phaseWeeks.map((week: any) => (
-                  <div key={week.id} className="border border-border rounded-lg">
-                    <button
-                      onClick={() => toggleWeek(week.week_number)}
-                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/30 transition-colors"
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className="text-xs">S{week.week_number}</Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {week.start_date ? format(new Date(week.start_date + 'T12:00:00'), 'dd/MM') : ''} — {week.end_date ? format(new Date(week.end_date + 'T12:00:00'), 'dd/MM') : ''}
-                        </span>
-                        {week.has_competition && <Badge className="bg-red-500/20 text-red-400 text-xs">🏁 Prova</Badge>}
-                        {week.is_adjustment_week && <Badge className="bg-amber-500/20 text-amber-400 text-xs">🔧 Ajuste</Badge>}
-                        {week.cho_gkg && <Badge variant="outline" className="text-xs">CHO: {week.cho_gkg} g/kg</Badge>}
-                        {week.protein_gkg && <Badge variant="outline" className="text-xs">PTN: {week.protein_gkg} g/kg</Badge>}
-                      </div>
-                      {expandedWeek === week.week_number ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button size="sm" onClick={() => handleGenerate('full')} disabled={generating || !raceDate} className="gap-1 text-xs h-8">
+              {generating && generationType === 'full' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+              Gerar Periodização
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleGenerate('current_block')} disabled={generating || !raceDate} className="gap-1 text-xs h-8">
+              {generating && generationType === 'current_block' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+              Gerar bloco atual
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleGenerate('recalculate')} disabled={generating || !raceDate} className="gap-1 text-xs h-8">
+              {generating && generationType === 'recalculate' ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              Recalcular com dados atuais
+            </Button>
+            {blocks.length > 0 && (
+              <>
+                <Button variant="outline" size="sm" onClick={applyPlan} className="gap-1 text-xs h-8">
+                  <Check className="h-3 w-3" /> Aplicar no plano
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleGenerate('full')} className="gap-1 text-xs h-8">
+                  <Plus className="h-3 w-3" /> Nova versão
+                </Button>
+              </>
+            )}
+            {activePeriodization && (
+              <Badge variant="outline" className="text-[10px] self-center">v{activePeriodization.version}</Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-                    {expandedWeek === week.week_number && editingWeek && (
-                      <div className="px-3 pb-3 space-y-4 border-t border-border pt-3">
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground">Fase</label>
-                            <Select value={editingWeek.phase_name || ''} onValueChange={v => updateEditing('phase_name', v)}>
-                              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecionar" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Base Metabólica">Base Metabólica</SelectItem>
-                                <SelectItem value="Transição / Performance">Transição / Performance</SelectItem>
-                                <SelectItem value="Performance Máxima">Performance Máxima</SelectItem>
-                                <SelectItem value="Taper">Taper</SelectItem>
-                                <SelectItem value="Competição">Competição</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">CHO (g/kg)</label>
-                            <Input type="number" step="0.5" value={editingWeek.cho_gkg || ''} onChange={e => updateEditing('cho_gkg', Number(e.target.value) || null)} className="h-8 text-xs" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Proteína (g/kg)</label>
-                            <Input type="number" step="0.1" value={editingWeek.protein_gkg || ''} onChange={e => updateEditing('protein_gkg', Number(e.target.value) || null)} className="h-8 text-xs" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Gordura (g/kg)</label>
-                            <Input type="number" step="0.1" value={editingWeek.fat_gkg || ''} onChange={e => updateEditing('fat_gkg', Number(e.target.value) || null)} className="h-8 text-xs" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Intra CHO (g/h)</label>
-                            <Select value={editingWeek.intra_cho_gh?.toString() || ''} onValueChange={v => updateEditing('intra_cho_gh', Number(v))}>
-                              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-                              <SelectContent>
-                                {INTRA_STRATEGIES.map(s => (
-                                  <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
+      {/* Energy Context (collapsed summary) */}
+      {tmbFa > 0 && (
+        <Card className="border-border/50">
+          <CardContent className="pt-3 pb-3">
+            <div className="flex flex-wrap gap-4 text-xs">
+              <span className="text-muted-foreground">TMB×FA+5%: <strong className="text-foreground">{Math.round(tmbFa)} kcal</strong></span>
+              <span className="text-muted-foreground">GEE semanal: <strong className="text-foreground">{Math.round(geePerDay.reduce((s, v) => s + v, 0))} kcal</strong></span>
+              <span className="text-muted-foreground">MLG: <strong className="text-foreground">{leanMassKg ? `${leanMassKg.toFixed(1)} kg` : 'N/D'}</strong></span>
+              <span className="text-muted-foreground">Peso: <strong className="text-foreground">{weight} kg</strong></span>
+              {!leanMassKg && (
+                <span className="text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" /> MLG não disponível — EA não será calculada
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-                        {(editingWeek.phase_name === 'Transição / Performance' || editingWeek.phase_name === 'Performance Máxima') && (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-2 rounded bg-muted/20 border border-border">
-                            <div>
-                              <label className="text-xs text-muted-foreground">Pré treino (g/kg)</label>
-                              <Input type="number" step="0.5" value={editingWeek.pre_training_cho_gkg || ''} onChange={e => updateEditing('pre_training_cho_gkg', Number(e.target.value) || null)} className="h-8 text-xs" />
-                            </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground">Cafeína (mg/kg)</label>
-                              <Input type="number" step="0.5" value={editingWeek.caffeine_mg_kg || ''} onChange={e => updateEditing('caffeine_mg_kg', Number(e.target.value) || null)} className="h-8 text-xs" />
-                            </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground">Carb Loading</label>
-                              <Select value={editingWeek.carb_loading_type || ''} onValueChange={v => updateEditing('carb_loading_type', v)}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="24h">24h</SelectItem>
-                                  <SelectItem value="48h">48h</SelectItem>
-                                  <SelectItem value="none">Nenhum</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground">Tolerância GI (1-5)</label>
-                              <Input type="number" min={1} max={5} value={editingWeek.gi_tolerance_rating || ''} onChange={e => updateEditing('gi_tolerance_rating', Number(e.target.value) || null)} className="h-8 text-xs" />
-                            </div>
-                          </div>
-                        )}
+      {/* Timeline */}
+      {blocks.length > 0 && (
+        <Card>
+          <CardContent className="pt-3 pb-3">
+            <div className="flex gap-0.5 h-8 rounded-lg overflow-hidden">
+              {blocks.map((block: any, i: number) => {
+                const phase = block.phase_name || 'Base Metabólica';
+                const colors = Object.entries(PHASE_COLORS).find(([k]) => phase.includes(k))?.[1] || 'bg-muted text-muted-foreground border-border';
+                return (
+                  <Tooltip key={i}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setExpandedBlock(expandedBlock === i ? null : i)}
+                        className={`flex items-center justify-center text-[10px] font-medium border transition-all ${colors} ${expandedBlock === i ? 'ring-2 ring-primary' : ''}`}
+                        style={{ flex: 1, minWidth: '24px' }}
+                      >
+                        {blocks.length <= 8 ? `B${i + 1}` : ''}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs font-medium">{block.phase_name}</p>
+                      <p className="text-[10px] text-muted-foreground">{block.date_start} → {block.date_end}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-                        {/* Daily Strategies */}
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground">Estratégias Diárias</label>
-                          <div className="grid grid-cols-7 gap-1 mt-1">
-                            {dayLabels.map((day, di) => {
-                              const currentStrategy = (editingWeek.daily_strategies || {})[di.toString()];
-                              return (
-                                <div key={di} className="space-y-1">
-                                  <p className="text-xs font-medium text-center">{day.slice(0, 3)}</p>
-                                  <Select value={currentStrategy || ''} onValueChange={v => updateDailyStrategy(di, v)}>
-                                    <SelectTrigger className="h-7 text-xs px-1"><SelectValue placeholder="—" /></SelectTrigger>
-                                    <SelectContent>
-                                      {DAILY_STRATEGY_OPTIONS.map(opt => (
-                                        <SelectItem key={opt.key} value={opt.key} className="text-xs">{opt.emoji} {opt.label}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
+      {/* Blocks */}
+      {blocks.length > 0 ? (
+        <div className="space-y-2">
+          {blocks.map((block: any, i: number) => {
+            const phase = block.phase_name || 'Bloco';
+            const isExpanded = expandedBlock === i;
+            const phaseColor = Object.entries(PHASE_COLORS).find(([k]) => phase.includes(k))?.[1] || 'bg-muted text-muted-foreground border-border';
 
-                        {/* Energy Availability */}
-                        {weight > 0 && leanMassKg > 0 && editingWeek.energy_availability != null && (
-                          <div className="p-2 rounded border border-border bg-muted/20">
-                            <p className="text-xs font-medium text-muted-foreground">Disponibilidade Energética</p>
-                            <p className={`text-sm font-bold ${getEAStatus(editingWeek.energy_availability || 0).color}`}>
-                              {getEAStatus(editingWeek.energy_availability || 0).label}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Competition & Adjustment */}
-                        <div className="flex gap-4">
-                          <div className="flex items-center gap-2">
-                            <Checkbox checked={editingWeek.has_competition || false} onCheckedChange={v => updateEditing('has_competition', v)} />
-                            <label className="text-xs">Competição</label>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Checkbox checked={editingWeek.is_adjustment_week || false} onCheckedChange={v => updateEditing('is_adjustment_week', v)} />
-                            <label className="text-xs">Semana de Ajuste</label>
-                          </div>
-                        </div>
-                        {editingWeek.has_competition && (
-                          <Input value={editingWeek.competition_name || ''} onChange={e => updateEditing('competition_name', e.target.value)} placeholder="Nome da competição" className="h-8 text-xs" />
-                        )}
-
-                        {editingWeek.phase_name === 'Performance Máxima' && (
-                          <div>
-                            <label className="text-xs font-medium text-muted-foreground">Simulação de Prova</label>
-                            <Textarea value={editingWeek.race_simulation_notes || ''} onChange={e => updateEditing('race_simulation_notes', e.target.value)} rows={3} className="text-xs" placeholder="Café da manhã de prova, timing dos géis, cafeína, hidratação, sódio..." />
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-xs text-muted-foreground">Estratégia Hídrica</label>
-                            <Input value={editingWeek.hydration_strategy || ''} onChange={e => updateEditing('hydration_strategy', e.target.value)} className="h-8 text-xs" placeholder="Ex: 500ml/h" />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground">Estratégia de Sódio</label>
-                            <Input value={editingWeek.sodium_strategy || ''} onChange={e => updateEditing('sodium_strategy', e.target.value)} className="h-8 text-xs" placeholder="Ex: 500-700mg/h" />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground">Planejamento Nutricional</label>
-                          <Textarea value={editingWeek.nutritional_plan || ''} onChange={e => updateEditing('nutritional_plan', e.target.value)} rows={2} className="text-xs" />
-                        </div>
-
-                        {editingWeek.is_adjustment_week && (
-                          <div className="p-2 rounded border border-amber-500/30 bg-amber-500/5">
-                            <label className="text-xs font-medium text-amber-400">Notas do Ajuste</label>
-                            <Textarea value={editingWeek.micro_adjustment_notes || ''} onChange={e => updateEditing('micro_adjustment_notes', e.target.value)} rows={2} className="text-xs mt-1" placeholder="Reavaliação, ajuste de CHO, mudança de estratégia..." />
-                          </div>
-                        )}
-
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground">Recursos Ergogênicos</label>
-                          <div className="flex flex-wrap gap-3 mt-1">
-                            {ergogenicSupplements.map(s => (
-                              <div key={s.key} className="flex items-center gap-1">
-                                <Checkbox checked={editingWeek[s.key] || false} onCheckedChange={v => updateEditing(s.key, v)} />
-                                <label className="text-xs">{s.label}</label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground">Suplementação Antioxidante e Reparo</label>
-                          <div className="flex flex-wrap gap-3 mt-1">
-                            {antioxidantSupplements.map(s => (
-                              <div key={s.key} className="flex items-center gap-1">
-                                <Checkbox checked={editingWeek[s.key] || false} onCheckedChange={v => updateEditing(s.key, v)} />
-                                <label className="text-xs">{s.label}</label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground">Notas Suplementação</label>
-                          <Textarea value={editingWeek.supplement_notes || ''} onChange={e => updateEditing('supplement_notes', e.target.value)} rows={1} className="text-xs" />
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-muted-foreground">Solicitação de Exames</label>
-                          <Textarea value={editingWeek.lab_exam_request || ''} onChange={e => updateEditing('lab_exam_request', e.target.value)} rows={1} className="text-xs" />
-                        </div>
-
-                        <Button size="sm" onClick={saveWeek} className="gap-1">
-                          <Save className="h-3.5 w-3.5" /> Salvar Semana
-                        </Button>
-                      </div>
+            return (
+              <Card key={i} className={isExpanded ? 'border-primary/30' : ''}>
+                <button
+                  onClick={() => setExpandedBlock(isExpanded ? null : i)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge className={`text-xs ${phaseColor}`}>Bloco {i + 1}</Badge>
+                    <span className="text-xs font-medium">{phase}</span>
+                    <span className="text-xs text-muted-foreground">{block.date_start} → {block.date_end}</span>
+                    {block.phase_targets?.cho_gkg && (
+                      <Badge variant="outline" className="text-[10px]">CHO: {block.phase_targets.cho_gkg} g/kg</Badge>
                     )}
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
-
-          {/* Glycogen Reference */}
-          {weeks.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Info className="h-4 w-4" /> Referências de Glicogênio (Burke & Jeukendrup)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                  <div className="p-2 rounded bg-muted/30 border border-border">
-                    <p className="font-medium">Recuperação &lt;8h</p>
-                    <p className="text-muted-foreground">1–1.2 g/kg/h de CHO</p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost" size="sm"
+                      onClick={(e) => { e.stopPropagation(); copyBlockText(block, i); }}
+                      className="h-6 w-6 p-0"
+                    >
+                      {copiedBlock === i ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                    </Button>
+                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </div>
-                  <div className="p-2 rounded bg-muted/30 border border-border">
-                    <p className="font-medium">Recuperação 8–24h</p>
-                    <p className="text-muted-foreground">5–7 g/kg de CHO</p>
-                  </div>
-                  <div className="p-2 rounded bg-muted/30 border border-border">
-                    <p className="font-medium">High Training</p>
-                    <p className="text-muted-foreground">6–10 g/kg de CHO</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </button>
 
-          {weeks.length === 0 && (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <p className="text-sm text-muted-foreground">Nenhuma semana gerada. Use o botão acima para criar o ciclo de periodização.</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+                {isExpanded && (
+                  <CardContent className="space-y-4 border-t border-border pt-4">
+                    {/* Phase Targets */}
+                    {block.phase_targets && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Diretrizes de Dieta</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          <div className="p-2 rounded bg-muted/30 border border-border">
+                            <p className="text-[10px] text-muted-foreground">CHO (g/kg/dia)</p>
+                            <p className="text-sm font-bold">{block.phase_targets.cho_gkg || '—'}</p>
+                          </div>
+                          <div className="p-2 rounded bg-muted/30 border border-border">
+                            <p className="text-[10px] text-muted-foreground">Proteína (g/kg/dia)</p>
+                            <p className="text-sm font-bold">{block.phase_targets.protein_gkg || '—'}</p>
+                          </div>
+                          <div className="p-2 rounded bg-muted/30 border border-border">
+                            <p className="text-[10px] text-muted-foreground">Gorduras</p>
+                            <p className="text-sm font-bold">{block.phase_targets.fat_guidance || '—'}</p>
+                          </div>
+                          <div className="p-2 rounded bg-muted/30 border border-border">
+                            <p className="text-[10px] text-muted-foreground">Fibras</p>
+                            <p className="text-sm font-bold">{block.phase_targets.fiber_guidance || '—'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-        {/* Knowledge Base Tab */}
-        <TabsContent value="knowledge">
-          <PeriodizaKnowledgeBase />
-        </TabsContent>
-      </Tabs>
+                    {/* Supplements */}
+                    {block.supplements_daily && block.supplements_daily.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Suplementação Diária</p>
+                        <div className="flex flex-wrap gap-1">
+                          {block.supplements_daily.map((s: any, si: number) => (
+                            <Badge key={si} variant="outline" className="text-[10px]">
+                              {s.name} {s.dose} ({s.timing})
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Long Run Strategy */}
+                    {block.long_run_strategy && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">🏃 Estratégia do Longão</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="p-2 rounded bg-muted/20 border border-border">
+                            <p className="text-[10px] text-muted-foreground">Pré-longão</p>
+                            <p className="text-xs">{block.long_run_strategy.pre || '—'}</p>
+                          </div>
+                          <div className="p-2 rounded bg-muted/20 border border-border">
+                            <p className="text-[10px] text-muted-foreground">Intra-longão</p>
+                            <p className="text-xs">{block.long_run_strategy.intra || '—'}</p>
+                          </div>
+                          <div className="p-2 rounded bg-muted/20 border border-border">
+                            <p className="text-[10px] text-muted-foreground">Pós-longão</p>
+                            <p className="text-xs">{block.long_run_strategy.post || '—'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Functional Supplements */}
+                    {block.functional_supps && block.functional_supps.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">💊 Suplementação Funcional</p>
+                        <div className="flex flex-wrap gap-1">
+                          {block.functional_supps.map((s: string, si: number) => (
+                            <Badge key={si} variant="outline" className="text-[10px]">{s}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pre/Intra Strategy */}
+                    {block.pre_intra_strategy && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">⚡ Pré e Intra Treino</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="p-2 rounded bg-muted/20 border border-border">
+                            <p className="text-[10px] text-muted-foreground">Pré-treino</p>
+                            <p className="text-xs">{block.pre_intra_strategy.pre || '—'}</p>
+                          </div>
+                          <div className="p-2 rounded bg-muted/20 border border-border">
+                            <p className="text-[10px] text-muted-foreground">Intra-treino</p>
+                            <p className="text-xs">{block.pre_intra_strategy.intra || '—'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Weekly Table */}
+                    {block.weekly_table && block.weekly_table.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-2">📅 Tabela Semanal</p>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-[10px] font-bold w-16"></TableHead>
+                                {block.weekly_table.map((d: any, di: number) => (
+                                  <TableHead key={di} className="text-[10px] text-center font-bold">{d.day}</TableHead>
+                                ))}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {/* Training stimulus row */}
+                              <TableRow>
+                                <TableCell className="text-[10px] font-semibold py-1 whitespace-nowrap">Estímulo</TableCell>
+                                {block.weekly_table.map((d: any, di: number) => (
+                                  <TableCell key={di} className="text-[9px] text-center py-1 text-muted-foreground max-w-[80px]">
+                                    {trainingStimuli[di]?.join(', ') || 'Descanso'}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                              {/* GEE */}
+                              <TableRow>
+                                <TableCell className="text-[10px] font-semibold py-1">GEE</TableCell>
+                                {block.weekly_table.map((_: any, di: number) => (
+                                  <TableCell key={di} className="text-[10px] text-center py-1">
+                                    {geePerDay[di] > 0 ? `${Math.round(geePerDay[di])}` : '—'}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                              {/* Type */}
+                              <TableRow>
+                                <TableCell className="text-[10px] font-semibold py-1">Tipo</TableCell>
+                                {block.weekly_table.map((d: any, di: number) => (
+                                  <TableCell key={di} className="py-1 text-center">
+                                    <Badge className={`text-[9px] ${DAY_TYPE_COLORS[d.type] || ''}`}>
+                                      {d.type?.toUpperCase() || '—'}
+                                    </Badge>
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                              {/* CHO */}
+                              <TableRow>
+                                <TableCell className="text-[10px] font-semibold py-1">CHO g/kg</TableCell>
+                                {block.weekly_table.map((d: any, di: number) => (
+                                  <TableCell key={di} className="text-[10px] text-center py-1 font-medium">{d.cho_gkg || '—'}</TableCell>
+                                ))}
+                              </TableRow>
+                              {/* Pre */}
+                              <TableRow>
+                                <TableCell className="text-[10px] font-semibold py-1">Pré</TableCell>
+                                {block.weekly_table.map((d: any, di: number) => (
+                                  <TableCell key={di} className="text-[9px] text-center py-1 text-muted-foreground">{d.pre_training || '—'}</TableCell>
+                                ))}
+                              </TableRow>
+                              {/* Intra */}
+                              <TableRow>
+                                <TableCell className="text-[10px] font-semibold py-1">Intra</TableCell>
+                                {block.weekly_table.map((d: any, di: number) => (
+                                  <TableCell key={di} className="text-[9px] text-center py-1 text-muted-foreground">{d.intra_training || '—'}</TableCell>
+                                ))}
+                              </TableRow>
+                              {/* Post */}
+                              <TableRow>
+                                <TableCell className="text-[10px] font-semibold py-1">Pós</TableCell>
+                                {block.weekly_table.map((d: any, di: number) => (
+                                  <TableCell key={di} className="text-[9px] text-center py-1 text-muted-foreground">{d.post_training || '—'}</TableCell>
+                                ))}
+                              </TableRow>
+                              {/* Note */}
+                              <TableRow>
+                                <TableCell className="text-[10px] font-semibold py-1">Nota</TableCell>
+                                {block.weekly_table.map((d: any, di: number) => (
+                                  <TableCell key={di} className="text-[9px] text-center py-1 italic text-muted-foreground">{d.note || ''}</TableCell>
+                                ))}
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Admin Notes */}
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Observações do Nutri</label>
+                      <Textarea
+                        value={editingNotes[i] ?? block.notes_admin ?? ''}
+                        onChange={e => setEditingNotes(prev => ({ ...prev, [i]: e.target.value }))}
+                        rows={2}
+                        className="text-xs mt-1"
+                        placeholder="Notas que sobrescrevem as sugestões da IA..."
+                      />
+                      <Button size="sm" variant="outline" onClick={() => saveBlockNotes(i)} className="gap-1 text-xs h-7 mt-1">
+                        <Save className="h-3 w-3" /> Salvar notas
+                      </Button>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Sparkles className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+            <h3 className="text-sm font-semibold">Nenhuma periodização gerada</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Configure as datas acima e clique em "Gerar Periodização" para criar os blocos automaticamente.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Nutritionist Notes (from AI) */}
+      {activePeriodization?.nutritionist_notes && (activePeriodization.nutritionist_notes as string[]).length > 0 && (
+        <Card className="border-amber-500/20">
+          <CardContent className="pt-3 pb-3 space-y-1">
+            <p className="text-xs font-medium text-amber-400 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" /> Notas e Alertas
+            </p>
+            {(activePeriodization.nutritionist_notes as string[]).map((note: string, i: number) => (
+              <p key={i} className="text-xs text-muted-foreground">• {note}</p>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

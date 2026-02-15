@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { athleteContext, adminInstructions, knowledgeBase, generationType, manualEdits } = await req.json();
+    const { athleteContext, adminInstructions, knowledgeBase, generationType, planType, blockSize, weeksToRace, periodStartDate } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -21,104 +21,120 @@ serve(async (req) => {
       .join('\n\n---\n\n');
 
     const typeInstructions: Record<string, string> = {
-      full: 'Gere uma periodização nutricional COMPLETA com todas as fases (Base, Transição, Performance, Taper).',
-      next_phase: 'Gere apenas a PRÓXIMA FASE da periodização, considerando o estado atual do ciclo.',
-      monthly_adjustment: 'Gere apenas o MICROAJUSTE para o próximo mês/consulta.',
-      long_run_week: 'Gere o ajuste específico para a SEMANA DO LONGÃO, otimizando pré/durante/pós.',
+      full: `Gere uma periodização COMPLETA dividida em blocos de ${blockSize} semanas, de ${periodStartDate} até a prova. Total de ${weeksToRace} semanas.`,
+      current_block: `Gere APENAS o bloco atual (próximas ${blockSize} semanas) com a tabela semanal detalhada.`,
+      recalculate: `Recalcule a periodização completa usando os dados energéticos atualizados (TMB, GEE, GET, EA).`,
     };
 
-    const manualEditsContext = manualEdits
-      ? `\n\nEDIÇÕES MANUAIS DO NUTRICIONISTA (prioridade máxima, manter):\n${JSON.stringify(manualEdits, null, 2)}`
-      : '';
+    // Calculate number of blocks and phase distribution
+    const numBlocks = Math.ceil(weeksToRace / blockSize);
+    let phaseDistribution = '';
+    if (numBlocks >= 4) {
+      const base = Math.ceil(numBlocks * 0.3);
+      const trans = Math.ceil(numBlocks * 0.3);
+      const perf = Math.max(numBlocks - base - trans - 1, 1);
+      const taper = 1;
+      phaseDistribution = `Distribua as fases: ${base} blocos Base Metabólica, ${trans} blocos Transição, ${perf} blocos Performance, ${taper} bloco Taper (últimas 2 semanas).`;
+    } else if (numBlocks >= 2) {
+      phaseDistribution = `Ciclo curto: distribua entre Transição, Performance e Taper.`;
+    } else {
+      phaseDistribution = `Ciclo muito curto: foque em Performance e Taper.`;
+    }
 
-    const systemPrompt = `Você é o Agente Periodiza, um especialista em periodização nutricional para atletas de endurance baseado nas evidências de Louise Burke, Asker Jeukendrup e conceitos de Train Low / Compete High.
+    const systemPrompt = `Você é o Agente Periodiza, especialista em periodização nutricional para atletas de endurance (Burke, Jeukendrup, Train Low / Compete High).
 
-REGRAS OBRIGATÓRIAS:
-1. Nunca invente dados do atleta. Use apenas o que foi fornecido.
-2. Se faltar MLG para calcular EA, use modo "EA estimada" e avise.
-3. Sempre proponha Fase 1 (Base), Fase 2 (Transição), Fase 3 (Performance) e Taper.
-4. Se semanas até prova < 10, simplificar: Fase 2 → Fase 3 → Taper.
-5. Fase 1: CHO ≤ 4g/kg, train-low, jejum estratégico, intra reduzido em treinos fáceis, SEM comprometer treinos-chave.
-6. Fase 2: CHO 4-5g/kg, carb-loading 24-48h, intra 40→60g/h, cafeína 3mg/kg, nitrato opcional.
-7. Fase 3: CHO ≥ 5g/kg, carb-loading +6g/kg 24-48h, treinar estratégia de prova, intra 60-90g/h.
-8. Taper (≤14 dias): reduzir volume, manter CHO alto, ajustar calorias.
-9. Sempre calcular/sugerir meta de EA por fase e alertar se EA <30.
-10. Se EA <30, corrigir antes de aumentar train-low.
+REGRAS:
+1. Nunca invente dados. Use APENAS o que foi fornecido no contexto.
+2. Se MLG não estiver disponível, avise que EA não pode ser calculada.
+3. Se EA < 30 kcal/kg MLG, ALERTE e ajuste VCT antes de propor train-low.
+4. O campo "agenda_treinos_semanal" contém os estímulos REAIS de treino por dia com GEE em kcal.
+5. A tabela semanal de CADA bloco deve refletir os estímulos reais:
+   - Dias com GEE alto (>600kcal, treinos-chave) → type: "high", suporte total
+   - Dias com GEE moderado (200-600kcal) → type: "moderate" ou "low" conforme fase
+   - Dias sem treino (GEE=0) → type: "recovery"
+6. Adapte CHO g/kg por dia conforme demanda energética.
+7. Cada bloco tem ${blockSize} semanas.
+8. ${phaseDistribution}
+9. Periodicidade: ${planType === '6_weeks' ? 'Consultas a cada 6 semanas — marque semana de ajuste profundo' : 'Consultoria mensal — ajustes a cada 4 semanas'}.
 
-REGRA CRÍTICA — ESTRUTURA SEMANAL BASEADA NOS ESTÍMULOS REAIS:
-11. O campo "agenda_treinos_semanal" contém os ESTÍMULOS REAIS de treino do atleta por dia da semana, incluindo zona/intensidade, duração e GEE (Gasto Energético do Exercício) em kcal.
-12. A weeklyStructure de CADA FASE deve ser alinhada com esses estímulos reais:
-    - Dias com GEE alto (treinos-chave, longão, tiros) → type: "high" com suporte total de CHO, pré-treino adequado e intra-treino.
-    - Dias com GEE baixo/moderado (rodagens leves, musculação leve) → type: "low", elegíveis para train-low/jejum estratégico conforme a fase.
-    - Dias SEM treino (GEE = 0) → type: "recovery".
-13. Nos "notes" de cada dia, REFERENCIE os estímulos específicos do atleta (ex: "Longão MODERADO 90min — GEE 1480kcal → suporte total, intra 60g/h").
-14. Adapte a distribuição de CHO intra-dia conforme a demanda energética: dias com GEE > 800 kcal precisam de mais suporte que dias com GEE < 300 kcal.
-15. Use o "gee_total_semanal_kcal" para calcular EA semanal e sugerir VCT mínimo por fase.
+FASES NUTRICIONAIS:
+- Base Metabólica: CHO 3-4 g/kg, train-low elegível em dias leves, proteína 1.8-2.2 g/kg
+- Transição: CHO 4-5 g/kg, início carb-loading 24h, intra 40→60 g/h, cafeína 3 mg/kg
+- Performance: CHO ≥5 g/kg, carb-loading +6 g/kg 24-48h, intra 60-90 g/h, simulação de prova
+- Taper: últimas 2 semanas, manter CHO alto, reduzir volume, cuidar peso
 
-INSTRUÇÕES DO ADMIN (prioridade alta):
-${adminInstructions || 'Nenhuma diretriz definida.'}
+INSTRUÇÕES DO ADMIN:
+${adminInstructions || 'Nenhuma'}
 
 BASE DE CONHECIMENTO:
-${kbContent || 'Nenhum conteúdo na base de conhecimento.'}
-${manualEditsContext}`;
+${kbContent || 'Nenhuma'}`;
 
     const userPrompt = `${typeInstructions[generationType] || typeInstructions.full}
 
 CONTEXTO DO ATLETA:
 ${JSON.stringify(athleteContext, null, 2)}
 
-Responda OBRIGATORIAMENTE em JSON válido seguindo EXATAMENTE este formato:
+Responda em JSON VÁLIDO com este formato EXATO:
 {
-  "phasePlan": [
+  "blocks": [
     {
-      "phase": "Fase 1 - Base Metabólica",
-      "startWeek": 1,
-      "endWeek": 6,
-      "targets": {
-        "carb_gkg_day_range": "3.0-4.0",
-        "protein_gkg_day_range": "1.8-2.2",
+      "block_index": 1,
+      "date_start": "YYYY-MM-DD",
+      "date_end": "YYYY-MM-DD",
+      "phase_name": "Base Metabólica",
+      "phase_targets": {
+        "cho_gkg": "3.0-4.0",
+        "protein_gkg": "1.8-2.2",
         "fat_guidance": "moderada",
-        "fiber_guidance": "alta",
-        "EA_target_kcal_kgFFM": ">=30"
+        "fiber_guidance": "alta"
       },
-      "strategies": ["estratégia 1", "estratégia 2"],
-      "weeklyStructure": {
-        "Mon": {"type":"low","notes":"..."},
-        "Tue": {"type":"high","notes":"..."},
-        "Wed": {"type":"low","notes":"..."},
-        "Thu": {"type":"high","notes":"..."},
-        "Fri": {"type":"low","notes":"..."},
-        "Sat": {"type":"high","notes":"longão ou treino-chave"},
-        "Sun": {"type":"recovery","notes":"..."}
+      "supplements_daily": [
+        {"name": "Creatina", "dose": "5g", "timing": "pós-treino"}
+      ],
+      "long_run_strategy": {
+        "pre": "descrição",
+        "intra": "g/h e composição",
+        "post": "recovery"
       },
-      "checkpoints": ["checkpoint 1", "checkpoint 2"]
+      "functional_supps": ["Ômega-3 2g", "Vitamina D 2000UI"],
+      "pre_intra_strategy": {
+        "pre": "composição e timing",
+        "intra": "g/h de gel, sódio, água"
+      },
+      "weekly_table": [
+        {
+          "day": "Seg",
+          "type": "low",
+          "cho_gkg": 3.0,
+          "pre_training": "",
+          "intra_training": "",
+          "post_training": "",
+          "note": "train-low, rodagem leve"
+        },
+        {
+          "day": "Ter",
+          "type": "high",
+          "cho_gkg": 5.0,
+          "pre_training": "1g/kg 2h antes",
+          "intra_training": "40g/h",
+          "post_training": "recovery 4:1",
+          "note": "treino-chave, suporte total"
+        },
+        {"day": "Qua", "type": "low", "cho_gkg": 3.0, "pre_training": "", "intra_training": "", "post_training": "", "note": ""},
+        {"day": "Qui", "type": "high", "cho_gkg": 5.0, "pre_training": "", "intra_training": "", "post_training": "", "note": ""},
+        {"day": "Sex", "type": "low", "cho_gkg": 3.0, "pre_training": "", "intra_training": "", "post_training": "", "note": ""},
+        {"day": "Sáb", "type": "high", "cho_gkg": 6.0, "pre_training": "", "intra_training": "60g/h", "post_training": "", "note": "longão"},
+        {"day": "Dom", "type": "recovery", "cho_gkg": 3.5, "pre_training": "", "intra_training": "", "post_training": "", "note": "recuperação"}
+      ],
+      "notes_admin": ""
     }
   ],
-  "monthlyAdjustments": [
-    {
-      "monthIndex": 1,
-      "changes": ["mudança 1"],
-      "why": "justificativa"
-    }
-  ],
-  "taperProtocol": {
-    "daysOut": 14,
-    "carbLoading": {
-      "enabled": true,
-      "durationHours": 24,
-      "carb_gkg_day": 6
-    },
-    "raceStrategy": {
-      "breakfast": "1-2 g/kg 2-3h antes",
-      "intraCHO_gph": "60-90",
-      "caffeine_mgkg": "3-6 conforme tolerância",
-      "sodium_strategy": "individualizado"
-    }
-  },
   "nutritionistNotes": ["nota 1", "nota 2"]
 }
 
-Após o JSON, adicione um separador "---HUMAN_READABLE---" seguido de um resumo em português claro para o nutricionista.`;
+IMPORTANTE: A weekly_table DEVE ter exatamente 7 dias (Seg a Dom). O type de cada dia deve ser baseado no GEE real fornecido em agenda_treinos_semanal.
+
+Após o JSON, adicione "---READABLE---" seguido de um resumo em português.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -139,12 +155,12 @@ Após o JSON, adicione um separador "---HUMAN_READABLE---" seguido de um resumo 
       const errorText = await response.text();
       console.error("AI gateway error:", response.status, errorText);
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Tente novamente em alguns segundos." }), {
+        return new Response(JSON.stringify({ error: "Rate limit. Tente em alguns segundos." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes. Adicione créditos ao workspace." }), {
+        return new Response(JSON.stringify({ error: "Créditos insuficientes." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -154,38 +170,36 @@ Após o JSON, adicione um separador "---HUMAN_READABLE---" seguido de um resumo 
     const data = await response.json();
     const fullResponse = data.choices?.[0]?.message?.content || '';
 
-    // Split JSON and human readable
     let jsonPart = fullResponse;
     let humanReadable = '';
-    
-    const separator = '---HUMAN_READABLE---';
+
+    const separator = '---READABLE---';
     if (fullResponse.includes(separator)) {
       const parts = fullResponse.split(separator);
       jsonPart = parts[0].trim();
       humanReadable = parts[1].trim();
     }
 
-    // Extract JSON from potential markdown code blocks
+    // Extract JSON
     const jsonMatch = jsonPart.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, jsonPart];
     const cleanJson = (jsonMatch[1] || jsonPart).trim();
 
-    let parsedPlan;
+    let parsed;
     try {
-      parsedPlan = JSON.parse(cleanJson);
+      parsed = JSON.parse(cleanJson);
     } catch {
-      // Try to find JSON object in the text
       const objMatch = cleanJson.match(/\{[\s\S]*\}/);
       if (objMatch) {
-        parsedPlan = JSON.parse(objMatch[0]);
+        parsed = JSON.parse(objMatch[0]);
       } else {
-        throw new Error("Não foi possível extrair JSON da resposta da IA");
+        throw new Error("Não foi possível extrair JSON da resposta");
       }
     }
 
     return new Response(JSON.stringify({
-      plan: parsedPlan,
-      humanReadable: humanReadable || 'Resumo não disponível.',
-      rawResponse: fullResponse,
+      blocks: parsed.blocks || [],
+      nutritionistNotes: parsed.nutritionistNotes || [],
+      humanReadable: humanReadable || '',
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
