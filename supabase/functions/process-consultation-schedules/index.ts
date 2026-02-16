@@ -170,6 +170,34 @@ Deno.serve(async (req) => {
       }
 
       try {
+        // Check if athlete already completed all consultations
+        const { data: clientInfo } = await supabase
+          .from('clients')
+          .select('consultation_count')
+          .eq('id', clientData.id)
+          .maybeSingle();
+
+        const { data: scheduleRule } = await supabase
+          .from('consultation_schedule_rules')
+          .select('consultations_completed')
+          .eq('client_id', clientData.id)
+          .maybeSingle();
+
+        if (
+          clientInfo?.consultation_count != null &&
+          clientInfo.consultation_count > 0 &&
+          (scheduleRule?.consultations_completed ?? 0) >= clientInfo.consultation_count
+        ) {
+          console.log(`Client ${clientData.name} already completed all ${clientInfo.consultation_count} consultations, skipping`);
+          // Auto-disable the rule
+          await supabase
+            .from('consultation_schedule_rules')
+            .update({ is_enabled: false, next_link_send_date: null, updated_at: new Date().toISOString() })
+            .eq('client_id', clientData.id);
+          results.push({ scheduleId: schedule.id, clientName: clientData.name, status: 'skipped', error: 'All consultations completed' });
+          continue;
+        }
+
         // Check athlete WhatsApp settings
         const { data: athleteSettings } = await supabase
           .from('athlete_whatsapp_settings')
