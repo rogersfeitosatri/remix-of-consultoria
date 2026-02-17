@@ -17,6 +17,7 @@ import {
 import { differenceInWeeks, parseISO, format, addWeeks, isAfter, isBefore, differenceInDays } from 'date-fns';
 import { useThemeToggle } from '@/App';
 import { DayDynamicDetailModal } from './DayDynamicDetailModal';
+import { PeriodizationExportButton } from './PeriodizationExportButton';
 
 const DAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const DAYS_SHORT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -1174,9 +1175,20 @@ export function PeriodizationWizard({
                     {raceDate ? format(parseISO(raceDate), 'dd/MM/yyyy') : ''}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-primary">{daysToRace}</p>
-                  <p className="text-[10px] text-muted-foreground">dias restantes</p>
+                <div className="flex items-center gap-3">
+                  <PeriodizationExportButton
+                    phases={journeyPhases}
+                    raceName={raceName}
+                    raceDate={raceDate}
+                    startDate={startDate}
+                    totalWeeks={totalWeeks}
+                    allDynamics={allDynamics}
+                    journeyWeeks={journeyWeeks}
+                  />
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-primary">{daysToRace}</p>
+                    <p className="text-[10px] text-muted-foreground">dias restantes</p>
+                  </div>
                 </div>
               </div>
               <Progress value={progressPercent} className="h-2" />
