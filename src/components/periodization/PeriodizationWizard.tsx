@@ -849,11 +849,42 @@ export function PeriodizationWizard({
                       </span>
                     </div>
                     
+                    {/* CHO g/kg target */}
+                    {day.cho_gkg && (
+                      <div className="px-3 py-1.5 border-b border-border bg-muted/30 text-center">
+                        <p className="text-sm font-bold text-foreground">{day.cho_gkg} g/kg</p>
+                        <p className="text-[9px] text-muted-foreground">CHO total do dia</p>
+                      </div>
+                    )}
+
+                    {/* Distribution bar */}
+                    {(day.morning_cho_pct || day.afternoon_cho_pct || day.night_cho_pct) && (
+                      <div className="px-3 py-1.5 border-b border-border space-y-1">
+                        <div className="flex h-2.5 w-full rounded-full overflow-hidden">
+                          <div className="bg-amber-400/70" style={{ width: `${day.morning_cho_pct || 33}%` }} />
+                          <div className="bg-orange-400/70" style={{ width: `${day.afternoon_cho_pct || 34}%` }} />
+                          <div className="bg-indigo-400/70" style={{ width: `${day.night_cho_pct || 33}%` }} />
+                        </div>
+                        <div className="flex justify-between text-[8px] text-muted-foreground">
+                          <span>☀ {day.morning_cho_pct || 33}%</span>
+                          <span>🌅 {day.afternoon_cho_pct || 34}%</span>
+                          <span>🌙 {day.night_cho_pct || 33}%</span>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Session info */}
                     {session?.modality && (
                       <div className="px-3 py-1.5 border-b border-border bg-muted/20">
                         <p className="text-[10px] text-muted-foreground">{session.modality}</p>
-                        <p className="text-[9px] text-muted-foreground">{session.shift} • {session.intensity} • Prio {session.priority}</p>
+                        <p className="text-[9px] text-muted-foreground">{session.shift} • {session.intensity} • {session.duration_minutes || 60}min</p>
+                      </div>
+                    )}
+
+                    {/* Distribution rationale */}
+                    {day.distribution_rationale && (
+                      <div className="px-3 py-1.5 border-b border-border bg-primary/5">
+                        <p className="text-[9px] italic text-muted-foreground leading-tight">{day.distribution_rationale}</p>
                       </div>
                     )}
 

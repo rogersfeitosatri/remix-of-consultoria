@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Loader2, Save } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Sparkles, Loader2, Save, ChevronDown, Sun, Sunset, Moon, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
@@ -20,6 +22,11 @@ interface DayDynamic {
   journey_week_id: string;
   day_of_week: number;
   cho_classification: string;
+  cho_gkg: number | null;
+  morning_cho_pct: number | null;
+  afternoon_cho_pct: number | null;
+  night_cho_pct: number | null;
+  distribution_rationale: string;
   pre_training: string;
   intra_training: string;
   post_training: string;
@@ -38,11 +45,12 @@ interface Props {
   onSaveDynamics: (weekId: string, dynamics: Omit<DayDynamic, 'id'>[]) => void;
   isGenerating: boolean;
   isSaving: boolean;
+  athleteWeight?: number | null;
 }
 
 export function JourneyDayDynamics({
   weekId, weekNumber, phaseName, existingDynamics, sessions,
-  onGenerateDynamics, onSaveDynamics, isGenerating, isSaving
+  onGenerateDynamics, onSaveDynamics, isGenerating, isSaving, athleteWeight
 }: Props) {
   const [dynamics, setDynamics] = useState<DayDynamic[]>(existingDynamics.length > 0
     ? existingDynamics
@@ -50,7 +58,6 @@ export function JourneyDayDynamics({
   );
   const [dirty, setDirty] = useState(false);
 
-  // Sync when existingDynamics change
   if (existingDynamics.length > 0 && dynamics.length === 0) {
     setDynamics(existingDynamics);
   }
@@ -68,6 +75,24 @@ export function JourneyDayDynamics({
   };
 
   const hasSessions = sessions.some(s => s.modality && s.modality.trim() !== '');
+
+  const getChoGrams = (gkg: number | null) => {
+    if (!gkg || !athleteWeight) return null;
+    return Math.round(gkg * athleteWeight);
+  };
+
+  const getDistributionBar = (morning: number | null, afternoon: number | null, night: number | null) => {
+    const m = morning || 33;
+    const a = afternoon || 34;
+    const n = night || 33;
+    return (
+      <div className="flex h-3 w-full rounded-full overflow-hidden border border-border/50">
+        <div className="bg-amber-400/70" style={{ width: `${m}%` }} title={`Manhã: ${m}%`} />
+        <div className="bg-orange-400/70" style={{ width: `${a}%` }} title={`Tarde: ${a}%`} />
+        <div className="bg-indigo-400/70" style={{ width: `${n}%` }} title={`Noite: ${n}%`} />
+      </div>
+    );
+  };
 
   return (
     <Card>
@@ -102,65 +127,98 @@ export function JourneyDayDynamics({
         )}
       </CardHeader>
       {dynamics.length > 0 && (
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-[10px] w-[50px]">Dia</TableHead>
-                  <TableHead className="text-[10px] w-[80px]">CHO</TableHead>
-                  <TableHead className="text-[10px]">Pré-treino</TableHead>
-                  <TableHead className="text-[10px]">Intra</TableHead>
-                  <TableHead className="text-[10px]">Pós-treino</TableHead>
-                  <TableHead className="text-[10px]">Noite</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dynamics.sort((a, b) => a.day_of_week - b.day_of_week).map((day) => (
-                  <TableRow key={day.day_of_week}>
-                    <TableCell className="py-1.5 text-xs font-medium">{DAYS[day.day_of_week]}</TableCell>
-                    <TableCell className="py-1.5">
-                      <Badge variant="outline" className={`text-[9px] ${CHO_COLORS[day.cho_classification] || 'text-muted-foreground'}`}>
-                        {day.cho_classification || '—'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <Textarea
-                        value={day.pre_training || ''}
-                        onChange={e => updateDynamic(day.day_of_week, 'pre_training', e.target.value)}
-                        rows={1}
-                        className="text-[10px] min-h-[28px] resize-none"
-                      />
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <Textarea
-                        value={day.intra_training || ''}
-                        onChange={e => updateDynamic(day.day_of_week, 'intra_training', e.target.value)}
-                        rows={1}
-                        className="text-[10px] min-h-[28px] resize-none"
-                      />
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <Textarea
-                        value={day.post_training || ''}
-                        onChange={e => updateDynamic(day.day_of_week, 'post_training', e.target.value)}
-                        rows={1}
-                        className="text-[10px] min-h-[28px] resize-none"
-                      />
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <Textarea
-                        value={day.night_guidance || ''}
-                        onChange={e => updateDynamic(day.day_of_week, 'night_guidance', e.target.value)}
-                        rows={1}
-                        className="text-[10px] min-h-[28px] resize-none"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        <CardContent className="p-2 pt-0 space-y-1">
+          {/* Legend */}
+          <div className="flex items-center gap-3 text-[9px] text-muted-foreground px-2 pb-1 border-b border-border/30">
+            <span className="flex items-center gap-1"><Sun className="h-3 w-3 text-amber-400" /> Manhã</span>
+            <span className="flex items-center gap-1"><Sunset className="h-3 w-3 text-orange-400" /> Tarde</span>
+            <span className="flex items-center gap-1"><Moon className="h-3 w-3 text-indigo-400" /> Noite</span>
           </div>
+
+          {dynamics.sort((a, b) => a.day_of_week - b.day_of_week).map((day) => {
+            const totalGrams = getChoGrams(day.cho_gkg);
+            return (
+              <Collapsible key={day.day_of_week}>
+                <CollapsibleTrigger asChild>
+                  <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 transition-colors group text-left">
+                    <span className="text-xs font-medium w-8 shrink-0">{DAYS[day.day_of_week]}</span>
+                    <Badge variant="outline" className={`text-[9px] shrink-0 ${CHO_COLORS[day.cho_classification] || 'text-muted-foreground'}`}>
+                      {day.cho_classification || '—'}
+                    </Badge>
+                    {day.cho_gkg && (
+                      <span className="text-[10px] font-semibold text-foreground shrink-0">
+                        {day.cho_gkg}g/kg
+                        {totalGrams && <span className="text-muted-foreground font-normal ml-1">({totalGrams}g)</span>}
+                      </span>
+                    )}
+                    <div className="flex-1 max-w-[120px]">
+                      {getDistributionBar(day.morning_cho_pct, day.afternoon_cho_pct, day.night_cho_pct)}
+                    </div>
+                    <div className="flex items-center gap-1 text-[9px] text-muted-foreground shrink-0">
+                      <Sun className="h-2.5 w-2.5 text-amber-400" />{day.morning_cho_pct || 33}%
+                      <Sunset className="h-2.5 w-2.5 text-orange-400 ml-1" />{day.afternoon_cho_pct || 34}%
+                      <Moon className="h-2.5 w-2.5 text-indigo-400 ml-1" />{day.night_cho_pct || 33}%
+                    </div>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180 shrink-0" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="pl-10 pr-2 pb-2 space-y-2">
+                    {/* Distribution rationale */}
+                    {day.distribution_rationale && (
+                      <div className="flex items-start gap-1.5 bg-muted/30 rounded p-2">
+                        <Info className="h-3 w-3 text-primary mt-0.5 shrink-0" />
+                        <p className="text-[10px] text-muted-foreground italic">{day.distribution_rationale}</p>
+                      </div>
+                    )}
+                    {/* Nutrient timing grid */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[9px] text-muted-foreground font-medium">Pré-treino</label>
+                        <Textarea
+                          value={day.pre_training || ''}
+                          onChange={e => updateDynamic(day.day_of_week, 'pre_training', e.target.value)}
+                          rows={2}
+                          className="text-[10px] min-h-[40px] resize-none mt-0.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-muted-foreground font-medium">Intra-treino</label>
+                        <Textarea
+                          value={day.intra_training || ''}
+                          onChange={e => updateDynamic(day.day_of_week, 'intra_training', e.target.value)}
+                          rows={2}
+                          className="text-[10px] min-h-[40px] resize-none mt-0.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-muted-foreground font-medium">Pós-treino</label>
+                        <Textarea
+                          value={day.post_training || ''}
+                          onChange={e => updateDynamic(day.day_of_week, 'post_training', e.target.value)}
+                          rows={2}
+                          className="text-[10px] min-h-[40px] resize-none mt-0.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-muted-foreground font-medium">Noite</label>
+                        <Textarea
+                          value={day.night_guidance || ''}
+                          onChange={e => updateDynamic(day.day_of_week, 'night_guidance', e.target.value)}
+                          rows={2}
+                          className="text-[10px] min-h-[40px] resize-none mt-0.5"
+                        />
+                      </div>
+                    </div>
+                    {/* Notes */}
+                    {day.notes && (
+                      <p className="text-[9px] text-muted-foreground border-l-2 border-primary/30 pl-2">{day.notes}</p>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
         </CardContent>
       )}
     </Card>
