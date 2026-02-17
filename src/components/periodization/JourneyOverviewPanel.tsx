@@ -7,8 +7,7 @@ import { differenceInDays, differenceInWeeks, parseISO, format, isAfter } from '
 const PHASE_COLORS: Record<string, string> = {
   'Base': 'bg-blue-500',
   'Específica': 'bg-amber-500',
-  'Competitiva': 'bg-orange-500',
-  'Pico': 'bg-emerald-500',
+  'Polimento': 'bg-emerald-500',
   'Transição': 'bg-purple-500',
 };
 
