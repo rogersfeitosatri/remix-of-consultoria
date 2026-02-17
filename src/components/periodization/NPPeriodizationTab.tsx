@@ -13,6 +13,7 @@ import { JourneyTimeline } from './JourneyTimeline';
 import { JourneyWeekSessions } from './JourneyWeekSessions';
 import { JourneyDayDynamics } from './JourneyDayDynamics';
 import { JourneyStrategicPanel } from './JourneyStrategicPanel';
+import { JourneyPhaseTransition } from './JourneyPhaseTransition';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInWeeks, parseISO } from 'date-fns';
@@ -29,9 +30,9 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
   const { athletePeriodization, savePeriodization } = useAthletePeriodization(clientId);
   const {
     journeyPhases, journeyWeeks, clientInfo, loadingPhases,
-    allSessions, allDynamics,
+    allSessions, allDynamics, transitions,
     suggestPhases, saveJourneyPhases, updatePhase,
-    saveSessions, saveDynamics, generateDynamics,
+    saveSessions, saveDynamics, generateDynamics, transitionPhase,
   } = useJourneyPeriodization(clientId);
 
   const [activeView, setActiveView] = useState<'journey' | 'method'>('journey');
@@ -177,7 +178,17 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
             />
           )}
 
-          {/* 9. Timeline */}
+          {/* 7. Controle de Transição de Fase */}
+          {currentPhase && journeyPhases.length > 1 && (
+            <JourneyPhaseTransition
+              phases={journeyPhases}
+              currentPhaseId={currentPhase.id}
+              transitions={transitions}
+              onTransition={(fromId, toId, notes) => transitionPhase.mutate({ fromPhaseId: fromId, toPhaseId: toId, notes })}
+              isTransitioning={transitionPhase.isPending}
+            />
+          )}
+
           <JourneyTimeline
             phases={journeyPhases}
             weeks={journeyWeeks}
