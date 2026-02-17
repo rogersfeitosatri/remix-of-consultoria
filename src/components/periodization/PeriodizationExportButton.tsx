@@ -1,24 +1,33 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Download, FileImage, FileText, Loader2, X } from 'lucide-react';
+import { Download, FileImage, FileText, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-const PHASE_COLORS: Record<string, { bg: string; border: string; text: string; light: string }> = {
-  'Base': { bg: '#3b82f6', border: '#2563eb', text: '#1d4ed8', light: '#eff6ff' },
-  'Específica': { bg: '#f59e0b', border: '#d97706', text: '#92400e', light: '#fffbeb' },
-  'Polimento': { bg: '#10b981', border: '#059669', text: '#065f46', light: '#ecfdf5' },
-  'Transição': { bg: '#8b5cf6', border: '#7c3aed', text: '#4c1d95', light: '#f5f3ff' },
+// ─── Phase color palettes (for inline HTML preview + export) ───────────────
+const PALETTE: Record<string, { accent: string; light: string; dark: string; label: string }> = {
+  Base:       { accent: '#2563eb', light: '#eff6ff', dark: '#1e40af', label: '#fff' },
+  Específica: { accent: '#d97706', light: '#fffbeb', dark: '#92400e', label: '#fff' },
+  Polimento:  { accent: '#059669', light: '#ecfdf5', dark: '#064e3b', label: '#fff' },
+  Transição:  { accent: '#7c3aed', light: '#f5f3ff', dark: '#3b0764', label: '#fff' },
 };
 
-const getPhaseColor = (name: string) =>
-  Object.entries(PHASE_COLORS).find(([k]) => name.includes(k))?.[1] ||
-  { bg: '#6b7280', border: '#4b5563', text: '#1f2937', light: '#f9fafb' };
+const getPalette = (name: string) =>
+  Object.entries(PALETTE).find(([k]) => name.includes(k))?.[1] ??
+  { accent: '#6b7280', light: '#f9fafb', dark: '#1f2937', label: '#fff' };
+
+// ─── Train-low color ────────────────────────────────────────────────────────
+const trainLowColor = (v?: string) => {
+  if (!v) return '#6b7280';
+  if (v === 'proibido') return '#dc2626';
+  if (v === 'reduzido') return '#d97706';
+  return '#059669';
+};
 
 interface Phase {
+  id?: string;
   phase_name: string;
   duration_weeks: number;
   start_date?: string;
@@ -42,52 +51,269 @@ interface Props {
   journeyWeeks?: any[];
 }
 
+// ─── Build a clean HTML string to render inside hidden div ──────────────────
+function buildHTML(
+  phases: Phase[],
+  raceName: string,
+  raceDate: string,
+  startDate: string,
+  totalWeeks: number,
+  allDynamics: any[],
+  journeyWeeks: any[],
+): string {
+
+  const dynSummary = (phase: Phase) => {
+    const weekIds = journeyWeeks
+      .filter((w: any) => w.journey_phase_id === (phase as any).id)
+      .map((w: any) => w.id);
+    const days = allDynamics.filter((d: any) => weekIds.includes(d.journey_week_id));
+    if (!days.length) return null;
+    return {
+      low:  days.filter((d: any) => d.cho_classification === 'Low').length,
+      high: days.filter((d: any) => d.cho_classification === 'High').length,
+      med:  days.filter((d: any) => d.cho_classification === 'Medium').length,
+    };
+  };
+
+  const phaseBarItems = phases.map(p => {
+    const pal = getPalette(p.phase_name);
+    const pct = totalWeeks > 0 ? (p.duration_weeks / totalWeeks) * 100 : 100 / phases.length;
+    return `
+      <div style="width:${pct}%;background:${pal.accent};display:flex;align-items:center;
+                  justify-content:center;border-right:1px solid rgba(255,255,255,.25);">
+        <span style="font-size:9px;font-weight:700;color:#fff;padding:0 3px;
+                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${p.phase_name}&nbsp;(${p.duration_weeks}s)
+        </span>
+      </div>`;
+  }).join('');
+
+  const phaseCards = phases.map((phase) => {
+    const pal = getPalette(phase.phase_name);
+    const dyn = dynSummary(phase);
+    const isPolimento = phase.phase_name.includes('Polimento');
+    const isTransicao = phase.phase_name.includes('Transição');
+
+    const dynHtml = dyn
+      ? `<span style="color:#2563eb">Low: ${dyn.low}d</span>
+         <span style="color:#9ca3af;margin:0 4px">·</span>
+         <span style="color:#059669">High: ${dyn.high}d</span>
+         <span style="color:#9ca3af;margin:0 4px">·</span>
+         <span style="color:#d97706">Med: ${dyn.med}d</span>`
+      : `<span style="color:#9ca3af;font-style:italic">Não configurada</span>`;
+
+    const details = [
+      phase.recovery_strategy && `<div style="grid-column:span 1"><span style="color:#6b7280;font-weight:600">Recuperação</span><br>${phase.recovery_strategy}</div>`,
+      phase.body_comp_strategy && `<div style="grid-column:span 1"><span style="color:#6b7280;font-weight:600">Comp. Corporal</span><br>${phase.body_comp_strategy}</div>`,
+      phase.supplement_base && `<div style="grid-column:span 2"><span style="color:#6b7280;font-weight:600">Suplementação</span><br>${phase.supplement_base}</div>`,
+      phase.strategic_notes && `<div style="grid-column:span 2"><span style="color:#6b7280;font-weight:600">Observações</span><br>${phase.strategic_notes}</div>`,
+    ].filter(Boolean).join('');
+
+    const badge = isPolimento
+      ? `<span style="background:#ecfdf5;color:#059669;border:1px solid #6ee7b7;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:8px">🏁 Prova</span>`
+      : isTransicao
+      ? `<span style="background:#f5f3ff;color:#7c3aed;border:1px solid #c4b5fd;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:8px">Pós-prova</span>`
+      : '';
+
+    return `
+      <div style="border:1.5px solid ${pal.accent};border-radius:10px;overflow:hidden;
+                  background:#fff;page-break-inside:avoid;break-inside:avoid;margin-bottom:14px;">
+
+        <!-- Phase Header -->
+        <div style="background:${pal.light};border-bottom:1.5px solid ${pal.accent};
+                    padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:11px;height:11px;border-radius:50%;background:${pal.accent}"></div>
+            <span style="font-size:15px;font-weight:800;color:${pal.dark}">${phase.phase_name}</span>
+            ${badge}
+          </div>
+          <div style="display:flex;gap:18px;font-size:11px;color:#6b7280;align-items:center">
+            <span style="font-weight:700;color:#374151">${phase.duration_weeks}&nbsp;semanas</span>
+            ${phase.start_date && phase.end_date
+              ? `<span>${format(parseISO(phase.start_date),'dd/MM/yyyy')}&nbsp;→&nbsp;${format(parseISO(phase.end_date),'dd/MM/yyyy')}</span>`
+              : ''}
+          </div>
+        </div>
+
+        <!-- Phase Body -->
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+
+          ${phase.objective ? `
+          <p style="font-size:12px;color:#374151;margin:0;line-height:1.6;
+                    padding:8px 12px;background:#f9fafb;border-radius:6px;
+                    border-left:3px solid ${pal.accent}">
+            <strong>Objetivo:</strong>&nbsp;${phase.objective}
+          </p>` : ''}
+
+          <!-- Metric chips -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:8px 10px">
+              <div style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">CHO</div>
+              <div style="font-size:15px;font-weight:800;color:#111827">${phase.cho_range ?? '—'}</div>
+              <div style="font-size:9px;color:#9ca3af">g / kg / dia</div>
+            </div>
+            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:8px 10px">
+              <div style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Train-Low</div>
+              <div style="font-size:13px;font-weight:800;color:${trainLowColor(phase.train_low_strategy)};text-transform:capitalize">
+                ${phase.train_low_strategy ?? '—'}
+              </div>
+            </div>
+            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:8px 10px">
+              <div style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Dinâmica CHO</div>
+              <div style="font-size:11px;line-height:1.7">${dynHtml}</div>
+            </div>
+          </div>
+
+          ${details ? `
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:11px;color:#374151;line-height:1.6">
+            ${details}
+          </div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div style="background:#fff;padding:40px 36px;font-family:'Segoe UI',system-ui,sans-serif;
+                min-width:680px;max-width:800px;color:#111827">
+
+      <!-- ── HEADER ───────────────────────────────────────────────── -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                  border-bottom:2.5px solid #111827;padding-bottom:18px;margin-bottom:22px">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#6b7280;letter-spacing:1.2px;
+                      text-transform:uppercase;margin-bottom:4px">Periodização Nutricional</div>
+          <h1 style="font-size:24px;font-weight:900;color:#111827;margin:0;line-height:1.1">
+            Planejamento Estratégico
+          </h1>
+          <p style="font-size:12px;color:#6b7280;margin:6px 0 0">por Fases · Endurance</p>
+        </div>
+        <div style="text-align:right">
+          ${raceName ? `<div style="font-size:14px;font-weight:800;color:#111827;margin-bottom:4px">🎯&nbsp;${raceName}</div>` : ''}
+          <div style="font-size:12px;color:#374151">
+            <span style="font-weight:600">Prova:</span>&nbsp;
+            ${raceDate ? format(parseISO(raceDate),'dd/MM/yyyy') : '—'}
+          </div>
+          <div style="font-size:12px;color:#374151">
+            <span style="font-weight:600">Início:</span>&nbsp;
+            ${startDate ? format(parseISO(startDate),'dd/MM/yyyy') : '—'}
+          </div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px">
+            ${totalWeeks}&nbsp;semanas totais
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PHASE BAR ─────────────────────────────────────────────── -->
+      <div style="height:30px;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;
+                  display:flex;margin-bottom:24px">
+        ${phaseBarItems}
+      </div>
+
+      <!-- ── PHASE CARDS ───────────────────────────────────────────── -->
+      ${phaseCards}
+
+      <!-- ── FOOTER ────────────────────────────────────────────────── -->
+      <div style="border-top:1px solid #e5e7eb;padding-top:14px;margin-top:8px;
+                  display:flex;justify-content:space-between;align-items:flex-end">
+        <p style="font-size:9px;color:#9ca3af;margin:0;max-width:560px;line-height:1.6">
+          📚&nbsp;Referências: Vitale &amp; Getzin (2019) · Burke et al. (2011) ·
+          Jeukendrup (2017) · Stellingwerff et al. (2019) · Thomas et al. (2016)
+        </p>
+        <p style="font-size:9px;color:#d1d5db;margin:0;white-space:nowrap;padding-left:16px">
+          Gerado em&nbsp;${format(new Date(),'dd/MM/yyyy')}
+        </p>
+      </div>
+    </div>`;
+}
+
+// ─── PDF renderer using jsPDF ────────────────────────────────────────────────
+async function exportPDF(
+  container: HTMLElement,
+  filename: string,
+): Promise<void> {
+  const canvas = await html2canvas(container, {
+    scale: 2.5,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+    windowWidth: 840,
+  });
+
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const PAGE_W = pdf.internal.pageSize.getWidth();   // 210 mm
+  const PAGE_H = pdf.internal.pageSize.getHeight();  // 297 mm
+  const MARGIN = 10;
+  const CONTENT_W = PAGE_W - MARGIN * 2;
+
+  // We'll tile the canvas vertically across pages
+  const canvasW = canvas.width;
+  const canvasH = canvas.height;
+  const mmPerPx  = CONTENT_W / canvasW;          // mm width of one canvas pixel
+  const pageHeightPx = (PAGE_H - MARGIN * 2) / mmPerPx; // canvas pixels per page
+
+  let remainingPx = canvasH;
+  let srcY = 0;
+
+  while (remainingPx > 0) {
+    if (srcY > 0) pdf.addPage();
+
+    const sliceH = Math.min(pageHeightPx, remainingPx);
+
+    // Create a slice canvas
+    const sliceCanvas = document.createElement('canvas');
+    sliceCanvas.width  = canvasW;
+    sliceCanvas.height = sliceH;
+    const ctx = sliceCanvas.getContext('2d')!;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvasW, sliceH);
+    ctx.drawImage(canvas, 0, srcY, canvasW, sliceH, 0, 0, canvasW, sliceH);
+
+    const imgData = sliceCanvas.toDataURL('image/jpeg', 0.95);
+    const sliceHmm = sliceH * mmPerPx;
+    pdf.addImage(imgData, 'JPEG', MARGIN, MARGIN, CONTENT_W, sliceHmm);
+
+    srcY        += sliceH;
+    remainingPx -= sliceH;
+  }
+
+  pdf.save(filename);
+}
+
+// ─── JPEG renderer ───────────────────────────────────────────────────────────
+async function exportJPEG(container: HTMLElement, filename: string): Promise<void> {
+  const canvas = await html2canvas(container, {
+    scale: 2.5,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    logging: false,
+    windowWidth: 840,
+  });
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = canvas.toDataURL('image/jpeg', 0.95);
+  link.click();
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
 export function PeriodizationExportButton({
   phases, raceName, raceDate, startDate, totalWeeks, allDynamics = [], journeyWeeks = []
 }: Props) {
-  const [open, setOpen] = useState(false);
-  const [format_, setFormat] = useState<'pdf' | 'jpeg'>('pdf');
+  const [open, setOpen]           = useState(false);
+  const [fmt, setFmt]             = useState<'pdf' | 'jpeg'>('pdf');
   const [exporting, setExporting] = useState(false);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const containerRef              = useRef<HTMLDivElement>(null);
+
+  const htmlContent = buildHTML(phases, raceName, raceDate, startDate, totalWeeks, allDynamics, journeyWeeks);
+  const filename = `periodizacao${raceName ? `-${raceName.replace(/\s+/g, '-').toLowerCase()}` : ''}`;
 
   const handleExport = async () => {
-    if (!previewRef.current) return;
+    if (!containerRef.current) return;
     setExporting(true);
     try {
-      const canvas = await html2canvas(previewRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-      });
-
-      if (format_ === 'jpeg') {
-        const link = document.createElement('a');
-        link.download = `periodizacao-${raceName || 'atleta'}.jpg`;
-        link.href = canvas.toDataURL('image/jpeg', 0.92);
-        link.click();
+      if (fmt === 'pdf') {
+        await exportPDF(containerRef.current, `${filename}.pdf`);
       } else {
-        const imgData = canvas.toDataURL('image/jpeg', 0.92);
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const pageW = pdf.internal.pageSize.getWidth();
-        const pageH = pdf.internal.pageSize.getHeight();
-        const ratio = canvas.width / canvas.height;
-        const imgW = pageW - 20;
-        const imgH = imgW / ratio;
-
-        if (imgH <= pageH - 20) {
-          pdf.addImage(imgData, 'JPEG', 10, 10, imgW, imgH);
-        } else {
-          // Multi-page if content is tall
-          let yOffset = 0;
-          const pageImgH = pageH - 20;
-          while (yOffset < imgH) {
-            if (yOffset > 0) pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 10, 10 - yOffset, imgW, imgH);
-            yOffset += pageImgH;
-          }
-        }
-        pdf.save(`periodizacao-${raceName || 'atleta'}.pdf`);
+        await exportJPEG(containerRef.current, `${filename}.jpg`);
       }
       setOpen(false);
     } catch (e) {
@@ -96,26 +322,11 @@ export function PeriodizationExportButton({
     setExporting(false);
   };
 
-  const getDynamicSummary = (phase: Phase) => {
-    const weekIds = journeyWeeks.filter((w: any) => w.journey_phase_id === (phases as any[]).find((p: any) => p.phase_name === phase.phase_name)?.id).map((w: any) => w.id);
-    const dynamics = allDynamics.filter((d: any) => weekIds.includes(d.journey_week_id));
-    if (dynamics.length === 0) return null;
-    const low = dynamics.filter((d: any) => d.cho_classification === 'Low').length;
-    const high = dynamics.filter((d: any) => d.cho_classification === 'High').length;
-    const med = dynamics.filter((d: any) => d.cho_classification === 'Medium').length;
-    return { low, high, med, total: dynamics.length };
-  };
-
   if (phases.length === 0) return null;
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-1.5 text-xs h-8"
-        onClick={() => setOpen(true)}
-      >
+      <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={() => setOpen(true)}>
         <Download className="h-3.5 w-3.5" />
         Exportar Visão Geral
       </Button>
@@ -123,198 +334,48 @@ export function PeriodizationExportButton({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-sm">Exportar Periodização</DialogTitle>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <DialogTitle className="text-sm font-semibold">Exportar Periodização</DialogTitle>
               <div className="flex items-center gap-2">
+                {/* Format selector */}
                 <button
-                  onClick={() => setFormat('pdf')}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs border transition-all ${format_ === 'pdf' ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}
+                  onClick={() => setFmt('pdf')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-all ${
+                    fmt === 'pdf' ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'
+                  }`}
                 >
                   <FileText className="h-3.5 w-3.5" /> PDF
                 </button>
                 <button
-                  onClick={() => setFormat('jpeg')}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs border transition-all ${format_ === 'jpeg' ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'}`}
+                  onClick={() => setFmt('jpeg')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-all ${
+                    fmt === 'jpeg' ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'
+                  }`}
                 >
                   <FileImage className="h-3.5 w-3.5" /> JPEG
                 </button>
                 <Button size="sm" onClick={handleExport} disabled={exporting} className="gap-1.5 text-xs h-8">
-                  {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                  {exporting ? 'Gerando...' : `Baixar ${format_.toUpperCase()}`}
+                  {exporting
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <Download className="h-3.5 w-3.5" />}
+                  {exporting ? 'Gerando…' : `Baixar ${fmt.toUpperCase()}`}
                 </Button>
               </div>
             </div>
           </DialogHeader>
 
-          {/* Preview area — this is what gets captured */}
-          <div ref={previewRef} style={{ background: '#ffffff', padding: '32px', fontFamily: 'system-ui, sans-serif', minWidth: 700 }}>
-            {/* Header */}
-            <div style={{ borderBottom: '2px solid #e5e7eb', paddingBottom: 20, marginBottom: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111827', margin: 0 }}>
-                    Periodização Nutricional
-                  </h1>
-                  <p style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
-                    Planejamento estratégico por fases
-                  </p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  {raceName && (
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>🎯 {raceName}</div>
-                  )}
-                  {raceDate && (
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                      Prova: {format(parseISO(raceDate), 'dd/MM/yyyy')}
-                    </div>
-                  )}
-                  {startDate && (
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>
-                      Início: {format(parseISO(startDate), 'dd/MM/yyyy')}
-                    </div>
-                  )}
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>{totalWeeks} semanas totais</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Phase Bar */}
-            <div style={{ display: 'flex', height: 32, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', marginBottom: 24 }}>
-              {phases.map((p, i) => {
-                const color = getPhaseColor(p.phase_name);
-                const pct = totalWeeks > 0 ? (p.duration_weeks / totalWeeks) * 100 : 25;
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      width: `${pct}%`,
-                      background: color.bg,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRight: i < phases.length - 1 ? '1px solid rgba(255,255,255,0.3)' : 'none',
-                    }}
-                  >
-                    <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', padding: '0 4px' }}>
-                      {p.phase_name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Phases */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {phases.map((phase, idx) => {
-                const color = getPhaseColor(phase.phase_name);
-                const dynSum = getDynamicSummary(phase);
-
-                return (
-                  <div key={idx} style={{
-                    border: `1.5px solid ${color.border}`,
-                    borderRadius: 10,
-                    overflow: 'hidden',
-                    background: '#fff',
-                  }}>
-                    {/* Phase header */}
-                    <div style={{
-                      background: color.light,
-                      borderBottom: `1.5px solid ${color.border}`,
-                      padding: '10px 16px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 12, height: 12, borderRadius: '50%', background: color.bg }} />
-                        <span style={{ fontSize: 15, fontWeight: 800, color: color.text }}>{phase.phase_name}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 16, fontSize: 11, color: '#6b7280' }}>
-                        <span style={{ fontWeight: 600 }}>{phase.duration_weeks} semanas</span>
-                        {phase.start_date && phase.end_date && (
-                          <span>
-                            {format(parseISO(phase.start_date), 'dd/MM/yyyy')} → {format(parseISO(phase.end_date), 'dd/MM/yyyy')}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Phase body */}
-                    <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {/* Objective */}
-                      {phase.objective && (
-                        <p style={{ fontSize: 12, color: '#374151', margin: 0, lineHeight: 1.5 }}>
-                          <strong>Objetivo:</strong> {phase.objective}
-                        </p>
-                      )}
-
-                      {/* Key metrics row */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px' }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 2 }}>CHO</div>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>{phase.cho_range || '—'} g/kg</div>
-                        </div>
-                        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px' }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 2 }}>Train-Low</div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: phase.train_low_strategy === 'proibido' ? '#dc2626' : phase.train_low_strategy === 'reduzido' ? '#d97706' : '#059669' }}>
-                            {phase.train_low_strategy || '—'}
-                          </div>
-                        </div>
-                        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px' }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 2 }}>Dinâmica CHO</div>
-                          {dynSum ? (
-                            <div style={{ fontSize: 10, color: '#374151' }}>
-                              <span style={{ color: '#3b82f6' }}>Low: {dynSum.low}d</span>
-                              {' · '}
-                              <span style={{ color: '#10b981' }}>High: {dynSum.high}d</span>
-                              {' · '}
-                              <span style={{ color: '#f59e0b' }}>Med: {dynSum.med}d</span>
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: 10, color: '#9ca3af' }}>Não configurada</div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Details row */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                        {phase.recovery_strategy && (
-                          <div style={{ fontSize: 11, color: '#374151' }}>
-                            <strong style={{ color: '#6b7280' }}>Recuperação:</strong> {phase.recovery_strategy}
-                          </div>
-                        )}
-                        {phase.body_comp_strategy && (
-                          <div style={{ fontSize: 11, color: '#374151' }}>
-                            <strong style={{ color: '#6b7280' }}>Comp. Corporal:</strong> {phase.body_comp_strategy}
-                          </div>
-                        )}
-                        {phase.supplement_base && (
-                          <div style={{ fontSize: 11, color: '#374151' }}>
-                            <strong style={{ color: '#6b7280' }}>Suplementação:</strong> {phase.supplement_base}
-                          </div>
-                        )}
-                        {phase.strategic_notes && (
-                          <div style={{ fontSize: 11, color: '#374151' }}>
-                            <strong style={{ color: '#6b7280' }}>Obs.:</strong> {phase.strategic_notes}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Footer */}
-            <div style={{ marginTop: 24, borderTop: '1px solid #e5e7eb', paddingTop: 12, textAlign: 'center' }}>
-              <p style={{ fontSize: 9, color: '#9ca3af', margin: 0 }}>
-                📚 Baseado em: Vitale & Getzin (2019) · Burke et al. (2011) · Jeukendrup (2017) · Stellingwerff et al. (2019)
-              </p>
-              <p style={{ fontSize: 9, color: '#d1d5db', marginTop: 4 }}>
-                Gerado em {format(new Date(), 'dd/MM/yyyy')}
-              </p>
-            </div>
+          {/* ── Live preview ── */}
+          <div className="rounded-lg border border-border overflow-hidden bg-white">
+            <div
+              ref={containerRef}
+              dangerouslySetInnerHTML={{ __html: htmlContent }}
+              style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}
+            />
           </div>
+
+          <p className="text-[10px] text-muted-foreground text-center">
+            Esta pré-visualização é idêntica ao arquivo exportado.
+          </p>
         </DialogContent>
       </Dialog>
     </>
