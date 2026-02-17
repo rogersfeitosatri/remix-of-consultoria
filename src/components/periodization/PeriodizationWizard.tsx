@@ -548,14 +548,41 @@ export function PeriodizationWizard({
             </div>
 
             {/* Phase preview */}
-            {suggestedPhases.length > 0 && !hasPhases && (
+            {suggestedPhases.length > 0 && !hasPhases && (() => {
+              const suggestedTotal = suggestedPhases.reduce((a, p) => a + (p.duration_weeks || 0), 0);
+              const competitivaEnd = (() => {
+                let d = parseISO(startDate);
+                for (const p of suggestedPhases) {
+                  d = addWeeks(d, p.duration_weeks || 0);
+                  if (p.phase_name.includes('Competitiva')) break;
+                }
+                return d;
+              })();
+              const raceDateMatch = raceDate ? format(competitivaEnd, 'yyyy-MM-dd') === raceDate : false;
+              return (
               <div className="space-y-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Distribuição sugerida das fases</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Distribuição das fases</p>
+                  <Badge variant="outline" className="text-[9px]">
+                    {suggestedTotal} semanas total
+                  </Badge>
+                </div>
+
+                {/* Info: race = end of Competitiva */}
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
+                  <Target className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span>A <strong className="text-foreground">Prova Alvo</strong> deve coincidir com o final da fase <strong className="text-foreground">Competitiva</strong>.</span>
+                  {raceDate && (
+                    raceDateMatch
+                      ? <Badge className="text-[8px] bg-emerald-500/20 text-emerald-400 border-emerald-500/30 ml-auto shrink-0">✓ Alinhado</Badge>
+                      : <Badge className="text-[8px] bg-amber-500/20 text-amber-400 border-amber-500/30 ml-auto shrink-0">Ajuste as semanas</Badge>
+                  )}
+                </div>
                 
                 {/* Visual bar */}
                 <div className="flex h-10 rounded-xl overflow-hidden border border-border">
-                  {suggestedPhases.map((p, i) => {
-                    const widthPct = totalWeeks > 0 ? (p.duration_weeks / totalWeeks) * 100 : 20;
+                  {suggestedPhases.filter(p => p.duration_weeks > 0).map((p, i) => {
+                    const widthPct = suggestedTotal > 0 ? (p.duration_weeks / suggestedTotal) * 100 : 20;
                     const style = getPhaseStyle(p.phase_name);
                     return (
                       <div
@@ -572,21 +599,47 @@ export function PeriodizationWizard({
                   })}
                 </div>
 
-                {/* Phase cards */}
+                {/* Phase cards with editable weeks */}
                 <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
                   {suggestedPhases.map((p, i) => {
                     const style = getPhaseStyle(p.phase_name);
+                    const isZero = p.duration_weeks === 0;
                     return (
-                      <div key={i} className={`p-3 rounded-lg border ${style.border} ${style.bg}`}>
+                      <div key={i} className={`p-3 rounded-lg border ${style.border} ${style.bg} ${isZero ? 'opacity-50' : ''}`}>
                         <div className="flex items-center gap-1.5 mb-1.5">
                           <div className={`w-2 h-2 rounded-full ${style.dot}`} />
                           <span className={`text-xs font-bold ${style.text}`}>{p.phase_name}</span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground">{p.duration_weeks} semanas</p>
-                        <p className="text-[9px] text-muted-foreground mt-0.5">
-                          {format(parseISO(p.start_date), 'dd/MM')} → {format(parseISO(p.end_date), 'dd/MM')}
-                        </p>
-                        <p className="text-[9px] text-muted-foreground mt-1 line-clamp-2">{p.objective}</p>
+                        <div className="flex items-center gap-1 mb-1">
+                          <Input
+                            type="number"
+                            min={0}
+                            value={p.duration_weeks}
+                            onChange={e => {
+                              const newWeeks = Math.max(parseInt(e.target.value) || 0, 0);
+                              const updated = [...suggestedPhases];
+                              updated[i] = { ...updated[i], duration_weeks: newWeeks };
+                              // Recalculate dates
+                              let currentDate = parseISO(startDate);
+                              for (let j = 0; j < updated.length; j++) {
+                                updated[j].start_date = format(currentDate, 'yyyy-MM-dd');
+                                currentDate = addWeeks(currentDate, updated[j].duration_weeks);
+                                updated[j].end_date = format(currentDate, 'yyyy-MM-dd');
+                              }
+                              setSuggestedPhases(updated);
+                            }}
+                            className="h-7 text-xs w-14"
+                          />
+                          <span className="text-[10px] text-muted-foreground">sem</span>
+                        </div>
+                        {!isZero && p.start_date && (
+                          <p className="text-[9px] text-muted-foreground">
+                            {format(parseISO(p.start_date), 'dd/MM')} → {format(parseISO(p.end_date), 'dd/MM')}
+                          </p>
+                        )}
+                        {isZero && (
+                          <p className="text-[9px] text-muted-foreground italic">Fase ignorada</p>
+                        )}
                       </div>
                     );
                   })}
@@ -595,7 +648,12 @@ export function PeriodizationWizard({
                 <Button
                   onClick={() => {
                     const choVal = parseFloat(initialCHO) || 4;
-                    const phasesWithCho = suggestedPhases.map(p => ({
+                    const activePhases = suggestedPhases.filter(p => p.duration_weeks > 0);
+                    if (activePhases.length === 0) {
+                      toast({ title: 'Defina ao menos uma fase com semanas', variant: 'destructive' });
+                      return;
+                    }
+                    const phasesWithCho = activePhases.map(p => ({
                       ...p,
                       cho_range: getChoRangeForPhase(p.phase_name, choVal) + ' g/kg',
                     }));
@@ -610,35 +668,41 @@ export function PeriodizationWizard({
                   Montar Periodização
                 </Button>
               </div>
-            )}
+              );
+            })()}
 
             {/* Already has phases - show summary and allow reconfigure */}
-            {hasPhases && (
+            {hasPhases && (() => {
+              const phasesTotal = journeyPhases.reduce((a: number, p: any) => a + (p.duration_weeks || 0), 0);
+              return (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-medium text-muted-foreground uppercase">Periodização configurada</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs gap-1"
-                    onClick={() => {
-                      const choVal = parseFloat(initialCHO) || 4;
-                      const suggested = suggestPhases(totalWeeks, startDate).map(p => ({
-                        ...p,
-                        cho_range: getChoRangeForPhase(p.phase_name, choVal) + ' g/kg',
-                      }));
-                      setSuggestedPhases(suggested);
-                      onSavePhases(suggested);
-                    }}
-                    disabled={isSavingPhases}
-                  >
-                    <RefreshCw className="h-3 w-3" /> Recalcular
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[9px]">{phasesTotal} semanas</Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs gap-1"
+                      onClick={() => {
+                        const choVal = parseFloat(initialCHO) || 4;
+                        const suggested = suggestPhases(totalWeeks, startDate).map(p => ({
+                          ...p,
+                          cho_range: getChoRangeForPhase(p.phase_name, choVal) + ' g/kg',
+                        }));
+                        setSuggestedPhases(suggested);
+                        onSavePhases(suggested);
+                      }}
+                      disabled={isSavingPhases}
+                    >
+                      <RefreshCw className="h-3 w-3" /> Recalcular
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex h-8 rounded-lg overflow-hidden border border-border">
-                  {journeyPhases.map((p, i) => {
-                    const widthPct = totalWeeks > 0 ? (p.duration_weeks / totalWeeks) * 100 : 20;
+                  {journeyPhases.map((p: any, i: number) => {
+                    const widthPct = phasesTotal > 0 ? (p.duration_weeks / phasesTotal) * 100 : 20;
                     const style = getPhaseStyle(p.phase_name);
                     const isCurrent = p.id === currentPhase?.id;
                     return (
@@ -649,7 +713,28 @@ export function PeriodizationWizard({
                         }`}
                         style={{ width: `${widthPct}%` }}
                       >
-                        <span className={`text-[9px] font-bold ${style.text} truncate px-1`}>{p.phase_name}</span>
+                        <span className={`text-[9px] font-bold ${style.text} truncate px-1`}>{p.phase_name} ({p.duration_weeks}s)</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Editable phase weeks for existing phases */}
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                  {journeyPhases.map((p: any, i: number) => {
+                    const style = getPhaseStyle(p.phase_name);
+                    return (
+                      <div key={p.id || i} className={`p-2.5 rounded-lg border ${style.border} ${style.bg}`}>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <div className={`w-2 h-2 rounded-full ${style.dot}`} />
+                          <span className={`text-[10px] font-bold ${style.text}`}>{p.phase_name}</span>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground">{p.duration_weeks} sem</p>
+                        {p.start_date && (
+                          <p className="text-[9px] text-muted-foreground">
+                            {format(parseISO(p.start_date), 'dd/MM')} → {format(parseISO(p.end_date), 'dd/MM')}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -659,7 +744,8 @@ export function PeriodizationWizard({
                   <ChevronRight className="h-4 w-4" /> Avançar para Treinos
                 </Button>
               </div>
-            )}
+              );
+            })()}
           </CardContent>
         </Card>
       )}
