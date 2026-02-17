@@ -2234,6 +2234,77 @@ export type Database = {
           },
         ]
       }
+      journey_phase_transitions: {
+        Row: {
+          athlete_periodization_id: string
+          auto_adjustments: Json | null
+          client_id: string
+          created_at: string
+          from_phase_id: string | null
+          from_phase_name: string | null
+          id: string
+          notes: string | null
+          to_phase_id: string | null
+          to_phase_name: string | null
+          transition_date: string
+        }
+        Insert: {
+          athlete_periodization_id: string
+          auto_adjustments?: Json | null
+          client_id: string
+          created_at?: string
+          from_phase_id?: string | null
+          from_phase_name?: string | null
+          id?: string
+          notes?: string | null
+          to_phase_id?: string | null
+          to_phase_name?: string | null
+          transition_date?: string
+        }
+        Update: {
+          athlete_periodization_id?: string
+          auto_adjustments?: Json | null
+          client_id?: string
+          created_at?: string
+          from_phase_id?: string | null
+          from_phase_name?: string | null
+          id?: string
+          notes?: string | null
+          to_phase_id?: string | null
+          to_phase_name?: string | null
+          transition_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_phase_transitions_athlete_periodization_id_fkey"
+            columns: ["athlete_periodization_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_periodization"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journey_phase_transitions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journey_phase_transitions_from_phase_id_fkey"
+            columns: ["from_phase_id"]
+            isOneToOne: false
+            referencedRelation: "journey_phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journey_phase_transitions_to_phase_id_fkey"
+            columns: ["to_phase_id"]
+            isOneToOne: false
+            referencedRelation: "journey_phases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       journey_phases: {
         Row: {
           athlete_periodization_id: string
@@ -2376,6 +2447,7 @@ export type Database = {
       }
       journey_weeks: {
         Row: {
+          adjustment_log: Json | null
           client_id: string
           created_at: string
           id: string
@@ -2388,6 +2460,7 @@ export type Database = {
           week_number: number
         }
         Insert: {
+          adjustment_log?: Json | null
           client_id: string
           created_at?: string
           id?: string
@@ -2400,6 +2473,7 @@ export type Database = {
           week_number: number
         }
         Update: {
+          adjustment_log?: Json | null
           client_id?: string
           created_at?: string
           id?: string

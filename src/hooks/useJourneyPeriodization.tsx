@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { addWeeks, differenceInWeeks, format, parseISO } from 'date-fns';
+import type { Json } from '@/integrations/supabase/types';
 
 const DEFAULT_PHASES = [
   { phase_name: 'Base', phase_order: 0, objective: 'Adaptação metabólica, eficiência lipídica e construção de base aeróbia.', cho_range: '3-5 g/kg', train_low_strategy: 'permitido', recovery_strategy: 'Regenerativo moderado', body_comp_strategy: 'Manutenção ou leve redução de gordura', supplement_base: 'Creatina 5g, Ômega-3 2g, Vitamina D', creatine: '5g/dia', beta_alanine: '3.2g/dia (loading)', caffeine: '—', nitrate: '—', supplement_general: 'Foco em adaptação metabólica. Suplementação de base.' },
@@ -328,6 +329,65 @@ export function useJourneyPeriodization(clientId?: string) {
     },
   });
 
+  // Fetch phase transitions
+  const { data: transitions = [] } = useQuery({
+    queryKey: ['journey-transitions', clientId],
+    queryFn: async () => {
+      if (!athletePeriodization?.id) return [];
+      const { data, error } = await supabase
+        .from('journey_phase_transitions')
+        .select('*')
+        .eq('athlete_periodization_id', athletePeriodization.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!athletePeriodization?.id,
+  });
+
+  // Transition to next phase
+  const transitionPhase = useMutation({
+    mutationFn: async ({ fromPhaseId, toPhaseId, notes }: { fromPhaseId: string; toPhaseId: string; notes: string }) => {
+      const fromPhase = journeyPhases.find(p => p.id === fromPhaseId);
+      const toPhase = journeyPhases.find(p => p.id === toPhaseId);
+
+      const autoAdj: string[] = [];
+      if (fromPhase && toPhase) {
+        if (fromPhase.train_low_strategy !== toPhase.train_low_strategy) {
+          autoAdj.push(`Train-Low: ${fromPhase.train_low_strategy} → ${toPhase.train_low_strategy}`);
+        }
+        if (fromPhase.cho_range !== toPhase.cho_range) {
+          autoAdj.push(`CHO: ${fromPhase.cho_range} → ${toPhase.cho_range}`);
+        }
+      }
+
+      // Update phase statuses
+      await supabase.from('journey_phases').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', fromPhaseId);
+      await supabase.from('journey_phases').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', toPhaseId);
+
+      // Log transition
+      const { error } = await supabase.from('journey_phase_transitions').insert({
+        athlete_periodization_id: athletePeriodization!.id,
+        client_id: clientId!,
+        from_phase_id: fromPhaseId,
+        to_phase_id: toPhaseId,
+        from_phase_name: fromPhase?.phase_name || '',
+        to_phase_name: toPhase?.phase_name || '',
+        notes: notes || null,
+        auto_adjustments: autoAdj as unknown as Json,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['journey-phases', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['journey-transitions', clientId] });
+      toast({ title: 'Transição de fase realizada' });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Erro na transição', description: err.message, variant: 'destructive' });
+    },
+  });
+
   return {
     athletePeriodization,
     journeyPhases,
@@ -336,12 +396,14 @@ export function useJourneyPeriodization(clientId?: string) {
     loadingPhases,
     allSessions,
     allDynamics,
+    transitions,
     suggestPhases,
     saveJourneyPhases,
     updatePhase,
     saveSessions,
     saveDynamics,
     generateDynamics,
+    transitionPhase,
     DEFAULT_PHASES,
   };
 }
