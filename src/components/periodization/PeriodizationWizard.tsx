@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import {
   Target, ChevronRight, ChevronLeft, Sparkles, Loader2,
   Calendar, Dumbbell, Zap, CheckCircle2, Clock, ArrowRight,
-  CalendarDays, RefreshCw, Eye
+  CalendarDays, RefreshCw, Eye, Plus, Trash2, Moon
 } from 'lucide-react';
 import { differenceInWeeks, parseISO, format, addWeeks, isAfter, isBefore, differenceInDays } from 'date-fns';
 
@@ -17,6 +17,7 @@ const DAYS_SHORT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const SHIFTS = ['Manhã', 'Tarde', 'Noite'];
 const INTENSITIES = ['Leve', 'Moderado', 'Intenso'];
 const PRIORITIES = ['A', 'B', 'C'];
+const MODALITIES = ['Corrida', 'Natação', 'Ciclismo', 'Força', 'Day Off'];
 
 const PHASE_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   'Base': { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
@@ -108,11 +109,12 @@ export function PeriodizationWizard({
     ? allDynamics.filter(d => d.journey_week_id === selectedWeek.id)
     : [];
 
-  // Init sessions when phase/week changes
+  // Init sessions when phase/week changes — now supports multiple sessions per day
   useEffect(() => {
     if (weekSessions.length > 0) {
       setSessions(weekSessions.map(s => ({ ...s })));
     } else if (selectedWeek) {
+      // One default session per day
       setSessions(DAYS.map((_, i) => ({
         journey_week_id: selectedWeek.id,
         day_of_week: i,
@@ -121,6 +123,7 @@ export function PeriodizationWizard({
         intensity: 'Moderado',
         priority: 'B',
         metabolic_objective: '',
+        is_day_off: false,
       })));
     }
     setSessionsDirty(false);
@@ -134,11 +137,55 @@ export function PeriodizationWizard({
     }
   }, [totalWeeks, startDate, hasPhases]);
 
-  const updateSession = (dayIdx: number, field: string, value: string) => {
+  const updateSession = (sessionIdx: number, field: string, value: string | boolean) => {
     setSessionsDirty(true);
-    setSessions(prev => prev.map(s =>
-      s.day_of_week === dayIdx ? { ...s, [field]: value } : s
-    ));
+    setSessions(prev => prev.map((s, i) => i === sessionIdx ? { ...s, [field]: value } : s));
+  };
+
+  const addSessionToDay = (dayIdx: number) => {
+    setSessionsDirty(true);
+    if (!selectedWeek) return;
+    setSessions(prev => [...prev, {
+      journey_week_id: selectedWeek.id,
+      day_of_week: dayIdx,
+      modality: '',
+      shift: 'Tarde',
+      intensity: 'Moderado',
+      priority: 'B',
+      metabolic_objective: '',
+      is_day_off: false,
+    }]);
+  };
+
+  const removeSession = (sessionIdx: number) => {
+    setSessionsDirty(true);
+    setSessions(prev => prev.filter((_, i) => i !== sessionIdx));
+  };
+
+  const toggleDayOff = (dayIdx: number) => {
+    setSessionsDirty(true);
+    const daySessions = sessions.filter(s => s.day_of_week === dayIdx);
+    if (daySessions.length === 1 && daySessions[0].is_day_off) {
+      // Turn off day-off
+      setSessions(prev => prev.map(s =>
+        s.day_of_week === dayIdx ? { ...s, is_day_off: false, modality: '' } : s
+      ));
+    } else {
+      // Set as day off — keep only 1 session for this day
+      setSessions(prev => [
+        ...prev.filter(s => s.day_of_week !== dayIdx),
+        {
+          journey_week_id: selectedWeek?.id || '',
+          day_of_week: dayIdx,
+          modality: 'Day Off',
+          shift: 'Manhã',
+          intensity: 'Leve',
+          priority: 'C',
+          metabolic_objective: 'Recuperação',
+          is_day_off: true,
+        },
+      ]);
+    }
   };
 
   const handleSaveSessions = () => {
@@ -154,7 +201,7 @@ export function PeriodizationWizard({
     }
   };
 
-  const hasSomeSessions = sessions.some(s => s.modality && s.modality.trim() !== '');
+  const hasSomeSessions = sessions.some(s => (s.modality && s.modality.trim() !== '') || s.is_day_off);
 
   // Progress calculations
   const weeksToRace = raceDate ? Math.max(differenceInWeeks(parseISO(raceDate), today), 0) : 0;
@@ -218,16 +265,35 @@ export function PeriodizationWizard({
               <p className="text-sm text-muted-foreground">Defina a prova alvo e o sistema monta toda a progressão</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1.5">Prova Alvo</label>
-                <div className="p-3 rounded-lg border border-border bg-muted/30">
-                  <p className="text-sm font-semibold">{raceName || 'Não definida'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {raceDate ? format(parseISO(raceDate), 'dd/MM/yyyy') : 'Defina no perfil do atleta'}
-                  </p>
-                </div>
+            {/* Race Target - Hero */}
+            {raceName || raceDate ? (
+              <div className="relative p-6 rounded-2xl bg-gradient-to-br from-primary/15 via-primary/5 to-transparent border-2 border-primary/30 text-center">
+                <Target className="h-8 w-8 text-primary mx-auto mb-2" />
+                <h3 className="text-xl font-bold text-foreground">{raceName || 'Prova Alvo'}</h3>
+                {raceDate && (
+                  <>
+                    <p className="text-lg font-semibold text-primary mt-1">{format(parseISO(raceDate), 'dd/MM/yyyy')}</p>
+                    {totalWeeks > 0 && (
+                      <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
+                        <Clock className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-bold text-primary">{totalWeeks} semanas até a prova</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                {!raceDate && (
+                  <p className="text-sm text-muted-foreground mt-2">Defina a prova alvo no perfil do atleta</p>
+                )}
               </div>
+            ) : (
+              <div className="p-6 rounded-2xl border-2 border-dashed border-muted-foreground/30 text-center">
+                <Target className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm font-medium text-muted-foreground">Nenhuma prova alvo definida</p>
+                <p className="text-xs text-muted-foreground mt-1">Defina no perfil do atleta para continuar</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-medium text-muted-foreground block mb-1.5">Início do Ciclo</label>
                 <Input
@@ -251,12 +317,6 @@ export function PeriodizationWizard({
                 />
               </div>
             </div>
-
-            {totalWeeks > 0 && (
-              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-center">
-                <p className="text-sm text-primary font-semibold">{totalWeeks} semanas até a prova</p>
-              </div>
-            )}
 
             {/* Phase preview */}
             {suggestedPhases.length > 0 && !hasPhases && (
@@ -438,48 +498,108 @@ export function PeriodizationWizard({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
-                {sessions.map((session) => {
-                  const hasActivity = session.modality && session.modality.trim() !== '';
+                {DAYS.map((dayName, dayIdx) => {
+                  const daySessions = sessions
+                    .map((s, idx) => ({ ...s, _idx: idx }))
+                    .filter(s => s.day_of_week === dayIdx);
+                  const isDayOff = daySessions.some(s => s.is_day_off);
+                  const hasActivity = daySessions.some(s => s.modality && s.modality.trim() !== '');
+
                   return (
                     <div
-                      key={session.day_of_week}
+                      key={dayIdx}
                       className={`p-3 rounded-xl border transition-all ${
+                        isDayOff ? 'border-purple-500/30 bg-purple-500/5' :
                         hasActivity ? 'border-primary/20 bg-primary/5' : 'border-border bg-muted/20'
                       }`}
                     >
-                      <p className="text-xs font-bold text-center mb-2">{DAYS_SHORT[session.day_of_week]}</p>
-                      
-                      <Input
-                        value={session.modality}
-                        onChange={e => updateSession(session.day_of_week, 'modality', e.target.value)}
-                        placeholder="Atividade"
-                        className="h-8 text-xs mb-1.5"
-                      />
-                      
-                      <Select value={session.shift} onValueChange={v => updateSession(session.day_of_week, 'shift', v)}>
-                        <SelectTrigger className="h-7 text-[10px] mb-1"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {SHIFTS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold">{DAYS_SHORT[dayIdx]}</p>
+                        <button
+                          onClick={() => toggleDayOff(dayIdx)}
+                          className={`text-[9px] px-1.5 py-0.5 rounded-md border transition-all ${
+                            isDayOff
+                              ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                              : 'text-muted-foreground border-border hover:bg-muted/50'
+                          }`}
+                        >
+                          <Moon className="h-3 w-3 inline mr-0.5" />Off
+                        </button>
+                      </div>
 
-                      <Select value={session.intensity} onValueChange={v => updateSession(session.day_of_week, 'intensity', v)}>
-                        <SelectTrigger className={`h-7 text-[10px] mb-1 ${
-                          session.intensity === 'Intenso' ? 'border-red-500/40 text-red-400' :
-                          session.intensity === 'Moderado' ? 'border-amber-500/40 text-amber-400' :
-                          'border-emerald-500/40 text-emerald-400'
-                        }`}><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {INTENSITIES.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      {isDayOff ? (
+                        <div className="text-center py-4">
+                          <Moon className="h-5 w-5 text-purple-400 mx-auto mb-1" />
+                          <p className="text-[10px] text-purple-400 font-medium">Day Off</p>
+                          <p className="text-[9px] text-muted-foreground">Recuperação</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {daySessions.map((session, sIdx) => (
+                            <div key={session._idx} className={`space-y-1 ${sIdx > 0 ? 'pt-2 border-t border-border/50' : ''}`}>
+                              {sIdx > 0 && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[8px] font-bold text-muted-foreground uppercase">Sessão {sIdx + 1}</span>
+                                  <button onClick={() => removeSession(session._idx)} className="text-destructive hover:text-destructive/80">
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              )}
 
-                      <Select value={session.priority} onValueChange={v => updateSession(session.day_of_week, 'priority', v)}>
-                        <SelectTrigger className="h-7 text-[10px]"><SelectValue placeholder="Prio" /></SelectTrigger>
-                        <SelectContent>
-                          {PRIORITIES.map(p => <SelectItem key={p} value={p}>Prio {p}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                              <Select
+                                value={session.modality || ''}
+                                onValueChange={v => {
+                                  if (v === 'Day Off') {
+                                    toggleDayOff(dayIdx);
+                                  } else {
+                                    updateSession(session._idx, 'modality', v);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Atividade" /></SelectTrigger>
+                                <SelectContent>
+                                  {MODALITIES.map(m => (
+                                    <SelectItem key={m} value={m}>{m === 'Day Off' ? '🌙 Day Off' : m}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              <Select value={session.shift} onValueChange={v => updateSession(session._idx, 'shift', v)}>
+                                <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {SHIFTS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+
+                              <Select value={session.intensity} onValueChange={v => updateSession(session._idx, 'intensity', v)}>
+                                <SelectTrigger className={`h-7 text-[10px] ${
+                                  session.intensity === 'Intenso' ? 'border-red-500/40 text-red-400' :
+                                  session.intensity === 'Moderado' ? 'border-amber-500/40 text-amber-400' :
+                                  'border-emerald-500/40 text-emerald-400'
+                                }`}><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {INTENSITIES.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+
+                              <Select value={session.priority} onValueChange={v => updateSession(session._idx, 'priority', v)}>
+                                <SelectTrigger className="h-7 text-[10px]"><SelectValue placeholder="Prio" /></SelectTrigger>
+                                <SelectContent>
+                                  {PRIORITIES.map(p => <SelectItem key={p} value={p}>Prio {p}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ))}
+
+                          {/* Add session button */}
+                          <button
+                            onClick={() => addSessionToDay(dayIdx)}
+                            className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-primary transition-all text-[9px]"
+                          >
+                            <Plus className="h-3 w-3" /> Treino duplo
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
