@@ -9,10 +9,11 @@ import { Progress } from '@/components/ui/progress';
 import {
   Target, ChevronRight, ChevronLeft, ChevronDown, Sparkles, Loader2,
   Calendar, Dumbbell, Zap, CheckCircle2, Clock, ArrowRight,
-  CalendarDays, RefreshCw, Eye, Plus, Trash2, Moon,
+  CalendarDays, RefreshCw, Eye, Plus, Trash2, Moon, Sun,
   Pill, Droplets, Flame, ShieldCheck, AlertTriangle, TrendingUp, Beaker, Apple
 } from 'lucide-react';
 import { differenceInWeeks, parseISO, format, addWeeks, isAfter, isBefore, differenceInDays } from 'date-fns';
+import { useThemeToggle } from '@/App';
 
 const DAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const DAYS_SHORT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -390,6 +391,8 @@ export function PeriodizationWizard({
 
   // ===== RENDER =====
 
+  const { theme, setTheme } = useThemeToggle();
+
   return (
     <div className="space-y-4">
       {/* Step indicator */}
@@ -426,6 +429,14 @@ export function PeriodizationWizard({
             </div>
           );
         })}
+        {/* Theme toggle */}
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="ml-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-colors shrink-0"
+          title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-muted-foreground" />}
+        </button>
       </div>
 
       {/* ===== STEP 0: Cadastro Inicial ===== */}
@@ -835,92 +846,91 @@ export function PeriodizationWizard({
 
           {/* Dynamics display - visual cards */}
           {weekDynamics.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-7 gap-1.5">
-              {[...weekDynamics].sort((a, b) => a.day_of_week - b.day_of_week).map((day) => {
-                const choStyle = CHO_STYLES[day.cho_classification] || { bg: 'bg-muted', text: 'text-muted-foreground', icon: '•' };
-                const session = sessions.find(s => s.day_of_week === day.day_of_week);
-                const isOff = !session?.modality || session.modality === 'Day Off';
-                return (
-                  <div key={day.day_of_week} className="rounded-lg border border-border overflow-hidden">
-                    {/* Header: Day + CHO badge */}
-                    <div className={`px-2 py-1.5 ${choStyle.bg} flex items-center justify-between`}>
-                      <span className="text-[11px] font-bold">{DAYS_SHORT[day.day_of_week]}</span>
-                      <Badge variant="outline" className={`text-[8px] px-1 py-0 h-4 ${choStyle.text} border-current/30`}>
-                        {day.cho_classification}
-                      </Badge>
-                    </div>
+            <div className="space-y-2">
+              {/* Legend row */}
+              <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-muted/20 border border-border text-[10px] text-muted-foreground">
+                <span className="font-semibold text-foreground">Legenda:</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> High</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> Med</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> Low</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500" /> Rec</span>
+                <span className="ml-auto text-[9px]">PRÉ · INT · PÓS · 🌙</span>
+              </div>
 
-                    {/* CHO g/kg */}
-                    {day.cho_gkg && (
-                      <div className="px-2 py-1 border-b border-border/50 text-center">
-                        <span className="text-base font-bold text-foreground">{day.cho_gkg}</span>
-                        <span className="text-[9px] text-muted-foreground ml-0.5">g/kg</span>
+              {/* Days grid */}
+              <div className="grid grid-cols-7 gap-2">
+                {[...weekDynamics].sort((a, b) => a.day_of_week - b.day_of_week).map((day) => {
+                  const choStyle = CHO_STYLES[day.cho_classification] || { bg: 'bg-muted', text: 'text-muted-foreground', icon: '•' };
+                  const session = sessions.find(s => s.day_of_week === day.day_of_week);
+                  const isOff = !session?.modality || session.modality === 'Day Off';
+                  
+                  return (
+                    <div key={day.day_of_week} className={`rounded-xl border border-border overflow-hidden transition-all hover:shadow-md hover:border-primary/30 ${isOff ? 'opacity-70' : ''}`}>
+                      {/* Day header */}
+                      <div className={`px-2.5 py-2 ${choStyle.bg} flex items-center justify-between border-b border-border/50`}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-foreground">{DAYS_SHORT[day.day_of_week]}</span>
+                          <span className="text-sm">{choStyle.icon}</span>
+                        </div>
+                        {day.cho_gkg && (
+                          <span className={`text-sm font-black ${choStyle.text}`}>{day.cho_gkg}<span className="text-[9px] font-normal opacity-70">g/kg</span></span>
+                        )}
                       </div>
-                    )}
 
-                    {/* Distribution bar */}
-                    {(day.morning_cho_pct || day.afternoon_cho_pct || day.night_cho_pct) && (
-                      <div className="px-2 py-1 border-b border-border/50">
-                        <div className="flex h-2 w-full rounded-full overflow-hidden">
-                          <div className="bg-amber-400/70" style={{ width: `${day.morning_cho_pct || 33}%` }} />
-                          <div className="bg-orange-400/70" style={{ width: `${day.afternoon_cho_pct || 34}%` }} />
-                          <div className="bg-indigo-400/70" style={{ width: `${day.night_cho_pct || 33}%` }} />
-                        </div>
-                        <div className="flex justify-between text-[7px] text-muted-foreground mt-0.5">
-                          <span>☀{day.morning_cho_pct}%</span>
-                          <span>🌅{day.afternoon_cho_pct}%</span>
-                          <span>🌙{day.night_cho_pct}%</span>
+                      {/* Session pill */}
+                      <div className="px-2 py-1.5 border-b border-border/30">
+                        <div className={`text-center py-0.5 rounded-md text-[9px] font-semibold ${isOff ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
+                          {isOff ? '🛌 OFF' : `${session.modality} · ${session.shift}`}
                         </div>
                       </div>
-                    )}
 
-                    {/* Session */}
-                    <div className="px-2 py-1 border-b border-border/50 bg-muted/20">
-                      <p className="text-[9px] text-muted-foreground font-medium">
-                        {isOff ? 'Day Off' : `${session.modality}`}
-                      </p>
-                      {!isOff && (
-                        <p className="text-[8px] text-muted-foreground">{session.shift} • {session.intensity} • {session.duration_minutes || 60}min</p>
+                      {/* CHO distribution mini-bar */}
+                      {(day.morning_cho_pct || day.afternoon_cho_pct || day.night_cho_pct) && (
+                        <div className="px-2 py-1.5 border-b border-border/30">
+                          <div className="flex h-1.5 w-full rounded-full overflow-hidden">
+                            <div className="bg-amber-400" style={{ width: `${day.morning_cho_pct || 33}%` }} />
+                            <div className="bg-orange-400" style={{ width: `${day.afternoon_cho_pct || 34}%` }} />
+                            <div className="bg-indigo-400" style={{ width: `${day.night_cho_pct || 33}%` }} />
+                          </div>
+                          <div className="flex justify-between text-[8px] text-muted-foreground mt-0.5 font-mono">
+                            <span>{day.morning_cho_pct}%</span>
+                            <span>{day.afternoon_cho_pct}%</span>
+                            <span>{day.night_cho_pct}%</span>
+                          </div>
+                        </div>
                       )}
-                    </div>
 
-                    {/* Rationale */}
-                    {day.distribution_rationale && (
-                      <div className="px-2 py-1 border-b border-border/50">
-                        <p className="text-[8px] italic text-muted-foreground">{day.distribution_rationale}</p>
+                      {/* Timing codes — ultra-compact pills */}
+                      <div className="p-2 space-y-1">
+                        {day.pre_training && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[7px] font-black text-amber-500 bg-amber-500/10 rounded px-1 py-0.5 leading-none">PRÉ</span>
+                            <span className="text-[9px] font-semibold text-foreground truncate">{day.pre_training}</span>
+                          </div>
+                        )}
+                        {day.intra_training && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[7px] font-black text-orange-500 bg-orange-500/10 rounded px-1 py-0.5 leading-none">INT</span>
+                            <span className="text-[9px] font-semibold text-foreground truncate">{day.intra_training}</span>
+                          </div>
+                        )}
+                        {day.post_training && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[7px] font-black text-emerald-500 bg-emerald-500/10 rounded px-1 py-0.5 leading-none">PÓS</span>
+                            <span className="text-[9px] font-semibold text-foreground truncate">{day.post_training}</span>
+                          </div>
+                        )}
+                        {day.night_guidance && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[7px] font-black text-indigo-400 bg-indigo-500/10 rounded px-1 py-0.5 leading-none">🌙</span>
+                            <span className="text-[9px] font-semibold text-foreground truncate">{day.night_guidance}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-
-                    {/* Timing codes */}
-                    <div className="px-2 py-1.5 space-y-0.5">
-                      {day.pre_training && (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-[7px] font-bold text-muted-foreground w-6 shrink-0">PRÉ</span>
-                          <span className="text-[9px] font-medium">{day.pre_training}</span>
-                        </div>
-                      )}
-                      {day.intra_training && (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-[7px] font-bold text-muted-foreground w-6 shrink-0">INT</span>
-                          <span className="text-[9px] font-medium">{day.intra_training}</span>
-                        </div>
-                      )}
-                      {day.post_training && (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-[7px] font-bold text-muted-foreground w-6 shrink-0">PÓS</span>
-                          <span className="text-[9px] font-medium">{day.post_training}</span>
-                        </div>
-                      )}
-                      {day.night_guidance && (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-[7px] font-bold text-muted-foreground w-6 shrink-0">🌙</span>
-                          <span className="text-[9px] font-medium">{day.night_guidance}</span>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <Card>
@@ -928,8 +938,7 @@ export function PeriodizationWizard({
                 <Sparkles className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                 <h3 className="text-sm font-semibold">Gerar Dinâmica Nutricional</h3>
                 <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-                  A IA vai analisar os estímulos de treino e gerar estratégias de periodização nutricional baseadas em evidências
-                  (Burke, Impey, train-low, sleep-low) específicas para a fase <strong>{selectedPhase?.phase_name}</strong>.
+                  A IA vai gerar códigos ultra-curtos de timing nutricional para cada dia da fase <strong>{selectedPhase?.phase_name}</strong>.
                 </p>
                 <Button
                   onClick={handleGenerateDynamics}
