@@ -272,8 +272,25 @@ export function useJourneyPeriodization(clientId?: string) {
 
   // Generate dynamics via AI
   const generateDynamics = useMutation({
-    mutationFn: async ({ weekId, phase }: { weekId: string; phase: any }) => {
-      const weekSessions = allSessions.filter(s => s.journey_week_id === weekId);
+    mutationFn: async ({ weekId, phase, localSessions }: { weekId: string; phase: any; localSessions?: any[] }) => {
+      // Prefer local sessions (just saved) over DB sessions which may be stale
+      let weekSessions = localSessions && localSessions.length > 0
+        ? localSessions
+        : allSessions.filter(s => s.journey_week_id === weekId);
+      
+      // If still no sessions, refetch from DB
+      if (weekSessions.length === 0) {
+        const { data: freshSessions } = await supabase
+          .from('journey_week_sessions')
+          .select('*')
+          .eq('journey_week_id', weekId)
+          .order('day_of_week');
+        weekSessions = freshSessions || [];
+      }
+      
+      if (weekSessions.length === 0) {
+        throw new Error('Nenhuma sessão de treino encontrada. Salve os treinos primeiro.');
+      }
       
       // Get athlete info
       const { data: profile } = await supabase
