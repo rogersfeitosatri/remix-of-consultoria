@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import {
-  Target, ChevronRight, ChevronLeft, Sparkles, Loader2,
+  Target, ChevronRight, ChevronLeft, ChevronDown, Sparkles, Loader2,
   Calendar, Dumbbell, Zap, CheckCircle2, Clock, ArrowRight,
   CalendarDays, RefreshCw, Eye, Plus, Trash2, Moon,
   Pill, Droplets, Flame, ShieldCheck, AlertTriangle, TrendingUp, Beaker, Apple
@@ -990,184 +991,191 @@ export function PeriodizationWizard({
             const phaseNutrients = getPhaseNutrients(phase.phase_name);
 
             return (
-              <Card
-                key={phase.id}
-                className={`overflow-hidden transition-all ${
-                  isCurrent ? `ring-2 ring-primary/30 border-primary/30` : isPast ? 'opacity-60' : ''
-                }`}
-              >
-                {/* Phase header */}
-                <div className={`px-5 py-3 ${style.bg} border-b border-border flex items-center justify-between`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-4 h-4 rounded-full ${style.dot} shrink-0`} />
-                    <div>
-                      <span className={`text-base font-bold ${style.text}`}>{phase.phase_name}</span>
-                      {isCurrent && <Badge className="text-[8px] bg-primary/30 text-primary border-primary/40 ml-2">FASE ATUAL</Badge>}
-                      {isPast && <Badge variant="outline" className="text-[8px] ml-2 opacity-60">Concluída</Badge>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    <span className="font-mono">{phase.duration_weeks} sem</span>
-                    <span className="hidden sm:inline">
-                      {phase.start_date ? format(parseISO(phase.start_date), 'dd/MM') : '—'}
-                      <ArrowRight className="h-3 w-3 inline mx-1" />
-                      {phase.end_date ? format(parseISO(phase.end_date), 'dd/MM') : '—'}
-                    </span>
-                  </div>
-                </div>
-
-                <CardContent className="pt-4 pb-4 space-y-4">
-                  {/* Objective */}
-                  {phase.objective && (
-                    <p className="text-sm text-muted-foreground leading-relaxed">{phase.objective}</p>
-                  )}
-
-                  {/* Macronutrient strategy */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Flame className="h-3.5 w-3.5 text-amber-400" />
-                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Carboidrato</span>
-                      </div>
-                      <p className="text-sm font-bold">{phase.cho_range || '—'}</p>
-                      <p className="text-[9px] text-muted-foreground">g/kg/dia</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Dumbbell className="h-3.5 w-3.5 text-red-400" />
-                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Proteína</span>
-                      </div>
-                      <p className="text-sm font-bold">{phaseNutrients.protein}</p>
-                      <p className="text-[9px] text-muted-foreground">g/kg/dia</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Droplets className="h-3.5 w-3.5 text-yellow-400" />
-                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Gordura</span>
-                      </div>
-                      <p className="text-sm font-bold">{phaseNutrients.fat}</p>
-                      <p className="text-[9px] text-muted-foreground">% do VCT</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Droplets className="h-3.5 w-3.5 text-blue-400" />
-                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Hidratação</span>
-                      </div>
-                      <p className="text-sm font-bold">{phaseNutrients.hydration}</p>
-                      <p className="text-[9px] text-muted-foreground">mL/kg/h treino</p>
-                    </div>
-                  </div>
-
-                  {/* Train-Low & CHO distribution */}
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <Badge variant="outline" className={`text-[10px] ${
-                      phase.train_low_strategy === 'permitido' ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/5' :
-                      phase.train_low_strategy === 'reduzido' ? 'text-amber-400 border-amber-500/30 bg-amber-500/5' :
-                      'text-destructive border-destructive/30 bg-destructive/5'
-                    }`}>
-                      Train-Low: {phase.train_low_strategy}
-                    </Badge>
-                    {hasDynamics && (
-                      <>
-                        <Badge variant="outline" className="text-[10px] text-blue-400 border-blue-500/30 bg-blue-500/5">
-                          🧊 Low: {lowCount}d
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/30 bg-amber-500/5">
-                          ⚡ Med: {medCount}d
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30 bg-emerald-500/5">
-                          🔋 High: {highCount}d
-                        </Badge>
-                      </>
-                    )}
-                    {!hasDynamics && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-[10px] h-6 gap-1 text-muted-foreground"
-                        onClick={() => {
-                          setSelectedPhaseIdx(idx);
-                          setActiveStep(1);
-                        }}
-                      >
-                        <Sparkles className="h-3 w-3" /> Configurar treinos
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Supplementation protocol — Vitale & Getzin (2019) */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Pill className="h-4 w-4 text-primary" />
-                      <span className="text-xs font-bold">Suplementação Baseada em Evidências</span>
-                      <span className="text-[8px] text-muted-foreground italic">(Vitale & Getzin, 2019)</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {phaseSupplements.map((supp, sIdx) => (
-                        <div key={sIdx} className={`flex items-start gap-2.5 p-2.5 rounded-lg border ${supp.active ? 'border-primary/20 bg-primary/5' : 'border-border bg-muted/20 opacity-50'}`}>
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm ${supp.active ? 'bg-primary/15' : 'bg-muted'}`}>
-                            {supp.emoji}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold">{supp.name}</span>
-                              {supp.active ? (
-                                <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
-                              ) : (
-                                <span className="text-[8px] text-muted-foreground">(não recomendado nesta fase)</span>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-muted-foreground leading-snug">{supp.dose}</p>
-                            {supp.timing && <p className="text-[9px] text-primary/70 mt-0.5">{supp.timing}</p>}
-                            {supp.note && <p className="text-[9px] text-amber-400/80 mt-0.5 flex items-center gap-0.5"><AlertTriangle className="h-2.5 w-2.5" /> {supp.note}</p>}
-                          </div>
+              <Collapsible key={phase.id} defaultOpen={isCurrent}>
+                <Card
+                  className={`overflow-hidden transition-all ${
+                    isCurrent ? `ring-2 ring-primary/30 border-primary/30` : isPast ? 'opacity-60' : ''
+                  }`}
+                >
+                  {/* Phase header — clickable */}
+                  <CollapsibleTrigger asChild>
+                    <button className={`w-full px-5 py-3 ${style.bg} border-b border-border flex items-center justify-between cursor-pointer hover:brightness-110 transition-all group`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded-full ${style.dot} shrink-0`} />
+                        <div className="text-left">
+                          <span className={`text-base font-bold ${style.text}`}>{phase.phase_name}</span>
+                          {isCurrent && <Badge className="text-[8px] bg-primary/30 text-primary border-primary/40 ml-2">FASE ATUAL</Badge>}
+                          {isPast && <Badge variant="outline" className="text-[8px] ml-2 opacity-60">Concluída</Badge>}
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-mono">{phase.duration_weeks} sem</span>
+                          <span className="hidden sm:inline">
+                            {phase.start_date ? format(parseISO(phase.start_date), 'dd/MM') : '—'}
+                            <ArrowRight className="h-3 w-3 inline mx-1" />
+                            {phase.end_date ? format(parseISO(phase.end_date), 'dd/MM') : '—'}
+                          </span>
+                        </div>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                      </div>
+                    </button>
+                  </CollapsibleTrigger>
 
-                  {/* Nutrient timing guidance */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="h-4 w-4 text-primary" />
-                      <span className="text-xs font-bold">Nutrient Timing</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="p-2.5 rounded-lg border border-border bg-muted/20 text-center">
-                        <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-1">Pré-treino</p>
-                        <p className="text-[10px] leading-snug">{phaseNutrients.preTiming}</p>
-                      </div>
-                      <div className="p-2.5 rounded-lg border border-border bg-muted/20 text-center">
-                        <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-1">Intra-treino</p>
-                        <p className="text-[10px] leading-snug">{phaseNutrients.intraTiming}</p>
-                      </div>
-                      <div className="p-2.5 rounded-lg border border-border bg-muted/20 text-center">
-                        <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-1">Pós-treino</p>
-                        <p className="text-[10px] leading-snug">{phaseNutrients.postTiming}</p>
-                      </div>
-                    </div>
-                  </div>
+                  <CollapsibleContent className="animate-accordion-down data-[state=closed]:animate-accordion-up">
+                    <CardContent className="pt-4 pb-4 space-y-4">
+                      {/* Objective */}
+                      {phase.objective && (
+                        <p className="text-sm text-muted-foreground leading-relaxed">{phase.objective}</p>
+                      )}
 
-                  {/* Phase-specific alerts */}
-                  {phaseNutrients.alerts.length > 0 && (
-                    <div className="space-y-1.5">
-                      {phaseNutrients.alerts.map((alert, aIdx) => (
-                        <div key={aIdx} className={`flex items-start gap-2 p-2.5 rounded-lg text-[10px] leading-snug ${
-                          alert.type === 'warning' ? 'bg-amber-500/10 border border-amber-500/20 text-amber-300' :
-                          alert.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300' :
-                          'bg-blue-500/10 border border-blue-500/20 text-blue-300'
+                      {/* Macronutrient strategy */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="p-3 rounded-xl bg-muted/30 border border-border">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Flame className="h-3.5 w-3.5 text-amber-400" />
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Carboidrato</span>
+                          </div>
+                          <p className="text-sm font-bold">{phase.cho_range || '—'}</p>
+                          <p className="text-[9px] text-muted-foreground">g/kg/dia</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-muted/30 border border-border">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Dumbbell className="h-3.5 w-3.5 text-red-400" />
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Proteína</span>
+                          </div>
+                          <p className="text-sm font-bold">{phaseNutrients.protein}</p>
+                          <p className="text-[9px] text-muted-foreground">g/kg/dia</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-muted/30 border border-border">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Droplets className="h-3.5 w-3.5 text-yellow-400" />
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Gordura</span>
+                          </div>
+                          <p className="text-sm font-bold">{phaseNutrients.fat}</p>
+                          <p className="text-[9px] text-muted-foreground">% do VCT</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-muted/30 border border-border">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Droplets className="h-3.5 w-3.5 text-blue-400" />
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">Hidratação</span>
+                          </div>
+                          <p className="text-sm font-bold">{phaseNutrients.hydration}</p>
+                          <p className="text-[9px] text-muted-foreground">mL/kg/h treino</p>
+                        </div>
+                      </div>
+
+                      {/* Train-Low & CHO distribution */}
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <Badge variant="outline" className={`text-[10px] ${
+                          phase.train_low_strategy === 'permitido' ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/5' :
+                          phase.train_low_strategy === 'reduzido' ? 'text-amber-400 border-amber-500/30 bg-amber-500/5' :
+                          'text-destructive border-destructive/30 bg-destructive/5'
                         }`}>
-                          {alert.type === 'warning' ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" /> :
-                           alert.type === 'success' ? <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5" /> :
-                           <TrendingUp className="h-3.5 w-3.5 shrink-0 mt-0.5" />}
-                          {alert.text}
+                          Train-Low: {phase.train_low_strategy}
+                        </Badge>
+                        {hasDynamics && (
+                          <>
+                            <Badge variant="outline" className="text-[10px] text-blue-400 border-blue-500/30 bg-blue-500/5">
+                              🧊 Low: {lowCount}d
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/30 bg-amber-500/5">
+                              ⚡ Med: {medCount}d
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30 bg-emerald-500/5">
+                              🔋 High: {highCount}d
+                            </Badge>
+                          </>
+                        )}
+                        {!hasDynamics && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-[10px] h-6 gap-1 text-muted-foreground"
+                            onClick={() => {
+                              setSelectedPhaseIdx(idx);
+                              setActiveStep(1);
+                            }}
+                          >
+                            <Sparkles className="h-3 w-3" /> Configurar treinos
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Supplementation protocol */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Pill className="h-4 w-4 text-primary" />
+                          <span className="text-xs font-bold">Suplementação Baseada em Evidências</span>
+                          <span className="text-[8px] text-muted-foreground italic">(Vitale & Getzin, 2019)</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {phaseSupplements.map((supp, sIdx) => (
+                            <div key={sIdx} className={`flex items-start gap-2.5 p-2.5 rounded-lg border ${supp.active ? 'border-primary/20 bg-primary/5' : 'border-border bg-muted/20 opacity-50'}`}>
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm ${supp.active ? 'bg-primary/15' : 'bg-muted'}`}>
+                                {supp.emoji}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold">{supp.name}</span>
+                                  {supp.active ? (
+                                    <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
+                                  ) : (
+                                    <span className="text-[8px] text-muted-foreground">(não recomendado nesta fase)</span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground leading-snug">{supp.dose}</p>
+                                {supp.timing && <p className="text-[9px] text-primary/70 mt-0.5">{supp.timing}</p>}
+                                {supp.note && <p className="text-[9px] text-amber-400/80 mt-0.5 flex items-center gap-0.5"><AlertTriangle className="h-2.5 w-2.5" /> {supp.note}</p>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Nutrient timing guidance */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Clock className="h-4 w-4 text-primary" />
+                          <span className="text-xs font-bold">Nutrient Timing</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="p-2.5 rounded-lg border border-border bg-muted/20 text-center">
+                            <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-1">Pré-treino</p>
+                            <p className="text-[10px] leading-snug">{phaseNutrients.preTiming}</p>
+                          </div>
+                          <div className="p-2.5 rounded-lg border border-border bg-muted/20 text-center">
+                            <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-1">Intra-treino</p>
+                            <p className="text-[10px] leading-snug">{phaseNutrients.intraTiming}</p>
+                          </div>
+                          <div className="p-2.5 rounded-lg border border-border bg-muted/20 text-center">
+                            <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-1">Pós-treino</p>
+                            <p className="text-[10px] leading-snug">{phaseNutrients.postTiming}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Phase-specific alerts */}
+                      {phaseNutrients.alerts.length > 0 && (
+                        <div className="space-y-1.5">
+                          {phaseNutrients.alerts.map((alert, aIdx) => (
+                            <div key={aIdx} className={`flex items-start gap-2 p-2.5 rounded-lg text-[10px] leading-snug ${
+                              alert.type === 'warning' ? 'bg-amber-500/10 border border-amber-500/20 text-amber-300' :
+                              alert.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300' :
+                              'bg-blue-500/10 border border-blue-500/20 text-blue-300'
+                            }`}>
+                              {alert.type === 'warning' ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" /> :
+                               alert.type === 'success' ? <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5" /> :
+                               <TrendingUp className="h-3.5 w-3.5 shrink-0 mt-0.5" />}
+                              {alert.text}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
             );
           })}
 
