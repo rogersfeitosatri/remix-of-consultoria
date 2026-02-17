@@ -117,12 +117,12 @@ export function useJourneyPeriodization(clientId?: string) {
   // Generate suggested phases
   const suggestPhases = (totalWeeks: number, startDate: string) => {
     const phases = DEFAULT_PHASES.map((p, i) => {
-      const weeks = Math.max(Math.round(totalWeeks * PHASE_WEIGHT[i]), 1);
+      const weeks = Math.max(Math.round(totalWeeks * PHASE_WEIGHT[i]), i === 3 || i === 4 ? 0 : 1);
       return { ...p, duration_weeks: weeks };
     });
     const sum = phases.reduce((a, p) => a + p.duration_weeks, 0);
     const diff = totalWeeks - sum;
-    if (diff !== 0) phases[0].duration_weeks = Math.max(phases[0].duration_weeks + diff, 1);
+    if (diff !== 0) phases[0].duration_weeks = Math.max(phases[0].duration_weeks + diff, 0);
 
     let currentDate = parseISO(startDate);
     return phases.map((p) => {
