@@ -2184,6 +2184,250 @@ export type Database = {
         }
         Relationships: []
       }
+      journey_day_dynamics: {
+        Row: {
+          ai_generated: boolean | null
+          cho_classification: string | null
+          created_at: string
+          day_of_week: number
+          id: string
+          intra_training: string | null
+          journey_week_id: string
+          night_guidance: string | null
+          notes: string | null
+          post_training: string | null
+          pre_training: string | null
+        }
+        Insert: {
+          ai_generated?: boolean | null
+          cho_classification?: string | null
+          created_at?: string
+          day_of_week: number
+          id?: string
+          intra_training?: string | null
+          journey_week_id: string
+          night_guidance?: string | null
+          notes?: string | null
+          post_training?: string | null
+          pre_training?: string | null
+        }
+        Update: {
+          ai_generated?: boolean | null
+          cho_classification?: string | null
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          intra_training?: string | null
+          journey_week_id?: string
+          night_guidance?: string | null
+          notes?: string | null
+          post_training?: string | null
+          pre_training?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_day_dynamics_journey_week_id_fkey"
+            columns: ["journey_week_id"]
+            isOneToOne: false
+            referencedRelation: "journey_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journey_phases: {
+        Row: {
+          athlete_periodization_id: string
+          beta_alanine: string | null
+          body_comp_strategy: string | null
+          caffeine: string | null
+          cho_range: string | null
+          client_id: string
+          created_at: string
+          creatine: string | null
+          duration_weeks: number
+          end_date: string | null
+          id: string
+          nitrate: string | null
+          objective: string | null
+          phase_name: string
+          phase_order: number
+          recovery_strategy: string | null
+          start_date: string | null
+          status: string
+          strategic_notes: string | null
+          supplement_base: string | null
+          supplement_general: string | null
+          train_low_strategy: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          athlete_periodization_id: string
+          beta_alanine?: string | null
+          body_comp_strategy?: string | null
+          caffeine?: string | null
+          cho_range?: string | null
+          client_id: string
+          created_at?: string
+          creatine?: string | null
+          duration_weeks?: number
+          end_date?: string | null
+          id?: string
+          nitrate?: string | null
+          objective?: string | null
+          phase_name: string
+          phase_order?: number
+          recovery_strategy?: string | null
+          start_date?: string | null
+          status?: string
+          strategic_notes?: string | null
+          supplement_base?: string | null
+          supplement_general?: string | null
+          train_low_strategy?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          athlete_periodization_id?: string
+          beta_alanine?: string | null
+          body_comp_strategy?: string | null
+          caffeine?: string | null
+          cho_range?: string | null
+          client_id?: string
+          created_at?: string
+          creatine?: string | null
+          duration_weeks?: number
+          end_date?: string | null
+          id?: string
+          nitrate?: string | null
+          objective?: string | null
+          phase_name?: string
+          phase_order?: number
+          recovery_strategy?: string | null
+          start_date?: string | null
+          status?: string
+          strategic_notes?: string | null
+          supplement_base?: string | null
+          supplement_general?: string | null
+          train_low_strategy?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_phases_athlete_periodization_id_fkey"
+            columns: ["athlete_periodization_id"]
+            isOneToOne: false
+            referencedRelation: "athlete_periodization"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journey_phases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journey_week_sessions: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          id: string
+          intensity: string | null
+          journey_week_id: string
+          metabolic_objective: string | null
+          modality: string | null
+          priority: string | null
+          shift: string | null
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          id?: string
+          intensity?: string | null
+          journey_week_id: string
+          metabolic_objective?: string | null
+          modality?: string | null
+          priority?: string | null
+          shift?: string | null
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          intensity?: string | null
+          journey_week_id?: string
+          metabolic_objective?: string | null
+          modality?: string | null
+          priority?: string | null
+          shift?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_week_sessions_journey_week_id_fkey"
+            columns: ["journey_week_id"]
+            isOneToOne: false
+            referencedRelation: "journey_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journey_weeks: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          journey_phase_id: string
+          notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          week_in_phase: number
+          week_number: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          journey_phase_id: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          week_in_phase: number
+          week_number: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          journey_phase_id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          week_in_phase?: number
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journey_weeks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journey_weeks_journey_phase_id_fkey"
+            columns: ["journey_phase_id"]
+            isOneToOne: false
+            referencedRelation: "journey_phases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kiwify_purchases: {
         Row: {
           created_at: string
