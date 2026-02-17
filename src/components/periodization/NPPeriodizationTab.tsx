@@ -23,7 +23,7 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
   const {
     journeyPhases, journeyWeeks, loadingPhases,
     allSessions, allDynamics,
-    suggestPhases, saveJourneyPhases,
+    suggestPhases, recalcPhaseDates, saveJourneyPhases,
     saveSessions, generateDynamics,
   } = useJourneyPeriodization(clientId);
 
@@ -108,6 +108,7 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
             allSessions={allSessions}
             allDynamics={allDynamics}
             suggestPhases={suggestPhases}
+            recalcPhaseDates={recalcPhaseDates}
             onSavePhases={handleSavePhases}
             isSavingPhases={saveJourneyPhases.isPending}
             onSaveSessions={(weekId, sessions) => saveSessions.mutate({ weekId, sessions })}
