@@ -119,6 +119,10 @@ Para CADA dia, defina:
 
 IMPORTANTE: Analise o treino do DIA SEGUINTE ao definir a distribuição de CHO de cada dia. A noite de hoje prepara o treino de amanhã.
 
+REGRA 7 — DIAS DE DESCANSO (Day Off):
+Em dias sem treino programado, NÃO gere orientações de pré-treino, intra-treino ou pós-treino. Deixe esses campos VAZIOS ("").
+Gere apenas night_guidance (orientação noturna considerando o treino do dia seguinte) e distribution_rationale.
+
 Responda usando a tool generate_dynamics.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
