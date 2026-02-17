@@ -21,20 +21,35 @@ serve(async (req) => {
       `${daysOfWeek[s.day_of_week]}: ${s.modality || 'Descanso'} | ${s.shift} | Intensidade: ${s.intensity} | Prioridade: ${s.priority}${s.metabolic_objective ? ` | Obj: ${s.metabolic_objective}` : ''}`
     ).join('\n');
 
-    const systemPrompt = `Você é um especialista em periodização nutricional para atletas de endurance (Burke, Impey, Jeukendrup).
-Gere a dinâmica nutricional semanal baseada nas sessões de treino e fase atual.
+    const systemPrompt = `Você é um especialista em periodização nutricional para atletas de endurance, fundamentado em Burke (2015), Impey et al. (2018), Jeukendrup (2017) e Hawley & Morton (2014).
 
-REGRAS:
-1. Cada dia deve ter classificação CHO: High, Medium, Low ou Recovery.
-2. Dias com treino intenso/prioritário A = High CHO.
-3. Dias leves ou recuperação = Low ou Recovery.
-4. Train-Low: ${phase.train_low_strategy === 'permitido' ? 'Pode usar em dias leves' : phase.train_low_strategy === 'reduzido' ? 'Usar com cautela, máximo 2x/semana' : 'NÃO permitido nesta fase'}.
-5. Faixa de CHO da fase: ${phase.cho_range || '3-6 g/kg'}.
-6. Pré-treino: orientação de timing e composição.
-7. Intra: aplicável apenas para sessões >60min de moderada/alta intensidade.
-8. Pós-treino: recovery proporcional à demanda.
-9. Noite: orientação para o período noturno (sleep-low quando aplicável).
-10. Use evidências de Impey et al. (2018) e Burke (2015) para fundamentar.`;
+CONHECIMENTO BASE — 6 MÉTODOS DE TRAIN-LOW (mysportscience.com / Hawley & Burke):
+1. **Dieta Low-Carb crônica**: Redução geral de CHO na dieta. Glicogênio muscular e hepático depletados. Aumento da oxidação lipídica, mas pode comprometer metabolismo de CHO. Usar com cautela.
+2. **Treino duplo no dia (twice-a-day)**: 1º treino depleta glicogênio muscular → sem CHO entre sessões → 2º treino com glicogênio baixo. Máximo 1-2x/semana. Eficaz para adaptações oxidativas.
+3. **Treino em jejum matinal (fasted training)**: Treino antes do café. Glicogênio hepático baixo, muscular NORMAL. Café sem açúcar permitido. Ideal para sessões leves/moderadas.
+4. **Longão sem CHO intra (training without carb intake)**: Sessão longa sem ingestão de CHO. Início com glicogênio normal que vai depletando. Compromete intensidade. Usar quando qualidade não é prioritária.
+5. **Sem CHO no recovery (withholding recovery carbs)**: Treino normal, mas sem CHO por 1-2h após. Pode potencializar adaptações, mas atrasa recuperação. Trade-off controlado.
+6. **Sleep-Low (dormir com glicogênio baixo)**: Treino à noite → sem CHO até o treino da manhã seguinte. Amplifica sinalização molecular (AMPK, PGC-1α). Estratégia potente mas exigente.
+
+REGRAS DE APLICAÇÃO POR FASE:
+- **Base**: Train-Low PERMITIDO. Priorizar métodos 3 (jejum), 5 (sem recovery CHO) e 6 (sleep-low) em dias de treino leve/B/C. Sessões A = sempre High CHO.
+- **Específica**: Train-Low REDUZIDO. Máximo 2x/semana. Apenas métodos 3 e 5. Foco em treino intestinal com CHO intra nos longões.
+- **Competitiva**: Train-Low PROIBIDO. Todos os treinos com suporte completo de CHO. Simular protocolo de prova.
+- **Pico**: Train-Low PROIBIDO. Carb-loading. Maximizar reservas de glicogênio.
+- **Transição**: Train-Low PERMITIDO. Fase regenerativa, flexibilidade nutricional.
+
+REGRAS GERAIS:
+1. Cada dia: classificação CHO = High, Medium, Low ou Recovery.
+2. Treino Intenso + Prioridade A = SEMPRE High CHO.
+3. Treino Leve ou descanso = Low ou Recovery.
+4. Timing importa: turno do treino define a janela nutricional.
+  - Manhã: pré-treino define se é fasted ou fed.
+  - Tarde/Noite: pós-treino define se é sleep-low ou recovery completo.
+5. Pré-treino: 1-4h antes. CHO proporcional à demanda. Low days = proteína + gordura.
+6. Intra: apenas para sessões >60min moderada/alta. 30-90g CHO/h conforme fase.
+7. Pós-treino: Recovery 4:1 (CHO:Prot) proporcional à intensidade. Em dias Low: apenas proteína.
+8. Noite: Se sleep-low → proteína caseína, sem CHO. Se recovery → CHO + proteína completo.
+9. Considerar o estímulo do DIA SEGUINTE ao definir a orientação noturna.`;
 
     const userPrompt = `FASE ATUAL: ${phase.phase_name}
 OBJETIVO DA FASE: ${phase.objective || 'Não definido'}
@@ -48,22 +63,14 @@ ${athleteInfo ? `DADOS DO ATLETA:
 Peso: ${athleteInfo.weight || '?'}kg
 Objetivo: ${athleteInfo.goal || '?'}` : ''}
 
-Responda APENAS em JSON válido com este formato:
-{
-  "dynamics": [
-    {
-      "day_of_week": 0,
-      "cho_classification": "High|Medium|Low|Recovery",
-      "pre_training": "orientação",
-      "intra_training": "orientação ou vazio",
-      "post_training": "orientação",
-      "night_guidance": "orientação noturna",
-      "notes": "justificativa breve"
-    }
-  ]
-}
+Gere a dinâmica nutricional para os 7 dias considerando:
+- O timing dos treinos (turno) define a janela nutricional
+- A intensidade e prioridade definem o suporte de CHO
+- Os métodos de train-low aplicáveis à fase atual
+- A recuperação entre sessões consecutivas
+- O estímulo do dia seguinte influencia a orientação noturna
 
-Gere exatamente 7 dias (day_of_week 0 a 6).`;
+Responda usando a tool generate_dynamics.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -81,7 +88,7 @@ Gere exatamente 7 dias (day_of_week 0 a 6).`;
           type: "function",
           function: {
             name: "generate_dynamics",
-            description: "Generate weekly nutritional dynamics for each day",
+            description: "Generate weekly nutritional dynamics for each day based on training stimuli and periodization phase rules",
             parameters: {
               type: "object",
               properties: {
@@ -90,13 +97,13 @@ Gere exatamente 7 dias (day_of_week 0 a 6).`;
                   items: {
                     type: "object",
                     properties: {
-                      day_of_week: { type: "number" },
+                      day_of_week: { type: "number", description: "0=Monday to 6=Sunday" },
                       cho_classification: { type: "string", enum: ["High", "Medium", "Low", "Recovery"] },
-                      pre_training: { type: "string" },
-                      intra_training: { type: "string" },
-                      post_training: { type: "string" },
-                      night_guidance: { type: "string" },
-                      notes: { type: "string" },
+                      pre_training: { type: "string", description: "Pre-training nutritional guidance with timing" },
+                      intra_training: { type: "string", description: "Intra-training guidance (empty if not applicable)" },
+                      post_training: { type: "string", description: "Post-training recovery guidance" },
+                      night_guidance: { type: "string", description: "Night guidance considering next day stimulus" },
+                      notes: { type: "string", description: "Brief evidence-based justification and train-low method used if any" },
                     },
                     required: ["day_of_week", "cho_classification", "pre_training", "post_training", "night_guidance"],
                     additionalProperties: false,
@@ -136,7 +143,6 @@ Gere exatamente 7 dias (day_of_week 0 a 6).`;
       const parsed = JSON.parse(toolCall.function.arguments);
       dynamics = parsed.dynamics;
     } else {
-      // Fallback: parse from content
       const content = data.choices?.[0]?.message?.content || '';
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
       const parsed = JSON.parse((jsonMatch[1] || content).trim());
