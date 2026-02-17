@@ -8,7 +8,8 @@ import { Progress } from '@/components/ui/progress';
 import {
   Target, ChevronRight, ChevronLeft, Sparkles, Loader2,
   Calendar, Dumbbell, Zap, CheckCircle2, Clock, ArrowRight,
-  CalendarDays, RefreshCw, Eye, Plus, Trash2, Moon
+  CalendarDays, RefreshCw, Eye, Plus, Trash2, Moon,
+  Pill, Droplets, Flame, ShieldCheck, AlertTriangle, TrendingUp, Beaker, Apple
 } from 'lucide-react';
 import { differenceInWeeks, parseISO, format, addWeeks, isAfter, isBefore, differenceInDays } from 'date-fns';
 
@@ -37,6 +38,173 @@ const CHO_STYLES: Record<string, { bg: string; text: string; icon: string }> = {
   'Low': { bg: 'bg-blue-500/15', text: 'text-blue-400', icon: '🧊' },
   'Recovery': { bg: 'bg-purple-500/15', text: 'text-purple-400', icon: '💤' },
 };
+
+interface SupplementInfo {
+  emoji: string;
+  name: string;
+  dose: string;
+  timing?: string;
+  note?: string;
+  active: boolean;
+}
+
+interface PhaseNutrientInfo {
+  protein: string;
+  fat: string;
+  hydration: string;
+  preTiming: string;
+  intraTiming: string;
+  postTiming: string;
+  alerts: { type: 'warning' | 'success' | 'info'; text: string }[];
+}
+
+function getPhaseSupplements(phaseName: string): SupplementInfo[] {
+  const isBase = phaseName.includes('Base');
+  const isEspecifica = phaseName.includes('Específica');
+  const isCompetitiva = phaseName.includes('Competitiva');
+  const isPico = phaseName.includes('Pico');
+  const isTransicao = phaseName.includes('Transição');
+
+  return [
+    {
+      emoji: '💪',
+      name: 'Creatina',
+      dose: isBase ? '20g/dia (4x5g) por 5-7d → 3-5g/dia' : '3-5g/dia manutenção',
+      timing: 'Pós-treino com refeição rica em CHO',
+      active: true,
+      note: isBase ? 'Fase de carregamento — pode haver ganho de 1-2kg de peso hídrico' : undefined,
+    },
+    {
+      emoji: '⚡',
+      name: 'Beta-alanina',
+      dose: '3.2-6.4g/dia (doses fracionadas de 0.8-1.6g)',
+      timing: 'Distribuir ao longo do dia para evitar parestesia',
+      active: isBase || isEspecifica || isCompetitiva,
+      note: isBase ? 'Início do carregamento — efeito pleno em 4-8 semanas' : undefined,
+    },
+    {
+      emoji: '☕',
+      name: 'Cafeína',
+      dose: '3-6 mg/kg',
+      timing: isPico ? '60min pré-prova' : '60min pré-treinos intensos',
+      active: isEspecifica || isCompetitiva || isPico,
+      note: isEspecifica ? 'Testar protocolo individual (dose, timing, tolerância GI)' :
+             isPico ? 'Dose validada — usar protocolo testado na Específica' : undefined,
+    },
+    {
+      emoji: '🥬',
+      name: 'Nitrato (Beterraba)',
+      dose: '300-600mg nitrato (≈500mL suco beterraba)',
+      timing: isPico ? '2-3h pré-prova (carregamento 3-5d antes)' : '2-3h pré-treinos de alta intensidade',
+      active: isCompetitiva || isPico,
+      note: isPico ? 'Carregamento: 3-5 dias consecutivos pré-prova' : undefined,
+    },
+    {
+      emoji: '🧂',
+      name: 'Eletrólitos (Na/K)',
+      dose: '300-600mg Na/L de fluido',
+      timing: 'Durante treinos >60min e na prova',
+      active: true,
+      note: isPico ? 'Ensaiar protocolo de prova com eletrólitos' : undefined,
+    },
+    {
+      emoji: '🩸',
+      name: 'Ferro',
+      dose: 'Conforme exames — ferritina > 35ng/mL ideal',
+      timing: 'Manhã, com vitamina C, longe de chá/café',
+      active: isBase || isEspecifica,
+      note: isBase ? 'Solicitar hemograma + ferritina no início do ciclo' : undefined,
+    },
+    {
+      emoji: '☀️',
+      name: 'Vitamina D',
+      dose: '1000-2000 UI/dia (ajustar conforme 25(OH)D)',
+      timing: 'Com refeição contendo gordura',
+      active: true,
+      note: isBase ? 'Dosar 25(OH)D — meta: 40-60 ng/mL' : undefined,
+    },
+    {
+      emoji: '🐟',
+      name: 'Ômega-3 (EPA/DHA)',
+      dose: '1-2g EPA+DHA/dia',
+      timing: 'Com refeições principais',
+      active: isTransicao || isBase,
+      note: isTransicao ? 'Foco anti-inflamatório e recuperação pós-ciclo' : undefined,
+    },
+  ];
+}
+
+function getPhaseNutrients(phaseName: string): PhaseNutrientInfo {
+  const isBase = phaseName.includes('Base');
+  const isEspecifica = phaseName.includes('Específica');
+  const isCompetitiva = phaseName.includes('Competitiva');
+  const isPico = phaseName.includes('Pico');
+  const isTransicao = phaseName.includes('Transição');
+
+  if (isPico) return {
+    protein: '1.4-1.6',
+    fat: '20-25%',
+    hydration: '5-10 mL/kg',
+    preTiming: 'CHO 1-4g/kg 3-4h antes + 30-60g 30min antes da prova',
+    intraTiming: '60-90g CHO/h (treinar tolerância GI) + Na 500-700mg/h',
+    postTiming: '1.0-1.2g CHO/kg/h + 0.3g PTN/kg nas primeiras 2h',
+    alerts: [
+      { type: 'success', text: 'Supercompensação de glicogênio: CHO 10-12g/kg nos 2-3 dias pré-prova' },
+      { type: 'warning', text: 'Evitar fibras e alimentos novos 48h antes da prova' },
+      { type: 'info', text: 'Ensaio geral nutricional: testar tudo que será usado na prova (gel, isotônico, cafeína)' },
+    ],
+  };
+  if (isCompetitiva) return {
+    protein: '1.4-1.8',
+    fat: '20-30%',
+    hydration: '5-8 mL/kg',
+    preTiming: 'CHO 1-3g/kg 2-3h antes dos treinos-chave',
+    intraTiming: '30-60g CHO/h em sessões >75min',
+    postTiming: '0.8-1.0g CHO/kg + 0.3g PTN/kg dentro de 30min',
+    alerts: [
+      { type: 'warning', text: 'Train-Low PROIBIDO — máxima disponibilidade de CHO para qualidade dos treinos' },
+      { type: 'info', text: 'Treinar o gut training: adaptar intestino a 60-90g CHO/h para a prova' },
+    ],
+  };
+  if (isEspecifica) return {
+    protein: '1.6-2.0',
+    fat: '25-30%',
+    hydration: '5-8 mL/kg',
+    preTiming: 'CHO 1-2g/kg 2-3h antes (variar conforme train-low)',
+    intraTiming: '30-60g CHO/h em sessões de alta intensidade',
+    postTiming: '0.8g CHO/kg + 0.4g PTN/kg imediato após sessões intensas',
+    alerts: [
+      { type: 'info', text: 'Train-Low reduzido: aplicar em sessões de baixa prioridade (Prio B/C) para adaptação metabólica' },
+      { type: 'warning', text: 'Monitorar sinais de fadiga crônica — ajustar se recuperação estiver comprometida' },
+    ],
+  };
+  if (isTransicao) return {
+    protein: '1.2-1.6',
+    fat: '25-35%',
+    hydration: '4-6 mL/kg',
+    preTiming: 'Refeição normal 2-3h antes, sem protocolos rígidos',
+    intraTiming: 'Apenas água para sessões leves <60min',
+    postTiming: 'Refeição equilibrada — sem urgência de timing',
+    alerts: [
+      { type: 'success', text: 'Foco em recuperação sistêmica: sono, anti-inflamatórios naturais (Ômega-3, polifenóis)' },
+      { type: 'info', text: 'Reavaliar composição corporal e exames laboratoriais antes do próximo ciclo' },
+    ],
+  };
+  // Base
+  return {
+    protein: '1.6-2.0',
+    fat: '25-35%',
+    hydration: '5-8 mL/kg',
+    preTiming: 'CHO 1-2g/kg 2-3h antes (Train-Low: treino em jejum ou low-CHO)',
+    intraTiming: 'Água para sessões <75min; Train-Low: sem CHO intra',
+    postTiming: '0.8g CHO/kg + 0.3g PTN/kg (ou Sleep-Low: retardar CHO até manhã seguinte)',
+    alerts: [
+      { type: 'info', text: 'Train-Low PERMITIDO: aplicar métodos de adaptação metabólica (sleep-low, fasted training, sem CHO intra)' },
+      { type: 'warning', text: 'Antioxidantes em alta dose podem bloquear adaptações — evitar suplementação de Vit C/E pós-treino' },
+      { type: 'info', text: 'Priorizar alimentos ricos em ferro heme + screening de ferritina/hemoglobina' },
+    ],
+  };
+}
 
 interface Props {
   clientId: string;
@@ -757,7 +925,7 @@ export function PeriodizationWizard({
         </div>
       )}
 
-      {/* ===== STEP 3: Visão Geral ===== */}
+      {/* ===== STEP 3: Visão Geral da Periodização ===== */}
       {activeStep === 3 && hasPhases && (
         <div className="space-y-4">
           {/* Progress header */}
@@ -771,68 +939,146 @@ export function PeriodizationWizard({
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-primary">{weeksToRace}</p>
-                  <p className="text-[10px] text-muted-foreground">semanas restantes</p>
+                  <p className="text-2xl font-bold text-primary">{daysToRace}</p>
+                  <p className="text-[10px] text-muted-foreground">dias restantes</p>
                 </div>
               </div>
               <Progress value={progressPercent} className="h-2" />
-              <p className="text-[10px] text-muted-foreground mt-1.5 text-center">{Math.round(progressPercent)}% do ciclo concluído</p>
+              <div className="flex justify-between mt-1.5">
+                <p className="text-[10px] text-muted-foreground">{Math.round(progressPercent)}% concluído</p>
+                <p className="text-[10px] text-muted-foreground">{totalWeeks} semanas totais</p>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Phase timeline */}
-          <div className="space-y-3">
-            {journeyPhases.map((phase, idx) => {
-              const style = getPhaseStyle(phase.phase_name);
-              const isCurrent = phase.id === currentPhase?.id;
-              const isPast = phase.end_date ? isAfter(today, parseISO(phase.end_date)) : false;
-              const phaseWeekIds = journeyWeeks.filter(w => w.journey_phase_id === phase.id).map(w => w.id);
-              const phaseDynamics = allDynamics.filter(d => phaseWeekIds.includes(d.journey_week_id));
-              const phaseSessions = allSessions.filter(s => phaseWeekIds.includes(s.journey_week_id));
-              
-              const lowCount = phaseDynamics.filter(d => d.cho_classification === 'Low').length;
-              const highCount = phaseDynamics.filter(d => d.cho_classification === 'High').length;
-              const hasDynamics = phaseDynamics.length > 0;
-
+          {/* Visual phase bar */}
+          <div className="flex h-8 rounded-xl overflow-hidden border border-border">
+            {journeyPhases.map((p, i) => {
+              const widthPct = totalWeeks > 0 ? (p.duration_weeks / totalWeeks) * 100 : 20;
+              const style = getPhaseStyle(p.phase_name);
+              const isCurrent = p.id === currentPhase?.id;
               return (
                 <div
-                  key={phase.id}
-                  className={`relative rounded-xl border overflow-hidden transition-all ${
-                    isCurrent ? `${style.border} ring-2 ring-primary/30` : isPast ? 'border-border opacity-60' : 'border-border'
+                  key={p.id || i}
+                  className={`flex items-center justify-center ${style.bg} border-r border-border last:border-r-0 transition-all ${
+                    isCurrent ? 'ring-1 ring-primary ring-inset' : ''
                   }`}
+                  style={{ width: `${widthPct}%` }}
                 >
-                  {/* Phase header */}
-                  <div className={`px-4 py-3 ${style.bg} flex items-center justify-between`}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${style.dot}`} />
-                      <div>
-                        <span className={`text-sm font-bold ${style.text}`}>{phase.phase_name}</span>
-                        {isCurrent && <Badge className="text-[8px] bg-primary/30 text-primary border-primary/40 ml-2">ATUAL</Badge>}
-                        {isPast && <Badge variant="outline" className="text-[8px] ml-2 opacity-60">Concluída</Badge>}
-                      </div>
+                  <span className={`text-[9px] font-bold ${style.text} truncate px-1`}>{p.phase_name}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Phase-by-phase comprehensive view */}
+          {journeyPhases.map((phase, idx) => {
+            const style = getPhaseStyle(phase.phase_name);
+            const isCurrent = phase.id === currentPhase?.id;
+            const isPast = phase.end_date ? isAfter(today, parseISO(phase.end_date)) : false;
+            const phaseWeekIds = journeyWeeks.filter(w => w.journey_phase_id === phase.id).map(w => w.id);
+            const phaseDynamics = allDynamics.filter(d => phaseWeekIds.includes(d.journey_week_id));
+            const phaseSessions = allSessions.filter(s => phaseWeekIds.includes(s.journey_week_id));
+            const hasDynamics = phaseDynamics.length > 0;
+
+            const lowCount = phaseDynamics.filter(d => d.cho_classification === 'Low').length;
+            const highCount = phaseDynamics.filter(d => d.cho_classification === 'High').length;
+            const medCount = phaseDynamics.filter(d => d.cho_classification === 'Medium').length;
+
+            // Evidence-based supplementation per phase (Vitale & Getzin, 2019)
+            const phaseSupplements = getPhaseSupplements(phase.phase_name);
+            const phaseNutrients = getPhaseNutrients(phase.phase_name);
+
+            return (
+              <Card
+                key={phase.id}
+                className={`overflow-hidden transition-all ${
+                  isCurrent ? `ring-2 ring-primary/30 border-primary/30` : isPast ? 'opacity-60' : ''
+                }`}
+              >
+                {/* Phase header */}
+                <div className={`px-5 py-3 ${style.bg} border-b border-border flex items-center justify-between`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-4 h-4 rounded-full ${style.dot} shrink-0`} />
+                    <div>
+                      <span className={`text-base font-bold ${style.text}`}>{phase.phase_name}</span>
+                      {isCurrent && <Badge className="text-[8px] bg-primary/30 text-primary border-primary/40 ml-2">FASE ATUAL</Badge>}
+                      {isPast && <Badge variant="outline" className="text-[8px] ml-2 opacity-60">Concluída</Badge>}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="font-mono">{phase.duration_weeks}s</span>
-                      <span>{phase.start_date ? format(parseISO(phase.start_date), 'dd/MM') : '—'}</span>
-                      <ArrowRight className="h-3 w-3" />
-                      <span>{phase.end_date ? format(parseISO(phase.end_date), 'dd/MM') : '—'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    <span className="font-mono">{phase.duration_weeks} sem</span>
+                    <span className="hidden sm:inline">
+                      {phase.start_date ? format(parseISO(phase.start_date), 'dd/MM') : '—'}
+                      <ArrowRight className="h-3 w-3 inline mx-1" />
+                      {phase.end_date ? format(parseISO(phase.end_date), 'dd/MM') : '—'}
+                    </span>
+                  </div>
+                </div>
+
+                <CardContent className="pt-4 pb-4 space-y-4">
+                  {/* Objective */}
+                  {phase.objective && (
+                    <p className="text-sm text-muted-foreground leading-relaxed">{phase.objective}</p>
+                  )}
+
+                  {/* Macronutrient strategy */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Flame className="h-3.5 w-3.5 text-amber-400" />
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Carboidrato</span>
+                      </div>
+                      <p className="text-sm font-bold">{phase.cho_range || '—'}</p>
+                      <p className="text-[9px] text-muted-foreground">g/kg/dia</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Dumbbell className="h-3.5 w-3.5 text-red-400" />
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Proteína</span>
+                      </div>
+                      <p className="text-sm font-bold">{phaseNutrients.protein}</p>
+                      <p className="text-[9px] text-muted-foreground">g/kg/dia</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Droplets className="h-3.5 w-3.5 text-yellow-400" />
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Gordura</span>
+                      </div>
+                      <p className="text-sm font-bold">{phaseNutrients.fat}</p>
+                      <p className="text-[9px] text-muted-foreground">% do VCT</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/30 border border-border">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Droplets className="h-3.5 w-3.5 text-blue-400" />
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase">Hidratação</span>
+                      </div>
+                      <p className="text-sm font-bold">{phaseNutrients.hydration}</p>
+                      <p className="text-[9px] text-muted-foreground">mL/kg/h treino</p>
                     </div>
                   </div>
 
-                  {/* Phase details */}
-                  <div className="px-4 py-3 flex flex-wrap gap-2 items-center">
-                    <Badge variant="outline" className="text-[9px]">CHO: {phase.cho_range}</Badge>
-                    <Badge variant="outline" className={`text-[9px] ${
-                      phase.train_low_strategy === 'permitido' ? 'text-emerald-400 border-emerald-500/30' :
-                      phase.train_low_strategy === 'reduzido' ? 'text-amber-400 border-amber-500/30' :
-                      'text-destructive border-destructive/30'
+                  {/* Train-Low & CHO distribution */}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <Badge variant="outline" className={`text-[10px] ${
+                      phase.train_low_strategy === 'permitido' ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/5' :
+                      phase.train_low_strategy === 'reduzido' ? 'text-amber-400 border-amber-500/30 bg-amber-500/5' :
+                      'text-destructive border-destructive/30 bg-destructive/5'
                     }`}>
                       Train-Low: {phase.train_low_strategy}
                     </Badge>
                     {hasDynamics && (
                       <>
-                        <Badge variant="outline" className="text-[9px] text-blue-400 border-blue-500/30">Low: {lowCount}</Badge>
-                        <Badge variant="outline" className="text-[9px] text-emerald-400 border-emerald-500/30">High: {highCount}</Badge>
+                        <Badge variant="outline" className="text-[10px] text-blue-400 border-blue-500/30 bg-blue-500/5">
+                          🧊 Low: {lowCount}d
+                        </Badge>
+                        <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/30 bg-amber-500/5">
+                          ⚡ Med: {medCount}d
+                        </Badge>
+                        <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30 bg-emerald-500/5">
+                          🔋 High: {highCount}d
+                        </Badge>
                       </>
                     )}
                     {!hasDynamics && (
@@ -850,15 +1096,87 @@ export function PeriodizationWizard({
                     )}
                   </div>
 
-                  {/* Objective */}
-                  {phase.objective && (
-                    <div className="px-4 pb-3">
-                      <p className="text-[10px] text-muted-foreground">{phase.objective}</p>
+                  {/* Supplementation protocol — Vitale & Getzin (2019) */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Pill className="h-4 w-4 text-primary" />
+                      <span className="text-xs font-bold">Suplementação Baseada em Evidências</span>
+                      <span className="text-[8px] text-muted-foreground italic">(Vitale & Getzin, 2019)</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {phaseSupplements.map((supp, sIdx) => (
+                        <div key={sIdx} className={`flex items-start gap-2.5 p-2.5 rounded-lg border ${supp.active ? 'border-primary/20 bg-primary/5' : 'border-border bg-muted/20 opacity-50'}`}>
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm ${supp.active ? 'bg-primary/15' : 'bg-muted'}`}>
+                            {supp.emoji}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold">{supp.name}</span>
+                              {supp.active ? (
+                                <CheckCircle2 className="h-3 w-3 text-emerald-400 shrink-0" />
+                              ) : (
+                                <span className="text-[8px] text-muted-foreground">(não recomendado nesta fase)</span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground leading-snug">{supp.dose}</p>
+                            {supp.timing && <p className="text-[9px] text-primary/70 mt-0.5">{supp.timing}</p>}
+                            {supp.note && <p className="text-[9px] text-amber-400/80 mt-0.5 flex items-center gap-0.5"><AlertTriangle className="h-2.5 w-2.5" /> {supp.note}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Nutrient timing guidance */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <span className="text-xs font-bold">Nutrient Timing</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="p-2.5 rounded-lg border border-border bg-muted/20 text-center">
+                        <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-1">Pré-treino</p>
+                        <p className="text-[10px] leading-snug">{phaseNutrients.preTiming}</p>
+                      </div>
+                      <div className="p-2.5 rounded-lg border border-border bg-muted/20 text-center">
+                        <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-1">Intra-treino</p>
+                        <p className="text-[10px] leading-snug">{phaseNutrients.intraTiming}</p>
+                      </div>
+                      <div className="p-2.5 rounded-lg border border-border bg-muted/20 text-center">
+                        <p className="text-[9px] font-semibold text-muted-foreground uppercase mb-1">Pós-treino</p>
+                        <p className="text-[10px] leading-snug">{phaseNutrients.postTiming}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phase-specific alerts */}
+                  {phaseNutrients.alerts.length > 0 && (
+                    <div className="space-y-1.5">
+                      {phaseNutrients.alerts.map((alert, aIdx) => (
+                        <div key={aIdx} className={`flex items-start gap-2 p-2.5 rounded-lg text-[10px] leading-snug ${
+                          alert.type === 'warning' ? 'bg-amber-500/10 border border-amber-500/20 text-amber-300' :
+                          alert.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-300' :
+                          'bg-blue-500/10 border border-blue-500/20 text-blue-300'
+                        }`}>
+                          {alert.type === 'warning' ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" /> :
+                           alert.type === 'success' ? <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5" /> :
+                           <TrendingUp className="h-3.5 w-3.5 shrink-0 mt-0.5" />}
+                          {alert.text}
+                        </div>
+                      ))}
                     </div>
                   )}
-                </div>
-              );
-            })}
+                </CardContent>
+              </Card>
+            );
+          })}
+
+          {/* Evidence reference */}
+          <div className="p-3 rounded-xl bg-muted/20 border border-border">
+            <p className="text-[9px] text-muted-foreground text-center leading-relaxed">
+              📚 Protocolo baseado em: <strong>Vitale, K. & Getzin, A. (2019). Nutrition and supplement update for the endurance athlete. Nutrients, 11(6), 1289.</strong>
+              <br />Burke et al. (2011); Impey et al. (2018); Jeukendrup (2017); Stellingwerff et al. (2019)
+            </p>
           </div>
 
           {/* Nav */}
