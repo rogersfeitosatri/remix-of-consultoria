@@ -2186,39 +2186,54 @@ export type Database = {
       }
       journey_day_dynamics: {
         Row: {
+          afternoon_cho_pct: number | null
           ai_generated: boolean | null
           cho_classification: string | null
+          cho_gkg: number | null
           created_at: string
           day_of_week: number
+          distribution_rationale: string | null
           id: string
           intra_training: string | null
           journey_week_id: string
+          morning_cho_pct: number | null
+          night_cho_pct: number | null
           night_guidance: string | null
           notes: string | null
           post_training: string | null
           pre_training: string | null
         }
         Insert: {
+          afternoon_cho_pct?: number | null
           ai_generated?: boolean | null
           cho_classification?: string | null
+          cho_gkg?: number | null
           created_at?: string
           day_of_week: number
+          distribution_rationale?: string | null
           id?: string
           intra_training?: string | null
           journey_week_id: string
+          morning_cho_pct?: number | null
+          night_cho_pct?: number | null
           night_guidance?: string | null
           notes?: string | null
           post_training?: string | null
           pre_training?: string | null
         }
         Update: {
+          afternoon_cho_pct?: number | null
           ai_generated?: boolean | null
           cho_classification?: string | null
+          cho_gkg?: number | null
           created_at?: string
           day_of_week?: number
+          distribution_rationale?: string | null
           id?: string
           intra_training?: string | null
           journey_week_id?: string
+          morning_cho_pct?: number | null
+          night_cho_pct?: number | null
           night_guidance?: string | null
           notes?: string | null
           post_training?: string | null
