@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -372,26 +373,40 @@ export function PeriodizationWizard({
   };
 
   const handleGenerateDynamics = async () => {
-    if (!selectedWeek) {
-      toast({ title: 'Nenhuma semana selecionada', description: 'Configure as fases primeiro.', variant: 'destructive' });
-      return;
-    }
     if (!selectedPhase) {
       toast({ title: 'Nenhuma fase selecionada', variant: 'destructive' });
       return;
     }
+
+    // If selectedWeek is null (journeyWeeks not loaded yet), fetch directly from DB
+    let weekToUse = selectedWeek;
+    if (!weekToUse) {
+      const { data: fetchedWeek } = await supabase
+        .from('journey_weeks')
+        .select('*')
+        .eq('journey_phase_id', selectedPhase.id)
+        .eq('week_in_phase', 1)
+        .maybeSingle();
+      weekToUse = fetchedWeek;
+    }
+
+    if (!weekToUse) {
+      toast({ title: 'Nenhuma semana encontrada', description: 'Configure as fases primeiro.', variant: 'destructive' });
+      return;
+    }
+
     if (!hasSomeSessions) {
       toast({ title: 'Cadastre os treinos primeiro', description: 'Vá para a etapa Treinos e salve as sessões.', variant: 'destructive' });
       return;
     }
     // Auto-save sessions if dirty before generating
     if (sessionsDirty) {
-      onSaveSessions(selectedWeek.id, sessions.map(({ id, ...rest }) => rest));
+      onSaveSessions(weekToUse.id, sessions.map(({ id, ...rest }) => rest));
       setSessionsDirty(false);
       // Small delay to let save propagate
       await new Promise(r => setTimeout(r, 800));
     }
-    onGenerateDynamics(selectedWeek.id, selectedPhase);
+    onGenerateDynamics(weekToUse.id, selectedPhase);
   };
 
   const hasSomeSessions = sessions.some(s => (s.modality && s.modality.trim() !== '') || s.is_day_off);
