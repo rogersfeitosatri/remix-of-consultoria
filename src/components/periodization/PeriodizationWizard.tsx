@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { differenceInWeeks, parseISO, format, addWeeks, isAfter, isBefore, differenceInDays } from 'date-fns';
 import { useThemeToggle } from '@/App';
+import { DayDynamicDetailModal } from './DayDynamicDetailModal';
 
 const DAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const DAYS_SHORT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -246,6 +247,7 @@ export function PeriodizationWizard({
   const [suggestedPhases, setSuggestedPhases] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [sessionsDirty, setSessionsDirty] = useState(false);
+  const [expandedDayIdx, setExpandedDayIdx] = useState<number | null>(null);
 
   const totalWeeks = raceDate && startDate
     ? Math.max(differenceInWeeks(parseISO(raceDate), parseISO(startDate)), 1)
@@ -393,6 +395,17 @@ export function PeriodizationWizard({
   };
 
   const hasSomeSessions = sessions.some(s => (s.modality && s.modality.trim() !== '') || s.is_day_off);
+
+  // CHO progression based on initialCHO (Base phase reference)
+  const getChoRangeForPhase = (phaseName: string, baseChoGkg: number) => {
+    const v = baseChoGkg;
+    if (phaseName.includes('Base')) return `${Math.max(v - 1, 2)}-${v + 1}`;
+    if (phaseName.includes('Específica')) return `${v}-${v + 2}`;
+    if (phaseName.includes('Competitiva')) return `${v + 1}-${v + 4}`;
+    if (phaseName.includes('Pico')) return `${Math.round(v * 2)}-${Math.round(v * 3)}`;
+    if (phaseName.includes('Transição')) return `${Math.max(v - 1, 2)}-${v + 1}`;
+    return `${v}-${v + 2}`;
+  };
 
   // Progress calculations
   const weeksToRace = raceDate ? Math.max(differenceInWeeks(parseISO(raceDate), today), 0) : 0;
@@ -566,7 +579,12 @@ export function PeriodizationWizard({
 
                 <Button
                   onClick={() => {
-                    onSavePhases(suggestedPhases);
+                    const choVal = parseFloat(initialCHO) || 4;
+                    const phasesWithCho = suggestedPhases.map(p => ({
+                      ...p,
+                      cho_range: getChoRangeForPhase(p.phase_name, choVal) + ' g/kg',
+                    }));
+                    onSavePhases(phasesWithCho);
                     setTimeout(() => setActiveStep(1), 500);
                   }}
                   disabled={isSavingPhases}
@@ -589,7 +607,11 @@ export function PeriodizationWizard({
                     size="sm"
                     className="text-xs gap-1"
                     onClick={() => {
-                      const suggested = suggestPhases(totalWeeks, startDate);
+                      const choVal = parseFloat(initialCHO) || 4;
+                      const suggested = suggestPhases(totalWeeks, startDate).map(p => ({
+                        ...p,
+                        cho_range: getChoRangeForPhase(p.phase_name, choVal) + ' g/kg',
+                      }));
                       setSuggestedPhases(suggested);
                       onSavePhases(suggested);
                     }}
@@ -882,7 +904,7 @@ export function PeriodizationWizard({
                   const isOff = !session?.modality || session.modality === 'Day Off';
                   
                   return (
-                    <div key={day.day_of_week} className={`rounded-xl border border-border overflow-hidden transition-all hover:shadow-md hover:border-primary/30 ${isOff ? 'opacity-70' : ''}`}>
+                    <div key={day.day_of_week} onClick={() => setExpandedDayIdx(day.day_of_week)} className={`rounded-xl border border-border overflow-hidden transition-all hover:shadow-md hover:border-primary/30 cursor-pointer ${isOff ? 'opacity-70' : ''}`}>
                       {/* Day header — horizontal on mobile */}
                       <div className={`px-3 py-2 ${choStyle.bg} flex items-center justify-between border-b border-border/50`}>
                         <div className="flex items-center gap-2">
@@ -975,7 +997,32 @@ export function PeriodizationWizard({
             </Card>
           )}
 
-          {/* Strategic summary */}
+          {/* Day detail modal */}
+          {expandedDayIdx !== null && weekDynamics.length > 0 && (() => {
+            const sortedDynamics = [...weekDynamics].sort((a, b) => a.day_of_week - b.day_of_week);
+            const dayData = sortedDynamics.find(d => d.day_of_week === expandedDayIdx);
+            if (!dayData) return null;
+            const prevDayIdx = (expandedDayIdx + 6) % 7;
+            const nextDayIdx = (expandedDayIdx + 1) % 7;
+            const prevDay = sortedDynamics.find(d => d.day_of_week === prevDayIdx) || null;
+            const nextDay = sortedDynamics.find(d => d.day_of_week === nextDayIdx) || null;
+            const currentSession = sessions.find(s => s.day_of_week === expandedDayIdx);
+            const prevSession = sessions.find(s => s.day_of_week === prevDayIdx) || null;
+            const nextSession = sessions.find(s => s.day_of_week === nextDayIdx) || null;
+            return (
+              <DayDynamicDetailModal
+                day={dayData}
+                prevDay={prevDay}
+                nextDay={nextDay}
+                session={currentSession}
+                prevSession={prevSession}
+                nextSession={nextSession}
+                phaseName={selectedPhase?.phase_name || ''}
+                onClose={() => setExpandedDayIdx(null)}
+              />
+            );
+          })()}
+
           {weekDynamics.length > 0 && (
             <StrategicSummary dynamics={weekDynamics} sessions={sessions} phaseName={selectedPhase?.phase_name || ''} />
           )}
