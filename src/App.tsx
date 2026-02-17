@@ -5,8 +5,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useState, useEffect, createContext, useContext } from "react";
 import { Loader2 } from "lucide-react";
+
+// Theme context
+export const ThemeContext = createContext<{ theme: string; setTheme: (t: string) => void }>({ theme: 'dark', setTheme: () => {} });
+export const useThemeToggle = () => useContext(ThemeContext);
 
 // Eager load critical pages (sidebar nav + auth)
 import Auth from "./pages/Auth";
@@ -153,20 +157,30 @@ function AppRoutes() {
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <div className="dark">
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <AppRoutes />
-          </AuthProvider>
-        </BrowserRouter>
-      </div>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [theme, setTheme] = useState(() => localStorage.getItem('rf-theme') || 'dark');
+
+  useEffect(() => {
+    localStorage.setItem('rf-theme', theme);
+  }, [theme]);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <ThemeContext.Provider value={{ theme, setTheme }}>
+          <div className={theme}>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AuthProvider>
+                <AppRoutes />
+              </AuthProvider>
+            </BrowserRouter>
+          </div>
+        </ThemeContext.Provider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
