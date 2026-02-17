@@ -48,6 +48,12 @@ REGRA 1 — PREPARAÇÃO PRÉ-TREINO INTENSO (dia anterior):
   → AMANHÃ: concentração crescente até o treino
   → Café: 25-30% | Almoço: 30-35% | Pré-treino: 20-25% | Pós+Noite: 15-20%
 
+REGRA 2.5 — TIMING PRÉ-TREINO POR TURNO:
+- Treino pela MANHÃ: o atleta acorda e treina cedo. Pré-treino de 2-3h antes é INVIÁVEL. Use recomendações para 40-60 minutos antes (snack leve, fácil digestão: banana + mel, gel, ou torrada com geleia). A carga maior de CHO deve vir na NOITE ANTERIOR.
+- Treino pela TARDE: pré-treino pode ser 2-3h antes (almoço reforçado em CHO) ou 40-60min antes (lanche).
+- Treino pela NOITE: pré-treino = lanche da tarde 2-3h antes ou snack 40-60min antes.
+Sempre especifique o timing sugerido no campo pre_training.
+
 REGRA 2 — PÓS-TREINO E RECUPERAÇÃO (fase-dependente):
 - FASE BASE: Pós-treino leve/moderado → Recovery reduzido (proteína + gordura). Buscar adaptações mitocondriais. Train-low permitido.
 - FASE ESPECÍFICA: Pós-treino intenso → Recovery progressivo. Iniciar suporte de CHO pós-treino para manter qualidade.
