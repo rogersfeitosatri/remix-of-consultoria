@@ -116,18 +116,36 @@ Objetivo: ${athleteInfo.goal || '?'}` : ''}
 
 INSTRUÇÃO: Gere a dinâmica nutricional para os 7 dias.
 
-Para CADA dia, defina:
-1. cho_gkg: o valor em g/kg de CHO total do dia (número decimal, ex: 4.5)
+FORMATO DE RESPOSTA — ULTRA-CURTO E PRÁTICO:
+Todas as orientações (pre_training, intra_training, post_training, night_guidance) devem ser CÓDIGOS CURTOS, não frases longas.
+
+Use este padrão de linguagem:
+- "↑CARB" = aumentar carboidrato  |  "↓CARB" = reduzir carboidrato  |  "=CARB" = normo carb
+- "↑PROT" = aumentar proteína  |  "↓PROT" ou "=PROT"
+- "↑FAT" = mais gordura (ex: abacate, nuts)
+- "JEJUM" = treino em jejum
+- "SLEEP-LOW" = protocolo sleep-low
+- "GEL 30-60g/h" = suplementação intra com dose
+- "RECOVERY 4:1" = protocolo recovery
+- "SNACK 40min" = snack leve 40min antes
+- "CAFÉ REFORÇ." = café da manhã reforçado
+- "ALM. ↑CARB" = almoço com mais carb
+- "CEIA PROT." = ceia proteica (caseína)
+- "N/A" = não aplicável
+
+Exemplos de como deve ser:
+- pre_training: "SNACK 40min: banana + mel" (máx 6 palavras)
+- intra_training: "GEL 30g/h" ou "Água" ou "" (vazio se <60min)
+- post_training: "RECOVERY 4:1 em 30min" ou "↓CARB, só PROT" ou "N/A"
+- night_guidance: "↑CARB — prep treino manhã" ou "SLEEP-LOW" ou "=CARB, CEIA PROT."
+- distribution_rationale: máx 10 palavras. Ex: "Prep treino intenso manhã seguinte" ou "Recovery + prep day off"
+
+REGRAS:
+1. cho_gkg: número decimal (ex: 4.5)
 2. cho_classification: High, Medium, Low ou Recovery
-3. morning_cho_pct + afternoon_cho_pct + night_cho_pct = 100 (distribuição percentual)
-4. distribution_rationale: 1-2 frases explicando POR QUE essa distribuição (considerar o treino do dia seguinte)
-5. pre_training, intra_training, post_training, night_guidance: orientações práticas
-
-IMPORTANTE: Analise o treino do DIA SEGUINTE ao definir a distribuição de CHO de cada dia. A noite de hoje prepara o treino de amanhã.
-
-REGRA 7 — DIAS DE DESCANSO (Day Off):
-Em dias sem treino programado, NÃO gere orientações de pré-treino, intra-treino ou pós-treino. Deixe esses campos VAZIOS ("").
-Gere apenas night_guidance (orientação noturna considerando o treino do dia seguinte) e distribution_rationale.
+3. morning_cho_pct + afternoon_cho_pct + night_cho_pct = 100
+4. DIAS DE DESCANSO (Day Off): pre_training="", intra_training="", post_training="". Apenas night_guidance.
+5. NÃO escreva frases explicativas. Apenas códigos práticos e diretos.
 
 Responda usando a tool generate_dynamics.`;
 

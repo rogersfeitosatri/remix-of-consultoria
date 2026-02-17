@@ -835,83 +835,86 @@ export function PeriodizationWizard({
 
           {/* Dynamics display - visual cards */}
           {weekDynamics.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-7 gap-1.5">
               {[...weekDynamics].sort((a, b) => a.day_of_week - b.day_of_week).map((day) => {
                 const choStyle = CHO_STYLES[day.cho_classification] || { bg: 'bg-muted', text: 'text-muted-foreground', icon: '•' };
                 const session = sessions.find(s => s.day_of_week === day.day_of_week);
+                const isOff = !session?.modality || session.modality === 'Day Off';
                 return (
-                  <div key={day.day_of_week} className={`rounded-xl border border-border overflow-hidden`}>
-                    {/* Day header */}
-                    <div className={`px-3 py-2 ${choStyle.bg} flex items-center justify-between`}>
-                      <span className="text-xs font-bold">{DAYS_SHORT[day.day_of_week]}</span>
-                      <span className={`text-xs font-bold ${choStyle.text}`}>
-                        {choStyle.icon} {day.cho_classification}
-                      </span>
+                  <div key={day.day_of_week} className="rounded-lg border border-border overflow-hidden">
+                    {/* Header: Day + CHO badge */}
+                    <div className={`px-2 py-1.5 ${choStyle.bg} flex items-center justify-between`}>
+                      <span className="text-[11px] font-bold">{DAYS_SHORT[day.day_of_week]}</span>
+                      <Badge variant="outline" className={`text-[8px] px-1 py-0 h-4 ${choStyle.text} border-current/30`}>
+                        {day.cho_classification}
+                      </Badge>
                     </div>
-                    
-                    {/* CHO g/kg target */}
+
+                    {/* CHO g/kg */}
                     {day.cho_gkg && (
-                      <div className="px-3 py-1.5 border-b border-border bg-muted/30 text-center">
-                        <p className="text-sm font-bold text-foreground">{day.cho_gkg} g/kg</p>
-                        <p className="text-[9px] text-muted-foreground">CHO total do dia</p>
+                      <div className="px-2 py-1 border-b border-border/50 text-center">
+                        <span className="text-base font-bold text-foreground">{day.cho_gkg}</span>
+                        <span className="text-[9px] text-muted-foreground ml-0.5">g/kg</span>
                       </div>
                     )}
 
                     {/* Distribution bar */}
                     {(day.morning_cho_pct || day.afternoon_cho_pct || day.night_cho_pct) && (
-                      <div className="px-3 py-1.5 border-b border-border space-y-1">
-                        <div className="flex h-2.5 w-full rounded-full overflow-hidden">
+                      <div className="px-2 py-1 border-b border-border/50">
+                        <div className="flex h-2 w-full rounded-full overflow-hidden">
                           <div className="bg-amber-400/70" style={{ width: `${day.morning_cho_pct || 33}%` }} />
                           <div className="bg-orange-400/70" style={{ width: `${day.afternoon_cho_pct || 34}%` }} />
                           <div className="bg-indigo-400/70" style={{ width: `${day.night_cho_pct || 33}%` }} />
                         </div>
-                        <div className="flex justify-between text-[8px] text-muted-foreground">
-                          <span>☀ {day.morning_cho_pct || 33}%</span>
-                          <span>🌅 {day.afternoon_cho_pct || 34}%</span>
-                          <span>🌙 {day.night_cho_pct || 33}%</span>
+                        <div className="flex justify-between text-[7px] text-muted-foreground mt-0.5">
+                          <span>☀{day.morning_cho_pct}%</span>
+                          <span>🌅{day.afternoon_cho_pct}%</span>
+                          <span>🌙{day.night_cho_pct}%</span>
                         </div>
                       </div>
                     )}
 
-                    {/* Session info */}
-                    {session?.modality && (
-                      <div className="px-3 py-1.5 border-b border-border bg-muted/20">
-                        <p className="text-[10px] text-muted-foreground">{session.modality}</p>
-                        <p className="text-[9px] text-muted-foreground">{session.shift} • {session.intensity} • {session.duration_minutes || 60}min</p>
-                      </div>
-                    )}
+                    {/* Session */}
+                    <div className="px-2 py-1 border-b border-border/50 bg-muted/20">
+                      <p className="text-[9px] text-muted-foreground font-medium">
+                        {isOff ? 'Day Off' : `${session.modality}`}
+                      </p>
+                      {!isOff && (
+                        <p className="text-[8px] text-muted-foreground">{session.shift} • {session.intensity} • {session.duration_minutes || 60}min</p>
+                      )}
+                    </div>
 
-                    {/* Distribution rationale */}
+                    {/* Rationale */}
                     {day.distribution_rationale && (
-                      <div className="px-3 py-1.5 border-b border-border bg-primary/5">
-                        <p className="text-[9px] italic text-muted-foreground leading-tight">{day.distribution_rationale}</p>
+                      <div className="px-2 py-1 border-b border-border/50">
+                        <p className="text-[8px] italic text-muted-foreground">{day.distribution_rationale}</p>
                       </div>
                     )}
 
-                    {/* Nutritional guidance */}
-                    <div className="px-3 py-2 space-y-1.5">
+                    {/* Timing codes */}
+                    <div className="px-2 py-1.5 space-y-0.5">
                       {day.pre_training && (
-                        <div>
-                          <p className="text-[8px] font-semibold text-muted-foreground uppercase">Pré</p>
-                          <p className="text-[10px] leading-tight">{day.pre_training}</p>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-[7px] font-bold text-muted-foreground w-6 shrink-0">PRÉ</span>
+                          <span className="text-[9px] font-medium">{day.pre_training}</span>
                         </div>
                       )}
                       {day.intra_training && (
-                        <div>
-                          <p className="text-[8px] font-semibold text-muted-foreground uppercase">Intra</p>
-                          <p className="text-[10px] leading-tight">{day.intra_training}</p>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-[7px] font-bold text-muted-foreground w-6 shrink-0">INT</span>
+                          <span className="text-[9px] font-medium">{day.intra_training}</span>
                         </div>
                       )}
                       {day.post_training && (
-                        <div>
-                          <p className="text-[8px] font-semibold text-muted-foreground uppercase">Pós</p>
-                          <p className="text-[10px] leading-tight">{day.post_training}</p>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-[7px] font-bold text-muted-foreground w-6 shrink-0">PÓS</span>
+                          <span className="text-[9px] font-medium">{day.post_training}</span>
                         </div>
                       )}
                       {day.night_guidance && (
-                        <div>
-                          <p className="text-[8px] font-semibold text-muted-foreground uppercase">Noite</p>
-                          <p className="text-[10px] leading-tight">{day.night_guidance}</p>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-[7px] font-bold text-muted-foreground w-6 shrink-0">🌙</span>
+                          <span className="text-[9px] font-medium">{day.night_guidance}</span>
                         </div>
                       )}
                     </div>
