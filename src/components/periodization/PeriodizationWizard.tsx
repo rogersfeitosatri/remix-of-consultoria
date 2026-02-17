@@ -18,6 +18,7 @@ const SHIFTS = ['Manhã', 'Tarde', 'Noite'];
 const INTENSITIES = ['Leve', 'Moderado', 'Intenso'];
 const PRIORITIES = ['A', 'B', 'C'];
 const MODALITIES = ['Corrida', 'Natação', 'Ciclismo', 'Força', 'Day Off'];
+const DURATIONS = ['30', '45', '60', '75', '90', '120', '150', '180'];
 
 const PHASE_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   'Base': { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
@@ -121,6 +122,7 @@ export function PeriodizationWizard({
         modality: '',
         shift: 'Manhã',
         intensity: 'Moderado',
+        duration_minutes: '60',
         priority: 'B',
         metabolic_objective: '',
         is_day_off: false,
@@ -151,6 +153,7 @@ export function PeriodizationWizard({
       modality: '',
       shift: 'Tarde',
       intensity: 'Moderado',
+      duration_minutes: '60',
       priority: 'B',
       metabolic_objective: '',
       is_day_off: false,
@@ -579,6 +582,16 @@ export function PeriodizationWizard({
                                 }`}><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   {INTENSITIES.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+
+                              <Select value={session.duration_minutes || '60'} onValueChange={v => updateSession(session._idx, 'duration_minutes', v)}>
+                                <SelectTrigger className="h-7 text-[10px]">
+                                  <Clock className="h-3 w-3 mr-1 opacity-50" />
+                                  <SelectValue placeholder="Duração" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {DURATIONS.map(d => <SelectItem key={d} value={d}>{d} min</SelectItem>)}
                                 </SelectContent>
                               </Select>
 
