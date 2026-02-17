@@ -12,7 +12,7 @@ const DEFAULT_PHASES = [
   { phase_name: 'Transição', phase_order: 4, objective: 'Recuperação pós-prova, restauração do metabolismo e planejamento do próximo ciclo.', cho_range: '3-5 g/kg', train_low_strategy: 'permitido', recovery_strategy: 'Completa, foco em anti-inflamatórios', body_comp_strategy: 'Flexível', supplement_base: 'Ômega-3, Vitamina D, Glutamina', creatine: 'Manutenção', beta_alanine: '—', caffeine: 'Reduzir/ciclar', nitrate: '—', supplement_general: 'Fase de recuperação e recomposição.' },
 ];
 
-const PHASE_WEIGHT = [0.30, 0.25, 0.25, 0.10, 0.10]; // Base, Específica, Competitiva, Pico, Transição
+const PHASE_WEIGHT = [0.30, 0.25, 0.25, 0.10, 0.10];
 
 export function useJourneyPeriodization(clientId?: string) {
   const { user } = useAuth();
@@ -32,7 +32,7 @@ export function useJourneyPeriodization(clientId?: string) {
     enabled: !!clientId,
   });
 
-  // Fetch journey phases for this athlete
+  // Fetch journey phases
   const { data: journeyPhases = [], isLoading: loadingPhases } = useQuery({
     queryKey: ['journey-phases', clientId],
     queryFn: async () => {
@@ -65,7 +65,41 @@ export function useJourneyPeriodization(clientId?: string) {
     enabled: journeyPhases.length > 0,
   });
 
-  // Fetch client info for plan expiration
+  // Fetch sessions for a specific week
+  const { data: allSessions = [] } = useQuery({
+    queryKey: ['journey-sessions', clientId],
+    queryFn: async () => {
+      const weekIds = journeyWeeks.map(w => w.id);
+      if (weekIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('journey_week_sessions')
+        .select('*')
+        .in('journey_week_id', weekIds)
+        .order('day_of_week');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: journeyWeeks.length > 0,
+  });
+
+  // Fetch dynamics for all weeks
+  const { data: allDynamics = [] } = useQuery({
+    queryKey: ['journey-dynamics', clientId],
+    queryFn: async () => {
+      const weekIds = journeyWeeks.map(w => w.id);
+      if (weekIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('journey_day_dynamics')
+        .select('*')
+        .in('journey_week_id', weekIds)
+        .order('day_of_week');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: journeyWeeks.length > 0,
+  });
+
+  // Fetch client info
   const { data: clientInfo } = useQuery({
     queryKey: ['journey-client-info', clientId],
     queryFn: async () => {
@@ -79,22 +113,16 @@ export function useJourneyPeriodization(clientId?: string) {
     enabled: !!clientId,
   });
 
-  // Generate suggested phase distribution
-  const suggestPhases = (totalWeeks: number, startDate: string): typeof DEFAULT_PHASES & { duration_weeks: number; start_date: string; end_date: string }[] => {
+  // Generate suggested phases
+  const suggestPhases = (totalWeeks: number, startDate: string) => {
     const phases = DEFAULT_PHASES.map((p, i) => {
       const weeks = Math.max(Math.round(totalWeeks * PHASE_WEIGHT[i]), 1);
       return { ...p, duration_weeks: weeks };
     });
-
-    // Adjust to match total
     const sum = phases.reduce((a, p) => a + p.duration_weeks, 0);
     const diff = totalWeeks - sum;
-    if (diff !== 0) {
-      // Add/remove from Base (largest phase)
-      phases[0].duration_weeks = Math.max(phases[0].duration_weeks + diff, 1);
-    }
+    if (diff !== 0) phases[0].duration_weeks = Math.max(phases[0].duration_weeks + diff, 1);
 
-    // Calculate dates
     let currentDate = parseISO(startDate);
     return phases.map((p) => {
       const start = format(currentDate, 'yyyy-MM-dd');
@@ -104,13 +132,10 @@ export function useJourneyPeriodization(clientId?: string) {
     });
   };
 
-  // Save journey phases (create all at once)
+  // Save journey phases
   const saveJourneyPhases = useMutation({
     mutationFn: async ({ periodizationId, phases }: { periodizationId: string; phases: any[] }) => {
-      // Delete existing phases first
       await supabase.from('journey_phases').delete().eq('athlete_periodization_id', periodizationId);
-
-      // Insert new phases
       const rows = phases.map((p, i) => ({
         athlete_periodization_id: periodizationId,
         client_id: clientId!,
@@ -134,11 +159,9 @@ export function useJourneyPeriodization(clientId?: string) {
         nitrate: p.nitrate || null,
         supplement_general: p.supplement_general || null,
       }));
-
       const { error } = await supabase.from('journey_phases').insert(rows);
       if (error) throw error;
 
-      // Also generate weeks for each phase
       const { data: insertedPhases } = await supabase
         .from('journey_phases')
         .select('id, phase_order, duration_weeks')
@@ -169,6 +192,8 @@ export function useJourneyPeriodization(clientId?: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['journey-phases', clientId] });
       queryClient.invalidateQueries({ queryKey: ['journey-weeks', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['journey-sessions', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['journey-dynamics', clientId] });
       toast({ title: 'Jornada configurada com sucesso' });
     },
     onError: (err: any) => {
@@ -176,7 +201,7 @@ export function useJourneyPeriodization(clientId?: string) {
     },
   });
 
-  // Update a single phase's structural data
+  // Update phase
   const updatePhase = useMutation({
     mutationFn: async ({ phaseId, data }: { phaseId: string; data: any }) => {
       const { error } = await supabase
@@ -191,15 +216,132 @@ export function useJourneyPeriodization(clientId?: string) {
     },
   });
 
+  // Save sessions for a week
+  const saveSessions = useMutation({
+    mutationFn: async ({ weekId, sessions }: { weekId: string; sessions: any[] }) => {
+      // Delete existing
+      await supabase.from('journey_week_sessions').delete().eq('journey_week_id', weekId);
+      const rows = sessions.map(s => ({
+        journey_week_id: weekId,
+        day_of_week: s.day_of_week,
+        modality: s.modality || null,
+        shift: s.shift || null,
+        intensity: s.intensity || null,
+        priority: s.priority || null,
+        metabolic_objective: s.metabolic_objective || null,
+      }));
+      const { error } = await supabase.from('journey_week_sessions').insert(rows);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['journey-sessions', clientId] });
+      toast({ title: 'Sessões salvas' });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Erro ao salvar sessões', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // Save dynamics for a week
+  const saveDynamics = useMutation({
+    mutationFn: async ({ weekId, dynamics }: { weekId: string; dynamics: any[] }) => {
+      await supabase.from('journey_day_dynamics').delete().eq('journey_week_id', weekId);
+      const rows = dynamics.map(d => ({
+        journey_week_id: weekId,
+        day_of_week: d.day_of_week,
+        cho_classification: d.cho_classification || null,
+        pre_training: d.pre_training || null,
+        intra_training: d.intra_training || null,
+        post_training: d.post_training || null,
+        night_guidance: d.night_guidance || null,
+        notes: d.notes || null,
+        ai_generated: d.ai_generated ?? true,
+      }));
+      const { error } = await supabase.from('journey_day_dynamics').insert(rows);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['journey-dynamics', clientId] });
+      toast({ title: 'Dinâmica salva' });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Erro ao salvar dinâmica', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // Generate dynamics via AI
+  const generateDynamics = useMutation({
+    mutationFn: async ({ weekId, phase }: { weekId: string; phase: any }) => {
+      const weekSessions = allSessions.filter(s => s.journey_week_id === weekId);
+      
+      // Get athlete info
+      const { data: profile } = await supabase
+        .from('athlete_profiles')
+        .select('current_weight, main_goal')
+        .eq('client_id', clientId!)
+        .maybeSingle();
+
+      const { data, error } = await supabase.functions.invoke('generate-journey-dynamics', {
+        body: {
+          sessions: weekSessions,
+          phase: {
+            phase_name: phase.phase_name,
+            objective: phase.objective,
+            cho_range: phase.cho_range,
+            train_low_strategy: phase.train_low_strategy,
+          },
+          athleteInfo: profile ? { weight: profile.current_weight, goal: profile.main_goal } : null,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Save generated dynamics
+      const dynamics = (data.dynamics || []).map((d: any) => ({
+        journey_week_id: weekId,
+        day_of_week: d.day_of_week,
+        cho_classification: d.cho_classification,
+        pre_training: d.pre_training || '',
+        intra_training: d.intra_training || '',
+        post_training: d.post_training || '',
+        night_guidance: d.night_guidance || '',
+        notes: d.notes || '',
+        ai_generated: true,
+      }));
+
+      // Save to DB
+      await supabase.from('journey_day_dynamics').delete().eq('journey_week_id', weekId);
+      if (dynamics.length > 0) {
+        const { error: insertErr } = await supabase.from('journey_day_dynamics').insert(dynamics);
+        if (insertErr) throw insertErr;
+      }
+
+      return dynamics;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['journey-dynamics', clientId] });
+      toast({ title: 'Dinâmica gerada pela IA' });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Erro ao gerar dinâmica', description: err.message, variant: 'destructive' });
+    },
+  });
+
   return {
     athletePeriodization,
     journeyPhases,
     journeyWeeks,
     clientInfo,
     loadingPhases,
+    allSessions,
+    allDynamics,
     suggestPhases,
     saveJourneyPhases,
     updatePhase,
+    saveSessions,
+    saveDynamics,
+    generateDynamics,
     DEFAULT_PHASES,
   };
 }

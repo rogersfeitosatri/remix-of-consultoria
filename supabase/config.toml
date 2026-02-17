@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.analyze-metabolic-screening]
 verify_jwt = false
+
+[functions.generate-journey-dynamics]
+verify_jwt = false

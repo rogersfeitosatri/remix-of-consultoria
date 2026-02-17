@@ -10,6 +10,9 @@ import { JourneyOverviewPanel } from './JourneyOverviewPanel';
 import { JourneyPhaseConfig } from './JourneyPhaseConfig';
 import { JourneyStructuralTable } from './JourneyStructuralTable';
 import { JourneyTimeline } from './JourneyTimeline';
+import { JourneyWeekSessions } from './JourneyWeekSessions';
+import { JourneyDayDynamics } from './JourneyDayDynamics';
+import { JourneyStrategicPanel } from './JourneyStrategicPanel';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInWeeks, parseISO } from 'date-fns';
@@ -26,7 +29,9 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
   const { athletePeriodization, savePeriodization } = useAthletePeriodization(clientId);
   const {
     journeyPhases, journeyWeeks, clientInfo, loadingPhases,
-    suggestPhases, saveJourneyPhases, updatePhase
+    allSessions, allDynamics,
+    suggestPhases, saveJourneyPhases, updatePhase,
+    saveSessions, saveDynamics, generateDynamics,
   } = useJourneyPeriodization(clientId);
 
   const [activeView, setActiveView] = useState<'journey' | 'method'>('journey');
@@ -67,9 +72,7 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
   // Ensure parent periodization record exists
   const handleSavePhases = async (phases: any[]) => {
     let periodizationId = athletePeriodization?.id;
-
     if (!periodizationId && method) {
-      // Create parent record first
       await savePeriodization.mutateAsync({
         start_date: startDate,
         race_date: raceDate,
@@ -77,7 +80,6 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
         method_id: method.id,
         timeline_blocks: [],
       });
-      // Refetch to get ID
       const { data } = await supabase
         .from('athlete_periodization')
         .select('id')
@@ -85,11 +87,34 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
         .single();
       periodizationId = data?.id;
     }
-
     if (periodizationId) {
       saveJourneyPhases.mutate({ periodizationId, phases });
     }
   };
+
+  // Selected week data
+  const selectedWeek = journeyWeeks.find(w => w.id === selectedWeekId);
+  const selectedPhase = selectedWeek
+    ? journeyPhases.find(p => p.id === selectedWeek.journey_phase_id)
+    : null;
+  const weekSessions = selectedWeekId
+    ? allSessions.filter(s => s.journey_week_id === selectedWeekId)
+    : [];
+  const weekDynamics = selectedWeekId
+    ? allDynamics.filter(d => d.journey_week_id === selectedWeekId)
+    : [];
+
+  // Current phase dynamics for strategic panel
+  const currentPhase = journeyPhases.find(p => {
+    if (!p.start_date || !p.end_date) return false;
+    const today = new Date();
+    return today >= parseISO(p.start_date) && today <= parseISO(p.end_date);
+  });
+  const currentPhaseWeekIds = currentPhase
+    ? journeyWeeks.filter(w => w.journey_phase_id === currentPhase.id).map(w => w.id)
+    : [];
+  const phaseDynamics = allDynamics.filter(d => currentPhaseWeekIds.includes(d.journey_week_id));
+  const phaseSessions = allSessions.filter(s => currentPhaseWeekIds.includes(s.journey_week_id));
 
   // If no method yet, prompt creation
   if (!loadingMethod && !method) {
@@ -113,7 +138,7 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
         </TabsContent>
 
         <TabsContent value="journey" className="mt-4 space-y-4">
-          {/* 1. Visão Geral da Jornada */}
+          {/* 1. Visão Geral */}
           <JourneyOverviewPanel
             raceName={raceName}
             raceDate={raceDate}
@@ -123,7 +148,7 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
             clientEndDate={clientInfo?.end_date}
           />
 
-          {/* 2. Configuração das Fases */}
+          {/* 2. Configuração */}
           <JourneyPhaseConfig
             raceDate={raceDate}
             startDate={startDate}
@@ -143,13 +168,50 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
             isSaving={updatePhase.isPending}
           />
 
-          {/* 9. Histórico / Timeline */}
+          {/* 6. Painel Estratégico da Fase Atual */}
+          {currentPhase && phaseDynamics.length > 0 && (
+            <JourneyStrategicPanel
+              phaseName={currentPhase.phase_name}
+              dynamics={phaseDynamics}
+              sessions={phaseSessions}
+            />
+          )}
+
+          {/* 9. Timeline */}
           <JourneyTimeline
             phases={journeyPhases}
             weeks={journeyWeeks}
             onSelectWeek={setSelectedWeekId}
             selectedWeekId={selectedWeekId}
           />
+
+          {/* 4. Estruturação Semanal (when week selected) */}
+          {selectedWeek && selectedPhase && (
+            <>
+              <JourneyWeekSessions
+                weekId={selectedWeek.id}
+                weekNumber={selectedWeek.week_number}
+                weekInPhase={selectedWeek.week_in_phase}
+                phaseName={selectedPhase.phase_name}
+                existingSessions={weekSessions}
+                onSaveSessions={(weekId, sessions) => saveSessions.mutate({ weekId, sessions })}
+                isSaving={saveSessions.isPending}
+              />
+
+              {/* 5. Dinâmica Nutricional */}
+              <JourneyDayDynamics
+                weekId={selectedWeek.id}
+                weekNumber={selectedWeek.week_number}
+                phaseName={selectedPhase.phase_name}
+                existingDynamics={weekDynamics}
+                sessions={weekSessions}
+                onGenerateDynamics={(weekId) => generateDynamics.mutate({ weekId, phase: selectedPhase })}
+                onSaveDynamics={(weekId, dynamics) => saveDynamics.mutate({ weekId, dynamics })}
+                isGenerating={generateDynamics.isPending}
+                isSaving={saveDynamics.isPending}
+              />
+            </>
+          )}
 
           {/* Empty state */}
           {journeyPhases.length === 0 && !raceDate && (
