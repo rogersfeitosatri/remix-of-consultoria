@@ -8,12 +8,11 @@ import type { Json } from '@/integrations/supabase/types';
 const DEFAULT_PHASES = [
   { phase_name: 'Base', phase_order: 0, objective: 'Adaptação metabólica, eficiência lipídica e construção de base aeróbia.', cho_range: '3-5 g/kg', train_low_strategy: 'permitido', recovery_strategy: 'Regenerativo moderado', body_comp_strategy: 'Manutenção ou leve redução de gordura', supplement_base: 'Creatina 5g, Ômega-3 2g, Vitamina D', creatine: '5g/dia', beta_alanine: '3.2g/dia (loading)', caffeine: '—', nitrate: '—', supplement_general: 'Foco em adaptação metabólica. Suplementação de base.' },
   { phase_name: 'Específica', phase_order: 1, objective: 'Desenvolvimento de capacidade específica, treino intestinal e aumento progressivo de CHO intra.', cho_range: '4-6 g/kg', train_low_strategy: 'reduzido', recovery_strategy: 'Recovery 4:1 pós treino-chave', body_comp_strategy: 'Estabilizar composição corporal', supplement_base: 'Creatina 5g, Cafeína 3mg/kg, Ômega-3', creatine: '5g/dia', beta_alanine: '3.2g/dia', caffeine: '3 mg/kg pré treino-chave', nitrate: 'Iniciar testes', supplement_general: 'Início da estratégia de prova. Treino intestinal com gel.' },
-  { phase_name: 'Competitiva', phase_order: 2, objective: 'Simulação de prova, carb-loading, maximizar rendimento.', cho_range: '5-8 g/kg', train_low_strategy: 'proibido', recovery_strategy: 'Recovery imediato pós longão, glutamina', body_comp_strategy: 'Manutenção estrita', supplement_base: 'Cafeína, Nitrato, Creatina, Gel intra 60-90g/h', creatine: '5g/dia', beta_alanine: '3.2g/dia', caffeine: '3-6 mg/kg', nitrate: '400-800mg 2-3h pré', supplement_general: 'Estratégia completa de prova. Simular protocolo intra.' },
-  { phase_name: 'Pico', phase_order: 3, objective: 'Polimento final, taper nutricional, carb-loading pré-prova.', cho_range: '8-12 g/kg', train_low_strategy: 'proibido', recovery_strategy: 'Regenerativo leve', body_comp_strategy: 'Aceitar leve aumento de peso (glicogênio)', supplement_base: 'Carb-loading +6g/kg 48h, Gel protocolo definido', creatine: '5g/dia', beta_alanine: 'Manutenção', caffeine: '3-6 mg/kg (dia da prova)', nitrate: '400-800mg', supplement_general: 'Foco total na prova. Nenhuma experimentação.' },
-  { phase_name: 'Transição', phase_order: 4, objective: 'Recuperação pós-prova, restauração do metabolismo e planejamento do próximo ciclo.', cho_range: '3-5 g/kg', train_low_strategy: 'permitido', recovery_strategy: 'Completa, foco em anti-inflamatórios', body_comp_strategy: 'Flexível', supplement_base: 'Ômega-3, Vitamina D, Glutamina', creatine: 'Manutenção', beta_alanine: '—', caffeine: 'Reduzir/ciclar', nitrate: '—', supplement_general: 'Fase de recuperação e recomposição.' },
+  { phase_name: 'Polimento', phase_order: 2, objective: 'Polimento final, taper nutricional, carb-loading pré-prova, simulação de protocolo de prova.', cho_range: '6-10 g/kg', train_low_strategy: 'proibido', recovery_strategy: 'Regenerativo leve, recovery imediato', body_comp_strategy: 'Aceitar leve aumento de peso (glicogênio)', supplement_base: 'Cafeína, Nitrato, Creatina, Carb-loading +6g/kg 48h, Gel protocolo definido', creatine: '5g/dia', beta_alanine: 'Manutenção', caffeine: '3-6 mg/kg (dia da prova)', nitrate: '400-800mg 2-3h pré', supplement_general: 'Foco total na prova. Estratégia completa validada. Nenhuma experimentação.' },
+  { phase_name: 'Transição', phase_order: 3, objective: 'Recuperação pós-prova, restauração do metabolismo e planejamento do próximo ciclo.', cho_range: '3-5 g/kg', train_low_strategy: 'permitido', recovery_strategy: 'Completa, foco em anti-inflamatórios', body_comp_strategy: 'Flexível', supplement_base: 'Ômega-3, Vitamina D, Glutamina', creatine: 'Manutenção', beta_alanine: '—', caffeine: 'Reduzir/ciclar', nitrate: '—', supplement_general: 'Fase de recuperação e recomposição.' },
 ];
 
-const PHASE_WEIGHT = [0.30, 0.25, 0.25, 0.10, 0.10];
+const PHASE_WEIGHT = [0.35, 0.30, 0.20, 0.15];
 
 export function useJourneyPeriodization(clientId?: string) {
   const { user } = useAuth();
@@ -117,7 +116,7 @@ export function useJourneyPeriodization(clientId?: string) {
   // Generate suggested phases
   const suggestPhases = (totalWeeks: number, startDate: string) => {
     const phases = DEFAULT_PHASES.map((p, i) => {
-      const weeks = Math.max(Math.round(totalWeeks * PHASE_WEIGHT[i]), i === 3 || i === 4 ? 0 : 1);
+      const weeks = Math.max(Math.round(totalWeeks * PHASE_WEIGHT[i]), i === 3 ? 0 : 1);
       return { ...p, duration_weeks: weeks };
     });
     const sum = phases.reduce((a, p) => a + p.duration_weeks, 0);

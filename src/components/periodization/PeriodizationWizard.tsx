@@ -29,8 +29,7 @@ const DURATIONS = ['30', '45', '60', '75', '90', '120', '150', '180'];
 const PHASE_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   'Base': { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/30', dot: 'bg-blue-500' },
   'Específica': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', dot: 'bg-amber-500' },
-  'Competitiva': { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/30', dot: 'bg-orange-500' },
-  'Pico': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
+  'Polimento': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', dot: 'bg-emerald-500' },
   'Transição': { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', dot: 'bg-purple-500' },
 };
 
@@ -66,8 +65,7 @@ interface PhaseNutrientInfo {
 function getPhaseSupplements(phaseName: string): SupplementInfo[] {
   const isBase = phaseName.includes('Base');
   const isEspecifica = phaseName.includes('Específica');
-  const isCompetitiva = phaseName.includes('Competitiva');
-  const isPico = phaseName.includes('Pico');
+  const isPolimento = phaseName.includes('Polimento');
   const isTransicao = phaseName.includes('Transição');
 
   return [
@@ -84,25 +82,25 @@ function getPhaseSupplements(phaseName: string): SupplementInfo[] {
       name: 'Beta-alanina',
       dose: '3.2-6.4g/dia (doses fracionadas de 0.8-1.6g)',
       timing: 'Distribuir ao longo do dia para evitar parestesia',
-      active: isBase || isEspecifica || isCompetitiva,
+      active: isBase || isEspecifica || isPolimento,
       note: isBase ? 'Início do carregamento — efeito pleno em 4-8 semanas' : undefined,
     },
     {
       emoji: '☕',
       name: 'Cafeína',
       dose: '3-6 mg/kg',
-      timing: isPico ? '60min pré-prova' : '60min pré-treinos intensos',
-      active: isEspecifica || isCompetitiva || isPico,
+      timing: isPolimento ? '60min pré-prova' : '60min pré-treinos intensos',
+      active: isEspecifica || isPolimento,
       note: isEspecifica ? 'Testar protocolo individual (dose, timing, tolerância GI)' :
-             isPico ? 'Dose validada — usar protocolo testado na Específica' : undefined,
+             isPolimento ? 'Dose validada — usar protocolo testado na Específica' : undefined,
     },
     {
       emoji: '🥬',
       name: 'Nitrato (Beterraba)',
       dose: '300-600mg nitrato (≈500mL suco beterraba)',
-      timing: isPico ? '2-3h pré-prova (carregamento 3-5d antes)' : '2-3h pré-treinos de alta intensidade',
-      active: isCompetitiva || isPico,
-      note: isPico ? 'Carregamento: 3-5 dias consecutivos pré-prova' : undefined,
+      timing: isPolimento ? '2-3h pré-prova (carregamento 3-5d antes)' : '2-3h pré-treinos de alta intensidade',
+      active: isEspecifica || isPolimento,
+      note: isPolimento ? 'Carregamento: 3-5 dias consecutivos pré-prova' : undefined,
     },
     {
       emoji: '🧂',
@@ -110,7 +108,7 @@ function getPhaseSupplements(phaseName: string): SupplementInfo[] {
       dose: '300-600mg Na/L de fluido',
       timing: 'Durante treinos >60min e na prova',
       active: true,
-      note: isPico ? 'Ensaiar protocolo de prova com eletrólitos' : undefined,
+      note: isPolimento ? 'Ensaiar protocolo de prova com eletrólitos' : undefined,
     },
     {
       emoji: '🩸',
@@ -142,11 +140,10 @@ function getPhaseSupplements(phaseName: string): SupplementInfo[] {
 function getPhaseNutrients(phaseName: string): PhaseNutrientInfo {
   const isBase = phaseName.includes('Base');
   const isEspecifica = phaseName.includes('Específica');
-  const isCompetitiva = phaseName.includes('Competitiva');
-  const isPico = phaseName.includes('Pico');
+  const isPolimento = phaseName.includes('Polimento');
   const isTransicao = phaseName.includes('Transição');
 
-  if (isPico) return {
+  if (isPolimento) return {
     protein: '1.4-1.6',
     fat: '20-25%',
     hydration: '5-10 mL/kg',
@@ -157,16 +154,6 @@ function getPhaseNutrients(phaseName: string): PhaseNutrientInfo {
       { type: 'success', text: 'Supercompensação de glicogênio: CHO 10-12g/kg nos 2-3 dias pré-prova' },
       { type: 'warning', text: 'Evitar fibras e alimentos novos 48h antes da prova' },
       { type: 'info', text: 'Ensaio geral nutricional: testar tudo que será usado na prova (gel, isotônico, cafeína)' },
-    ],
-  };
-  if (isCompetitiva) return {
-    protein: '1.4-1.8',
-    fat: '20-30%',
-    hydration: '5-8 mL/kg',
-    preTiming: 'CHO 1-3g/kg 2-3h antes dos treinos-chave',
-    intraTiming: '30-60g CHO/h em sessões >75min',
-    postTiming: '0.8-1.0g CHO/kg + 0.3g PTN/kg dentro de 30min',
-    alerts: [
       { type: 'warning', text: 'Train-Low PROIBIDO — máxima disponibilidade de CHO para qualidade dos treinos' },
       { type: 'info', text: 'Treinar o gut training: adaptar intestino a 60-90g CHO/h para a prova' },
     ],
@@ -416,8 +403,7 @@ export function PeriodizationWizard({
     const v = baseChoGkg;
     if (phaseName.includes('Base')) return `${Math.max(v - 1, 2)}-${v + 1}`;
     if (phaseName.includes('Específica')) return `${v}-${v + 2}`;
-    if (phaseName.includes('Competitiva')) return `${v + 1}-${v + 4}`;
-    if (phaseName.includes('Pico')) return `${Math.round(v * 2)}-${Math.round(v * 3)}`;
+    if (phaseName.includes('Polimento')) return `${v + 2}-${Math.round(v * 2.5)}`;
     if (phaseName.includes('Transição')) return `${Math.max(v - 1, 2)}-${v + 1}`;
     return `${v}-${v + 2}`;
   };
@@ -550,15 +536,15 @@ export function PeriodizationWizard({
             {/* Phase preview */}
             {suggestedPhases.length > 0 && !hasPhases && (() => {
               const suggestedTotal = suggestedPhases.reduce((a, p) => a + (p.duration_weeks || 0), 0);
-              const competitivaEnd = (() => {
+              const polimentoEnd = (() => {
                 let d = parseISO(startDate);
                 for (const p of suggestedPhases) {
                   d = addWeeks(d, p.duration_weeks || 0);
-                  if (p.phase_name.includes('Competitiva')) break;
+                  if (p.phase_name.includes('Polimento')) break;
                 }
                 return d;
               })();
-              const raceDateMatch = raceDate ? format(competitivaEnd, 'yyyy-MM-dd') === raceDate : false;
+              const raceDateMatch = raceDate ? format(polimentoEnd, 'yyyy-MM-dd') === raceDate : false;
               return (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -568,10 +554,10 @@ export function PeriodizationWizard({
                   </Badge>
                 </div>
 
-                {/* Info: race = end of Competitiva */}
+                {/* Info: race = end of Polimento */}
                 <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
                   <Target className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span>A <strong className="text-foreground">Prova Alvo</strong> deve coincidir com o final da fase <strong className="text-foreground">Competitiva</strong>.</span>
+                  <span>A <strong className="text-foreground">Prova Alvo</strong> deve coincidir com o final da fase <strong className="text-foreground">Polimento</strong>.</span>
                   {raceDate && (
                     raceDateMatch
                       ? <Badge className="text-[8px] bg-emerald-500/20 text-emerald-400 border-emerald-500/30 ml-auto shrink-0">✓ Alinhado</Badge>
@@ -600,7 +586,7 @@ export function PeriodizationWizard({
                 </div>
 
                 {/* Phase cards with editable weeks */}
-                <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                   {suggestedPhases.map((p, i) => {
                     const style = getPhaseStyle(p.phase_name);
                     const isZero = p.duration_weeks === 0;
@@ -720,7 +706,7 @@ export function PeriodizationWizard({
                 </div>
 
                 {/* Editable phase weeks for existing phases */}
-                <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                   {journeyPhases.map((p: any, i: number) => {
                     const style = getPhaseStyle(p.phase_name);
                     return (
@@ -729,11 +715,46 @@ export function PeriodizationWizard({
                           <div className={`w-2 h-2 rounded-full ${style.dot}`} />
                           <span className={`text-[10px] font-bold ${style.text}`}>{p.phase_name}</span>
                         </div>
-                        <p className="text-[9px] text-muted-foreground">{p.duration_weeks} sem</p>
-                        {p.start_date && (
+                        <div className="flex items-center gap-1 mb-1">
+                          <Input
+                            type="number"
+                            min={0}
+                            value={p.duration_weeks}
+                            onChange={e => {
+                              const newWeeks = Math.max(parseInt(e.target.value) || 0, 0);
+                              const updated = journeyPhases.map((ph: any, idx: number) => {
+                                if (idx === i) return { ...ph, duration_weeks: newWeeks };
+                                return { ...ph };
+                              });
+                              let currentDate = parseISO(startDate);
+                              for (let j = 0; j < updated.length; j++) {
+                                updated[j].start_date = format(currentDate, 'yyyy-MM-dd');
+                                currentDate = addWeeks(currentDate, updated[j].duration_weeks);
+                                updated[j].end_date = format(currentDate, 'yyyy-MM-dd');
+                              }
+                              const choVal = parseFloat(initialCHO) || 4;
+                              const activePhases = updated.filter((ph: any) => ph.duration_weeks > 0);
+                              if (activePhases.length === 0) {
+                                toast({ title: 'Defina ao menos uma fase com semanas', variant: 'destructive' });
+                                return;
+                              }
+                              const phasesWithCho = activePhases.map((ph: any) => ({
+                                ...ph,
+                                cho_range: getChoRangeForPhase(ph.phase_name, choVal) + ' g/kg',
+                              }));
+                              onSavePhases(phasesWithCho);
+                            }}
+                            className="h-7 text-xs w-14"
+                          />
+                          <span className="text-[10px] text-muted-foreground">sem</span>
+                        </div>
+                        {p.start_date && p.duration_weeks > 0 && (
                           <p className="text-[9px] text-muted-foreground">
                             {format(parseISO(p.start_date), 'dd/MM')} → {format(parseISO(p.end_date), 'dd/MM')}
                           </p>
+                        )}
+                        {p.duration_weeks === 0 && (
+                          <p className="text-[9px] text-muted-foreground italic">Fase ignorada</p>
                         )}
                       </div>
                     );

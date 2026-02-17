@@ -14,8 +14,7 @@ import { parseISO, format, isAfter, isBefore } from 'date-fns';
 const PHASE_BADGE: Record<string, string> = {
   'Base': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   'Específica': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  'Competitiva': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  'Pico': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  'Polimento': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   'Transição': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
 };
 
