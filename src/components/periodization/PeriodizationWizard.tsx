@@ -209,7 +209,8 @@ interface Props {
   journeyWeeks: any[];
   allSessions: any[];
   allDynamics: any[];
-  suggestPhases: (totalWeeks: number, startDate: string) => any[];
+  suggestPhases: (totalWeeks: number, startDate: string, raceDate?: string) => any[];
+  recalcPhaseDates: (phases: any[], startDate: string, raceDate?: string) => any[];
   onSavePhases: (phases: any[]) => void;
   isSavingPhases: boolean;
   onSaveSessions: (weekId: string, sessions: any[]) => void;
@@ -223,7 +224,7 @@ interface Props {
 export function PeriodizationWizard({
   clientId, raceDate, raceName, startDate, onStartDateChange,
   journeyPhases, journeyWeeks, allSessions, allDynamics,
-  suggestPhases, onSavePhases, isSavingPhases,
+  suggestPhases, recalcPhaseDates, onSavePhases, isSavingPhases,
   onSaveSessions, isSavingSessions,
   onGenerateDynamics, isGeneratingDynamics,
   onSaveDynamics, isSavingDynamics,
@@ -296,10 +297,10 @@ export function PeriodizationWizard({
   // Auto-suggest phases
   useEffect(() => {
     if (totalWeeks > 0 && startDate && !hasPhases) {
-      const suggested = suggestPhases(totalWeeks, startDate);
+      const suggested = suggestPhases(totalWeeks, startDate, raceDate);
       setSuggestedPhases(suggested);
     }
-  }, [totalWeeks, startDate, hasPhases]);
+  }, [totalWeeks, startDate, hasPhases, raceDate]);
 
   const updateSession = (sessionIdx: number, field: string, value: string | boolean) => {
     setSessionsDirty(true);
@@ -537,15 +538,10 @@ export function PeriodizationWizard({
             {/* Phase preview */}
             {suggestedPhases.length > 0 && !hasPhases && (() => {
               const suggestedTotal = suggestedPhases.reduce((a, p) => a + (p.duration_weeks || 0), 0);
-              const polimentoEnd = (() => {
-                let d = parseISO(startDate);
-                for (const p of suggestedPhases) {
-                  d = addWeeks(d, p.duration_weeks || 0);
-                  if (p.phase_name.includes('Polimento')) break;
-                }
-                return d;
-              })();
-              const raceDateMatch = raceDate ? format(polimentoEnd, 'yyyy-MM-dd') === raceDate : false;
+              const polimentoPhase = suggestedPhases.find(p => p.phase_name.includes('Polimento'));
+              const raceDateMatch = raceDate && polimentoPhase?.end_date
+                ? polimentoPhase.end_date === raceDate
+                : false;
               return (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -602,18 +598,13 @@ export function PeriodizationWizard({
                             type="number"
                             min={0}
                             value={p.duration_weeks}
-                            onChange={e => {
+                          onChange={e => {
                               const newWeeks = Math.max(parseInt(e.target.value) || 0, 0);
                               const updated = [...suggestedPhases];
                               updated[i] = { ...updated[i], duration_weeks: newWeeks };
-                              // Recalculate dates
-                              let currentDate = parseISO(startDate);
-                              for (let j = 0; j < updated.length; j++) {
-                                updated[j].start_date = format(currentDate, 'yyyy-MM-dd');
-                                currentDate = addWeeks(currentDate, updated[j].duration_weeks);
-                                updated[j].end_date = format(currentDate, 'yyyy-MM-dd');
-                              }
-                              setSuggestedPhases(updated);
+                              // Recalculate dates anchoring Polimento end to raceDate
+                              const recalculated = recalcPhaseDates(updated, startDate, raceDate);
+                              setSuggestedPhases(recalculated);
                             }}
                             className="h-7 text-xs w-14"
                           />
@@ -673,7 +664,7 @@ export function PeriodizationWizard({
                       className="text-xs gap-1"
                       onClick={() => {
                         const choVal = parseFloat(initialCHO) || 4;
-                        const suggested = suggestPhases(totalWeeks, startDate).map(p => ({
+                        const suggested = suggestPhases(totalWeeks, startDate, raceDate).map(p => ({
                           ...p,
                           cho_range: getChoRangeForPhase(p.phase_name, choVal) + ' g/kg',
                         }));
@@ -721,20 +712,15 @@ export function PeriodizationWizard({
                             type="number"
                             min={0}
                             value={p.duration_weeks}
-                            onChange={e => {
+                          onChange={e => {
                               const newWeeks = Math.max(parseInt(e.target.value) || 0, 0);
-                              const updated = journeyPhases.map((ph: any, idx: number) => {
-                                if (idx === i) return { ...ph, duration_weeks: newWeeks };
-                                return { ...ph };
-                              });
-                              let currentDate = parseISO(startDate);
-                              for (let j = 0; j < updated.length; j++) {
-                                updated[j].start_date = format(currentDate, 'yyyy-MM-dd');
-                                currentDate = addWeeks(currentDate, updated[j].duration_weeks);
-                                updated[j].end_date = format(currentDate, 'yyyy-MM-dd');
-                              }
+                              const updated = journeyPhases.map((ph: any, idx: number) =>
+                                idx === i ? { ...ph, duration_weeks: newWeeks } : { ...ph }
+                              );
+                              // Recalculate dates anchoring Polimento end to raceDate
+                              const recalculated = recalcPhaseDates(updated, startDate, raceDate);
                               const choVal = parseFloat(initialCHO) || 4;
-                              const activePhases = updated.filter((ph: any) => ph.duration_weeks > 0);
+                              const activePhases = recalculated.filter((ph: any) => ph.duration_weeks > 0);
                               if (activePhases.length === 0) {
                                 toast({ title: 'Defina ao menos uma fase com semanas', variant: 'destructive' });
                                 return;

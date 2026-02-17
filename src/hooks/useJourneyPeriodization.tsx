@@ -114,22 +114,100 @@ export function useJourneyPeriodization(clientId?: string) {
   });
 
   // Generate suggested phases
-  const suggestPhases = (totalWeeks: number, startDate: string) => {
-    const phases = DEFAULT_PHASES.map((p, i) => {
-      const weeks = Math.max(Math.round(totalWeeks * PHASE_WEIGHT[i]), i === 3 ? 0 : 1);
+  // Key invariant: end of Polimento === raceDate, Transição starts after raceDate
+  const suggestPhases = (totalWeeks: number, startDate: string, raceDate?: string) => {
+    // Weights for Base, Específica, Polimento (Transição is post-race, fixed at 2 weeks default)
+    const transicaoWeeks = 2;
+    const preRaceWeeks = Math.max(totalWeeks - transicaoWeeks, 3); // weeks from start to race
+
+    const preRaceWeights = [0.45, 0.35, 0.20]; // Base, Específica, Polimento
+    const preRacePhases = DEFAULT_PHASES.slice(0, 3).map((p, i) => {
+      const weeks = Math.max(Math.round(preRaceWeeks * preRaceWeights[i]), 1);
       return { ...p, duration_weeks: weeks };
     });
-    const sum = phases.reduce((a, p) => a + p.duration_weeks, 0);
-    const diff = totalWeeks - sum;
-    if (diff !== 0) phases[0].duration_weeks = Math.max(phases[0].duration_weeks + diff, 0);
 
-    let currentDate = parseISO(startDate);
-    return phases.map((p) => {
-      const start = format(currentDate, 'yyyy-MM-dd');
-      currentDate = addWeeks(currentDate, p.duration_weeks);
-      const end = format(currentDate, 'yyyy-MM-dd');
-      return { ...p, start_date: start, end_date: end };
-    });
+    // Adjust sum to exactly preRaceWeeks
+    const sum = preRacePhases.reduce((a, p) => a + p.duration_weeks, 0);
+    const diff = preRaceWeeks - sum;
+    if (diff !== 0) preRacePhases[0].duration_weeks = Math.max(preRacePhases[0].duration_weeks + diff, 1);
+
+    // Calculate dates: Base and Específica go forward from startDate
+    // Polimento end = raceDate (anchor), so Polimento start = raceDate - polimentoWeeks
+    const allPhases = [...preRacePhases, { ...DEFAULT_PHASES[3], duration_weeks: transicaoWeeks }];
+
+    return recalcPhaseDates(allPhases, startDate, raceDate);
+  };
+
+  // Recalculate dates anchoring Polimento.end === raceDate, Transição after raceDate
+  const recalcPhaseDates = (phases: any[], startDate: string, raceDate?: string) => {
+    if (!raceDate) {
+      // Fallback: simple sequential
+      let cur = parseISO(startDate);
+      return phases.map(p => {
+        const start = format(cur, 'yyyy-MM-dd');
+        cur = addWeeks(cur, p.duration_weeks);
+        return { ...p, start_date: start, end_date: format(cur, 'yyyy-MM-dd') };
+      });
+    }
+
+    const raceDateParsed = parseISO(raceDate);
+    const polimentoIdx = phases.findIndex(p => p.phase_name.includes('Polimento'));
+
+    if (polimentoIdx === -1) {
+      // No Polimento phase — fallback sequential
+      let cur = parseISO(startDate);
+      return phases.map(p => {
+        const start = format(cur, 'yyyy-MM-dd');
+        cur = addWeeks(cur, p.duration_weeks);
+        return { ...p, start_date: start, end_date: format(cur, 'yyyy-MM-dd') };
+      });
+    }
+
+    const result = phases.map(p => ({ ...p }));
+
+    // Phases after Polimento (Transição etc.) start at raceDate and go forward
+    let afterDate = raceDateParsed;
+    for (let i = polimentoIdx + 1; i < result.length; i++) {
+      result[i].start_date = format(afterDate, 'yyyy-MM-dd');
+      afterDate = addWeeks(afterDate, result[i].duration_weeks);
+      result[i].end_date = format(afterDate, 'yyyy-MM-dd');
+    }
+
+    // Polimento ends at raceDate, starts = raceDate - polimentoWeeks
+    const polimentoStart = addWeeks(raceDateParsed, -result[polimentoIdx].duration_weeks);
+    result[polimentoIdx].end_date = raceDate;
+    result[polimentoIdx].start_date = format(polimentoStart, 'yyyy-MM-dd');
+
+    // Phases before Polimento: distribute from startDate to polimentoStart
+    // Fit Base + Específica (and any others) into the window [startDate, polimentoStart]
+    const prePhases = result.slice(0, polimentoIdx);
+    if (prePhases.length > 0) {
+      const totalPreWeeks = Math.max(differenceInWeeks(polimentoStart, parseISO(startDate)), prePhases.length);
+      // Redistribute pre-phase weeks proportionally
+      const currentPreWeeks = prePhases.reduce((a, p) => a + (p.duration_weeks || 0), 0);
+      if (currentPreWeeks !== totalPreWeeks) {
+        const ratio = totalPreWeeks / (currentPreWeeks || 1);
+        let assigned = 0;
+        for (let i = 0; i < prePhases.length - 1; i++) {
+          result[i].duration_weeks = Math.max(Math.round((result[i].duration_weeks || 1) * ratio), 1);
+          assigned += result[i].duration_weeks;
+        }
+        result[polimentoIdx - 1].duration_weeks = Math.max(totalPreWeeks - assigned, 1);
+      }
+
+      // Now assign dates sequentially for pre-phases
+      let cur = parseISO(startDate);
+      for (let i = 0; i < polimentoIdx; i++) {
+        result[i].start_date = format(cur, 'yyyy-MM-dd');
+        cur = addWeeks(cur, result[i].duration_weeks);
+        result[i].end_date = format(cur, 'yyyy-MM-dd');
+      }
+
+      // Snap Polimento start to end of last pre-phase (may differ by rounding)
+      result[polimentoIdx].start_date = result[polimentoIdx - 1].end_date;
+    }
+
+    return result;
   };
 
   // Save journey phases
@@ -419,6 +497,7 @@ export function useJourneyPeriodization(clientId?: string) {
     allDynamics,
     transitions,
     suggestPhases,
+    recalcPhaseDates,
     saveJourneyPhases,
     updatePhase,
     saveSessions,
