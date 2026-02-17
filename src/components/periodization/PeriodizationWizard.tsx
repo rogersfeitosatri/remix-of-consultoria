@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
@@ -368,10 +369,27 @@ export function PeriodizationWizard({
     }
   };
 
-  const handleGenerateDynamics = () => {
-    if (selectedWeek && selectedPhase) {
-      onGenerateDynamics(selectedWeek.id, selectedPhase);
+  const handleGenerateDynamics = async () => {
+    if (!selectedWeek) {
+      toast({ title: 'Nenhuma semana selecionada', description: 'Configure as fases primeiro.', variant: 'destructive' });
+      return;
     }
+    if (!selectedPhase) {
+      toast({ title: 'Nenhuma fase selecionada', variant: 'destructive' });
+      return;
+    }
+    if (!hasSomeSessions) {
+      toast({ title: 'Cadastre os treinos primeiro', description: 'Vá para a etapa Treinos e salve as sessões.', variant: 'destructive' });
+      return;
+    }
+    // Auto-save sessions if dirty before generating
+    if (sessionsDirty) {
+      onSaveSessions(selectedWeek.id, sessions.map(({ id, ...rest }) => rest));
+      setSessionsDirty(false);
+      // Small delay to let save propagate
+      await new Promise(r => setTimeout(r, 800));
+    }
+    onGenerateDynamics(selectedWeek.id, selectedPhase);
   };
 
   const hasSomeSessions = sessions.some(s => (s.modality && s.modality.trim() !== '') || s.is_day_off);
