@@ -848,17 +848,16 @@ export function PeriodizationWizard({
           {weekDynamics.length > 0 ? (
             <div className="space-y-2">
               {/* Legend row */}
-              <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-muted/20 border border-border text-[10px] text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 px-3 py-2 rounded-lg bg-muted/20 border border-border text-[10px] text-muted-foreground">
                 <span className="font-semibold text-foreground">Legenda:</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> High</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> Med</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> Low</span>
                 <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500" /> Rec</span>
-                <span className="ml-auto text-[9px]">PRÉ · INT · PÓS · 🌙</span>
               </div>
 
-              {/* Days grid */}
-              <div className="grid grid-cols-7 gap-2">
+              {/* Days — stack on mobile, 7-col on desktop */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2">
                 {[...weekDynamics].sort((a, b) => a.day_of_week - b.day_of_week).map((day) => {
                   const choStyle = CHO_STYLES[day.cho_classification] || { bg: 'bg-muted', text: 'text-muted-foreground', icon: '•' };
                   const session = sessions.find(s => s.day_of_week === day.day_of_week);
@@ -866,19 +865,25 @@ export function PeriodizationWizard({
                   
                   return (
                     <div key={day.day_of_week} className={`rounded-xl border border-border overflow-hidden transition-all hover:shadow-md hover:border-primary/30 ${isOff ? 'opacity-70' : ''}`}>
-                      {/* Day header */}
-                      <div className={`px-2.5 py-2 ${choStyle.bg} flex items-center justify-between border-b border-border/50`}>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-foreground">{DAYS_SHORT[day.day_of_week]}</span>
+                      {/* Day header — horizontal on mobile */}
+                      <div className={`px-3 py-2 ${choStyle.bg} flex items-center justify-between border-b border-border/50`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-foreground">{DAYS_SHORT[day.day_of_week]}</span>
                           <span className="text-sm">{choStyle.icon}</span>
+                          {/* Session inline on mobile */}
+                          <span className={`sm:hidden text-[10px] font-semibold ${isOff ? 'text-muted-foreground' : 'text-primary'}`}>
+                            {isOff ? 'OFF' : `${session.modality}`}
+                          </span>
                         </div>
-                        {day.cho_gkg && (
-                          <span className={`text-sm font-black ${choStyle.text}`}>{day.cho_gkg}<span className="text-[9px] font-normal opacity-70">g/kg</span></span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {day.cho_gkg && (
+                            <span className={`text-base font-black ${choStyle.text}`}>{day.cho_gkg}<span className="text-[9px] font-normal opacity-70">g/kg</span></span>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Session pill */}
-                      <div className="px-2 py-1.5 border-b border-border/30">
+                      {/* Session pill — hidden on mobile (shown inline above) */}
+                      <div className="hidden sm:block px-2 py-1.5 border-b border-border/30">
                         <div className={`text-center py-0.5 rounded-md text-[9px] font-semibold ${isOff ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
                           {isOff ? '🛌 OFF' : `${session.modality} · ${session.shift}`}
                         </div>
@@ -886,44 +891,44 @@ export function PeriodizationWizard({
 
                       {/* CHO distribution mini-bar */}
                       {(day.morning_cho_pct || day.afternoon_cho_pct || day.night_cho_pct) && (
-                        <div className="px-2 py-1.5 border-b border-border/30">
+                        <div className="px-3 sm:px-2 py-1.5 border-b border-border/30">
                           <div className="flex h-1.5 w-full rounded-full overflow-hidden">
                             <div className="bg-amber-400" style={{ width: `${day.morning_cho_pct || 33}%` }} />
                             <div className="bg-orange-400" style={{ width: `${day.afternoon_cho_pct || 34}%` }} />
                             <div className="bg-indigo-400" style={{ width: `${day.night_cho_pct || 33}%` }} />
                           </div>
                           <div className="flex justify-between text-[8px] text-muted-foreground mt-0.5 font-mono">
-                            <span>{day.morning_cho_pct}%</span>
-                            <span>{day.afternoon_cho_pct}%</span>
-                            <span>{day.night_cho_pct}%</span>
+                            <span>☀{day.morning_cho_pct}%</span>
+                            <span>🌅{day.afternoon_cho_pct}%</span>
+                            <span>🌙{day.night_cho_pct}%</span>
                           </div>
                         </div>
                       )}
 
-                      {/* Timing codes — ultra-compact pills */}
-                      <div className="p-2 space-y-1">
+                      {/* Timing codes */}
+                      <div className="px-3 sm:px-2 py-2 flex flex-wrap gap-1 sm:space-y-1 sm:block">
                         {day.pre_training && (
                           <div className="flex items-center gap-1">
-                            <span className="text-[7px] font-black text-amber-500 bg-amber-500/10 rounded px-1 py-0.5 leading-none">PRÉ</span>
-                            <span className="text-[9px] font-semibold text-foreground truncate">{day.pre_training}</span>
+                            <span className="text-[8px] font-black text-amber-500 bg-amber-500/10 rounded px-1.5 py-0.5 leading-none shrink-0">PRÉ</span>
+                            <span className="text-[10px] sm:text-[9px] font-semibold text-foreground">{day.pre_training}</span>
                           </div>
                         )}
                         {day.intra_training && (
                           <div className="flex items-center gap-1">
-                            <span className="text-[7px] font-black text-orange-500 bg-orange-500/10 rounded px-1 py-0.5 leading-none">INT</span>
-                            <span className="text-[9px] font-semibold text-foreground truncate">{day.intra_training}</span>
+                            <span className="text-[8px] font-black text-orange-500 bg-orange-500/10 rounded px-1.5 py-0.5 leading-none shrink-0">INT</span>
+                            <span className="text-[10px] sm:text-[9px] font-semibold text-foreground">{day.intra_training}</span>
                           </div>
                         )}
                         {day.post_training && (
                           <div className="flex items-center gap-1">
-                            <span className="text-[7px] font-black text-emerald-500 bg-emerald-500/10 rounded px-1 py-0.5 leading-none">PÓS</span>
-                            <span className="text-[9px] font-semibold text-foreground truncate">{day.post_training}</span>
+                            <span className="text-[8px] font-black text-emerald-500 bg-emerald-500/10 rounded px-1.5 py-0.5 leading-none shrink-0">PÓS</span>
+                            <span className="text-[10px] sm:text-[9px] font-semibold text-foreground">{day.post_training}</span>
                           </div>
                         )}
                         {day.night_guidance && (
                           <div className="flex items-center gap-1">
-                            <span className="text-[7px] font-black text-indigo-400 bg-indigo-500/10 rounded px-1 py-0.5 leading-none">🌙</span>
-                            <span className="text-[9px] font-semibold text-foreground truncate">{day.night_guidance}</span>
+                            <span className="text-[8px] font-black text-indigo-400 bg-indigo-500/10 rounded px-1.5 py-0.5 leading-none shrink-0">🌙</span>
+                            <span className="text-[10px] sm:text-[9px] font-semibold text-foreground">{day.night_guidance}</span>
                           </div>
                         )}
                       </div>
