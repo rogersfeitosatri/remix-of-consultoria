@@ -205,13 +205,14 @@ interface Props {
   raceName: string;
   startDate: string;
   onStartDateChange: (d: string) => void;
+  initialChoGkg?: number;
   journeyPhases: any[];
   journeyWeeks: any[];
   allSessions: any[];
   allDynamics: any[];
   suggestPhases: (totalWeeks: number, startDate: string, raceDate?: string) => any[];
   recalcPhaseDates: (phases: any[], startDate: string, raceDate?: string) => any[];
-  onSavePhases: (phases: any[]) => void;
+  onSavePhases: (phases: any[], initialChoGkg?: number) => void;
   isSavingPhases: boolean;
   onSaveSessions: (weekId: string, sessions: any[]) => void;
   isSavingSessions: boolean;
@@ -223,6 +224,7 @@ interface Props {
 
 export function PeriodizationWizard({
   clientId, raceDate, raceName, startDate, onStartDateChange,
+  initialChoGkg = 4,
   journeyPhases, journeyWeeks, allSessions, allDynamics,
   suggestPhases, recalcPhaseDates, onSavePhases, isSavingPhases,
   onSaveSessions, isSavingSessions,
@@ -233,7 +235,7 @@ export function PeriodizationWizard({
   const hasPhases = journeyPhases.length > 0;
   const [activeStep, setActiveStep] = useState(hasPhases ? 1 : 0);
   const [selectedPhaseIdx, setSelectedPhaseIdx] = useState(0);
-  const [initialCHO, setInitialCHO] = useState('4');
+  const [initialCHO, setInitialCHO] = useState(String(initialChoGkg || 4));
   const [suggestedPhases, setSuggestedPhases] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [sessionsDirty, setSessionsDirty] = useState(false);
@@ -278,7 +280,7 @@ export function PeriodizationWizard({
   // Init sessions when phase/week changes — now supports multiple sessions per day
   useEffect(() => {
     if (weekSessions.length > 0) {
-      setSessions(weekSessions.map(s => ({ ...s })));
+      setSessions(weekSessions.map(s => ({ ...s, duration_minutes: s.duration_minutes ? String(s.duration_minutes) : '' })));
     } else if (selectedWeek) {
       // One default session per day
       setSessions(DAYS.map((_, i) => ({
@@ -304,6 +306,14 @@ export function PeriodizationWizard({
       setSuggestedPhases(suggested);
     }
   }, [totalWeeks, startDate, hasPhases, raceDate]);
+
+  // Sync initialCHO from DB when prop arrives (async load from backend)
+  useEffect(() => {
+    if (initialChoGkg && Math.abs(initialChoGkg - (parseFloat(initialCHO) || 0)) > 0.01) {
+      setInitialCHO(String(initialChoGkg));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialChoGkg]);
 
   const updateSession = (sessionIdx: number, field: string, value: string | boolean) => {
     setSessionsDirty(true);
@@ -640,7 +650,7 @@ export function PeriodizationWizard({
                       ...p,
                       cho_range: getChoRangeForPhase(p.phase_name, choVal) + ' g/kg',
                     }));
-                    onSavePhases(phasesWithCho);
+                    onSavePhases(phasesWithCho, choVal);
                     setTimeout(() => setActiveStep(1), 500);
                   }}
                   disabled={isSavingPhases}
@@ -674,7 +684,7 @@ export function PeriodizationWizard({
                           cho_range: getChoRangeForPhase(p.phase_name, choVal) + ' g/kg',
                         }));
                         setSuggestedPhases(suggested);
-                        onSavePhases(suggested);
+                        onSavePhases(suggested, choVal);
                       }}
                       disabled={isSavingPhases}
                     >
@@ -734,7 +744,7 @@ export function PeriodizationWizard({
                                 ...ph,
                                 cho_range: getChoRangeForPhase(ph.phase_name, choVal) + ' g/kg',
                               }));
-                              onSavePhases(phasesWithCho);
+                              onSavePhases(phasesWithCho, choVal);
                             }}
                             className="h-7 text-xs w-14"
                           />

@@ -18,7 +18,7 @@ interface Props {
 }
 
 export function NPPeriodizationTab({ clientId, client, consultationId, consultation }: Props) {
-  const { method, loadingMethod, createMethod } = usePeriodizationMethod();
+  const { method, loadingMethod } = usePeriodizationMethod();
   const { athletePeriodization, savePeriodization } = useAthletePeriodization(clientId);
   const {
     journeyPhases, journeyWeeks, loadingPhases,
@@ -47,17 +47,31 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
   const raceDate = athleteProfile?.target_deadline || consultation?.target_race_date || '';
   const raceName = athleteProfile?.target_race || '';
 
-  // Init start date
+  // Recover initial_cho_gkg from saved record (any type cast since new column)
+  const savedInitialCho = (athletePeriodization as any)?.initial_cho_gkg ?? 4;
+
+  // Init start date from saved periodization or client start date
   useEffect(() => {
     if (athletePeriodization?.start_date) {
       setStartDate(athletePeriodization.start_date);
     } else if (client?.start_date) {
       setStartDate(client.start_date);
     }
-  }, [athletePeriodization, client]);
+  }, [athletePeriodization?.start_date, client?.start_date]);
 
-  // Ensure parent periodization record exists
-  const handleSavePhases = async (phases: any[]) => {
+  // Persist startDate change to DB when periodization already exists
+  const handleStartDateChange = async (date: string) => {
+    setStartDate(date);
+    if (athletePeriodization?.id) {
+      await supabase
+        .from('athlete_periodization')
+        .update({ start_date: date, updated_at: new Date().toISOString() })
+        .eq('id', athletePeriodization.id);
+    }
+  };
+
+  // Ensure parent periodization record exists, persist cho_gkg too
+  const handleSavePhases = async (phases: any[], initialChoGkg?: number) => {
     let periodizationId = athletePeriodization?.id;
     if (!periodizationId && method) {
       await savePeriodization.mutateAsync({
@@ -73,6 +87,24 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
         .eq('client_id', clientId)
         .single();
       periodizationId = data?.id;
+      // save cho on newly created record
+      if (periodizationId && initialChoGkg != null) {
+        await supabase
+          .from('athlete_periodization')
+          .update({ initial_cho_gkg: initialChoGkg })
+          .eq('id', periodizationId);
+      }
+    } else if (periodizationId) {
+      // Update start_date, race_date and initial_cho_gkg on existing record
+      await supabase
+        .from('athlete_periodization')
+        .update({
+          start_date: startDate,
+          race_date: raceDate,
+          updated_at: new Date().toISOString(),
+          ...(initialChoGkg != null ? { initial_cho_gkg: initialChoGkg } : {}),
+        })
+        .eq('id', periodizationId);
     }
     if (periodizationId) {
       saveJourneyPhases.mutate({ periodizationId, phases });
@@ -102,7 +134,8 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
             raceDate={raceDate}
             raceName={raceName}
             startDate={startDate}
-            onStartDateChange={setStartDate}
+            onStartDateChange={handleStartDateChange}
+            initialChoGkg={typeof savedInitialCho === 'number' ? savedInitialCho : parseFloat(savedInitialCho) || 4}
             journeyPhases={journeyPhases}
             journeyWeeks={journeyWeeks}
             allSessions={allSessions}
