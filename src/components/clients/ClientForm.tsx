@@ -293,9 +293,17 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     setFormData(prev => ({ ...prev, remaining_consultations: remaining > 0 ? remaining : 0 }));
   };
 
-  // Calculate end date based on plan duration - always auto-calculate when start_date or plan_duration changes
+  // Track if start_date or plan_duration changed from initial values (to avoid overwriting saved end_date on open)
+  const [initialStartDate] = useState(client?.start_date || new Date().toISOString().split('T')[0]);
+  const [initialPlanDuration] = useState(client?.plan_duration || 'monthly');
+
+  // Auto-calculate end date ONLY when start_date or plan_duration actually changes from their initial values
   useEffect(() => {
-    if (formData.start_date && formData.plan_duration) {
+    const startDateChanged = formData.start_date !== initialStartDate;
+    const planDurationChanged = formData.plan_duration !== initialPlanDuration;
+
+    // For new clients OR when admin actively changes start_date/plan_duration on existing clients
+    if (formData.start_date && formData.plan_duration && (!client || startDateChanged || planDurationChanged)) {
       const startDate = new Date(formData.start_date);
       let endDate: Date;
       
@@ -319,7 +327,6 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
           endDate = addMonths(startDate, 1);
       }
       
-      // Always auto-calculate the end date when start_date or plan_duration changes
       setFormData(prev => ({
         ...prev,
         end_date: endDate.toISOString().split('T')[0]
@@ -327,8 +334,11 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     }
   }, [formData.start_date, formData.plan_duration]);
 
-  // Set has_consultations and has_agenda_access based on plan type
+  const [initialPlanType] = useState(client?.plan_type || 'consultoria');
+
+  // Set has_consultations and has_agenda_access based on plan type ONLY when plan_type actively changes
   useEffect(() => {
+    if (formData.plan_type === initialPlanType) return; // Don't overwrite saved values on open
     if (formData.plan_type === 'premium') {
       setFormData(prev => ({ ...prev, has_consultations: true, has_agenda_access: true }));
     } else {
