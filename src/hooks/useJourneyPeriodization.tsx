@@ -307,6 +307,8 @@ export function useJourneyPeriodization(clientId?: string) {
         intensity: s.intensity || null,
         priority: s.priority || null,
         metabolic_objective: s.metabolic_objective || null,
+        duration_minutes: s.duration_minutes ? parseInt(s.duration_minutes) : null,
+        is_day_off: s.is_day_off ?? false,
       }));
       const { error } = await supabase.from('journey_week_sessions').insert(rows);
       if (error) throw error;
