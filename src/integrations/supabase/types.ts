@@ -520,6 +520,7 @@ export type Database = {
           client_id: string
           created_at: string
           id: string
+          initial_cho_gkg: number | null
           method_id: string
           plan_adjustment_type: string
           race_date: string
@@ -532,6 +533,7 @@ export type Database = {
           client_id: string
           created_at?: string
           id?: string
+          initial_cho_gkg?: number | null
           method_id: string
           plan_adjustment_type?: string
           race_date: string
@@ -544,6 +546,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           id?: string
+          initial_cho_gkg?: number | null
           method_id?: string
           plan_adjustment_type?: string
           race_date?: string
@@ -2420,6 +2423,7 @@ export type Database = {
         Row: {
           created_at: string
           day_of_week: number
+          duration_minutes: number | null
           id: string
           intensity: string | null
           journey_week_id: string
@@ -2431,6 +2435,7 @@ export type Database = {
         Insert: {
           created_at?: string
           day_of_week: number
+          duration_minutes?: number | null
           id?: string
           intensity?: string | null
           journey_week_id: string
@@ -2442,6 +2447,7 @@ export type Database = {
         Update: {
           created_at?: string
           day_of_week?: number
+          duration_minutes?: number | null
           id?: string
           intensity?: string | null
           journey_week_id?: string
