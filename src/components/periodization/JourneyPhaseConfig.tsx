@@ -39,6 +39,8 @@ export function JourneyPhaseConfig({
 }: Props) {
   const [phases, setPhases] = useState<any[]>([]);
   const [hasEdited, setHasEdited] = useState(false);
+  // Track raw string values for each input to avoid reset while typing
+  const [durationInputs, setDurationInputs] = useState<Record<number, string>>({});
 
   // Auto-suggest when dates change (only if no existing phases and user hasn't manually edited)
   useEffect(() => {
@@ -46,22 +48,30 @@ export function JourneyPhaseConfig({
       const totalWeeks = Math.max(differenceInWeeks(parseISO(raceDate), parseISO(startDate)), 1);
       const suggested = suggestPhases(totalWeeks, startDate, raceDate);
       setPhases(suggested);
+      setDurationInputs({});
     }
   }, [startDate, raceDate, existingPhases.length]);
 
-  // Load existing phases (only once)
+  // Load existing phases (only once, and never again after user edits)
   useEffect(() => {
-    if (existingPhases.length > 0 && phases.length === 0) {
+    if (existingPhases.length > 0 && phases.length === 0 && !hasEdited) {
       setPhases(existingPhases);
+      setDurationInputs({});
     }
-  }, [existingPhases]);
+  }, [existingPhases.length]);
 
-  // When user types a new duration: keep the value exactly, just recalc sequential dates
+  // When user types a new duration: keep the raw string in input, only commit on blur or valid number
   const handleDurationChange = (index: number, value: string) => {
+    // Always update the raw input display
+    setDurationInputs(prev => ({ ...prev, [index]: value }));
     setHasEdited(true);
-    const weeks = value === '' ? 0 : Math.max(parseInt(value) || 0, 0);
+
+    // Only update phases if we have a valid positive integer
+    const parsed = parseInt(value);
+    if (value === '' || isNaN(parsed) || parsed < 0) return;
+
     const updated = [...phases];
-    updated[index] = { ...updated[index], duration_weeks: weeks };
+    updated[index] = { ...updated[index], duration_weeks: parsed };
     // Only recalculate start/end dates sequentially — never touch durations
     const withDates = startDate ? recalcDatesOnly(updated, startDate) : updated;
     setPhases(withDates);
@@ -72,6 +82,7 @@ export function JourneyPhaseConfig({
       const totalWeeks = Math.max(differenceInWeeks(parseISO(raceDate), parseISO(startDate)), 1);
       const suggested = suggestPhases(totalWeeks, startDate, raceDate);
       setPhases(suggested);
+      setDurationInputs({});
       setHasEdited(false);
     }
   };
@@ -185,8 +196,17 @@ export function JourneyPhaseConfig({
                       <Input
                         type="number"
                         min={0}
-                        value={phase.duration_weeks === 0 ? '0' : phase.duration_weeks || ''}
+                        value={durationInputs[i] !== undefined ? durationInputs[i] : (phase.duration_weeks ?? '')}
                         onChange={e => handleDurationChange(i, e.target.value)}
+                        onBlur={e => {
+                          // On blur, commit empty string as 0
+                          if (e.target.value === '') {
+                            setDurationInputs(prev => ({ ...prev, [i]: '0' }));
+                            const updated = [...phases];
+                            updated[i] = { ...updated[i], duration_weeks: 0 };
+                            setPhases(startDate ? recalcDatesOnly(updated, startDate) : updated);
+                          }
+                        }}
                         className="h-7 text-xs w-16"
                       />
                       <span className="text-[10px] text-muted-foreground">sem</span>

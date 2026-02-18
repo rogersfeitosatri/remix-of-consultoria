@@ -15,15 +15,20 @@ import {
   Edit2,
   Plus,
   Save,
-  X
+  X,
+  ChevronDown,
+  Search
 } from 'lucide-react';
 import { useTargetRaceAlert } from '@/hooks/useTargetRaceAlert';
 import { useMarkDietAdjustmentDone } from '@/hooks/useDietAdjustmentAlerts';
+import { useTargetRaces, useCreateTargetRace } from '@/hooks/useTargetRaces';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
 
 interface TargetRaceAlertProps {
   clientId: string;
@@ -34,11 +39,16 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
   const { data: alertData, isLoading } = useTargetRaceAlert(clientId);
   const markDone = useMarkDietAdjustmentDone();
   const queryClient = useQueryClient();
+  const { data: raceLibrary = [] } = useTargetRaces();
+  const createRace = useCreateTargetRace();
   
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [targetRace, setTargetRace] = useState('');
   const [targetDeadline, setTargetDeadline] = useState('');
+  const [racePickerOpen, setRacePickerOpen] = useState(false);
+  const [newRaceInput, setNewRaceInput] = useState('');
+  const [isAddingNew, setIsAddingNew] = useState(false);
 
   const handleStartEdit = () => {
     setTargetRace(alertData?.targetRace || '');
@@ -50,12 +60,32 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
     setIsEditing(false);
     setTargetRace('');
     setTargetDeadline('');
+    setNewRaceInput('');
+    setIsAddingNew(false);
+  };
+
+  const handleSelectRace = (raceName: string) => {
+    setTargetRace(raceName);
+    setRacePickerOpen(false);
+  };
+
+  const handleAddNewRace = async () => {
+    if (!newRaceInput.trim()) return;
+    try {
+      const race = await createRace.mutateAsync(newRaceInput.trim());
+      setTargetRace(race.name);
+      setNewRaceInput('');
+      setIsAddingNew(false);
+      setRacePickerOpen(false);
+      toast.success('Prova adicionada à biblioteca!');
+    } catch (error: any) {
+      toast.error('Erro ao adicionar prova: ' + error.message);
+    }
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Check if profile exists
       const { data: existingProfile } = await supabase
         .from('athlete_profiles')
         .select('id')
@@ -63,7 +93,6 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
         .maybeSingle();
 
       if (existingProfile) {
-        // Update existing profile
         const { error } = await supabase
           .from('athlete_profiles')
           .update({
@@ -71,10 +100,8 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
             target_deadline: targetDeadline || null,
           })
           .eq('client_id', clientId);
-
         if (error) throw error;
       } else {
-        // Create new profile
         const { error } = await supabase
           .from('athlete_profiles')
           .insert({
@@ -82,7 +109,6 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
             target_race: targetRace.trim() || null,
             target_deadline: targetDeadline || null,
           });
-
         if (error) throw error;
       }
 
@@ -124,7 +150,7 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
     );
   }
 
-  // Modo de edição
+  // Edit mode
   if (isEditing) {
     return (
       <Card className="border-blue-500/30 bg-blue-500/5">
@@ -137,14 +163,93 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Race selector with library */}
           <div className="space-y-2">
-            <Label htmlFor="targetRace">Nome da Prova</Label>
-            <Input
-              id="targetRace"
-              placeholder="Ex: Maratona do Rio, Meia de São Paulo..."
-              value={targetRace}
-              onChange={(e) => setTargetRace(e.target.value)}
-            />
+            <Label>Nome da Prova</Label>
+            <Popover open={racePickerOpen} onOpenChange={setRacePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between text-left font-normal"
+                >
+                  <span className={targetRace ? 'text-foreground' : 'text-muted-foreground'}>
+                    {targetRace || 'Selecionar ou adicionar prova...'}
+                  </span>
+                  <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar prova..." />
+                  <CommandList>
+                    <CommandEmpty>
+                      <p className="text-sm text-muted-foreground py-2">Nenhuma prova encontrada.</p>
+                    </CommandEmpty>
+                    {raceLibrary.length > 0 && (
+                      <CommandGroup heading="Provas cadastradas">
+                        {raceLibrary.map(race => (
+                          <CommandItem
+                            key={race.id}
+                            value={race.name}
+                            onSelect={() => handleSelectRace(race.name)}
+                            className="cursor-pointer"
+                          >
+                            <Flag className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                            {race.name}
+                            {targetRace === race.name && (
+                              <Check className="h-4 w-4 ml-auto text-primary" />
+                            )}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                    <CommandSeparator />
+                    <CommandGroup heading="Adicionar nova prova">
+                      {isAddingNew ? (
+                        <div className="p-2 flex gap-2">
+                          <Input
+                            autoFocus
+                            placeholder="Nome da prova..."
+                            value={newRaceInput}
+                            onChange={e => setNewRaceInput(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleAddNewRace();
+                              if (e.key === 'Escape') setIsAddingNew(false);
+                            }}
+                            className="h-8 text-sm flex-1"
+                          />
+                          <Button
+                            size="sm"
+                            className="h-8 px-2"
+                            onClick={handleAddNewRace}
+                            disabled={!newRaceInput.trim() || createRace.isPending}
+                          >
+                            {createRace.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-2"
+                            onClick={() => setIsAddingNew(false)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <CommandItem
+                          onSelect={() => setIsAddingNew(true)}
+                          className="cursor-pointer text-primary"
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-2" />
+                          Adicionar prova à biblioteca
+                        </CommandItem>
+                      )}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           
           <div className="space-y-2">
@@ -183,7 +288,7 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
     );
   }
 
-  // Se não tem prova alvo, mostrar opção de adicionar
+  // No target race
   if (!alertData?.hasTargetRace) {
     return (
       <Card className="border-dashed border-muted-foreground/30 bg-muted/10">
@@ -208,14 +313,10 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
 
   const getReasonLabel = (reason: string | null) => {
     switch (reason) {
-      case 'checkin_monthly':
-        return 'Check-in mensal';
-      case 'checkin_cycle':
-        return 'Ciclo de check-ins';
-      case 'consultation':
-        return 'Consulta recorrente';
-      default:
-        return 'Acompanhamento';
+      case 'checkin_monthly': return 'Check-in mensal';
+      case 'checkin_cycle': return 'Ciclo de check-ins';
+      case 'consultation': return 'Consulta recorrente';
+      default: return 'Acompanhamento';
     }
   };
 
@@ -231,9 +332,7 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
     }
     const months = Math.floor(days / 30);
     const remainingDays = days % 30;
-    if (remainingDays === 0) {
-      return `${months} ${months === 1 ? 'mês' : 'meses'}`;
-    }
+    if (remainingDays === 0) return `${months} ${months === 1 ? 'mês' : 'meses'}`;
     return `${months} ${months === 1 ? 'mês' : 'meses'} e ${remainingDays} dias`;
   };
 
@@ -241,7 +340,6 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
   const borderColor = alertData.needsDietAdjustment 
     ? isUrgent ? 'border-destructive/30 bg-destructive/5' : 'border-orange-500/30 bg-orange-500/5'
     : 'border-blue-500/30 bg-blue-500/5';
-  
   const iconColor = alertData.needsDietAdjustment 
     ? isUrgent ? 'text-destructive' : 'text-orange-500'
     : 'text-blue-500';
@@ -261,19 +359,13 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
                 Ajuste Pendente
               </Badge>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2"
-              onClick={handleStartEdit}
-            >
+            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleStartEdit}>
               <Edit2 className="h-3 w-3" />
             </Button>
           </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Prova e Data */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -299,18 +391,15 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
           )}
         </div>
 
-        {/* Informações do Ajuste */}
         <div className="pt-2 border-t space-y-2">
           <p className="text-xs text-muted-foreground">
             Tipo de acompanhamento: <span className="font-medium">{getReasonLabel(alertData.adjustmentReason)}</span>
           </p>
-          
           {alertData.lastAdjustmentAt && (
             <p className="text-xs text-muted-foreground">
               Último ajuste: {format(parseISO(alertData.lastAdjustmentAt), "dd/MM/yyyy", { locale: ptBR })}
             </p>
           )}
-          
           {alertData.nextAdjustmentDue && !alertData.needsDietAdjustment && (
             <p className="text-xs text-muted-foreground">
               Próximo ajuste: {format(parseISO(alertData.nextAdjustmentDue), "dd/MM/yyyy", { locale: ptBR })}
@@ -318,7 +407,6 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
           )}
         </div>
 
-        {/* Descrição do Alerta */}
         {alertData.needsDietAdjustment && (
           <div className="bg-muted/50 p-3 rounded-lg space-y-3">
             <p className="text-sm">
@@ -327,7 +415,6 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
                 : `Está na hora de fazer um ajuste profundo na dieta rumo à ${alertData.targetRace}.`
               }
             </p>
-            
             <Button
               size="sm"
               className="w-full bg-orange-500 hover:bg-orange-600"
