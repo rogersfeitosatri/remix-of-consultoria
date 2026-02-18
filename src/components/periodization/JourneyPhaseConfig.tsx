@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Settings2, Plus, Target, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Settings2, Plus, Target, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
 import { differenceInWeeks, addWeeks, parseISO, format } from 'date-fns';
 
 interface Props {
@@ -34,12 +34,26 @@ function recalcDatesOnly(phases: any[], startDate: string): any[] {
   });
 }
 
+const PHASE_COLORS: Record<string, { bg: string; border: string; dot: string; label: string }> = {
+  'Base': { bg: 'bg-blue-500/5', border: 'border-blue-300/40', dot: 'bg-blue-500', label: 'text-blue-600 dark:text-blue-400' },
+  'Específica': { bg: 'bg-orange-500/5', border: 'border-orange-300/40', dot: 'bg-orange-500', label: 'text-orange-600 dark:text-orange-400' },
+  'Polimento': { bg: 'bg-emerald-500/5', border: 'border-emerald-300/40', dot: 'bg-emerald-500', label: 'text-emerald-600 dark:text-emerald-400' },
+  'Transição': { bg: 'bg-purple-500/5', border: 'border-purple-300/40', dot: 'bg-purple-500', label: 'text-purple-600 dark:text-purple-400' },
+};
+
+function getPhaseColor(phaseName: string) {
+  for (const key of Object.keys(PHASE_COLORS)) {
+    if (phaseName?.includes(key)) return PHASE_COLORS[key];
+  }
+  return { bg: 'bg-muted/20', border: 'border-border', dot: 'bg-muted-foreground', label: 'text-foreground' };
+}
+
 export function JourneyPhaseConfig({
   raceDate, startDate, onStartDateChange, suggestPhases, recalcPhaseDates, onSavePhases, existingPhases, isSaving, raceName
 }: Props) {
   const [phases, setPhases] = useState<any[]>([]);
   const [hasEdited, setHasEdited] = useState(false);
-  // Track raw string values for each input to avoid reset while typing
+  // Track raw string values for each input
   const [durationInputs, setDurationInputs] = useState<Record<number, string>>({});
 
   // Auto-suggest when dates change (only if no existing phases and user hasn't manually edited)
@@ -52,7 +66,7 @@ export function JourneyPhaseConfig({
     }
   }, [startDate, raceDate, existingPhases.length]);
 
-  // Load existing phases (only once, and never again after user edits)
+  // Load existing phases (only once)
   useEffect(() => {
     if (existingPhases.length > 0 && phases.length === 0 && !hasEdited) {
       setPhases(existingPhases);
@@ -60,21 +74,47 @@ export function JourneyPhaseConfig({
     }
   }, [existingPhases.length]);
 
-  // When user types a new duration: keep the raw string in input, only commit on blur or valid number
-  const handleDurationChange = (index: number, value: string) => {
-    // Always update the raw input display
-    setDurationInputs(prev => ({ ...prev, [index]: value }));
-    setHasEdited(true);
-
-    // Only update phases if we have a valid positive integer
-    const parsed = parseInt(value);
-    if (value === '' || isNaN(parsed) || parsed < 0) return;
-
+  const applyNewDuration = (index: number, newValue: number) => {
+    const clamped = Math.max(0, newValue);
     const updated = [...phases];
-    updated[index] = { ...updated[index], duration_weeks: parsed };
-    // Only recalculate start/end dates sequentially — never touch durations
+    updated[index] = { ...updated[index], duration_weeks: clamped };
     const withDates = startDate ? recalcDatesOnly(updated, startDate) : updated;
     setPhases(withDates);
+    setDurationInputs(prev => ({ ...prev, [index]: String(clamped) }));
+    setHasEdited(true);
+  };
+
+  const handleInputChange = (index: number, value: string) => {
+    // Allow free typing — only update display
+    setDurationInputs(prev => ({ ...prev, [index]: value }));
+    setHasEdited(true);
+  };
+
+  const handleInputBlur = (index: number, value: string) => {
+    const parsed = parseInt(value);
+    if (value === '' || isNaN(parsed)) {
+      // Reset to current phase value
+      setDurationInputs(prev => ({ ...prev, [index]: String(phases[index]?.duration_weeks ?? 0) }));
+      return;
+    }
+    applyNewDuration(index, parsed);
+  };
+
+  const handleInputKeyDown = (index: number, value: string, e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      const parsed = parseInt(value);
+      if (!isNaN(parsed)) applyNewDuration(index, parsed);
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const current = parseInt(durationInputs[index] ?? String(phases[index]?.duration_weeks ?? 0)) || 0;
+      applyNewDuration(index, current + 1);
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const current = parseInt(durationInputs[index] ?? String(phases[index]?.duration_weeks ?? 0)) || 0;
+      applyNewDuration(index, Math.max(0, current - 1));
+    }
   };
 
   const handleRegenerate = () => {
@@ -92,7 +132,6 @@ export function JourneyPhaseConfig({
     ? Math.max(differenceInWeeks(parseISO(raceDate), parseISO(startDate)), 1)
     : 0;
 
-  // Weeks up to and including Polimento (exclude Transição from race alignment check)
   const polimentoIndex = phases.findIndex(p => p.phase_name?.includes('Polimento'));
   const weeksUntilPolimento = phases
     .slice(0, polimentoIndex + 1)
@@ -101,6 +140,10 @@ export function JourneyPhaseConfig({
   const totalWeeksAll = phases.reduce((sum, p) => sum + (p.duration_weeks || 0), 0);
   const isAligned = expectedTotalWeeks > 0 && weeksUntilPolimento === expectedTotalWeeks;
   const weeksDiff = weeksUntilPolimento - expectedTotalWeeks;
+
+  const getDisplayValue = (index: number, phase: any) => {
+    return durationInputs[index] !== undefined ? durationInputs[index] : String(phase.duration_weeks ?? 0);
+  };
 
   return (
     <Card>
@@ -145,21 +188,13 @@ export function JourneyPhaseConfig({
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
           )}
           {isAligned ? (
-            <span>
-              A <strong className="text-foreground">Prova Alvo</strong> coincide com o final da fase <strong className="text-foreground">Polimento</strong>. ✓
-            </span>
+            <span>A <strong className="text-foreground">Prova Alvo</strong> coincide com o final de <strong className="text-foreground">Polimento</strong>. ✓</span>
           ) : weeksDiff > 0 ? (
-            <span>
-              As fases até o Polimento somam <strong>{weeksUntilPolimento} sem</strong>, mas o ciclo tem <strong>{expectedTotalWeeks} sem</strong> até a prova.
-              Reduza <strong>{weeksDiff} sem</strong> para alinhar.
-            </span>
+            <span>Polimento termina <strong>{weeksDiff} sem</strong> depois da prova. Reduza para alinhar.</span>
           ) : weeksDiff < 0 ? (
-            <span>
-              As fases até o Polimento somam <strong>{weeksUntilPolimento} sem</strong>, mas o ciclo tem <strong>{expectedTotalWeeks} sem</strong> até a prova.
-              Adicione <strong>{Math.abs(weeksDiff)} sem</strong> para alinhar.
-            </span>
+            <span>Faltam <strong>{Math.abs(weeksDiff)} sem</strong> até a prova. Adicione para alinhar.</span>
           ) : (
-            <span>A <strong className="text-foreground">Prova Alvo</strong> deve coincidir com o final da fase <strong className="text-foreground">Polimento</strong>.</span>
+            <span>A <strong className="text-foreground">Prova Alvo</strong> deve coincidir com o final do <strong className="text-foreground">Polimento</strong>.</span>
           )}
           {raceDate && isAligned && (
             <Badge className="text-[8px] bg-emerald-500/20 text-emerald-500 border-emerald-500/30 ml-auto shrink-0">✓ Alinhado</Badge>
@@ -168,67 +203,78 @@ export function JourneyPhaseConfig({
 
         {/* Phase duration editor */}
         {phases.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase">Distribuição das Fases</p>
+          <div className="space-y-3">
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Distribuição das Fases</p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {phases.map((phase, i) => {
                 const isTransicao = phase.phase_name?.includes('Transição');
                 const isPolimento = phase.phase_name?.includes('Polimento');
+                const colors = getPhaseColor(phase.phase_name);
+                const displayVal = getDisplayValue(i, phase);
+                const numVal = parseInt(displayVal) || 0;
+
                 return (
-                  <div key={i} className={`p-2 rounded-lg border bg-muted/20 space-y-1.5 ${
-                    isPolimento && !isAligned && phases.length > 0
-                      ? 'border-amber-500/30'
-                      : 'border-border'
-                  }`}>
-                    <div className="flex items-center gap-1">
-                      <p className="text-xs font-semibold flex-1">{phase.phase_name}</p>
+                  <div key={i} className={`rounded-xl border p-3 space-y-2 ${colors.bg} ${isPolimento && !isAligned ? 'border-amber-400/50' : colors.border}`}>
+                    {/* Phase name */}
+                    <div className="flex items-center gap-1.5">
+                      <span className={`h-2 w-2 rounded-full shrink-0 ${colors.dot}`} />
+                      <p className={`text-xs font-semibold flex-1 leading-tight ${colors.label}`}>{phase.phase_name}</p>
                       {isPolimento && raceDate && (
-                        <Badge className={`text-[7px] ${isAligned ? 'bg-primary/20 text-primary border-primary/30' : 'bg-amber-500/20 text-amber-500 border-amber-500/30'}`}>
-                          🏁 prova
-                        </Badge>
+                        <span className="text-[8px]">🏁</span>
                       )}
                       {isTransicao && (
-                        <Badge variant="outline" className="text-[7px]">pós-prova</Badge>
+                        <span className="text-[8px] text-muted-foreground">pós</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        min={0}
-                        value={durationInputs[i] !== undefined ? durationInputs[i] : (phase.duration_weeks ?? '')}
-                        onChange={e => handleDurationChange(i, e.target.value)}
-                        onBlur={e => {
-                          // On blur, commit empty string as 0
-                          if (e.target.value === '') {
-                            setDurationInputs(prev => ({ ...prev, [i]: '0' }));
-                            const updated = [...phases];
-                            updated[i] = { ...updated[i], duration_weeks: 0 };
-                            setPhases(startDate ? recalcDatesOnly(updated, startDate) : updated);
-                          }
-                        }}
-                        className="h-7 text-xs w-16"
+
+                    {/* Counter control */}
+                    <div className="flex items-center gap-0">
+                      <button
+                        type="button"
+                        onClick={() => applyNewDuration(i, numVal - 1)}
+                        className="h-8 w-7 flex items-center justify-center rounded-l-md border border-r-0 border-border bg-background hover:bg-muted transition-colors"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={displayVal}
+                        onChange={e => handleInputChange(i, e.target.value)}
+                        onBlur={e => handleInputBlur(i, e.target.value)}
+                        onKeyDown={e => handleInputKeyDown(i, displayVal, e)}
+                        className="h-8 w-10 border border-border bg-background text-center text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary/50 text-foreground"
                       />
-                      <span className="text-[10px] text-muted-foreground">sem</span>
+                      <button
+                        type="button"
+                        onClick={() => applyNewDuration(i, numVal + 1)}
+                        className="h-8 w-7 flex items-center justify-center rounded-r-md border border-l-0 border-border bg-background hover:bg-muted transition-colors"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                      <span className="text-[10px] text-muted-foreground ml-1.5">sem</span>
                     </div>
-                    {phase.start_date && (phase.duration_weeks || 0) > 0 && (
-                      <p className="text-[9px] text-muted-foreground">
+
+                    {/* Date range */}
+                    {phase.start_date && numVal > 0 ? (
+                      <p className="text-[9px] text-muted-foreground font-medium">
                         {format(parseISO(phase.start_date), 'dd/MM')} → {format(parseISO(phase.end_date), 'dd/MM')}
                         {isPolimento && ' 🏁'}
                       </p>
-                    )}
-                    {(phase.duration_weeks === 0 || phase.duration_weeks === '0') && (
+                    ) : numVal === 0 ? (
                       <p className="text-[9px] text-muted-foreground italic">Fase ignorada</p>
-                    )}
+                    ) : null}
                   </div>
                 );
               })}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 pt-1">
               <Button
                 size="sm"
-                onClick={() => onSavePhases(phases.filter(p => p.duration_weeks > 0))}
+                onClick={() => onSavePhases(phases.filter(p => (p.duration_weeks || 0) > 0))}
                 disabled={isSaving}
                 className="gap-1 text-xs"
               >
@@ -237,7 +283,7 @@ export function JourneyPhaseConfig({
               </Button>
               {!isAligned && expectedTotalWeeks > 0 && (
                 <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                  ⚠ Ajuste as semanas até o Polimento = {expectedTotalWeeks} sem para alinhar com a prova
+                  ⚠ Ajuste o Polimento para {expectedTotalWeeks} sem no total
                 </p>
               )}
             </div>
@@ -247,4 +293,3 @@ export function JourneyPhaseConfig({
     </Card>
   );
 }
-
