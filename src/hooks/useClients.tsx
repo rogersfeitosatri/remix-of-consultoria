@@ -565,7 +565,10 @@ export function useUpdateClient() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Client> & { id: string }) => {
+    mutationFn: async ({ id, ...updates }: Partial<Client> & { id: string; custom_schedule_dates?: any }) => {
+      // Strip virtual/non-DB fields before sending to Supabase
+      const { custom_schedule_dates, ...dbUpdates } = updates as any;
+
       // First get the current client data to compare
       const { data: currentClient, error: fetchError } = await supabase
         .from('clients')
@@ -578,7 +581,7 @@ export function useUpdateClient() {
       // Update the client
       const { data, error } = await supabase
         .from('clients')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();
@@ -587,19 +590,19 @@ export function useUpdateClient() {
 
       // Check if we need to regenerate consultation schedules
       const consultationFieldsChanged = 
-        updates.start_date !== undefined ||
-        updates.end_date !== undefined ||
-        updates.first_consultation_date !== undefined ||
-        updates.consultation_frequency !== undefined ||
-        updates.has_consultations !== undefined ||
-        updates.plan_duration !== undefined;
+        dbUpdates.start_date !== undefined ||
+        dbUpdates.end_date !== undefined ||
+        dbUpdates.first_consultation_date !== undefined ||
+        dbUpdates.consultation_frequency !== undefined ||
+        dbUpdates.has_consultations !== undefined ||
+        dbUpdates.plan_duration !== undefined;
 
       // Check if we need to regenerate checkin schedules
       const checkinFieldsChanged =
-        updates.start_date !== undefined ||
-        updates.end_date !== undefined ||
-        updates.has_checkin !== undefined ||
-        updates.checkin_frequency !== undefined;
+        dbUpdates.start_date !== undefined ||
+        dbUpdates.end_date !== undefined ||
+        dbUpdates.has_checkin !== undefined ||
+        dbUpdates.checkin_frequency !== undefined;
 
       if (consultationFieldsChanged && user) {
         const updatedClient = data as Client;
