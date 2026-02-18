@@ -241,6 +241,8 @@ export function PeriodizationWizard({
   const [sessionsDirty, setSessionsDirty] = useState(false);
   const [expandedDayIdx, setExpandedDayIdx] = useState<number | null>(null);
   const [localDynamics, setLocalDynamics] = useState<any[]>([]);
+  const [localPhases, setLocalPhases] = useState<any[]>([]);
+  const [phasesDirty, setPhasesDirty] = useState(false);
 
   const totalWeeks = raceDate && startDate
     ? Math.max(differenceInWeeks(parseISO(raceDate), parseISO(startDate)), 1)
@@ -314,6 +316,13 @@ export function PeriodizationWizard({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialChoGkg]);
+
+  // Sync localPhases from DB when journeyPhases load/change (only if not dirty)
+  useEffect(() => {
+    if (journeyPhases.length > 0 && !phasesDirty) {
+      setLocalPhases(journeyPhases);
+    }
+  }, [journeyPhases, phasesDirty]);
 
   const updateSession = (sessionIdx: number, field: string, value: string | boolean) => {
     setSessionsDirty(true);
@@ -666,7 +675,12 @@ export function PeriodizationWizard({
 
             {/* Already has phases - show summary and allow reconfigure */}
             {hasPhases && (() => {
-              const phasesTotal = journeyPhases.reduce((a: number, p: any) => a + (p.duration_weeks || 0), 0);
+              const displayPhases = localPhases.length > 0 ? localPhases : journeyPhases;
+              const phasesTotal = displayPhases.reduce((a: number, p: any) => a + (p.duration_weeks || 0), 0);
+              const polimentoPhase = displayPhases.find((p: any) => p.phase_name.includes('Polimento'));
+              const raceDateMatch = raceDate && polimentoPhase?.end_date
+                ? polimentoPhase.end_date === raceDate
+                : false;
               return (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -684,7 +698,8 @@ export function PeriodizationWizard({
                           cho_range: getChoRangeForPhase(p.phase_name, choVal) + ' g/kg',
                         }));
                         setSuggestedPhases(suggested);
-                        onSavePhases(suggested, choVal);
+                        setLocalPhases(suggested);
+                        setPhasesDirty(true);
                       }}
                       disabled={isSavingPhases}
                     >
@@ -693,9 +708,22 @@ export function PeriodizationWizard({
                   </div>
                 </div>
 
+                {/* Info alignment badge */}
+                {raceDate && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
+                    <Target className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span>A <strong className="text-foreground">Prova Alvo</strong> deve coincidir com o final da fase <strong className="text-foreground">Polimento</strong>.</span>
+                    {raceDateMatch
+                      ? <Badge className="text-[8px] bg-emerald-500/20 text-emerald-400 border-emerald-500/30 ml-auto shrink-0">✓ Alinhado</Badge>
+                      : <Badge className="text-[8px] bg-amber-500/20 text-amber-400 border-amber-500/30 ml-auto shrink-0">Ajuste as semanas</Badge>
+                    }
+                  </div>
+                )}
+
                 <div className="flex h-8 rounded-lg overflow-hidden border border-border">
-                  {journeyPhases.map((p: any, i: number) => {
-                    const widthPct = phasesTotal > 0 ? (p.duration_weeks / phasesTotal) * 100 : 20;
+                  {displayPhases.filter((p: any) => p.duration_weeks > 0).map((p: any, i: number) => {
+                    const activeTotal = displayPhases.filter((ph: any) => ph.duration_weeks > 0).reduce((a: number, ph: any) => a + ph.duration_weeks, 0);
+                    const widthPct = activeTotal > 0 ? (p.duration_weeks / activeTotal) * 100 : 20;
                     const style = getPhaseStyle(p.phase_name);
                     const isCurrent = p.id === currentPhase?.id;
                     return (
@@ -712,9 +740,9 @@ export function PeriodizationWizard({
                   })}
                 </div>
 
-                {/* Editable phase weeks for existing phases */}
+                {/* Editable phase weeks for existing phases — local state, save on confirm */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                  {journeyPhases.map((p: any, i: number) => {
+                  {displayPhases.map((p: any, i: number) => {
                     const style = getPhaseStyle(p.phase_name);
                     return (
                       <div key={p.id || i} className={`p-2.5 rounded-lg border ${style.border} ${style.bg}`}>
@@ -723,31 +751,48 @@ export function PeriodizationWizard({
                           <span className={`text-[10px] font-bold ${style.text}`}>{p.phase_name}</span>
                         </div>
                         <div className="flex items-center gap-1 mb-1">
-                          <Input
-                            type="number"
-                            min={0}
-                            value={p.duration_weeks}
-                          onChange={e => {
-                              const newWeeks = Math.max(parseInt(e.target.value) || 0, 0);
-                              const updated = journeyPhases.map((ph: any, idx: number) =>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newWeeks = Math.max((p.duration_weeks || 0) - 1, 0);
+                              const updated = displayPhases.map((ph: any, idx: number) =>
                                 idx === i ? { ...ph, duration_weeks: newWeeks } : { ...ph }
                               );
-                              // Recalculate dates anchoring Polimento end to raceDate
                               const recalculated = recalcPhaseDates(updated, startDate, raceDate);
-                              const choVal = parseFloat(initialCHO) || 4;
-                              const activePhases = recalculated.filter((ph: any) => ph.duration_weeks > 0);
-                              if (activePhases.length === 0) {
-                                toast({ title: 'Defina ao menos uma fase com semanas', variant: 'destructive' });
-                                return;
-                              }
-                              const phasesWithCho = activePhases.map((ph: any) => ({
-                                ...ph,
-                                cho_range: getChoRangeForPhase(ph.phase_name, choVal) + ' g/kg',
-                              }));
-                              onSavePhases(phasesWithCho, choVal);
+                              setLocalPhases(recalculated);
+                              setPhasesDirty(true);
                             }}
-                            className="h-7 text-xs w-14"
+                            className="w-6 h-7 flex items-center justify-center rounded border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors text-sm font-bold"
+                          >−</button>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={p.duration_weeks}
+                            onChange={e => {
+                              const newWeeks = Math.max(parseInt(e.target.value) || 0, 0);
+                              const updated = displayPhases.map((ph: any, idx: number) =>
+                                idx === i ? { ...ph, duration_weeks: newWeeks } : { ...ph }
+                              );
+                              const recalculated = recalcPhaseDates(updated, startDate, raceDate);
+                              setLocalPhases(recalculated);
+                              setPhasesDirty(true);
+                            }}
+                            className="h-7 text-xs w-10 text-center bg-background border border-border rounded px-1 focus:outline-none focus:ring-1 focus:ring-primary"
                           />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newWeeks = (p.duration_weeks || 0) + 1;
+                              const updated = displayPhases.map((ph: any, idx: number) =>
+                                idx === i ? { ...ph, duration_weeks: newWeeks } : { ...ph }
+                              );
+                              const recalculated = recalcPhaseDates(updated, startDate, raceDate);
+                              setLocalPhases(recalculated);
+                              setPhasesDirty(true);
+                            }}
+                            className="w-6 h-7 flex items-center justify-center rounded border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors text-sm font-bold"
+                          >+</button>
                           <span className="text-[10px] text-muted-foreground">sem</span>
                         </div>
                         {p.start_date && p.duration_weeks > 0 && (
@@ -763,7 +808,38 @@ export function PeriodizationWizard({
                   })}
                 </div>
 
-                <Button onClick={() => setActiveStep(1)} className="w-full gap-2" size="lg">
+                {/* Save phases button (only shown when dirty) */}
+                {phasesDirty && (
+                  <Button
+                    onClick={() => {
+                      const choVal = parseFloat(initialCHO) || 4;
+                      const activePhases = displayPhases.filter((ph: any) => ph.duration_weeks > 0);
+                      if (activePhases.length === 0) {
+                        toast({ title: 'Defina ao menos uma fase com semanas', variant: 'destructive' });
+                        return;
+                      }
+                      const phasesWithCho = activePhases.map((ph: any) => ({
+                        ...ph,
+                        cho_range: getChoRangeForPhase(ph.phase_name, choVal) + ' g/kg',
+                      }));
+                      onSavePhases(phasesWithCho, choVal);
+                      setPhasesDirty(false);
+                    }}
+                    disabled={isSavingPhases}
+                    className="w-full gap-2"
+                    variant="default"
+                  >
+                    {isSavingPhases ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    Confirmar distribuição de semanas
+                  </Button>
+                )}
+
+                <Button
+                  onClick={() => setActiveStep(1)}
+                  className="w-full gap-2"
+                  size="lg"
+                  variant={phasesDirty ? 'outline' : 'default'}
+                >
                   <ChevronRight className="h-4 w-4" /> Avançar para Treinos
                 </Button>
               </div>
