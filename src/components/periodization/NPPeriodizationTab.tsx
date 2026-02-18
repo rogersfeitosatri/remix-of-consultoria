@@ -113,7 +113,7 @@ export function NPPeriodizationTab({ clientId, client, consultationId, consultat
             isSavingPhases={saveJourneyPhases.isPending}
             onSaveSessions={(weekId, sessions) => saveSessions.mutate({ weekId, sessions })}
             isSavingSessions={saveSessions.isPending}
-            onGenerateDynamics={(weekId, phase) => generateDynamics.mutate({ weekId, phase })}
+            onGenerateDynamics={(weekId, phase, onSuccess) => generateDynamics.mutate({ weekId, phase }, { onSuccess: (data) => { if (onSuccess && data) onSuccess(data); } })}
             isGeneratingDynamics={generateDynamics.isPending}
             onSaveDynamics={() => {}}
             isSavingDynamics={false}

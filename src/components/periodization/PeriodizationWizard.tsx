@@ -215,7 +215,7 @@ interface Props {
   isSavingPhases: boolean;
   onSaveSessions: (weekId: string, sessions: any[]) => void;
   isSavingSessions: boolean;
-  onGenerateDynamics: (weekId: string, phase: any) => void;
+  onGenerateDynamics: (weekId: string, phase: any, onSuccess?: (dynamics: any[]) => void) => void;
   isGeneratingDynamics: boolean;
   onSaveDynamics: (weekId: string, dynamics: any[]) => void;
   isSavingDynamics: boolean;
@@ -238,6 +238,7 @@ export function PeriodizationWizard({
   const [sessions, setSessions] = useState<any[]>([]);
   const [sessionsDirty, setSessionsDirty] = useState(false);
   const [expandedDayIdx, setExpandedDayIdx] = useState<number | null>(null);
+  const [localDynamics, setLocalDynamics] = useState<any[]>([]);
 
   const totalWeeks = raceDate && startDate
     ? Math.max(differenceInWeeks(parseISO(raceDate), parseISO(startDate)), 1)
@@ -269,9 +270,10 @@ export function PeriodizationWizard({
   const weekSessions = selectedWeek
     ? allSessions.filter(s => s.journey_week_id === selectedWeek.id)
     : [];
-  const weekDynamics = selectedWeek
+  const weekDynamicsFromDB = selectedWeek
     ? allDynamics.filter(d => d.journey_week_id === selectedWeek.id)
     : [];
+  const weekDynamics = localDynamics.length > 0 ? localDynamics : weekDynamicsFromDB;
 
   // Init sessions when phase/week changes — now supports multiple sessions per day
   useEffect(() => {
@@ -292,6 +294,7 @@ export function PeriodizationWizard({
       })));
     }
     setSessionsDirty(false);
+    setLocalDynamics([]); // Clear local dynamics when phase/week changes
   }, [selectedWeek?.id, weekSessions.length]);
 
   // Auto-suggest phases
@@ -395,7 +398,9 @@ export function PeriodizationWizard({
       // Small delay to let save propagate
       await new Promise(r => setTimeout(r, 800));
     }
-    onGenerateDynamics(weekToUse.id, selectedPhase);
+    onGenerateDynamics(weekToUse.id, selectedPhase, (newDynamics) => {
+      setLocalDynamics(newDynamics);
+    });
   };
 
   const hasSomeSessions = sessions.some(s => (s.modality && s.modality.trim() !== '') || s.is_day_off);
@@ -988,7 +993,7 @@ export function PeriodizationWizard({
                 className="gap-1 text-xs"
               >
                 {isGeneratingDynamics ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                {weekDynamics.length > 0 ? 'Regenerar' : 'Gerar com IA'}
+                {weekDynamics.length > 0 ? 'Regenerar' : 'Gerar'}
               </Button>
             </div>
           )}
@@ -1100,7 +1105,7 @@ export function PeriodizationWizard({
                   className="mt-4 gap-2"
                 >
                   {isGeneratingDynamics ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  Gerar Dinâmica com IA
+                  Gerar dinâmica
                 </Button>
               </CardContent>
             </Card>
