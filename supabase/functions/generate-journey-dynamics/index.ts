@@ -47,71 +47,123 @@ CONHECIMENTO BASE — 6 MÉTODOS DE TRAIN-LOW (mysportscience.com / Hawley & Bur
 6. **Sleep-Low (dormir com glicogênio baixo)**: Treino à noite → sem CHO até o treino da manhã seguinte.
 
 ═══════════════════════════════════════════════════════════
-LÓGICA CENTRAL: OLHAR PARA TRÁS (DIA ATUAL) E PARA FRENTE (DIA SEGUINTE)
+PRINCÍPIO FUNDAMENTAL: O CHO DO DIA SERVE AO TREINO DO DIA SEGUINTE
 ═══════════════════════════════════════════════════════════
 
+A disponibilidade de glicogênio para um treino matinal depende do CHO ingerido NA NOITE ANTERIOR.
+Portanto: o planejamento de CHO de cada dia é orientado principalmente pelo ESTÍMULO DO DIA SEGUINTE.
+
 ANTES DE DECIDIR A DISTRIBUIÇÃO DE CADA DIA, VOCÊ DEVE:
-1. Identificar o TREINO DO DIA (modalidade, intensidade, duração, turno)
-2. Identificar o TREINO DO DIA SEGUINTE (ou se é Day Off / Descanso)
-3. Identificar o TREINO DO DIA ANTERIOR (para entender recovery)
+1. Identificar o TREINO DO DIA SEGUINTE (esse é o driver principal da noite)
+2. Identificar o TREINO DO DIA (para guiar pré, intra e pós-treino, e o g/kg total)
+3. Identificar o TREINO DO DIA ANTERIOR (para entender o estado de recovery)
 4. Aplicar as regras abaixo COM BASE NESSES 3 DADOS CONCRETOS
 
 ═══════════════════════════════════════════════════════════
-REGRA CRÍTICA — QUANDO AUMENTAR CHO À NOITE (carb-loading noturno):
+REGRA CRÍTICA — CARB-LOADING NOTURNO (PREPARAÇÃO PARA O DIA SEGUINTE):
 ═══════════════════════════════════════════════════════════
 
-Aumentar CHO à noite (night_cho_pct > 35%) SÓ É JUSTIFICADO quando TODAS estas condições são verdadeiras:
-✅ O dia SEGUINTE tem treino (NÃO é Day Off / Descanso)
-✅ O treino do dia seguinte é de MANHÃ (turno matinal)
-✅ O treino do dia seguinte é INTENSO ou LONGO (>90min OU alta intensidade)
-✅ A FASE justifica carb-loading (ver regras por fase abaixo)
+A noite de HOJE prepara o glicogênio para o TREINO DE AMANHÃ.
 
-Se o dia seguinte é DAY OFF ou DESCANSO → night_cho_pct deve ser ≤ 30%. 
-Se o dia seguinte tem treino LEVE ou MODERADO na fase de BASE → night_cho_pct normal (30-35%).
+✅ AUMENTAR CHO à noite (night_cho_pct 38-45%) quando:
+   - Amanhã tem treino INTENSO ou LONGO pela MANHÃ (>90min OU alta intensidade)
+   - A fase justifica (Específica → sem restrição; Base → apenas se >90min + alta intensidade)
+
+⛔ REDUZIR ou manter CHO BAIXO à noite quando:
+   - Amanhã é Day Off ou Descanso → night_cho_pct ≤ 28% (sleep-low ou ↓CARB)
+   - Amanhã tem treino LEVE ou MODERADO (Base): night_cho_pct 28-33% (possível sleep-low)
+   - Amanhã tem treino leve: oportunidade de treinar com glicogênio baixo (adaptação mitocondrial)
+
 NUNCA faça carb-loading na noite anterior a um dia de descanso.
+NUNCA reduza o CHO da noite se amanhã é treino intenso pela manhã.
 
 ═══════════════════════════════════════════════════════════
-REGRA POR FASE — QUANDO CARB-LOADING É JUSTIFICADO:
+REGRA ESPECIAL — DIA ANTES DO LONGÃO (FASE BASE):
+═══════════════════════════════════════════════════════════
+
+Longão = treino longo de baixa-moderada intensidade (corrida >60-90min, baixa intensidade).
+
+**DIA ANTERIOR ao Longão (noite):**
+- night_cho_pct: 35-40% (pequeno carb-loading para suportar a duração)
+- cho_gkg: usar faixa superior do dia (ex: se é treino moderado, usar 4.5-5 g/kg)
+- night_guidance: "↑CARB — prep Longão amanhã manhã"
+
+**DIA DO LONGÃO (Base):**
+- cho_gkg: REDUZIR em relação ao dia anterior. Ex: 2-3 g/kg.
+  → O carb principal já veio na noite anterior. Pós-Longão na Base = ↓CARB para estimular metabolismo lipídico.
+- morning: snack leve pré-treino (banana + mel)
+- intra: Água ou solução hipotônica (Base = oportunidade de train-low intra)
+- post_training: ↓CARB, ↑PROT, ↑FAT (recovery com gordura na fase Base)
+- night_guidance: orientado pelo dia SEGUINTE ao Longão
+
+EXEMPLO CONCRETO (fase Base):
+- Sexta (dia antes do Longão sábado): cho_gkg=4.5, night_cho_pct=38%, night_guidance="↑CARB — prep Longão sábado"
+- Sábado (Longão manhã): cho_gkg=2.0-2.5, morning=30%(snack leve), afternoon=42%(almoço pós-treino), night=28%(orientado por domingo)
+- Se domingo é Day Off: sábado à noite → ↓CARB ainda mais, sleep-low
+
+═══════════════════════════════════════════════════════════
+REGRA — TREINO INTENSO MATINAL VS. TREINO LEVE MATINAL (FASE BASE):
+═══════════════════════════════════════════════════════════
+
+**Treino INTENSO pela MANHÃ (corrida intervalada, alta intensidade):**
+- A noite ANTERIOR deve ter CHO ELEVADO (carb-loading na noite de ontem)
+- O dia do treino intenso: cho_gkg moderado (4-5 g/kg em Base), pois o principal veio da noite anterior
+- Pré-treino: snack leve 40-60min antes (banana, torrada + mel)
+- Pós-treino: ↑PROT + CHO moderado no almoço (recovery ativo)
+- Noite do dia do treino intenso: orientar pelo DIA SEGUINTE
+
+**Treino LEVE pela MANHÃ (corrida fácil, curta, <60min, baixa intensidade):**
+- A noite ANTERIOR pode ter CHO BAIXO (sleep-low → treinar com glicogênio parcialmente depletado)
+- Isso estimula adaptações mitocondriais (fat oxidation ↑)
+- Pré-treino: pode ser em JEJUM ou snack mínimo
+- Pós-treino: recovery com ↑PROT, ↑FAT, ↓CARB (Base)
+- cho_gkg do dia: 2.5-3.5 g/kg
+
+**ERRO A EVITAR:** NÃO aplique sleep-low antes de treino intenso. NÃO faça carb-loading antes de treino leve.
+
+═══════════════════════════════════════════════════════════
+REGRA POR FASE — CHO g/kg E COMPORTAMENTO GERAL:
 ═══════════════════════════════════════════════════════════
 
 **FASE BASE:**
-- Carb-loading NÃO é necessário. Priorizar adaptações mitocondriais.
-- Aumento moderado de CHO noturno (máx 35%) SOMENTE se amanhã há treino >90min E alta intensidade.
-- Para treinos longos de BAIXA intensidade: NÃO fazer carb-loading. Usar train-low.
-- Para treinos leves/moderados: distribuição equilibrada ou train-low.
-- Dia de treino matinal na Base: o CHO principal vai no ALMOÇO (recovery), não na noite (pois o treino já passou).
-- Dia pré Day Off: ↓CARB à noite. Oportunidade de sleep-low ou simplesmente reduzir.
+- Prioridade: adaptações mitocondriais, metabolismo lipídico, eficiência metabólica
+- Day Off: 2-2.5 g/kg
+- Treino leve: 2.5-3.5 g/kg
+- Treino moderado: 3.5-4.5 g/kg
+- Treino intenso/longo: 4-5 g/kg (o CHO do dia do treino intenso é moderado; o carb-loading veio na noite anterior)
+- Dia PRÉ-treino intenso/longo: cho_gkg pode ser 4-5 g/kg com night_cho_pct alto
+- Longão dia (pós-treino): cho_gkg = 2-3 g/kg (↓CARB para adaptação lipídica)
+- Sleep-low: permitido antes de treinos LEVES
+- Carb-loading noturno: SOMENTE se amanhã tem treino intenso/longo (>90min + alta intensidade)
 
 **FASE ESPECÍFICA:**
-- Carb-loading moderado permitido antes de treinos intensos/longos (>90min).
-- Aumento noturno (35-40%) justificado se amanhã há treino intenso pela manhã.
-- Train-low ainda pode ser usado antes de treinos leves.
+- Carb-loading moderado antes de treinos intensos/longos
+- night_cho_pct 35-40% se amanhã tem treino intenso manhã
+- cho_gkg: usar meio das faixas padrão
+- Train-low ainda aplicável antes de treinos leves
 
 **FASE COMPETITIVA:**
-- Carb-loading mais agressivo antes de treinos-chave e simulados de prova.
-- Aumento noturno (40-45%) justificado antes de treinos intensos/longos.
-- Reduzir train-low. Priorizar disponibilidade de substrato.
+- Carb-loading mais agressivo (40-45% noite)
+- Recovery completo e imediato pós-treino
+- Train-low reduzido
 
 **FASE PICO:**
-- Carb-loading máximo nos últimos 2-3 dias pré-prova (8-12 g/kg).
-- Train-low PROIBIDO.
-- Máxima disponibilidade de glicogênio.
+- Carb-loading máximo (8-12 g/kg nos últimos 2-3 dias)
+- Train-low PROIBIDO
 
 **TRANSIÇÃO:**
 - Similar à Base. CHO baixo. Sem carb-loading.
 
 ═══════════════════════════════════════════════════════════
-LÓGICA DO DIA DE TREINO MATINAL (atleta corre de manhã):
+LÓGICA DO DIA DE TREINO MATINAL (pós-treino):
 ═══════════════════════════════════════════════════════════
 
-Se o atleta treinou de MANHÃ, o restante do dia é PÓS-TREINO:
-- O almoço é a principal refeição de RECOVERY.
-- A tarde e noite devem ser orientadas pelo DIA SEGUINTE:
-  → Se amanhã é Day Off: ↓CARB à noite, CEIA PROT., possível sleep-low.
-  → Se amanhã é treino leve (Base): =CARB ou ↓CARB à noite.
-  → Se amanhã é treino intenso: ↑CARB à noite (carb-loading justificado se a fase permitir).
-
-NÃO faz sentido manter CHO alto à noite se o treino do dia já passou E amanhã é descanso.
+Se o atleta treinou de MANHÃ:
+- Almoço = refeição principal de RECOVERY (maior % de CHO do dia, pós-treino imediato)
+- Noite = orientada pelo TREINO DE AMANHÃ:
+  → Amanhã é Day Off: ↓CARB noite, CEIA PROT., sleep-low
+  → Amanhã treino leve (Base): =CARB ou ↓CARB noite (possível sleep-low)
+  → Amanhã treino intenso manhã: ↑CARB noite (carb-loading → fase deve justificar)
 
 ═══════════════════════════════════════════════════════════
 REGRAS DE DISTRIBUIÇÃO INTRA-DIA
@@ -123,53 +175,32 @@ REGRA — DISTRIBUIÇÃO PERCENTUAL (morning_cho_pct + afternoon_cho_pct + night
 - "night" = Jantar + Ceia
 
 Cenários de distribuição:
-- Treino HOJE de manhã + amanhã é OFF: morning 30% | afternoon 45% (recovery) | night 25%
-- Treino HOJE de manhã + amanhã treino intenso manhã: morning 25% | afternoon 35% | night 40%
+- Treino HOJE manhã + amanhã OFF: morning 30% | afternoon 45% (recovery) | night 25%
+- Treino HOJE manhã + amanhã treino INTENSO manhã: morning 25% | afternoon 33% | night 42%
+- Treino HOJE manhã + amanhã treino LEVE manhã (Base): morning 28% | afternoon 42% | night 30%
 - Treino HOJE à tarde + amanhã OFF: morning 30% | afternoon 40% | night 30%
-- Day Off + amanhã treino intenso manhã (fase específica+): morning 25% | afternoon 30% | night 45%
-- Day Off + amanhã treino intenso manhã (fase BASE): morning 30% | afternoon 35% | night 35%
+- Day Off + amanhã treino INTENSO manhã (Específica+): morning 25% | afternoon 30% | night 45%
+- Day Off + amanhã treino INTENSO manhã (Base): morning 28% | afternoon 33% | night 39%
+- Day Off + amanhã treino LEVE manhã (Base): morning 33% | afternoon 37% | night 30%
 - Day Off + amanhã OFF: morning 33% | afternoon 34% | night 33%
-- Day Off geral: distribuição equilibrada (33/34/33)
 
 REGRA — TIMING PRÉ-TREINO POR TURNO:
-- Treino pela MANHÃ: pré-treino = snack leve 40-60min antes. Carga principal de CHO veio na noite anterior (se justificado pela fase).
+- Treino pela MANHÃ: pré-treino = snack leve 40-60min antes. Carga principal de CHO veio na noite ANTERIOR.
 - Treino pela TARDE: pré-treino = almoço reforçado 2-3h antes ou snack 40-60min antes.
 - Treino pela NOITE: pré-treino = lanche da tarde 2-3h antes.
 
 REGRA — PÓS-TREINO E RECUPERAÇÃO (fase-dependente):
-- FASE BASE: Recovery reduzido (↑PROT, ↑FAT, ↓CARB). Buscar adaptações mitocondriais.
+- FASE BASE: Recovery com ↑PROT + ↑FAT + ↓CARB. Metabolismo lipídico e adaptação mitocondrial.
 - FASE ESPECÍFICA: Recovery progressivo. CHO moderado pós-treino.
 - FASE COMPETITIVA/PICO: Recovery COMPLETO e imediato (4:1 CHO:Prot).
-
-REGRA — CHO g/kg POR DIA:
-- Descanso / Day Off: 2-3 g/kg
-- Treino leve (<60min, baixa intensidade): 3-4 g/kg
-- Treino moderado (60-90min, moderado): 4-5 g/kg
-- Treino intenso/longo (>90min ou alta intensidade): 5-7 g/kg
-- Treino muito intenso/intervalado (>90min + alta intensidade): 6-8 g/kg
-- Dia pré-prova ou carb-loading (só fase Pico): 8-12 g/kg
-
-AJUSTES POR FASE:
-- Base: usar o limite INFERIOR das faixas. Ex: treino moderado = 4 g/kg, não 5. Day Off = 2-2.5 g/kg.
-- Específica: usar o meio das faixas.
-- Competitiva: usar limite SUPERIOR.
-- Pico: usar faixas máximas.
-- Transição: usar faixas baixas, semelhante à base.
-
-REGRA — ADAPTAÇÕES MITOCONDRIAIS NA BASE:
-Na fase Base, treinos LEVES e LONGOS de baixa intensidade são oportunidades para:
-- Treinar em jejum (fasted morning training)
-- Reduzir CHO intra-treino para estimular oxidação lipídica
-- Aplicar sleep-low na noite anterior a treinos LEVES (nunca antes de Day Off sem propósito)
-- CHO g/kg pode ser 3-4g/kg mesmo em treinos longos SE a intensidade for baixa
 
 REGRA — PROGRESSÃO ENTRE FASES:
 Base → Específica → Competitiva → Pico:
 - CHO total g/kg AUMENTA progressivamente
-- Recovery pós-treino MELHORA progressivamente
+- Recovery pós-treino MELHORA progressivamente (mais CHO no pós)
 - Métodos train-low DIMINUEM progressivamente
-- Na Base: priorizar adaptação (tolerar desconforto metabólico)
-- Na Competitiva: priorizar performance (suprimir qualquer limitação nutricional)`;
+- Na Base: tolerar desconforto metabólico para adaptação
+- Na Competitiva: suprimir qualquer limitação nutricional`;
 
     const userPrompt = `FASE ATUAL: ${phase.phase_name}
 OBJETIVO DA FASE: ${phase.objective || 'Não definido'}
@@ -183,10 +214,25 @@ ${athleteInfo ? `DADOS DO ATLETA:
 Peso: ${athleteInfo.weight || '?'}kg
 Objetivo: ${athleteInfo.goal || '?'}` : ''}
 
-INSTRUÇÃO CRÍTICA: Para CADA dia, analise o contexto do dia anterior e do dia seguinte informado acima.
-⚠️ Se o dia seguinte é Descanso/Day Off, NÃO aumente o CHO à noite. Reduza ou mantenha equilibrado.
-⚠️ Se o treino do dia já passou (treino matinal) e amanhã é Day Off, o foco é recovery no almoço e ↓CARB à noite.
-⚠️ Carb-loading noturno SOMENTE se amanhã tem treino intenso/longo E a fase justifica (Específica em diante, ou >90min + alta intensidade na Base).
+INSTRUÇÃO CRÍTICA: Para CADA dia, a noite de HOJE prepara o glicogênio para o TREINO DE AMANHÃ.
+
+⚠️ REGRA PRINCIPAL: A noite antes de treino INTENSO/LONGO pela manhã = ↑CARB (carb-loading).
+⚠️ A noite antes de treino LEVE pela manhã (Base) = ↓CARB ou sleep-low.
+⚠️ A noite antes de Day Off = ↓CARB sempre (sleep-low ou simplesmente reduzir).
+
+⚠️ DIA DO LONGÃO (Base): O carb-loading veio NA NOITE ANTERIOR. O cho_gkg DO DIA do longão deve ser MENOR (2-3 g/kg), com recovery pós-treino priorizando ↑PROT + ↑FAT + ↓CARB para estimular metabolismo lipídico e adaptação mitocondrial.
+
+⚠️ DIA ANTERIOR AO LONGÃO: cho_gkg MAIOR (4-5 g/kg em Base), night_cho_pct 35-40%, night_guidance="↑CARB — prep Longão amanhã".
+
+⚠️ NUNCA aplique sleep-low antes de treino intenso/longo. Isso é um erro grave.
+⚠️ NUNCA faça carb-loading antes de Day Off ou treino leve (Base).
+
+⚠️ FASE BASE — g/kg corretos:
+   - Day Off: 2-2.5 g/kg
+   - Dia anterior ao Longão: 4-4.5 g/kg (noite ↑CARB)
+   - Dia DO Longão (após treino): 2-2.5 g/kg (↓CARB pós, ↑FAT, metabolismo lipídico)
+   - Treino leve manhã: 2.5-3.5 g/kg (possível sleep-low na noite anterior)
+   - Treino intenso: 4-5 g/kg (carb-loading veio da noite anterior)
 
 Gere a dinâmica nutricional para os 7 dias.
 
