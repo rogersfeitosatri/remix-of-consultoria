@@ -116,13 +116,31 @@ export default function CalendarPage() {
 
   // Get events for a specific date
   const getEventsForDate = (date: Date) => {
-    const events: { type: 'first' | 'sendLink'; schedule?: ConsultationSchedule & { client_name: string }; client?: Client }[] = [];
+    const events: { type: 'first' | 'sendLink' | 'appointment'; schedule?: ConsultationSchedule & { client_name: string }; client?: Client; appointment?: typeof appointments[0] }[] = [];
 
-    // First consultations from clients
+    // First consultations from clients (only those without a real appointment)
     activeClients
-      .filter(c => c.first_consultation_date && isSameDay(parseISO(c.first_consultation_date), date))
+      .filter(c => {
+        if (!c.first_consultation_date) return false;
+        if (!isSameDay(parseISO(c.first_consultation_date), date)) return false;
+        // If there's already a real appointment for this client on this date, skip (will show as appointment)
+        const hasAppointment = (appointments || []).some(
+          apt => apt.client_id === c.id && apt.appointment_date === format(date, 'yyyy-MM-dd')
+        );
+        return !hasAppointment;
+      })
       .forEach(client => {
         events.push({ type: 'first', client });
+      });
+
+    // Real scheduled appointments from the appointments table
+    (appointments || [])
+      .filter(apt => 
+        (apt.status === 'scheduled' || apt.status === 'confirmed') &&
+        apt.appointment_date === format(date, 'yyyy-MM-dd')
+      )
+      .forEach(apt => {
+        events.push({ type: 'appointment', appointment: apt });
       });
 
     // Send link tasks (pending only) - using send_link_date
@@ -543,13 +561,63 @@ export default function CalendarPage() {
                       {/* Events */}
                       <div className="space-y-1 overflow-y-auto max-h-[70px] sm:max-h-[85px]">
                         {events.map((event, eventIndex) => {
-                          if (event.type === 'first' && event.client) {
-                            // Find the appointment for this client on this date
-                            const clientAppointment = appointments?.find(
-                              apt => apt.client_id === event.client!.id && 
-                                     apt.appointment_date === event.client!.first_consultation_date
+                          if (event.type === 'appointment' && event.appointment) {
+                            const apt = event.appointment;
+                            const clientName = typeof apt.client?.name === 'string' ? apt.client.name : 'Cliente';
+                            return (
+                              <Popover key={`apt-${apt.id}`}>
+                                <PopoverTrigger asChild>
+                                  <div
+                                    className="text-[10px] sm:text-xs p-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-foreground truncate cursor-pointer hover:bg-emerald-500/30 transition-colors"
+                                    title={`Consulta: ${clientName} - ${apt.appointment_time?.substring(0,5)}`}
+                                  >
+                                    <span className="hidden sm:inline">1ª </span>
+                                    {clientName}
+                                  </div>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-72 p-3" align="start">
+                                  <div className="space-y-3">
+                                    <div>
+                                      <p className="font-medium text-sm">{clientName}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {format(parseISO(apt.appointment_date), "dd/MM/yyyy")} • {apt.appointment_time?.substring(0,5)}
+                                      </p>
+                                    </div>
+                                    <div className="space-y-1.5 text-xs">
+                                      {apt.client?.phone && (
+                                        <div className="flex items-center gap-2">
+                                          <Phone className="h-3 w-3 text-muted-foreground" />
+                                          <span>{apt.client.phone}</span>
+                                        </div>
+                                      )}
+                                      {apt.client?.email && (
+                                        <div className="flex items-center gap-2">
+                                          <Mail className="h-3 w-3 text-muted-foreground" />
+                                          <span className="truncate">{apt.client.email}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2 pt-1">
+                                      <Button size="sm" variant="outline" className="flex-1 text-xs" asChild>
+                                        <Link to={`/appointments/${apt.id}`}>
+                                          <CalendarCheck2 className="h-3 w-3 mr-1" />
+                                          Detalhes
+                                        </Link>
+                                      </Button>
+                                      <Button size="sm" variant="outline" className="flex-1 text-xs" asChild>
+                                        <Link to={`/clients?search=${encodeURIComponent(clientName)}`}>
+                                          <User className="h-3 w-3 mr-1" />
+                                          Ver atleta
+                                        </Link>
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             );
-                            
+                          }
+
+                          if (event.type === 'first' && event.client) {
                             return (
                               <Popover key={`first-${event.client.id}`}>
                                 <PopoverTrigger asChild>
@@ -584,31 +652,12 @@ export default function CalendarPage() {
                                       )}
                                     </div>
                                     <div className="flex gap-2 pt-1">
-                                      {clientAppointment ? (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="flex-1 text-xs"
-                                          asChild
-                                        >
-                                          <Link to={`/appointments/${clientAppointment.id}`}>
-                                            <CalendarCheck2 className="h-3 w-3 mr-1" />
-                                            Detalhes da consulta
-                                          </Link>
-                                        </Button>
-                                      ) : (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="flex-1 text-xs"
-                                          asChild
-                                        >
-                                          <Link to={`/clients?search=${encodeURIComponent(event.client.name)}`}>
-                                            <User className="h-3 w-3 mr-1" />
-                                            Ver atleta
-                                          </Link>
-                                        </Button>
-                                      )}
+                                      <Button size="sm" variant="outline" className="flex-1 text-xs" asChild>
+                                        <Link to={`/clients?search=${encodeURIComponent(event.client.name)}`}>
+                                          <User className="h-3 w-3 mr-1" />
+                                          Ver atleta
+                                        </Link>
+                                      </Button>
                                     </div>
                                   </div>
                                 </PopoverContent>

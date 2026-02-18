@@ -58,12 +58,13 @@ export function usePendingMealPlans() {
 
       if (!mealPlanData || mealPlanData.length === 0) return [];
 
-      // Fetch client names
+      // Fetch client names and service_type
       const clientIds = mealPlanData.map(mp => mp.client_id);
       const { data: clients, error: clientError } = await supabase
         .from('clients')
-        .select('id, name, phone')
-        .in('id', clientIds);
+        .select('id, name, phone, service_type')
+        .in('id', clientIds)
+        .in('service_type', ['nutrition', 'both']);
 
       if (clientError) throw clientError;
 
