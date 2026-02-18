@@ -21,7 +21,7 @@ import {
   ClipboardCheck,
   TrendingUp
 } from 'lucide-react';
-import { useClients, useDeleteClient } from '@/hooks/useClients';
+import { useClients, useDeleteClient, useUpdateClient } from '@/hooks/useClients';
 import { useSchedulingSettings } from '@/hooks/useScheduling';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,6 +56,7 @@ export default function ClientDetail() {
   
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const deleteClientMutation = useDeleteClient();
+  const updateClientMutation = useUpdateClient();
   const { data: schedulingSettings } = useSchedulingSettings();
   const { data: checkinForms = [] } = useCheckinForms();
   
@@ -220,9 +221,14 @@ export default function ClientDetail() {
   };
   
   const handleEditSubmit = async (data: any) => {
-    // ClientForm already handles the update
+    if (!client) return;
     setShowEditForm(false);
-    toast.success('Atleta atualizado com sucesso');
+    try {
+      await updateClientMutation.mutateAsync({ id: client.id, ...data });
+      toast.success('Atleta atualizado com sucesso');
+    } catch (error: any) {
+      toast.error('Erro ao atualizar atleta: ' + (error.message || 'Tente novamente'));
+    }
   };
   
   const copyToClipboard = (text: string, label: string) => {
