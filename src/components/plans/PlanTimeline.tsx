@@ -100,24 +100,40 @@ interface PlanTimelineProps {
   consultoriaUrl: string;
   consultasUrl: string;
   isLoading: boolean;
+  timelineTitle?: string;
+  timelineSubtitle?: string;
+  consultoriaSectionTitle?: string;
+  consultasSectionTitle?: string;
+  consultoriaCtaLabel?: string;
+  consultasCtaLabel?: string;
 }
 
-export default function PlanTimeline({ consultoriaUrl, consultasUrl, isLoading }: PlanTimelineProps) {
+export default function PlanTimeline({
+  consultoriaUrl,
+  consultasUrl,
+  isLoading,
+  timelineTitle = 'Linha do tempo do acompanhamento',
+  timelineSubtitle = 'Veja como funciona a jornada do atleta em cada plano',
+  consultoriaSectionTitle = 'Plano Consultoria',
+  consultasSectionTitle = 'Plano Consultas',
+  consultoriaCtaLabel = 'Quero o Plano Consultoria',
+  consultasCtaLabel = 'Quero o Plano Consultas',
+}: PlanTimelineProps) {
   return (
     <section id="planos" className="py-20 md:py-28 bg-zinc-950">
       <div className="max-w-7xl mx-auto px-4">
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
-          Linha do tempo do acompanhamento
+          {timelineTitle}
         </h2>
         <p className="text-gray-400 text-center mb-16 max-w-2xl mx-auto">
-          Veja como funciona a jornada do atleta em cada plano
+          {timelineSubtitle}
         </p>
 
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
           {/* Consultoria Timeline */}
           <div className="bg-zinc-900/50 backdrop-blur-sm rounded-3xl p-8 md:p-10 border border-zinc-800">
             <h3 className="text-xl md:text-2xl font-bold text-white mb-8">
-              Plano Consultoria
+              {consultoriaSectionTitle}
             </h3>
             <TimelineSteps steps={consultoriaSteps} variant="dark" />
             <Button
@@ -126,7 +142,7 @@ export default function PlanTimeline({ consultoriaUrl, consultasUrl, isLoading }
               disabled={isLoading}
             >
               <MessageCircle className="h-5 w-5 mr-2" />
-              Quero o Plano Consultoria
+              {consultoriaCtaLabel}
             </Button>
           </div>
 
@@ -136,7 +152,7 @@ export default function PlanTimeline({ consultoriaUrl, consultasUrl, isLoading }
               MAIS COMPLETO
             </div>
             <h3 className="text-xl md:text-2xl font-bold text-primary-foreground mb-8">
-              Plano Consultas
+              {consultasSectionTitle}
             </h3>
             <TimelineSteps steps={consultasSteps} variant="light" />
             <Button
@@ -145,7 +161,7 @@ export default function PlanTimeline({ consultoriaUrl, consultasUrl, isLoading }
               disabled={isLoading}
             >
               <MessageCircle className="h-5 w-5 mr-2" />
-              Quero o Plano Consultas
+              {consultasCtaLabel}
             </Button>
           </div>
         </div>

@@ -14,26 +14,24 @@ import runner4 from '@/assets/runner-4.jpg';
 export default function PlansLanding() {
   const { data: settings, isLoading } = usePublicLandingPageSettings();
 
-  const consultoriaUrl = settings?.plans_consultoria_whatsapp_url || '';
-  const consultasUrl = settings?.plans_consultas_whatsapp_url || '';
+  const s = settings;
 
-  const consultoriaFeatures = [
-    'Plano alimentar pra fase atual do ciclo de treino',
-    'Plano suplementar com estratégias de pré, intra e pós-treino adaptados à rotina do corredor',
-    'Suporte longão via Zona Nutri (sistema de ajuste estratégico de géis + pré, intra e pós)',
-    'Avaliação mensal via formulário para coleta de sensações e ajustes na dieta (se for preciso)',
-    'Dúvidas no WhatsApp diretamente com o Nutri',
-  ];
+  const consultoriaUrl = s?.plans_consultoria_whatsapp_url || '';
+  const consultasUrl = s?.plans_consultas_whatsapp_url || '';
 
-  const consultasFeatures = [
-    'Consultas nutricionais a cada 6 semanas',
-    'Plano alimentar pra fase atual do ciclo de treino',
-    'Plano suplementar com estratégias de pré, intra e pós-treino adaptados à rotina do corredor',
-    'Suporte longão via Zona Nutri (sistema de ajuste estratégico de géis + pré, intra e pós)',
-    'Avaliação QUINZENAL via formulário para coleta de sensações com o plano para serem discutidas nas consultas',
-    'Ajustes ilimitados no plano (basta solicitar)',
-    'Dúvidas no WhatsApp diretamente com o Nutri',
-  ];
+  const consultoriaItems = [
+    s?.consultoria_item_1,
+    s?.consultoria_item_2,
+    s?.consultoria_item_3,
+    s?.consultoria_item_4,
+  ].filter(Boolean) as string[];
+
+  const consultasItems = [
+    s?.consultas_item_1,
+    s?.consultas_item_2,
+    s?.consultas_item_3,
+    s?.consultas_item_4,
+  ].filter(Boolean) as string[];
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -52,29 +50,29 @@ export default function PlansLanding() {
         {/* Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-4 text-center py-20">
           <span className="inline-block px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-sm font-medium mb-6 border border-white/20">
-            Nutrição Esportiva Especializada
+            {s?.hero_badge}
           </span>
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-tight">
-            Consultoria{' '}
+            {s?.hero_title}{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
-              Nutricional
+              {s?.hero_title_highlight}
             </span>
           </h1>
           <p className="text-xl md:text-2xl text-gray-300 font-medium mb-4">
-            Emagrecimento e Performance
+            {s?.hero_subtitle}
           </p>
           <p className="text-lg md:text-xl text-gray-400 mb-6 max-w-3xl mx-auto">
-            Acompanhamento personalizado para quem busca <strong className="text-white">emagrecer com saúde</strong>, melhorar a <strong className="text-white">performance esportiva</strong> ou alcançar a melhor forma física.
+            {s?.hero_description}
           </p>
           <p className="text-base text-gray-500 italic mb-10">
-            Planos adaptados à sua rotina, seja você atleta amador, praticante de corrida, triathlon ou qualquer outra modalidade.
+            {s?.hero_description_italic}
           </p>
           <Button
             size="lg"
             className="bg-white text-primary-foreground hover:bg-gray-200 text-lg px-8 py-6 h-auto font-semibold"
             onClick={() => document.getElementById('planos')?.scrollIntoView({ behavior: 'smooth' })}
           >
-            Conhecer os Planos
+            {s?.hero_cta_button}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </div>
@@ -91,10 +89,10 @@ export default function PlansLanding() {
       <section className="py-20 md:py-28 bg-zinc-950">
         <div className="max-w-7xl mx-auto px-4">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
-            Qual plano é ideal pra você?
+            {s?.para_quem_title}
           </h2>
           <p className="text-gray-400 text-center mb-16 max-w-2xl mx-auto">
-            Entenda as diferenças e escolha o acompanhamento que faz sentido pro seu momento
+            {s?.para_quem_subtitle}
           </p>
 
           <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
@@ -113,28 +111,18 @@ export default function PlansLanding() {
                   <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
                     <Target className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="text-2xl font-bold">Plano Consultoria</h3>
+                  <h3 className="text-2xl font-bold">{s?.consultoria_card_title}</h3>
                 </div>
                 <p className="text-lg text-white/80 mb-6 font-medium">
-                  Pra quem é?
+                  {s?.consultoria_card_subtitle}
                 </p>
                 <ul className="space-y-3 text-gray-400">
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
-                    <span>Atleta que já conhece sua rotina alimentar e precisa de direcionamento estratégico</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
-                    <span>Quem busca otimizar suplementação e estratégia de prova sem precisar de consultas frequentes</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
-                    <span>Corredores que preferem acompanhamento assíncrono via formulários e WhatsApp</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
-                    <span>Atleta com rotina estável que precisa de ajustes pontuais conforme evolução</span>
-                  </li>
+                  {consultoriaItems.map((item, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             </div>
@@ -143,9 +131,11 @@ export default function PlansLanding() {
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent rounded-3xl transform group-hover:scale-105 transition-transform duration-300" />
               <div className="relative bg-zinc-900/50 backdrop-blur-sm rounded-3xl p-8 border border-white/20 h-full">
-                <div className="absolute -top-3 -right-3 bg-white text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
-                  MAIS COMPLETO
-                </div>
+                {s?.consultas_badge && (
+                  <div className="absolute -top-3 -right-3 bg-white text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
+                    {s.consultas_badge}
+                  </div>
+                )}
                 <div className="aspect-[4/3] rounded-2xl overflow-hidden mb-8">
                   <img 
                     src={runner3} 
@@ -157,28 +147,18 @@ export default function PlansLanding() {
                   <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
                     <Users className="h-6 w-6 text-white" />
                   </div>
-                  <h3 className="text-2xl font-bold">Plano Consultas</h3>
+                  <h3 className="text-2xl font-bold">{s?.consultas_card_title}</h3>
                 </div>
                 <p className="text-lg text-white/80 mb-6 font-medium">
-                  Pra quem é?
+                  {s?.consultas_card_subtitle}
                 </p>
                 <ul className="space-y-3 text-gray-400">
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
-                    <span>Atleta que quer acompanhamento intensivo com consultas periódicas e ajustes ilimitados</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
-                    <span>Quem está em fase de preparação para prova importante e precisa de atenção máxima</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
-                    <span>Corredores que valorizam feedback semanal e resposta rápida às mudanças</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
-                    <span>Atleta com meta ambiciosa de performance ou emagrecimento acelerado</span>
-                  </li>
+                  {consultasItems.map((item, i) => (
+                    <li key={i} className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-white mt-0.5 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             </div>
@@ -187,7 +167,17 @@ export default function PlansLanding() {
       </section>
 
       {/* Timeline Section */}
-      <PlanTimeline consultoriaUrl={consultoriaUrl} consultasUrl={consultasUrl} isLoading={isLoading} />
+      <PlanTimeline
+        consultoriaUrl={consultoriaUrl}
+        consultasUrl={consultasUrl}
+        isLoading={isLoading}
+        timelineTitle={s?.timeline_title}
+        timelineSubtitle={s?.timeline_subtitle}
+        consultoriaSectionTitle={s?.timeline_consultoria_title}
+        consultasSectionTitle={s?.timeline_consultas_title}
+        consultoriaCtaLabel={s?.timeline_cta_consultoria}
+        consultasCtaLabel={s?.timeline_cta_consultas}
+      />
 
       {/* Zona Nutri Section */}
       <ZonaNutriSection />
@@ -209,27 +199,27 @@ export default function PlansLanding() {
         <div className="relative z-10 max-w-3xl mx-auto text-center px-4">
           <MessageCircle className="h-16 w-16 text-white mx-auto mb-8 opacity-80" />
           <h3 className="text-3xl md:text-4xl font-bold mb-6">
-            Ainda tem dúvidas?
+            {s?.cta_title}
           </h3>
           <p className="text-xl text-gray-300 mb-10">
-            Me chama no WhatsApp e eu te digo qual plano faz mais sentido pro seu momento.
+            {s?.cta_subtitle}
           </p>
           <Button
             variant="outline"
             size="lg"
             className="text-lg border-white text-white hover:bg-white hover:text-black px-8 py-6 h-auto"
-            onClick={() => window.open('https://wa.me/5599984817697', '_blank')}
+            onClick={() => window.open(s?.cta_whatsapp_url || 'https://wa.me/5599984817697', '_blank')}
             disabled={isLoading}
           >
             <MessageCircle className="h-5 w-5 mr-2" />
-            Falar no WhatsApp
+            {s?.cta_button}
           </Button>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="py-8 px-4 text-center text-sm text-gray-500 bg-black border-t border-zinc-900">
-        <p>© {new Date().getFullYear()} Rogers Feitosa - Nutricionista Esportivo</p>
+        <p>© {new Date().getFullYear()} {s?.footer_text}</p>
       </footer>
     </div>
   );
