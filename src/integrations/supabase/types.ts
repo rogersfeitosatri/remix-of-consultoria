@@ -2426,6 +2426,7 @@ export type Database = {
           duration_minutes: number | null
           id: string
           intensity: string | null
+          is_day_off: boolean | null
           journey_week_id: string
           metabolic_objective: string | null
           modality: string | null
@@ -2438,6 +2439,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           intensity?: string | null
+          is_day_off?: boolean | null
           journey_week_id: string
           metabolic_objective?: string | null
           modality?: string | null
@@ -2450,6 +2452,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           intensity?: string | null
+          is_day_off?: boolean | null
           journey_week_id?: string
           metabolic_objective?: string | null
           modality?: string | null

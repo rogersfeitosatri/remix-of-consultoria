@@ -1,0 +1,1 @@
+ALTER TABLE public.journey_week_sessions ADD COLUMN IF NOT EXISTS is_day_off boolean DEFAULT false;
