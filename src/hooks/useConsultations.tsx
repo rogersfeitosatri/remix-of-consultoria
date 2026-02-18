@@ -512,6 +512,7 @@ export function useConsultationAppointments() {
           *,
           client:clients(name, email, phone)
         `)
+        .eq('user_id', user!.id)
         .order('appointment_date', { ascending: true })
         .order('appointment_time', { ascending: true });
 
@@ -519,7 +520,7 @@ export function useConsultationAppointments() {
       return data;
     },
     enabled: !!user,
-    staleTime: 1000 * 60 * 2, // 2 minutes
+    staleTime: 1000 * 30, // 30 seconds - more responsive
   });
 }
 
