@@ -122,37 +122,49 @@ REGRA — TREINO INTENSO MATINAL VS. TREINO LEVE MATINAL (FASE BASE):
 **ERRO A EVITAR:** NÃO aplique sleep-low antes de treino intenso. NÃO faça carb-loading antes de treino leve.
 
 ═══════════════════════════════════════════════════════════
-REGRA POR FASE — CHO g/kg E COMPORTAMENTO GERAL:
+PROGRESSÃO GRADUAL ENTRE FASES — TABELA DE REFERÊNCIA:
 ═══════════════════════════════════════════════════════════
 
-**FASE BASE:**
-- Prioridade: adaptações mitocondriais, metabolismo lipídico, eficiência metabólica
-- Day Off: 2-2.5 g/kg
-- Treino leve: 2.5-3.5 g/kg
-- Treino moderado: 3.5-4.5 g/kg
-- Treino intenso/longo: 4-5 g/kg (o CHO do dia do treino intenso é moderado; o carb-loading veio na noite anterior)
-- Dia PRÉ-treino intenso/longo: cho_gkg pode ser 4-5 g/kg com night_cho_pct alto
-- Longão dia (pós-treino): cho_gkg = 2-3 g/kg (↓CARB para adaptação lipídica)
-- Sleep-low: permitido antes de treinos LEVES
-- Carb-loading noturno: SOMENTE se amanhã tem treino intenso/longo (>90min + alta intensidade)
+As regras NÃO são binárias. Elas mudam GRADUALMENTE de Base → Específica → Polimento → Pico.
+Use esta tabela como referência central para cho_gkg e night_cho_pct:
 
-**FASE ESPECÍFICA:**
-- Carb-loading moderado antes de treinos intensos/longos
-- night_cho_pct 35-40% se amanhã tem treino intenso manhã
-- cho_gkg: usar meio das faixas padrão
-- Train-low ainda aplicável antes de treinos leves
+| Variável                          | BASE        | ESPECÍFICA    | POLIMENTO     | PICO         |
+|-----------------------------------|-------------|---------------|---------------|--------------|
+| Day Off (g/kg)                    | 2.0–2.5     | 2.5–3.0       | 3.0–3.5       | 3.5–4.0      |
+| Treino leve (g/kg)                | 2.5–3.5     | 3.5–4.0       | 4.0–4.5       | 4.5–5.0      |
+| Treino moderado (g/kg)            | 3.5–4.5     | 4.5–5.5       | 5.0–6.0       | 5.5–7.0      |
+| Treino intenso (g/kg)             | 4.0–5.0     | 5.0–6.5       | 6.0–7.5       | 8.0–12.0     |
+| Dia ANTES do Longão/Intenso (g/kg)| 4.0–4.5     | 4.5–5.5       | 5.5–6.5       | 6.0–8.0      |
+| Dia DO Longão (g/kg, pós-treino)  | 2.0–2.5     | 3.0–4.0       | 4.5–5.5       | 6.0+         |
+| Night % antes treino INTENSO manhã| 35–38%      | 38–42%        | 42–45%        | 45–48%       |
+| Night % antes treino LEVE manhã   | 25–30%(SL)  | 28–33%        | 32–36%        | 35–40%       |
+| Night % antes Day Off             | 22–27%      | 25–30%        | 28–33%        | 30–35%       |
+| Sleep-low aplicação               | FREQUENTE   | MODERADA      | RARA          | NUNCA        |
+| Recovery pós-Longão               | ↓CARB+↑FAT  | CHO mod+Prot  | CHO completo  | CHO máximo   |
+| Threshold carb-loading noturno    | >90min+alta | >60min+mod    | >45min mod    | Todo treino  |
 
-**FASE COMPETITIVA:**
-- Carb-loading mais agressivo (40-45% noite)
-- Recovery completo e imediato pós-treino
-- Train-low reduzido
+**FASE BASE** — Prioridade: adaptação metabólica, biogênese mitocondrial, eficiência lipídica.
+- Longão pós-treino: ↓CARB + ↑FAT + ↑PROT. NÃO recuperar CHO agressivamente.
+- Sleep-low: usar frequentemente antes de treinos leves e moderados.
+- Carb-loading: SOMENTE antes de treino intenso/longo (>90min + alta intensidade).
+- Dia DO Longão: cho_gkg 2-2.5 g/kg. O carb principal veio da noite anterior.
 
-**FASE PICO:**
-- Carb-loading máximo (8-12 g/kg nos últimos 2-3 dias)
-- Train-low PROIBIDO
+**FASE ESPECÍFICA** — Transição progressiva: mais CHO, menos train-low, recovery melhorado.
+- Longão pós-treino: recovery com CHO moderado (3-4 g/kg no dia do Longão), não apenas gordura.
+- Sleep-low: apenas antes de treinos claramente leves. Não aplicar antes de moderados.
+- Carb-loading: permitido antes de qualquer treino >60min com intensidade moderada ou alta.
+- Night_cho_pct cresce em relação à Base (ver tabela). Recovery noturno começa a incluir CHO.
 
-**TRANSIÇÃO:**
-- Similar à Base. CHO baixo. Sem carb-loading.
+**FASE POLIMENTO** — Performance é prioridade. Minimizar qualquer limitação nutricional.
+- Recovery máximo pós-treino em todos os treinos significativos.
+- Sleep-low: evitar. Apenas se treino muito leve e curto (<45min, baixa intensidade).
+- Carb-loading: aplicar antes de qualquer treino moderado ou acima.
+- Longão pós-treino: recovery completo (CHO reforçado + Proteína). Não priorizar lipídios.
+- Dia DO Longão: cho_gkg 4.5-5.5 g/kg (não reduzir como na Base).
+
+**FASE PICO** — Carb-loading máximo. Train-low PROIBIDO. Recovery imediato e completo.
+
+**TRANSIÇÃO** (pós-prova) — Similar à Base. CHO baixo. Sem carb-loading. Priorizar recovery ativo.
 
 ═══════════════════════════════════════════════════════════
 LÓGICA DO DIA DE TREINO MATINAL (pós-treino):
