@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Settings2, Plus, Target } from 'lucide-react';
-import { differenceInWeeks, parseISO, format } from 'date-fns';
+import { RefreshCw, Settings2, Plus, Target, AlertTriangle } from 'lucide-react';
+import { differenceInWeeks, addWeeks, parseISO, format } from 'date-fns';
 
 interface Props {
   raceDate: string;
@@ -19,13 +19,28 @@ interface Props {
   raceName?: string;
 }
 
+// Recalc dates sequentially from startDate without touching durations
+function recalcDatesOnly(phases: any[], startDate: string): any[] {
+  let cursor = parseISO(startDate);
+  return phases.map((phase) => {
+    const start = cursor;
+    const end = addWeeks(start, phase.duration_weeks || 0);
+    cursor = end;
+    return {
+      ...phase,
+      start_date: format(start, 'yyyy-MM-dd'),
+      end_date: format(end, 'yyyy-MM-dd'),
+    };
+  });
+}
+
 export function JourneyPhaseConfig({
   raceDate, startDate, onStartDateChange, suggestPhases, recalcPhaseDates, onSavePhases, existingPhases, isSaving, raceName
 }: Props) {
   const [phases, setPhases] = useState<any[]>([]);
   const [hasEdited, setHasEdited] = useState(false);
 
-  // Auto-suggest when dates change
+  // Auto-suggest when dates change (only if no existing phases and user hasn't manually edited)
   useEffect(() => {
     if (startDate && raceDate && !hasEdited && existingPhases.length === 0) {
       const totalWeeks = Math.max(differenceInWeeks(parseISO(raceDate), parseISO(startDate)), 1);
@@ -34,20 +49,22 @@ export function JourneyPhaseConfig({
     }
   }, [startDate, raceDate, existingPhases.length]);
 
-  // Load existing phases
+  // Load existing phases (only once)
   useEffect(() => {
     if (existingPhases.length > 0 && phases.length === 0) {
       setPhases(existingPhases);
     }
   }, [existingPhases]);
 
-  const handleDurationChange = (index: number, weeks: number) => {
+  // When user types a new duration: keep the value exactly, just recalc sequential dates
+  const handleDurationChange = (index: number, value: string) => {
     setHasEdited(true);
+    const weeks = value === '' ? 0 : Math.max(parseInt(value) || 0, 0);
     const updated = [...phases];
-    updated[index] = { ...updated[index], duration_weeks: Math.max(weeks, 0) };
-    // Recalculate anchoring Polimento end to raceDate
-    const recalculated = recalcPhaseDates(updated, startDate, raceDate);
-    setPhases(recalculated);
+    updated[index] = { ...updated[index], duration_weeks: weeks };
+    // Only recalculate start/end dates sequentially — never touch durations
+    const withDates = startDate ? recalcDatesOnly(updated, startDate) : updated;
+    setPhases(withDates);
   };
 
   const handleRegenerate = () => {
@@ -59,11 +76,20 @@ export function JourneyPhaseConfig({
     }
   };
 
-  // Check alignment: Polimento end === raceDate
-  const polimentoPhase = phases.find(p => p.phase_name?.includes('Polimento'));
-  const isAligned = raceDate && polimentoPhase?.end_date
-    ? polimentoPhase.end_date === raceDate
-    : false;
+  // Calculate totals for alignment feedback
+  const expectedTotalWeeks = (startDate && raceDate)
+    ? Math.max(differenceInWeeks(parseISO(raceDate), parseISO(startDate)), 1)
+    : 0;
+
+  // Weeks up to and including Polimento (exclude Transição from race alignment check)
+  const polimentoIndex = phases.findIndex(p => p.phase_name?.includes('Polimento'));
+  const weeksUntilPolimento = phases
+    .slice(0, polimentoIndex + 1)
+    .reduce((sum, p) => sum + (p.duration_weeks || 0), 0);
+
+  const totalWeeksAll = phases.reduce((sum, p) => sum + (p.duration_weeks || 0), 0);
+  const isAligned = expectedTotalWeeks > 0 && weeksUntilPolimento === expectedTotalWeeks;
+  const weeksDiff = weeksUntilPolimento - expectedTotalWeeks;
 
   return (
     <Card>
@@ -71,6 +97,11 @@ export function JourneyPhaseConfig({
         <CardTitle className="text-sm flex items-center gap-2">
           <Settings2 className="h-4 w-4 text-primary" />
           Configuração da Periodização
+          {expectedTotalWeeks > 0 && (
+            <Badge variant="outline" className="ml-auto text-[10px]">
+              {totalWeeksAll} sem total
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -85,18 +116,42 @@ export function JourneyPhaseConfig({
             <Input type="date" value={raceDate} disabled className="h-8 text-xs opacity-60" />
           </div>
           <Button variant="outline" size="sm" onClick={handleRegenerate} className="gap-1 text-xs h-8">
-            <RefreshCw className="h-3 w-3" /> Recalcular
+            <RefreshCw className="h-3 w-3" /> Sugerir
           </Button>
         </div>
 
         {/* Alignment info */}
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
-          <Target className="h-3.5 w-3.5 text-primary shrink-0" />
-          <span>O final do <strong className="text-foreground">Polimento</strong> coincide com a <strong className="text-foreground">Data da Prova</strong>. A Transição é pós-prova.</span>
-          {raceDate && (
-            isAligned
-              ? <Badge className="text-[8px] bg-emerald-500/20 text-emerald-400 border-emerald-500/30 ml-auto shrink-0">✓ Alinhado</Badge>
-              : <Badge className="text-[8px] bg-amber-500/20 text-amber-400 border-amber-500/30 ml-auto shrink-0">Calculando...</Badge>
+        <div className={`flex items-center gap-2 p-2 rounded-lg border text-xs ${
+          isAligned
+            ? 'bg-emerald-500/5 border-emerald-500/20 text-muted-foreground'
+            : weeksDiff !== 0
+              ? 'bg-amber-500/5 border-amber-500/30 text-amber-700 dark:text-amber-400'
+              : 'bg-primary/5 border-primary/20 text-muted-foreground'
+        }`}>
+          {isAligned ? (
+            <Target className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+          )}
+          {isAligned ? (
+            <span>
+              A <strong className="text-foreground">Prova Alvo</strong> coincide com o final da fase <strong className="text-foreground">Polimento</strong>. ✓
+            </span>
+          ) : weeksDiff > 0 ? (
+            <span>
+              As fases até o Polimento somam <strong>{weeksUntilPolimento} sem</strong>, mas o ciclo tem <strong>{expectedTotalWeeks} sem</strong> até a prova.
+              Reduza <strong>{weeksDiff} sem</strong> para alinhar.
+            </span>
+          ) : weeksDiff < 0 ? (
+            <span>
+              As fases até o Polimento somam <strong>{weeksUntilPolimento} sem</strong>, mas o ciclo tem <strong>{expectedTotalWeeks} sem</strong> até a prova.
+              Adicione <strong>{Math.abs(weeksDiff)} sem</strong> para alinhar.
+            </span>
+          ) : (
+            <span>A <strong className="text-foreground">Prova Alvo</strong> deve coincidir com o final da fase <strong className="text-foreground">Polimento</strong>.</span>
+          )}
+          {raceDate && isAligned && (
+            <Badge className="text-[8px] bg-emerald-500/20 text-emerald-500 border-emerald-500/30 ml-auto shrink-0">✓ Alinhado</Badge>
           )}
         </div>
 
@@ -110,11 +165,17 @@ export function JourneyPhaseConfig({
                 const isTransicao = phase.phase_name?.includes('Transição');
                 const isPolimento = phase.phase_name?.includes('Polimento');
                 return (
-                  <div key={i} className="p-2 rounded-lg border border-border bg-muted/20 space-y-1.5">
+                  <div key={i} className={`p-2 rounded-lg border bg-muted/20 space-y-1.5 ${
+                    isPolimento && !isAligned && phases.length > 0
+                      ? 'border-amber-500/30'
+                      : 'border-border'
+                  }`}>
                     <div className="flex items-center gap-1">
                       <p className="text-xs font-semibold flex-1">{phase.phase_name}</p>
                       {isPolimento && raceDate && (
-                        <Badge className="text-[7px] bg-primary/20 text-primary border-primary/30">🏁 prova</Badge>
+                        <Badge className={`text-[7px] ${isAligned ? 'bg-primary/20 text-primary border-primary/30' : 'bg-amber-500/20 text-amber-500 border-amber-500/30'}`}>
+                          🏁 prova
+                        </Badge>
                       )}
                       {isTransicao && (
                         <Badge variant="outline" className="text-[7px]">pós-prova</Badge>
@@ -123,20 +184,20 @@ export function JourneyPhaseConfig({
                     <div className="flex items-center gap-1">
                       <Input
                         type="number"
-                        min={isPolimento ? 1 : 0}
-                        value={phase.duration_weeks}
-                        onChange={e => handleDurationChange(i, parseInt(e.target.value) || 0)}
+                        min={0}
+                        value={phase.duration_weeks === 0 ? '0' : phase.duration_weeks || ''}
+                        onChange={e => handleDurationChange(i, e.target.value)}
                         className="h-7 text-xs w-16"
                       />
                       <span className="text-[10px] text-muted-foreground">sem</span>
                     </div>
-                    {phase.start_date && phase.duration_weeks > 0 && (
+                    {phase.start_date && (phase.duration_weeks || 0) > 0 && (
                       <p className="text-[9px] text-muted-foreground">
                         {format(parseISO(phase.start_date), 'dd/MM')} → {format(parseISO(phase.end_date), 'dd/MM')}
                         {isPolimento && ' 🏁'}
                       </p>
                     )}
-                    {phase.duration_weeks === 0 && (
+                    {(phase.duration_weeks === 0 || phase.duration_weeks === '0') && (
                       <p className="text-[9px] text-muted-foreground italic">Fase ignorada</p>
                     )}
                   </div>
@@ -144,18 +205,26 @@ export function JourneyPhaseConfig({
               })}
             </div>
 
-            <Button
-              size="sm"
-              onClick={() => onSavePhases(phases.filter(p => p.duration_weeks > 0))}
-              disabled={isSaving || !isAligned}
-              className="gap-1 text-xs"
-            >
-              {existingPhases.length > 0 ? <RefreshCw className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-              {existingPhases.length > 0 ? 'Atualizar Jornada' : 'Criar Jornada'}
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                size="sm"
+                onClick={() => onSavePhases(phases.filter(p => p.duration_weeks > 0))}
+                disabled={isSaving}
+                className="gap-1 text-xs"
+              >
+                {existingPhases.length > 0 ? <RefreshCw className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                {existingPhases.length > 0 ? 'Atualizar Jornada' : 'Criar Jornada'}
+              </Button>
+              {!isAligned && expectedTotalWeeks > 0 && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                  ⚠ Ajuste as semanas até o Polimento = {expectedTotalWeeks} sem para alinhar com a prova
+                </p>
+              )}
+            </div>
           </div>
         )}
       </CardContent>
     </Card>
   );
 }
+
