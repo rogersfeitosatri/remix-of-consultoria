@@ -51,6 +51,14 @@ interface Props {
   journeyWeeks?: any[];
 }
 
+// ─── Escape user-controlled strings to prevent XSS ─────────────────────────
+function esc(text: string | null | undefined): string {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // ─── Build a clean HTML string to render inside hidden div ──────────────────
 function buildHTML(
   phases: Phase[],
@@ -80,10 +88,10 @@ function buildHTML(
     const pct = totalWeeks > 0 ? (p.duration_weeks / totalWeeks) * 100 : 100 / phases.length;
     return `
       <div style="width:${pct}%;background:${pal.accent};display:flex;align-items:center;
-                  justify-content:center;border-right:1px solid rgba(255,255,255,.25);">
+                   justify-content:center;border-right:1px solid rgba(255,255,255,.25);">
         <span style="font-size:9px;font-weight:700;color:#fff;padding:0 3px;
                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${p.phase_name}&nbsp;(${p.duration_weeks}s)
+          ${esc(p.phase_name)}&nbsp;(${p.duration_weeks}s)
         </span>
       </div>`;
   }).join('');
@@ -103,10 +111,10 @@ function buildHTML(
       : `<span style="color:#9ca3af;font-style:italic">Não configurada</span>`;
 
     const details = [
-      phase.recovery_strategy && `<div style="grid-column:span 1"><span style="color:#6b7280;font-weight:600">Recuperação</span><br>${phase.recovery_strategy}</div>`,
-      phase.body_comp_strategy && `<div style="grid-column:span 1"><span style="color:#6b7280;font-weight:600">Comp. Corporal</span><br>${phase.body_comp_strategy}</div>`,
-      phase.supplement_base && `<div style="grid-column:span 2"><span style="color:#6b7280;font-weight:600">Suplementação</span><br>${phase.supplement_base}</div>`,
-      phase.strategic_notes && `<div style="grid-column:span 2"><span style="color:#6b7280;font-weight:600">Observações</span><br>${phase.strategic_notes}</div>`,
+      phase.recovery_strategy && `<div style="grid-column:span 1"><span style="color:#6b7280;font-weight:600">Recuperação</span><br>${esc(phase.recovery_strategy)}</div>`,
+      phase.body_comp_strategy && `<div style="grid-column:span 1"><span style="color:#6b7280;font-weight:600">Comp. Corporal</span><br>${esc(phase.body_comp_strategy)}</div>`,
+      phase.supplement_base && `<div style="grid-column:span 2"><span style="color:#6b7280;font-weight:600">Suplementação</span><br>${esc(phase.supplement_base)}</div>`,
+      phase.strategic_notes && `<div style="grid-column:span 2"><span style="color:#6b7280;font-weight:600">Observações</span><br>${esc(phase.strategic_notes)}</div>`,
     ].filter(Boolean).join('');
 
     const badge = isPolimento
@@ -124,7 +132,7 @@ function buildHTML(
                     padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
           <div style="display:flex;align-items:center;gap:8px">
             <div style="width:11px;height:11px;border-radius:50%;background:${pal.accent}"></div>
-            <span style="font-size:15px;font-weight:800;color:${pal.dark}">${phase.phase_name}</span>
+            <span style="font-size:15px;font-weight:800;color:${pal.dark}">${esc(phase.phase_name)}</span>
             ${badge}
           </div>
           <div style="display:flex;gap:18px;font-size:11px;color:#6b7280;align-items:center">
@@ -142,20 +150,20 @@ function buildHTML(
           <p style="font-size:12px;color:#374151;margin:0;line-height:1.6;
                     padding:8px 12px;background:#f9fafb;border-radius:6px;
                     border-left:3px solid ${pal.accent}">
-            <strong>Objetivo:</strong>&nbsp;${phase.objective}
+            <strong>Objetivo:</strong>&nbsp;${esc(phase.objective)}
           </p>` : ''}
 
           <!-- Metric chips -->
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
             <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:8px 10px">
               <div style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">CHO</div>
-              <div style="font-size:15px;font-weight:800;color:#111827">${phase.cho_range ?? '—'}</div>
+              <div style="font-size:15px;font-weight:800;color:#111827">${esc(phase.cho_range) || '—'}</div>
               <div style="font-size:9px;color:#9ca3af">g / kg / dia</div>
             </div>
             <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:8px 10px">
               <div style="font-size:8px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">Train-Low</div>
               <div style="font-size:13px;font-weight:800;color:${trainLowColor(phase.train_low_strategy)};text-transform:capitalize">
-                ${phase.train_low_strategy ?? '—'}
+                ${esc(phase.train_low_strategy) || '—'}
               </div>
             </div>
             <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:8px 10px">
@@ -188,7 +196,7 @@ function buildHTML(
           <p style="font-size:12px;color:#6b7280;margin:6px 0 0">por Fases · Endurance</p>
         </div>
         <div style="text-align:right">
-          ${raceName ? `<div style="font-size:14px;font-weight:800;color:#111827;margin-bottom:4px">🎯&nbsp;${raceName}</div>` : ''}
+          ${raceName ? `<div style="font-size:14px;font-weight:800;color:#111827;margin-bottom:4px">🎯&nbsp;${esc(raceName)}</div>` : ''}
           <div style="font-size:12px;color:#374151">
             <span style="font-weight:600">Prova:</span>&nbsp;
             ${raceDate ? format(parseISO(raceDate),'dd/MM/yyyy') : '—'}
