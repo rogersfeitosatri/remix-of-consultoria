@@ -64,7 +64,8 @@ Deno.serve(async (req) => {
 
     const normalizedInput = normalizePhoneToE164(body.phone);
 
-    // If clientId is provided, validate specifically against that client.
+    // If clientId is provided, try strict validation first.
+    // If it fails (stale/wrong clientId), fallback to phone lookup.
     if (body.clientId && typeof body.clientId === "string" && isUuid(body.clientId)) {
       const { data: client, error } = await supabase
         .from("clients")
@@ -72,40 +73,53 @@ Deno.serve(async (req) => {
         .eq("id", body.clientId)
         .maybeSingle();
 
-      if (error || !client?.phone) {
+      if (!error && client?.phone) {
+        const normalizedDb = normalizePhoneToE164(client.phone);
+        const ok = normalizedDb === normalizedInput;
+
+        if (ok) {
+          return new Response(JSON.stringify({ valid: true, clientId: client.id }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
+
+    // Fallback: find client by phone (also covers stale/invalid ?client=...)
+    // Fetch in pages to avoid missing matches in larger datasets.
+    const pageSize = 1000;
+    let from = 0;
+    let matchedClientId: string | null = null;
+
+    while (true) {
+      const to = from + pageSize - 1;
+      const { data: candidates, error: candError } = await supabase
+        .from("clients")
+        .select("id, phone")
+        .not("phone", "is", null)
+        .range(from, to);
+
+      if (candError) {
         return new Response(JSON.stringify({ valid: false, clientId: null }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const normalizedDb = normalizePhoneToE164(client.phone);
-      const ok = normalizedDb === normalizedInput;
+      if (!candidates?.length) break;
 
-      return new Response(JSON.stringify({ valid: ok, clientId: ok ? client.id : null }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const match = candidates.find((c) => c.phone && normalizePhoneToE164(c.phone) === normalizedInput);
+      if (match?.id) {
+        matchedClientId = match.id;
+        break;
+      }
+
+      if (candidates.length < pageSize) break;
+      from += pageSize;
     }
 
-    // Fallback: find client by phone (used when link does not include ?client=...)
-    // Fetch all clients with phone and compare after normalizing
-    const { data: candidates, error: candError } = await supabase
-      .from("clients")
-      .select("id, phone")
-      .not("phone", "is", null)
-      .limit(500);
-
-    if (candError || !candidates?.length) {
-      return new Response(JSON.stringify({ valid: false, clientId: null }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const match = candidates.find((c) => c.phone && normalizePhoneToE164(c.phone) === normalizedInput);
-
-    return new Response(JSON.stringify({ valid: !!match, clientId: match?.id ?? null }), {
+    return new Response(JSON.stringify({ valid: !!matchedClientId, clientId: matchedClientId }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
