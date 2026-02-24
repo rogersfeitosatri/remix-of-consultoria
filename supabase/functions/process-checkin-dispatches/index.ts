@@ -32,12 +32,12 @@ Deno.serve(async (req) => {
 
     console.log(`[process-checkin-dispatches] Running at ${now.toISOString()}, day=${currentDay}, time=${currentTime}`);
 
-    // Fetch active schedules
+    // Fetch active schedules with client end_date for plan expiry check
     const { data: schedules, error: sErr } = await supabase
       .from('athlete_checkin_schedules')
       .select(`
         *,
-        clients:client_id (id, name, phone, user_id),
+        clients:client_id (id, name, phone, user_id, end_date, is_active),
         checkin_forms:checkin_form_id (id, title, is_active)
       `)
       .eq('is_active', true)
@@ -57,6 +57,20 @@ Deno.serve(async (req) => {
         const form = schedule.checkin_forms as any;
 
         if (!client?.phone || !form?.is_active) {
+          skipped++;
+          continue;
+        }
+
+        // ── PLAN EXPIRY GUARD ──
+        // Skip if client is inactive or plan has ended
+        const todayDate = now.toISOString().split('T')[0];
+        if (!client.is_active || (client.end_date && client.end_date < todayDate)) {
+          console.log(`[process-checkin-dispatches] Skipping ${client.name}: plan expired (end_date=${client.end_date}, is_active=${client.is_active})`);
+          // Auto-deactivate the schedule so it won't be picked up again
+          await supabase
+            .from('athlete_checkin_schedules')
+            .update({ is_active: false })
+            .eq('id', schedule.id);
           skipped++;
           continue;
         }
