@@ -1454,12 +1454,14 @@ export type Database = {
           email: string | null
           end_date: string
           first_consultation_date: string | null
+          frozen_at: string | null
           has_agenda_access: boolean | null
           has_checkin: boolean
           has_consultations: boolean | null
           has_zona_nutri_access: boolean | null
           id: string
           is_active: boolean
+          is_frozen: boolean
           last_consultation_at: string | null
           last_consultation_index: number | null
           monthly_value: number
@@ -1475,6 +1477,7 @@ export type Database = {
           remaining_consultations: number | null
           service_type: string
           start_date: string
+          total_frozen_days: number
           updated_at: string
           user_id: string
         }
@@ -1493,12 +1496,14 @@ export type Database = {
           email?: string | null
           end_date: string
           first_consultation_date?: string | null
+          frozen_at?: string | null
           has_agenda_access?: boolean | null
           has_checkin?: boolean
           has_consultations?: boolean | null
           has_zona_nutri_access?: boolean | null
           id?: string
           is_active?: boolean
+          is_frozen?: boolean
           last_consultation_at?: string | null
           last_consultation_index?: number | null
           monthly_value: number
@@ -1514,6 +1519,7 @@ export type Database = {
           remaining_consultations?: number | null
           service_type: string
           start_date: string
+          total_frozen_days?: number
           updated_at?: string
           user_id: string
         }
@@ -1532,12 +1538,14 @@ export type Database = {
           email?: string | null
           end_date?: string
           first_consultation_date?: string | null
+          frozen_at?: string | null
           has_agenda_access?: boolean | null
           has_checkin?: boolean
           has_consultations?: boolean | null
           has_zona_nutri_access?: boolean | null
           id?: string
           is_active?: boolean
+          is_frozen?: boolean
           last_consultation_at?: string | null
           last_consultation_index?: number | null
           monthly_value?: number
@@ -1553,6 +1561,7 @@ export type Database = {
           remaining_consultations?: number | null
           service_type?: string
           start_date?: string
+          total_frozen_days?: number
           updated_at?: string
           user_id?: string
         }

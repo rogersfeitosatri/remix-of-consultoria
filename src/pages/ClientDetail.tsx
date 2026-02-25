@@ -19,7 +19,9 @@ import {
   Lock,
   Copy,
   ClipboardCheck,
-  TrendingUp
+  TrendingUp,
+  Snowflake,
+  Play
 } from 'lucide-react';
 import { useClients, useDeleteClient, useUpdateClient } from '@/hooks/useClients';
 import { useSchedulingSettings } from '@/hooks/useScheduling';
@@ -38,6 +40,8 @@ import { ClientForm } from '@/components/clients/ClientForm';
 import { ChangeAthletePasswordDialog } from '@/components/clients/ChangeAthletePasswordDialog';
 import { AthleteCheckinSchedules } from '@/components/admin/AthleteCheckinSchedules';
 import { useQuery } from '@tanstack/react-query';
+import { useFreezePlan } from '@/hooks/useFreezePlan';
+import { differenceInCalendarDays } from 'date-fns';
 
 const SERVICE_LABELS: Record<string, string> = {
   nutrition: 'Nutrição',
@@ -65,7 +69,7 @@ export default function ClientDetail() {
   const [sendingCheckin, setSendingCheckin] = useState(false);
   const [sendingBooking, setSendingBooking] = useState(false);
   const [sendingCredentials, setSendingCredentials] = useState(false);
-  
+  const { freezeMutation, unfreezeMutation } = useFreezePlan();
   const client = clients.find(c => c.id === clientId);
   
   // Fetch checkin responses for evolution charts
@@ -282,6 +286,12 @@ export default function ClientDetail() {
                   <Badge variant={client.is_active ? 'default' : 'secondary'}>
                     {client.is_active ? 'Ativo' : 'Inativo'}
                   </Badge>
+                  {(client as any).is_frozen && (
+                    <Badge variant="outline" className="gap-1 border-blue-400 text-blue-600 bg-blue-50">
+                      <Snowflake className="h-3 w-3" />
+                      Congelado
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-muted-foreground">
                   {client.email && (
@@ -371,8 +381,43 @@ export default function ClientDetail() {
               <Brain className="h-4 w-4" />
               Análise IA
             </Button>
+            {/* Freeze/Unfreeze Plan */}
+            {(client as any).is_frozen ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm(`Deseja descongelar o plano de ${client.name}? A data de término será estendida.`)) {
+                    unfreezeMutation.mutate({
+                      clientId: client.id,
+                      frozenAt: (client as any).frozen_at,
+                      currentEndDate: client.end_date,
+                    });
+                  }
+                }}
+                disabled={unfreezeMutation.isPending}
+                className="gap-1 text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+              >
+                <Play className="h-4 w-4" />
+                {unfreezeMutation.isPending ? '...' : `Descongelar (${differenceInCalendarDays(new Date(), new Date((client as any).frozen_at))}d)`}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm(`Deseja congelar o plano de ${client.name}? Check-ins e contagem do plano serão pausados.`)) {
+                    freezeMutation.mutate(client.id);
+                  }
+                }}
+                disabled={freezeMutation.isPending}
+                className="gap-1 text-blue-600 border-blue-300 hover:bg-blue-50"
+              >
+                <Snowflake className="h-4 w-4" />
+                {freezeMutation.isPending ? '...' : 'Congelar Plano'}
+              </Button>
+            )}
             <Button
-              variant="outline"
               size="sm"
               onClick={() => setShowEditForm(true)}
               className="gap-1 text-foreground"
