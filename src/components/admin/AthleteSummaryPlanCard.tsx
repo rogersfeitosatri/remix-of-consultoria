@@ -18,6 +18,7 @@ const DURATION_LABELS: Record<string, string> = {
   semiannual: 'Semestral',
   annual: 'Anual',
   six_weeks: '6 Semanas',
+  custom: 'Personalizado',
 };
 
 interface AthleteSummaryPlanCardProps {

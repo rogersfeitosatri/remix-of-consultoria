@@ -12,7 +12,7 @@ export interface Client {
   phone: string | null;
   service_type: 'nutrition' | 'training' | 'both';
   plan_type: 'consultoria' | 'premium';
-  plan_duration: 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks';
+  plan_duration: 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks' | 'custom';
   checkin_frequency: 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly' | null;
   has_checkin: boolean;
   has_agenda_access: boolean;

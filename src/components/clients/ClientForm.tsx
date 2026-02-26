@@ -42,6 +42,7 @@ const PLAN_DURATION_LABELS = {
   quarterly: 'Trimestral',
   semiannual: 'Semestral',
   annual: 'Anual',
+  custom: 'Personalizado',
 };
 
 const ATHLETE_STATUS_LABELS = {
@@ -92,7 +93,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     phone: client?.phone || '',
     service_type: client?.service_type || 'nutrition' as 'nutrition' | 'training' | 'both',
     plan_type: client?.plan_type || 'consultoria' as 'consultoria' | 'premium',
-    plan_duration: client?.plan_duration || 'monthly' as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual',
+    plan_duration: client?.plan_duration || 'monthly' as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'custom',
     has_checkin: client?.has_checkin ?? true,
     has_agenda_access: client?.has_agenda_access ?? false,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly',
@@ -146,7 +147,16 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       annual: 12,
     };
 
-    const months = durationToMonths[formData.plan_duration] || 12;
+    // For custom duration, calculate months from start_date and end_date
+    let months: number;
+    if (formData.plan_duration === 'custom' && formData.start_date && formData.end_date) {
+      const start = parseISO(formData.start_date);
+      const end = parseISO(formData.end_date);
+      const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      months = diffDays / 30;
+    } else {
+      months = durationToMonths[formData.plan_duration] || 12;
+    }
     
     if (formData.consultation_frequency === 'monthly') {
       // Monthly = 1 consultation per month
@@ -301,6 +311,9 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
   useEffect(() => {
     const startDateChanged = formData.start_date !== initialStartDate;
     const planDurationChanged = formData.plan_duration !== initialPlanDuration;
+
+    // For custom duration, don't auto-calculate end_date
+    if (formData.plan_duration === 'custom') return;
 
     // For new clients OR when admin actively changes start_date/plan_duration on existing clients
     if (formData.start_date && formData.plan_duration && (!client || startDateChanged || planDurationChanged)) {
@@ -491,7 +504,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               <Label>Duração do Plano</Label>
               <Select
                 value={formData.plan_duration}
-                onValueChange={(v) => setFormData({ ...formData, plan_duration: v as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual' })}
+                onValueChange={(v) => setFormData({ ...formData, plan_duration: v as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'custom' })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -503,6 +516,31 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                 </SelectContent>
               </Select>
             </div>
+            {formData.plan_duration === 'custom' && (
+              <div className="space-y-2">
+                <Label htmlFor="custom_end_date">Data Final do Plano</Label>
+                <Input
+                  id="custom_end_date"
+                  type="date"
+                  value={formData.end_date}
+                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                  min={formData.start_date}
+                  required
+                />
+                {formData.start_date && formData.end_date && (
+                  <p className="text-xs text-muted-foreground">
+                    {(() => {
+                      const days = Math.round((new Date(formData.end_date).getTime() - new Date(formData.start_date).getTime()) / (1000 * 60 * 60 * 24));
+                      const weeks = Math.floor(days / 7);
+                      const months = Math.floor(days / 30);
+                      if (months > 0) return `≈ ${months} ${months === 1 ? 'mês' : 'meses'} (${days} dias)`;
+                      if (weeks > 0) return `${weeks} ${weeks === 1 ? 'semana' : 'semanas'} (${days} dias)`;
+                      return `${days} dias`;
+                    })()}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Consultation Config for Consultoria plan */}
