@@ -324,9 +324,27 @@ export function PeriodizationWizard({
     }
   }, [journeyPhases, phasesDirty]);
 
-  const updateSession = (sessionIdx: number, field: string, value: string | boolean) => {
+  const updateSession = (sessionIdx: number, field: string, value: string | boolean | number | null) => {
     setSessionsDirty(true);
-    setSessions(prev => prev.map((s, i) => i === sessionIdx ? { ...s, [field]: value } : s));
+    setSessions(prev => prev.map((s, i) => {
+      if (i !== sessionIdx) return s;
+      const updated = { ...s, [field]: value };
+      if (field === 'is_long_run' && value === true && !s.carb_loading_enabled) {
+        updated.carb_loading_enabled = true;
+        updated.carb_loading_hours = 24;
+      }
+      if (field === 'is_long_run' && value === false) {
+        updated.carb_loading_enabled = false;
+        updated.carb_loading_hours = null;
+      }
+      if (field === 'carb_loading_enabled' && value === false) {
+        updated.carb_loading_hours = null;
+      }
+      if (field === 'carb_loading_enabled' && value === true && !updated.carb_loading_hours) {
+        updated.carb_loading_hours = 24;
+      }
+      return updated;
+    }));
   };
 
   const addSessionToDay = (dayIdx: number) => {
@@ -1021,6 +1039,53 @@ export function PeriodizationWizard({
                                   {PRIORITIES.map(p => <SelectItem key={p} value={p}>Prio {p}</SelectItem>)}
                                 </SelectContent>
                               </Select>
+
+                              {/* Longão + Carb-Loading */}
+                              <div className="pt-1 border-t border-border/30 space-y-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => updateSession(session._idx, 'is_long_run', !session.is_long_run)}
+                                  className={`w-full flex items-center gap-1.5 py-1 px-2 rounded-md text-[10px] font-medium transition-all border ${
+                                    session.is_long_run
+                                      ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                                      : 'text-muted-foreground border-transparent hover:border-border hover:bg-muted/30'
+                                  }`}
+                                >
+                                  <Flame className="h-3 w-3" />
+                                  Longão
+                                </button>
+
+                                {session.is_long_run && (
+                                  <div className="flex items-center gap-1.5 pl-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateSession(session._idx, 'carb_loading_enabled', !session.carb_loading_enabled)}
+                                      className={`flex items-center gap-1 py-0.5 px-1.5 rounded text-[9px] font-medium border transition-all ${
+                                        session.carb_loading_enabled
+                                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                          : 'text-muted-foreground border-border hover:bg-muted/30'
+                                      }`}
+                                    >
+                                      <Zap className="h-2.5 w-2.5" />
+                                      CarbLoad
+                                    </button>
+                                    {session.carb_loading_enabled && (
+                                      <Select
+                                        value={String(session.carb_loading_hours || 24)}
+                                        onValueChange={v => updateSession(session._idx, 'carb_loading_hours', parseInt(v))}
+                                      >
+                                        <SelectTrigger className="h-5 text-[9px] w-[55px] px-1">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="24">24h</SelectItem>
+                                          <SelectItem value="48">48h</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ))}
 
