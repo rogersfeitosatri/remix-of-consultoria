@@ -115,6 +115,8 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
       toast.success('Prova alvo salva com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['target-race-alert', clientId] });
       queryClient.invalidateQueries({ queryKey: ['athletes-target-race-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-profile-periodization', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-periodization', clientId] });
       setIsEditing(false);
     } catch (error: any) {
       toast.error('Erro ao salvar: ' + (error.message || 'Tente novamente'));

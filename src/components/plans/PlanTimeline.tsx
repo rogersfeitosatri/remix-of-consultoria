@@ -47,13 +47,13 @@ const consultoriaSteps = [
   },
   {
     icon: RefreshCw,
-    title: 'Avaliação mensal',
-    description: 'Avaliação mensal via formulário para coleta de sensações e ajustes no plano se necessário.',
+    title: 'Avaliação quinzenal',
+    description: 'Avaliação quinzenal via formulário para coleta de sensações e ajustes no plano se necessário.',
   },
   {
     icon: Activity,
-    title: 'Zona Nutri',
-    description: 'Acesso ao sistema de ajuste estratégico de géis e suplementação nos treinos de corrida.',
+    title: '🎁 Bônus: Zona Nutri',
+    description: 'Acesso ao sistema de ajuste estratégico de géis e suplementação nos treinos de corrida — incluso como bônus exclusivo.',
   },
   {
     icon: MessageCircle,

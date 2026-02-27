@@ -24,7 +24,7 @@ export const DEFAULT_PLANS_TEXTS = {
   consultoria_card_subtitle: 'Pra quem é?',
   consultoria_item_1: 'Atleta que já conhece sua rotina alimentar e precisa de direcionamento estratégico',
   consultoria_item_2: 'Quem busca otimizar suplementação e estratégia de prova sem precisar de consultas frequentes',
-  consultoria_item_3: 'Corredores que preferem acompanhamento assíncrono via formulários e WhatsApp',
+  consultoria_item_3: 'Corredores que preferem acompanhamento assíncrono via formulários quinzenais e WhatsApp',
   consultoria_item_4: 'Atleta com rotina estável que precisa de ajustes pontuais conforme evolução',
   // Consultas card
   consultas_card_title: 'Plano Consultas',
