@@ -2430,12 +2430,15 @@ export type Database = {
       }
       journey_week_sessions: {
         Row: {
+          carb_loading_enabled: boolean | null
+          carb_loading_hours: number | null
           created_at: string
           day_of_week: number
           duration_minutes: number | null
           id: string
           intensity: string | null
           is_day_off: boolean | null
+          is_long_run: boolean | null
           journey_week_id: string
           metabolic_objective: string | null
           modality: string | null
@@ -2443,12 +2446,15 @@ export type Database = {
           shift: string | null
         }
         Insert: {
+          carb_loading_enabled?: boolean | null
+          carb_loading_hours?: number | null
           created_at?: string
           day_of_week: number
           duration_minutes?: number | null
           id?: string
           intensity?: string | null
           is_day_off?: boolean | null
+          is_long_run?: boolean | null
           journey_week_id: string
           metabolic_objective?: string | null
           modality?: string | null
@@ -2456,12 +2462,15 @@ export type Database = {
           shift?: string | null
         }
         Update: {
+          carb_loading_enabled?: boolean | null
+          carb_loading_hours?: number | null
           created_at?: string
           day_of_week?: number
           duration_minutes?: number | null
           id?: string
           intensity?: string | null
           is_day_off?: boolean | null
+          is_long_run?: boolean | null
           journey_week_id?: string
           metabolic_objective?: string | null
           modality?: string | null
