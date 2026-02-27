@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dumbbell, Save, Plus, Trash2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Dumbbell, Save, Zap } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const DAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const SHIFTS = ['Manhã', 'Tarde', 'Noite'];
@@ -21,6 +23,11 @@ interface Session {
   intensity: string;
   priority: string;
   metabolic_objective: string;
+  duration_minutes?: number | null;
+  is_day_off?: boolean;
+  is_long_run?: boolean;
+  carb_loading_enabled?: boolean;
+  carb_loading_hours?: number | null;
 }
 
 interface Props {
@@ -43,7 +50,6 @@ export function JourneyWeekSessions({
     if (existingSessions.length > 0) {
       setSessions(existingSessions.map(s => ({ ...s })));
     } else {
-      // Init empty sessions for each day
       setSessions(DAYS.map((_, i) => ({
         journey_week_id: weekId,
         day_of_week: i,
@@ -52,16 +58,38 @@ export function JourneyWeekSessions({
         intensity: 'Moderado',
         priority: 'B',
         metabolic_objective: '',
+        is_long_run: false,
+        carb_loading_enabled: false,
+        carb_loading_hours: null,
       })));
     }
     setDirty(false);
   }, [weekId, existingSessions]);
 
-  const updateSession = (dayIdx: number, field: string, value: string) => {
+  const updateSession = (dayIdx: number, field: string, value: any) => {
     setDirty(true);
-    setSessions(prev => prev.map(s =>
-      s.day_of_week === dayIdx ? { ...s, [field]: value } : s
-    ));
+    setSessions(prev => prev.map(s => {
+      if (s.day_of_week !== dayIdx) return s;
+      const updated = { ...s, [field]: value };
+      // Auto-enable carb loading when marking as long run
+      if (field === 'is_long_run' && value === true && !s.carb_loading_enabled) {
+        updated.carb_loading_enabled = true;
+        updated.carb_loading_hours = 24;
+      }
+      // Reset carb loading when unmarking long run
+      if (field === 'is_long_run' && value === false) {
+        updated.carb_loading_enabled = false;
+        updated.carb_loading_hours = null;
+      }
+      // Reset hours when disabling carb loading
+      if (field === 'carb_loading_enabled' && value === false) {
+        updated.carb_loading_hours = null;
+      }
+      if (field === 'carb_loading_enabled' && value === true && !updated.carb_loading_hours) {
+        updated.carb_loading_hours = 24;
+      }
+      return updated;
+    }));
   };
 
   const handleSave = () => {
@@ -74,15 +102,6 @@ export function JourneyWeekSessions({
       case 'Moderado': return 'text-amber-400 border-amber-500/30';
       case 'Intenso': return 'text-red-400 border-red-500/30';
       default: return 'text-muted-foreground border-border';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'A': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'B': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-      case 'C': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      default: return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -111,6 +130,8 @@ export function JourneyWeekSessions({
                 <TableHead className="text-[10px] w-[100px]">Intensidade</TableHead>
                 <TableHead className="text-[10px] w-[60px]">Prio</TableHead>
                 <TableHead className="text-[10px]">Objetivo Metab.</TableHead>
+                <TableHead className="text-[10px] w-[70px] text-center">Longão</TableHead>
+                <TableHead className="text-[10px] w-[130px] text-center">Carb-Loading</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -156,6 +177,52 @@ export function JourneyWeekSessions({
                       placeholder="opcional"
                       className="h-7 text-xs"
                     />
+                  </TableCell>
+                  <TableCell className="py-1.5 text-center">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={session.is_long_run || false}
+                              onCheckedChange={v => updateSession(session.day_of_week, 'is_long_run', v)}
+                              className="scale-75"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="text-xs">Marcar como treino longo (longão)</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableCell>
+                  <TableCell className="py-1.5">
+                    {session.is_long_run ? (
+                      <div className="flex items-center gap-1.5">
+                        <Switch
+                          checked={session.carb_loading_enabled || false}
+                          onCheckedChange={v => updateSession(session.day_of_week, 'carb_loading_enabled', v)}
+                          className="scale-75"
+                        />
+                        {session.carb_loading_enabled && (
+                          <Select
+                            value={String(session.carb_loading_hours || 24)}
+                            onValueChange={v => updateSession(session.day_of_week, 'carb_loading_hours', parseInt(v))}
+                          >
+                            <SelectTrigger className="h-6 text-[10px] w-[65px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="24">24h</SelectItem>
+                              <SelectItem value="48">48h</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {session.carb_loading_enabled && (
+                          <Zap className="h-3 w-3 text-amber-400 shrink-0" />
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[9px] text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
