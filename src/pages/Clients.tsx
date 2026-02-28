@@ -100,11 +100,15 @@ export default function Clients() {
   };
 
   const filteredActiveClients = useMemo(() => {
-    return applyFilters(activeClients);
+    return applyFilters(activeClients).sort((a, b) => 
+      new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
+    );
   }, [searchQuery, activeClients, serviceFilter, planFilter, targetRaceFilter, targetRaceAlerts]);
 
   const filteredInactiveClients = useMemo(() => {
-    return applyFilters(inactiveClients);
+    return applyFilters(inactiveClients).sort((a, b) => 
+      new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
+    );
   }, [searchQuery, inactiveClients, serviceFilter, planFilter, targetRaceFilter, targetRaceAlerts]);
 
   const handleSubmit = async (
