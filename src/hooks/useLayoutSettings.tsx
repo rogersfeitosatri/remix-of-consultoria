@@ -24,6 +24,7 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItemConfig[] = [
   { key: '/admin', label: 'Dashboard', visible: true },
   { key: '/tasks', label: 'Tarefas', visible: true },
   { key: '/clients', label: 'Atletas', visible: true },
+  { key: '/checkin-hub', label: 'Check-ins', visible: true },
   { key: '/periodization', label: 'Periodização', visible: true },
   { key: '/metabolic-web', label: 'Interconexão Metabólica', visible: true },
   { key: '/financial', label: 'Financeiro', visible: true },

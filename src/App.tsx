@@ -35,6 +35,7 @@ import CheckinReview from "./pages/CheckinReview";
 
 // Lazy load remaining secondary pages
 const Checkin = lazy(() => import("./pages/Checkin"));
+const CheckinHub = lazy(() => import("./pages/CheckinHub"));
 const CheckinFormBuilder = lazy(() => import("./pages/CheckinFormBuilder"));
 const AnamneseFormBuilder = lazy(() => import("./pages/AnamneseFormBuilder"));
 const PublicCheckinForm = lazy(() => import("./pages/PublicCheckinForm"));
@@ -142,6 +143,7 @@ function AppRoutes() {
         <Route path="/link-bio" element={<ProtectedRoute adminOnly><LinkBioManager /></ProtectedRoute>} />
         <Route path="/forms" element={<ProtectedRoute adminOnly><Forms /></ProtectedRoute>} />
         <Route path="/question-bank" element={<ProtectedRoute adminOnly><QuestionBank /></ProtectedRoute>} />
+        <Route path="/checkin-hub" element={<ProtectedRoute adminOnly><CheckinHub /></ProtectedRoute>} />
         <Route path="/checkin" element={<ProtectedRoute adminOnly><Checkin /></ProtectedRoute>} />
         <Route path="/checkin/:formId" element={<ProtectedRoute adminOnly><CheckinFormBuilder /></ProtectedRoute>} />
         <Route path="/anamnese/:formId" element={<ProtectedRoute adminOnly><AnamneseFormBuilder /></ProtectedRoute>} />
