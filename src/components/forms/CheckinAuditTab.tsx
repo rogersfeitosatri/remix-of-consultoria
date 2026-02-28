@@ -12,35 +12,13 @@ import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
-  Loader2, 
-  Search, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Pause,
-  Filter,
-  CalendarDays,
-  X,
-  ExternalLink
+  Loader2, Search, CheckCircle, Clock, AlertCircle,
+  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useNavigate } from 'react-router-dom';
-
-interface DispatchRecord {
-  id: string;
-  client_id: string;
-  checkin_form_id: string;
-  sent_at: string;
-  status: string;
-  due_at: string | null;
-  error_message: string | null;
-  schedule_id: string | null;
-}
 
 export function CheckinAuditTab() {
   const { user } = useAuth();
@@ -53,29 +31,14 @@ export function CheckinAuditTab() {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [specificDate, setSpecificDate] = useState<Date | undefined>(undefined);
 
-  // Fetch dispatches
-  const { data: dispatches = [], isLoading: dispatchesLoading } = useQuery({
-    queryKey: ['checkin-audit-dispatches', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('checkin_dispatches')
-        .select('id, client_id, checkin_form_id, sent_at, status, due_at, error_message, schedule_id')
-        .eq('user_id', user!.id)
-        .order('sent_at', { ascending: false });
-      if (error) throw error;
-      return (data || []) as DispatchRecord[];
-    },
-    enabled: !!user,
-    staleTime: 60_000,
-  });
-
-  // Fetch responses to know which dispatches were answered
+  // Fetch checkin responses (the actual submitted check-ins)
   const { data: responses = [], isLoading: responsesLoading } = useQuery({
-    queryKey: ['checkin-audit-responses', user?.id],
+    queryKey: ['checkin-audit-responses'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('checkin_responses')
-        .select('id, client_id, submitted_at, form_id');
+        .select('id, client_id, form_id, submitted_at, checkin_forms(title)')
+        .order('submitted_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -83,13 +46,13 @@ export function CheckinAuditTab() {
     staleTime: 60_000,
   });
 
-  // Fetch feedbacks to know review status
-  const { data: feedbacks = [] } = useQuery({
-    queryKey: ['checkin-audit-feedbacks', user?.id],
+  // Fetch feedbacks to determine review status
+  const { data: feedbacks = [], isLoading: feedbacksLoading } = useQuery({
+    queryKey: ['checkin-audit-feedbacks'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('checkin_feedbacks')
-        .select('checkin_response_id, status');
+        .select('checkin_response_id, status, sent_at, final_feedback');
       if (error) throw error;
       return data || [];
     },
@@ -97,94 +60,48 @@ export function CheckinAuditTab() {
     staleTime: 60_000,
   });
 
-  // Fetch scheduled checkin schedules (athlete_checkin_schedules) for paused info
-  const { data: schedules = [] } = useQuery({
-    queryKey: ['checkin-audit-schedules', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('athlete_checkin_schedules')
-        .select('id, client_id, is_active, frequency_type')
-        .eq('user_id', user!.id);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user,
-    staleTime: 60_000,
-  });
-
-  const isLoading = dispatchesLoading || clientsLoading || responsesLoading;
+  const isLoading = responsesLoading || clientsLoading || feedbacksLoading;
 
   // Clients map
   const clientsMap = useMemo(() => {
     return clients.reduce((acc, c) => { acc[c.id] = c; return acc; }, {} as Record<string, typeof clients[0]>);
   }, [clients]);
 
-  // Response lookup: client_id+form_id -> response dates
-  const responsesByClient = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    responses.forEach(r => {
-      const key = r.client_id;
-      if (!map.has(key)) map.set(key, new Set());
-      map.get(key)!.add(r.submitted_at);
-    });
-    return map;
-  }, [responses]);
-
-  // Feedback lookup
+  // Feedback map: response_id -> feedback
   const feedbackMap = useMemo(() => {
-    const map = new Map<string, string>();
-    feedbacks.forEach(f => map.set(f.checkin_response_id, f.status));
+    const map = new Map<string, { status: string; sent_at: string | null }>();
+    feedbacks.forEach(f => map.set(f.checkin_response_id, { status: f.status, sent_at: f.sent_at }));
     return map;
   }, [feedbacks]);
 
-  // Schedule paused map
-  const pausedClients = useMemo(() => {
-    const set = new Set<string>();
-    schedules.forEach(s => { if (!s.is_active) set.add(s.client_id); });
-    return set;
-  }, [schedules]);
-
-  // Build unified audit list
+  // Build audit items from responses
   type AuditItem = {
     id: string;
     client_id: string;
-    date: string;
-    status: 'sent' | 'responded' | 'pending_response' | 'paused' | 'error';
-    sent_at: string;
-    error_message: string | null;
-    has_response: boolean;
+    submitted_at: string;
+    form_title: string;
+    feedback_status: 'pending' | 'sent' | 'reviewed' | 'no_feedback';
   };
 
   const auditItems = useMemo((): AuditItem[] => {
-    return dispatches.map(d => {
-      // Check if there's a response from this client after dispatch
-      const clientResponses = responsesByClient.get(d.client_id);
-      const hasResponse = clientResponses ? Array.from(clientResponses).some(rDate => {
-        return new Date(rDate) >= new Date(d.sent_at);
-      }) : false;
-
-      let status: AuditItem['status'] = 'sent';
-      if (d.status === 'error' || d.error_message) {
-        status = 'error';
-      } else if (hasResponse) {
-        status = 'responded';
-      } else if (pausedClients.has(d.client_id)) {
-        status = 'paused';
-      } else {
-        status = 'pending_response';
+    return responses.map(r => {
+      const fb = feedbackMap.get(r.id);
+      let feedback_status: AuditItem['feedback_status'] = 'no_feedback';
+      if (fb) {
+        if (fb.status === 'sent' && fb.sent_at) feedback_status = 'sent';
+        else if (fb.status === 'sent') feedback_status = 'reviewed';
+        else feedback_status = 'pending';
       }
 
       return {
-        id: d.id,
-        client_id: d.client_id,
-        date: d.sent_at,
-        status,
-        sent_at: d.sent_at,
-        error_message: d.error_message,
-        has_response: hasResponse,
+        id: r.id,
+        client_id: r.client_id,
+        submitted_at: r.submitted_at,
+        form_title: (r as any).checkin_forms?.title || 'Check-in',
+        feedback_status,
       };
     });
-  }, [dispatches, responsesByClient, pausedClients]);
+  }, [responses, feedbackMap]);
 
   // Filter
   const filteredItems = useMemo(() => {
@@ -193,13 +110,13 @@ export function CheckinAuditTab() {
 
     return auditItems
       .filter(item => {
-        const itemDate = parseISO(item.date);
+        const itemDate = parseISO(item.submitted_at);
         if (specificDate) return isSameDay(itemDate, specificDate);
         return itemDate >= monthStart && itemDate <= monthEnd;
       })
       .filter(item => {
         if (statusFilter === 'all') return true;
-        return item.status === statusFilter;
+        return item.feedback_status === statusFilter;
       })
       .filter(item => {
         if (frequencyFilter === 'all') return true;
@@ -211,54 +128,46 @@ export function CheckinAuditTab() {
         const client = clientsMap[item.client_id];
         return client?.name?.toLowerCase().includes(searchQuery.toLowerCase());
       })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
   }, [auditItems, currentMonth, specificDate, statusFilter, frequencyFilter, searchQuery, clientsMap]);
 
   // Stats
   const stats = useMemo(() => {
     const total = filteredItems.length;
-    const sent = filteredItems.filter(i => i.status === 'pending_response').length;
-    const responded = filteredItems.filter(i => i.status === 'responded').length;
-    const paused = filteredItems.filter(i => i.status === 'paused').length;
-    const errors = filteredItems.filter(i => i.status === 'error').length;
-    return { total, sent, responded, paused, errors };
+    const pendingReview = filteredItems.filter(i => i.feedback_status === 'pending' || i.feedback_status === 'no_feedback').length;
+    const feedbackSent = filteredItems.filter(i => i.feedback_status === 'sent').length;
+    const reviewed = filteredItems.filter(i => i.feedback_status === 'reviewed').length;
+    return { total, pendingReview, feedbackSent, reviewed };
   }, [filteredItems]);
 
-  const getStatusBadge = (status: AuditItem['status']) => {
+  const getStatusBadge = (status: AuditItem['feedback_status']) => {
     switch (status) {
-      case 'responded':
+      case 'sent':
         return (
           <Badge className="bg-green-500/20 text-green-700 border-green-500/30">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Respondido
+            Feedback Enviado
           </Badge>
         );
-      case 'pending_response':
-        return (
-          <Badge variant="outline" className="text-amber-600 border-amber-500/30">
-            <Clock className="h-3 w-3 mr-1" />
-            Aguardando
-          </Badge>
-        );
-      case 'sent':
+      case 'reviewed':
         return (
           <Badge className="bg-blue-500/20 text-blue-700 border-blue-500/30">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Enviado
+            Conferido
           </Badge>
         );
-      case 'paused':
+      case 'pending':
         return (
-          <Badge variant="secondary" className="text-muted-foreground">
-            <Pause className="h-3 w-3 mr-1" />
-            Pausado
+          <Badge variant="outline" className="text-amber-600 border-amber-500/30">
+            <Clock className="h-3 w-3 mr-1" />
+            Pendente Revisão
           </Badge>
         );
-      case 'error':
+      case 'no_feedback':
         return (
-          <Badge variant="destructive">
-            <XCircle className="h-3 w-3 mr-1" />
-            Erro
+          <Badge variant="outline" className="text-muted-foreground">
+            <MessageSquare className="h-3 w-3 mr-1" />
+            Sem Feedback
           </Badge>
         );
       default:
@@ -283,61 +192,44 @@ export function CheckinAuditTab() {
             Conferência de Check-ins
           </CardTitle>
           <CardDescription>
-            Histórico de check-ins enviados e seus status de resposta
+            Histórico de check-ins respondidos e status de feedback
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-muted/50 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold">{stats.total}</div>
-              <div className="text-xs text-muted-foreground">Total</div>
-            </div>
-            <div className="bg-amber-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-amber-600">{stats.sent}</div>
-              <div className="text-xs text-muted-foreground">Aguardando Resposta</div>
-            </div>
-            <div className="bg-green-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.responded}</div>
               <div className="text-xs text-muted-foreground">Respondidos</div>
             </div>
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-muted-foreground">{stats.paused}</div>
-              <div className="text-xs text-muted-foreground">Pausados</div>
+            <div className="bg-amber-500/10 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-amber-600">{stats.pendingReview}</div>
+              <div className="text-xs text-muted-foreground">Pendente Revisão</div>
             </div>
-            <div className="bg-red-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.errors}</div>
-              <div className="text-xs text-muted-foreground">Erros</div>
+            <div className="bg-green-500/10 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-green-600">{stats.feedbackSent}</div>
+              <div className="text-xs text-muted-foreground">Feedback Enviado</div>
+            </div>
+            <div className="bg-blue-500/10 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-blue-600">{stats.reviewed}</div>
+              <div className="text-xs text-muted-foreground">Conferidos</div>
             </div>
           </div>
 
           {/* Filters */}
           <div className="flex flex-col md:flex-row gap-3 flex-wrap">
-            {/* Month Navigation */}
             <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="icon"
-                onClick={() => { setSpecificDate(undefined); setCurrentMonth(prev => subMonths(prev, 1)); }}
-              >
+              <Button variant="outline" size="icon" onClick={() => { setSpecificDate(undefined); setCurrentMonth(prev => subMonths(prev, 1)); }}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <div className="text-sm font-medium min-w-[120px] text-center">
-                {specificDate 
-                  ? format(specificDate, 'dd/MM/yyyy', { locale: ptBR })
-                  : format(currentMonth, 'MMMM yyyy', { locale: ptBR })
-                }
+                {specificDate ? format(specificDate, 'dd/MM/yyyy', { locale: ptBR }) : format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
               </div>
-              <Button 
-                variant="outline" 
-                size="icon"
-                onClick={() => { setSpecificDate(undefined); setCurrentMonth(prev => addMonths(prev, 1)); }}
-              >
+              <Button variant="outline" size="icon" onClick={() => { setSpecificDate(undefined); setCurrentMonth(prev => addMonths(prev, 1)); }}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
 
-            {/* Specific Date Picker */}
             <div className="flex items-center gap-1">
               <Popover>
                 <PopoverTrigger asChild>
@@ -347,16 +239,7 @@ export function CheckinAuditTab() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={specificDate}
-                    onSelect={(date) => {
-                      setSpecificDate(date);
-                      if (date) setCurrentMonth(startOfMonth(date));
-                    }}
-                    locale={ptBR}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={specificDate} onSelect={(date) => { setSpecificDate(date); if (date) setCurrentMonth(startOfMonth(date)); }} locale={ptBR} initialFocus />
                 </PopoverContent>
               </Popover>
               {specificDate && (
@@ -366,7 +249,6 @@ export function CheckinAuditTab() {
               )}
             </div>
 
-            {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
@@ -374,14 +256,13 @@ export function CheckinAuditTab() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pending_response">Aguardando Resposta</SelectItem>
-                <SelectItem value="responded">Respondidos</SelectItem>
-                <SelectItem value="paused">Pausados</SelectItem>
-                <SelectItem value="error">Erros</SelectItem>
+                <SelectItem value="no_feedback">Sem Feedback</SelectItem>
+                <SelectItem value="pending">Pendente Revisão</SelectItem>
+                <SelectItem value="sent">Feedback Enviado</SelectItem>
+                <SelectItem value="reviewed">Conferidos</SelectItem>
               </SelectContent>
             </Select>
 
-            {/* Frequency Filter */}
             <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Periodicidade" />
@@ -394,15 +275,9 @@ export function CheckinAuditTab() {
               </SelectContent>
             </Select>
 
-            {/* Search */}
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar atleta..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+              <Input placeholder="Buscar atleta..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
             </div>
           </div>
 
@@ -413,9 +288,9 @@ export function CheckinAuditTab() {
                 <TableRow>
                   <TableHead>Atleta</TableHead>
                   <TableHead>Periodicidade</TableHead>
-                  <TableHead>Enviado em</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Erro</TableHead>
+                  <TableHead>Respondido em</TableHead>
+                  <TableHead>Formulário</TableHead>
+                  <TableHead>Status Feedback</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -431,37 +306,23 @@ export function CheckinAuditTab() {
                     const client = clientsMap[item.client_id];
                     return (
                       <TableRow key={item.id}>
-                        <TableCell className="font-medium">
-                          {client?.name || 'Cliente não encontrado'}
-                        </TableCell>
+                        <TableCell className="font-medium">{client?.name || 'Não encontrado'}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
-                            {client?.checkin_frequency === 'weekly' && 'Semanal'}
-                            {client?.checkin_frequency === 'biweekly' && 'Quinzenal'}
-                            {client?.checkin_frequency === 'monthly' && 'Mensal'}
-                            {!client?.checkin_frequency && '-'}
+                            {client?.checkin_frequency === 'weekly' ? 'Semanal' : client?.checkin_frequency === 'biweekly' ? 'Quinzenal' : client?.checkin_frequency === 'monthly' ? 'Mensal' : '-'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {format(parseISO(item.sent_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                          {format(parseISO(item.submitted_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                         </TableCell>
-                        <TableCell>
-                          {getStatusBadge(item.status)}
-                        </TableCell>
-                        <TableCell className="text-sm text-destructive max-w-[200px] truncate">
-                          {item.error_message || '-'}
-                        </TableCell>
+                        <TableCell className="text-sm">{item.form_title}</TableCell>
+                        <TableCell>{getStatusBadge(item.feedback_status)}</TableCell>
                         <TableCell className="text-right">
-                          {client && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => navigate(`/clients/${client.id}`)}
-                              className="h-8 w-8 p-0"
-                            >
+                          <div className="flex items-center justify-end gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => navigate(`/checkin-review/${item.id}`)} className="h-8 w-8 p-0" title="Revisar">
                               <ExternalLink className="h-4 w-4" />
                             </Button>
-                          )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
