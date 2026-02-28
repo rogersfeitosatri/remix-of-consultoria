@@ -5,13 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useScheduledCheckins, useUpdateScheduledCheckin, useDeleteScheduledCheckin } from '@/hooks/useScheduledCheckins';
 import { useClients } from '@/hooks/useClients';
-import { useWhatsAppTemplates } from '@/hooks/useWhatsAppTemplates';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isSameDay } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
 import { ptBR } from 'date-fns/locale';
 import { 
   Loader2, 
@@ -19,302 +17,248 @@ import {
   CheckCircle, 
   XCircle, 
   Clock, 
-  Send, 
-  Trash2, 
   AlertCircle,
   ChevronLeft,
   ChevronRight,
   Pause,
   Filter,
   CalendarDays,
-  X
+  X,
+  ExternalLink
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useNavigate } from 'react-router-dom';
 
-const SAO_PAULO_TZ = 'America/Sao_Paulo';
+interface DispatchRecord {
+  id: string;
+  client_id: string;
+  checkin_form_id: string;
+  sent_at: string;
+  status: string;
+  due_at: string | null;
+  error_message: string | null;
+  schedule_id: string | null;
+}
 
 export function CheckinAuditTab() {
-  const { toast } = useToast();
-  const { data: checkins = [], isLoading: checkinsLoading, refetch } = useScheduledCheckins();
+  const { user } = useAuth();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
-  const { data: templates = [] } = useWhatsAppTemplates();
-  const updateCheckin = useUpdateScheduledCheckin();
-  const deleteCheckin = useDeleteScheduledCheckin();
+  const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    const now = toZonedTime(new Date(), SAO_PAULO_TZ);
-    return startOfMonth(now);
-  });
+  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [specificDate, setSpecificDate] = useState<Date | undefined>(undefined);
-  const [sendingCheckins, setSendingCheckins] = useState<Set<string>>(new Set());
-  const [deletingCheckins, setDeletingCheckins] = useState<Set<string>>(new Set());
 
-  const isLoading = checkinsLoading || clientsLoading;
+  // Fetch dispatches
+  const { data: dispatches = [], isLoading: dispatchesLoading } = useQuery({
+    queryKey: ['checkin-audit-dispatches', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checkin_dispatches')
+        .select('id, client_id, checkin_form_id, sent_at, status, due_at, error_message, schedule_id')
+        .eq('user_id', user!.id)
+        .order('sent_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as DispatchRecord[];
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
 
-  // Create clients map
+  // Fetch responses to know which dispatches were answered
+  const { data: responses = [], isLoading: responsesLoading } = useQuery({
+    queryKey: ['checkin-audit-responses', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checkin_responses')
+        .select('id, client_id, submitted_at, form_id');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
+  // Fetch feedbacks to know review status
+  const { data: feedbacks = [] } = useQuery({
+    queryKey: ['checkin-audit-feedbacks', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('checkin_feedbacks')
+        .select('checkin_response_id, status');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
+  // Fetch scheduled checkin schedules (athlete_checkin_schedules) for paused info
+  const { data: schedules = [] } = useQuery({
+    queryKey: ['checkin-audit-schedules', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('athlete_checkin_schedules')
+        .select('id, client_id, is_active, frequency_type')
+        .eq('user_id', user!.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
+  const isLoading = dispatchesLoading || clientsLoading || responsesLoading;
+
+  // Clients map
   const clientsMap = useMemo(() => {
-    return clients.reduce((acc, client) => {
-      acc[client.id] = client;
-      return acc;
-    }, {} as Record<string, typeof clients[0]>);
+    return clients.reduce((acc, c) => { acc[c.id] = c; return acc; }, {} as Record<string, typeof clients[0]>);
   }, [clients]);
 
-  // Filter checkins by month and search
-  const filteredCheckins = useMemo(() => {
+  // Response lookup: client_id+form_id -> response dates
+  const responsesByClient = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    responses.forEach(r => {
+      const key = r.client_id;
+      if (!map.has(key)) map.set(key, new Set());
+      map.get(key)!.add(r.submitted_at);
+    });
+    return map;
+  }, [responses]);
+
+  // Feedback lookup
+  const feedbackMap = useMemo(() => {
+    const map = new Map<string, string>();
+    feedbacks.forEach(f => map.set(f.checkin_response_id, f.status));
+    return map;
+  }, [feedbacks]);
+
+  // Schedule paused map
+  const pausedClients = useMemo(() => {
+    const set = new Set<string>();
+    schedules.forEach(s => { if (!s.is_active) set.add(s.client_id); });
+    return set;
+  }, [schedules]);
+
+  // Build unified audit list
+  type AuditItem = {
+    id: string;
+    client_id: string;
+    date: string;
+    status: 'sent' | 'responded' | 'pending_response' | 'paused' | 'error';
+    sent_at: string;
+    error_message: string | null;
+    has_response: boolean;
+  };
+
+  const auditItems = useMemo((): AuditItem[] => {
+    return dispatches.map(d => {
+      // Check if there's a response from this client after dispatch
+      const clientResponses = responsesByClient.get(d.client_id);
+      const hasResponse = clientResponses ? Array.from(clientResponses).some(rDate => {
+        return new Date(rDate) >= new Date(d.sent_at);
+      }) : false;
+
+      let status: AuditItem['status'] = 'sent';
+      if (d.status === 'error' || d.error_message) {
+        status = 'error';
+      } else if (hasResponse) {
+        status = 'responded';
+      } else if (pausedClients.has(d.client_id)) {
+        status = 'paused';
+      } else {
+        status = 'pending_response';
+      }
+
+      return {
+        id: d.id,
+        client_id: d.client_id,
+        date: d.sent_at,
+        status,
+        sent_at: d.sent_at,
+        error_message: d.error_message,
+        has_response: hasResponse,
+      };
+    });
+  }, [dispatches, responsesByClient, pausedClients]);
+
+  // Filter
+  const filteredItems = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
 
-    return checkins
-      .filter(checkin => {
-        const checkinDate = parseISO(checkin.scheduled_send_date);
-        // If specific date is selected, filter by that date only
-        if (specificDate) {
-          return isSameDay(checkinDate, specificDate);
-        }
-        // Otherwise filter by month
-        return checkinDate >= monthStart && checkinDate <= monthEnd;
+    return auditItems
+      .filter(item => {
+        const itemDate = parseISO(item.date);
+        if (specificDate) return isSameDay(itemDate, specificDate);
+        return itemDate >= monthStart && itemDate <= monthEnd;
       })
-      .filter(checkin => {
-        if (statusFilter !== 'all' && checkin.status !== statusFilter) {
-          return false;
-        }
-        return true;
+      .filter(item => {
+        if (statusFilter === 'all') return true;
+        return item.status === statusFilter;
       })
-      .filter(checkin => {
-        if (frequencyFilter !== 'all') {
-          const client = clientsMap[checkin.client_id];
-          if (client?.checkin_frequency !== frequencyFilter) {
-            return false;
-          }
-        }
-        return true;
+      .filter(item => {
+        if (frequencyFilter === 'all') return true;
+        const client = clientsMap[item.client_id];
+        return client?.checkin_frequency === frequencyFilter;
       })
-      .filter(checkin => {
+      .filter(item => {
         if (!searchQuery) return true;
-        const client = clientsMap[checkin.client_id];
-        const clientName = client?.name?.toLowerCase() || '';
-        return clientName.includes(searchQuery.toLowerCase());
+        const client = clientsMap[item.client_id];
+        return client?.name?.toLowerCase().includes(searchQuery.toLowerCase());
       })
-      .sort((a, b) => {
-        // Sort by date, then by client name
-        const dateCompare = parseISO(a.scheduled_send_date).getTime() - parseISO(b.scheduled_send_date).getTime();
-        if (dateCompare !== 0) return dateCompare;
-        const clientA = clientsMap[a.client_id]?.name || '';
-        const clientB = clientsMap[b.client_id]?.name || '';
-        return clientA.localeCompare(clientB);
-      });
-  }, [checkins, currentMonth, specificDate, searchQuery, statusFilter, frequencyFilter, clientsMap]);
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [auditItems, currentMonth, specificDate, statusFilter, frequencyFilter, searchQuery, clientsMap]);
 
-  // Stats for the month - Updated logic:
-  // - Pendentes: Not sent yet (pending) OR sent but not responded (sent)
-  // - Respondidos: Completed (responded)
+  // Stats
   const stats = useMemo(() => {
-    const total = filteredCheckins.length;
-    const sent = filteredCheckins.filter(c => c.status === 'sent').length;
-    const pending = filteredCheckins.filter(c => c.status === 'pending').length;
-    const skipped = filteredCheckins.filter(c => c.status === 'skipped').length;
-    const completed = filteredCheckins.filter(c => c.status === 'completed').length;
-    // Awaiting response = pending (not sent) + sent (sent but not responded)
-    const awaitingResponse = pending + sent;
-    return { total, sent, pending, skipped, completed, awaitingResponse };
-  }, [filteredCheckins]);
+    const total = filteredItems.length;
+    const sent = filteredItems.filter(i => i.status === 'pending_response').length;
+    const responded = filteredItems.filter(i => i.status === 'responded').length;
+    const paused = filteredItems.filter(i => i.status === 'paused').length;
+    const errors = filteredItems.filter(i => i.status === 'error').length;
+    return { total, sent, responded, paused, errors };
+  }, [filteredItems]);
 
-  const handleSendCheckin = async (checkinId: string, clientId: string) => {
-    const client = clientsMap[clientId];
-    if (!client?.phone) {
-      toast({
-        title: 'Erro',
-        description: 'Cliente não possui telefone cadastrado.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setSendingCheckins(prev => new Set(prev).add(checkinId));
-
-    try {
-      // Find the checkin_reminder template
-      const template = templates.find(t => t.template_key === 'checkin_reminder');
-      if (!template) {
-        throw new Error('Template de checkin não encontrado');
-      }
-
-      // Build the checkin link
-      const checkin = checkins.find(c => c.id === checkinId);
-      let checkinLink = '';
-      
-      if (checkin?.form_id) {
-        checkinLink = `${window.location.origin}/form/${checkin.form_id}?client=${clientId}`;
-      } else {
-        // Find active form as fallback
-        const { data: activeForms } = await supabase
-          .from('checkin_forms')
-          .select('id')
-          .eq('is_active', true)
-          .limit(1);
-        
-        if (activeForms && activeForms.length > 0) {
-          checkinLink = `${window.location.origin}/form/${activeForms[0].id}?client=${clientId}`;
-        } else {
-          throw new Error('Nenhum formulário de checkin ativo encontrado');
-        }
-      }
-
-      // Build context for template
-      const contextData = {
-        client_name: client.name?.split(' ')[0] || 'Atleta',
-        checkin_link: checkinLink,
-      };
-
-      // Send via edge function
-      const { error } = await supabase.functions.invoke('send-whatsapp', {
-        body: {
-          template_key: 'checkin_reminder',
-          to_phone: client.phone,
-          context_data: contextData,
-          client_id: clientId,
-        },
-      });
-
-      if (error) throw error;
-
-      // Update checkin status
-      await updateCheckin.mutateAsync({
-        id: checkinId,
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-      });
-
-      toast({
-        title: 'Sucesso',
-        description: `Check-in enviado para ${client.name}`,
-      });
-
-      refetch();
-    } catch (error: any) {
-      console.error('Error sending checkin:', error);
-      toast({
-        title: 'Erro ao enviar',
-        description: error.message || 'Não foi possível enviar o check-in.',
-        variant: 'destructive',
-      });
-    } finally {
-      setSendingCheckins(prev => {
-        const next = new Set(prev);
-        next.delete(checkinId);
-        return next;
-      });
-    }
-  };
-
-  const handleDeleteCheckin = async (checkinId: string) => {
-    setDeletingCheckins(prev => new Set(prev).add(checkinId));
-
-    try {
-      await deleteCheckin.mutateAsync(checkinId);
-      toast({
-        title: 'Sucesso',
-        description: 'Agendamento removido.',
-      });
-      refetch();
-    } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Não foi possível remover.',
-        variant: 'destructive',
-      });
-    } finally {
-      setDeletingCheckins(prev => {
-        const next = new Set(prev);
-        next.delete(checkinId);
-        return next;
-      });
-    }
-  };
-
-  const handleMarkAsSent = async (checkinId: string) => {
-    try {
-      await updateCheckin.mutateAsync({
-        id: checkinId,
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-      });
-      toast({ title: 'Marcado como enviado' });
-      refetch();
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleTogglePause = async (checkinId: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'skipped' ? 'pending' : 'skipped';
-    try {
-      await updateCheckin.mutateAsync({
-        id: checkinId,
-        status: newStatus,
-      });
-      toast({ 
-        title: newStatus === 'skipped' ? 'Pausado' : 'Reativado' 
-      });
-      refetch();
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível atualizar.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: AuditItem['status']) => {
     switch (status) {
-      case 'sent':
+      case 'responded':
         return (
           <Badge className="bg-green-500/20 text-green-700 border-green-500/30">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Respondido
+          </Badge>
+        );
+      case 'pending_response':
+        return (
+          <Badge variant="outline" className="text-amber-600 border-amber-500/30">
+            <Clock className="h-3 w-3 mr-1" />
+            Aguardando
+          </Badge>
+        );
+      case 'sent':
+        return (
+          <Badge className="bg-blue-500/20 text-blue-700 border-blue-500/30">
             <CheckCircle className="h-3 w-3 mr-1" />
             Enviado
           </Badge>
         );
-      case 'pending':
-        return (
-          <Badge variant="outline" className="text-amber-600 border-amber-500/30">
-            <Clock className="h-3 w-3 mr-1" />
-            Pendente
-          </Badge>
-        );
-      case 'skipped':
+      case 'paused':
         return (
           <Badge variant="secondary" className="text-muted-foreground">
             <Pause className="h-3 w-3 mr-1" />
             Pausado
           </Badge>
         );
-      case 'completed':
+      case 'error':
         return (
-          <Badge className="bg-blue-500/20 text-blue-700 border-blue-500/30">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Respondido
+          <Badge variant="destructive">
+            <XCircle className="h-3 w-3 mr-1" />
+            Erro
           </Badge>
         );
       default:
@@ -339,7 +283,7 @@ export function CheckinAuditTab() {
             Conferência de Check-ins
           </CardTitle>
           <CardDescription>
-            Visualize e gerencie todos os check-ins agendados e enviados
+            Histórico de check-ins enviados e seus status de resposta
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -350,20 +294,20 @@ export function CheckinAuditTab() {
               <div className="text-xs text-muted-foreground">Total</div>
             </div>
             <div className="bg-amber-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-amber-600">{stats.awaitingResponse}</div>
-              <div className="text-xs text-muted-foreground">Sem Resposta</div>
-            </div>
-            <div className="bg-blue-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.completed}</div>
-              <div className="text-xs text-muted-foreground">Respondidos</div>
+              <div className="text-2xl font-bold text-amber-600">{stats.sent}</div>
+              <div className="text-xs text-muted-foreground">Aguardando Resposta</div>
             </div>
             <div className="bg-green-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.sent}</div>
-              <div className="text-xs text-muted-foreground">Enviados</div>
+              <div className="text-2xl font-bold text-green-600">{stats.responded}</div>
+              <div className="text-xs text-muted-foreground">Respondidos</div>
             </div>
             <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-muted-foreground">{stats.skipped}</div>
+              <div className="text-2xl font-bold text-muted-foreground">{stats.paused}</div>
               <div className="text-xs text-muted-foreground">Pausados</div>
+            </div>
+            <div className="bg-red-500/10 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-red-600">{stats.errors}</div>
+              <div className="text-xs text-muted-foreground">Erros</div>
             </div>
           </div>
 
@@ -374,10 +318,7 @@ export function CheckinAuditTab() {
               <Button 
                 variant="outline" 
                 size="icon"
-                onClick={() => {
-                  setSpecificDate(undefined);
-                  setCurrentMonth(prev => subMonths(prev, 1));
-                }}
+                onClick={() => { setSpecificDate(undefined); setCurrentMonth(prev => subMonths(prev, 1)); }}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -390,10 +331,7 @@ export function CheckinAuditTab() {
               <Button 
                 variant="outline" 
                 size="icon"
-                onClick={() => {
-                  setSpecificDate(undefined);
-                  setCurrentMonth(prev => addMonths(prev, 1));
-                }}
+                onClick={() => { setSpecificDate(undefined); setCurrentMonth(prev => addMonths(prev, 1)); }}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -403,11 +341,7 @@ export function CheckinAuditTab() {
             <div className="flex items-center gap-1">
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button 
-                    variant={specificDate ? "default" : "outline"} 
-                    size="sm"
-                    className="gap-2"
-                  >
+                  <Button variant={specificDate ? "default" : "outline"} size="sm" className="gap-2">
                     <CalendarDays className="h-4 w-4" />
                     {specificDate ? format(specificDate, 'dd/MM/yyyy', { locale: ptBR }) : 'Data específica'}
                   </Button>
@@ -418,9 +352,7 @@ export function CheckinAuditTab() {
                     selected={specificDate}
                     onSelect={(date) => {
                       setSpecificDate(date);
-                      if (date) {
-                        setCurrentMonth(startOfMonth(date));
-                      }
+                      if (date) setCurrentMonth(startOfMonth(date));
                     }}
                     locale={ptBR}
                     initialFocus
@@ -428,12 +360,7 @@ export function CheckinAuditTab() {
                 </PopoverContent>
               </Popover>
               {specificDate && (
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setSpecificDate(undefined)}
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSpecificDate(undefined)}>
                   <X className="h-4 w-4" />
                 </Button>
               )}
@@ -441,16 +368,16 @@ export function CheckinAuditTab() {
 
             {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="sent">Enviados</SelectItem>
-                <SelectItem value="pending">Pendentes</SelectItem>
-                <SelectItem value="skipped">Pausados</SelectItem>
-                <SelectItem value="completed">Respondidos</SelectItem>
+                <SelectItem value="pending_response">Aguardando Resposta</SelectItem>
+                <SelectItem value="responded">Respondidos</SelectItem>
+                <SelectItem value="paused">Pausados</SelectItem>
+                <SelectItem value="error">Erros</SelectItem>
               </SelectContent>
             </Select>
 
@@ -480,173 +407,69 @@ export function CheckinAuditTab() {
           </div>
 
           {/* Table */}
-          <TooltipProvider>
-            <ScrollArea className="h-[500px] rounded-md border">
-              <Table>
-                <TableHeader>
+          <ScrollArea className="h-[500px] rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Atleta</TableHead>
+                  <TableHead>Periodicidade</TableHead>
+                  <TableHead>Enviado em</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Erro</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.length === 0 ? (
                   <TableRow>
-                    <TableHead>Atleta</TableHead>
-                    <TableHead>Periodicidade</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>Data Agendada</TableHead>
-                    <TableHead>Horário</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Enviado em</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      Nenhum check-in encontrado para este período.
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCheckins.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        Nenhum check-in encontrado para este período.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredCheckins.map((checkin) => {
-                      const client = clientsMap[checkin.client_id];
-                      const isSending = sendingCheckins.has(checkin.id);
-                      const isDeleting = deletingCheckins.has(checkin.id);
-
-                      return (
-                        <TableRow key={checkin.id}>
-                          <TableCell className="font-medium">
-                            {client?.name || 'Cliente não encontrado'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {client?.checkin_frequency === 'weekly' && 'Semanal'}
-                              {client?.checkin_frequency === 'biweekly' && 'Quinzenal'}
-                              {client?.checkin_frequency === 'monthly' && 'Mensal'}
-                              {!client?.checkin_frequency && '-'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground font-mono">
-                            {client?.phone || '-'}
-                          </TableCell>
-                          <TableCell>
-                            {format(parseISO(checkin.scheduled_send_date), 'dd/MM/yyyy', { locale: ptBR })}
-                          </TableCell>
-                          <TableCell>
-                            {checkin.scheduled_send_time?.slice(0, 5) || '07:00'}
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(checkin.status)}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {checkin.sent_at
-                              ? format(parseISO(checkin.sent_at), 'dd/MM HH:mm', { locale: ptBR })
-                              : '-'}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center justify-end gap-1">
-                              {/* Send Button - only for pending */}
-                              {checkin.status === 'pending' && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleSendCheckin(checkin.id, checkin.client_id)}
-                                      disabled={isSending || !client?.phone}
-                                      className="h-8 w-8 p-0"
-                                    >
-                                      {isSending ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <Send className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Enviar agora</TooltipContent>
-                                </Tooltip>
-                              )}
-
-                              {/* Mark as Sent - for pending */}
-                              {checkin.status === 'pending' && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleMarkAsSent(checkin.id)}
-                                      className="h-8 w-8 p-0"
-                                    >
-                                      <CheckCircle className="h-4 w-4 text-green-500" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Marcar como enviado</TooltipContent>
-                                </Tooltip>
-                              )}
-
-                              {/* Pause/Resume - for pending or skipped */}
-                              {(checkin.status === 'pending' || checkin.status === 'skipped') && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleTogglePause(checkin.id, checkin.status)}
-                                      className="h-8 w-8 p-0"
-                                    >
-                                      {checkin.status === 'skipped' ? (
-                                        <Clock className="h-4 w-4 text-amber-500" />
-                                      ) : (
-                                        <Pause className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {checkin.status === 'skipped' ? 'Reativar' : 'Pausar'}
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-
-                              {/* Delete */}
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={isDeleting}
-                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                  >
-                                    {isDeleting ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Remover agendamento?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Esta ação irá remover o agendamento de check-in de {client?.name}.
-                                      O check-in não será mais enviado automaticamente.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction 
-                                      onClick={() => handleDeleteCheckin(checkin.id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                    >
-                                      Remover
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </TooltipProvider>
+                ) : (
+                  filteredItems.map((item) => {
+                    const client = clientsMap[item.client_id];
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">
+                          {client?.name || 'Cliente não encontrado'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {client?.checkin_frequency === 'weekly' && 'Semanal'}
+                            {client?.checkin_frequency === 'biweekly' && 'Quinzenal'}
+                            {client?.checkin_frequency === 'monthly' && 'Mensal'}
+                            {!client?.checkin_frequency && '-'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {format(parseISO(item.sent_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(item.status)}
+                        </TableCell>
+                        <TableCell className="text-sm text-destructive max-w-[200px] truncate">
+                          {item.error_message || '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {client && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => navigate(`/clients/${client.id}`)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
         </CardContent>
       </Card>
     </div>
