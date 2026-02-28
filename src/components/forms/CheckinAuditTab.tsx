@@ -13,12 +13,22 @@ import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isSam
 import { ptBR } from 'date-fns/locale';
 import { 
   Loader2, Search, CheckCircle, Clock, AlertCircle,
-  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare
+  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useNavigate } from 'react-router-dom';
+
+type AuditItem = {
+  id: string;
+  client_id: string;
+  date: string; // submitted_at or sent created_at
+  form_title: string;
+  type: 'response' | 'unanswered';
+  feedback_status: 'pending' | 'sent' | 'reviewed' | 'no_feedback' | 'unanswered';
+  response_id?: string;
+};
 
 export function CheckinAuditTab() {
   const { user } = useAuth();
@@ -60,7 +70,24 @@ export function CheckinAuditTab() {
     staleTime: 60_000,
   });
 
-  const isLoading = responsesLoading || clientsLoading || feedbacksLoading;
+  // Fetch whatsapp_message_logs for checkin_reminder sends
+  const { data: checkinSends = [], isLoading: sendsLoading } = useQuery({
+    queryKey: ['checkin-audit-sends', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('whatsapp_message_logs')
+        .select('id, client_id, created_at, status')
+        .eq('user_id', user!.id)
+        .eq('template_key', 'checkin_reminder')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
+  const isLoading = responsesLoading || clientsLoading || feedbacksLoading || sendsLoading;
 
   // Clients map
   const clientsMap = useMemo(() => {
@@ -74,17 +101,38 @@ export function CheckinAuditTab() {
     return map;
   }, [feedbacks]);
 
-  // Build audit items from responses
-  type AuditItem = {
-    id: string;
-    client_id: string;
-    submitted_at: string;
-    form_title: string;
-    feedback_status: 'pending' | 'sent' | 'reviewed' | 'no_feedback';
-  };
+  // Build a set of (client_id + date_key) for responses to detect unanswered sends
+  const responseKeys = useMemo(() => {
+    const keys = new Set<string>();
+    responses.forEach(r => {
+      // Use date only (YYYY-MM-DD) to match send date window (response within 7 days of send)
+      keys.add(r.client_id);
+    });
+    return keys;
+  }, [responses]);
 
+  // For each send, check if the client responded within 7 days after the send
+  const respondedSendIds = useMemo(() => {
+    const set = new Set<string>();
+    checkinSends.forEach(send => {
+      const sendDate = new Date(send.created_at);
+      const found = responses.some(r => {
+        if (r.client_id !== send.client_id) return false;
+        const respDate = new Date(r.submitted_at);
+        const diffMs = respDate.getTime() - sendDate.getTime();
+        return diffMs >= 0 && diffMs <= 7 * 24 * 60 * 60 * 1000;
+      });
+      if (found) set.add(send.id);
+    });
+    return set;
+  }, [checkinSends, responses]);
+
+  // Build audit items: responses + unanswered sends
   const auditItems = useMemo((): AuditItem[] => {
-    return responses.map(r => {
+    const items: AuditItem[] = [];
+
+    // Add responses
+    responses.forEach(r => {
       const fb = feedbackMap.get(r.id);
       let feedback_status: AuditItem['feedback_status'] = 'no_feedback';
       if (fb) {
@@ -92,16 +140,33 @@ export function CheckinAuditTab() {
         else if (fb.status === 'sent') feedback_status = 'reviewed';
         else feedback_status = 'pending';
       }
-
-      return {
+      items.push({
         id: r.id,
         client_id: r.client_id,
-        submitted_at: r.submitted_at,
+        date: r.submitted_at,
         form_title: (r as any).checkin_forms?.title || 'Check-in',
+        type: 'response',
         feedback_status,
-      };
+        response_id: r.id,
+      });
     });
-  }, [responses, feedbackMap]);
+
+    // Add unanswered sends
+    checkinSends.forEach(send => {
+      if (!respondedSendIds.has(send.id)) {
+        items.push({
+          id: `send-${send.id}`,
+          client_id: send.client_id,
+          date: send.created_at,
+          form_title: 'Check-in',
+          type: 'unanswered',
+          feedback_status: 'unanswered',
+        });
+      }
+    });
+
+    return items;
+  }, [responses, feedbackMap, checkinSends, respondedSendIds]);
 
   // Filter
   const filteredItems = useMemo(() => {
@@ -110,12 +175,13 @@ export function CheckinAuditTab() {
 
     return auditItems
       .filter(item => {
-        const itemDate = parseISO(item.submitted_at);
+        const itemDate = parseISO(item.date);
         if (specificDate) return isSameDay(itemDate, specificDate);
         return itemDate >= monthStart && itemDate <= monthEnd;
       })
       .filter(item => {
         if (statusFilter === 'all') return true;
+        if (statusFilter === 'unanswered') return item.feedback_status === 'unanswered';
         return item.feedback_status === statusFilter;
       })
       .filter(item => {
@@ -128,16 +194,16 @@ export function CheckinAuditTab() {
         const client = clientsMap[item.client_id];
         return client?.name?.toLowerCase().includes(searchQuery.toLowerCase());
       })
-      .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [auditItems, currentMonth, specificDate, statusFilter, frequencyFilter, searchQuery, clientsMap]);
 
   // Stats
   const stats = useMemo(() => {
-    const total = filteredItems.length;
+    const total = filteredItems.filter(i => i.type === 'response').length;
     const pendingReview = filteredItems.filter(i => i.feedback_status === 'pending' || i.feedback_status === 'no_feedback').length;
     const feedbackSent = filteredItems.filter(i => i.feedback_status === 'sent').length;
-    const reviewed = filteredItems.filter(i => i.feedback_status === 'reviewed').length;
-    return { total, pendingReview, feedbackSent, reviewed };
+    const unanswered = filteredItems.filter(i => i.feedback_status === 'unanswered').length;
+    return { total, pendingReview, feedbackSent, unanswered };
   }, [filteredItems]);
 
   const getStatusBadge = (status: AuditItem['feedback_status']) => {
@@ -170,6 +236,13 @@ export function CheckinAuditTab() {
             Sem Feedback
           </Badge>
         );
+      case 'unanswered':
+        return (
+          <Badge className="bg-red-500/20 text-red-700 border-red-500/30">
+            <Send className="h-3 w-3 mr-1" />
+            Enviado sem Resposta
+          </Badge>
+        );
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -192,7 +265,7 @@ export function CheckinAuditTab() {
             Conferência de Check-ins
           </CardTitle>
           <CardDescription>
-            Histórico de check-ins respondidos e status de feedback
+            Histórico de check-ins enviados, respondidos e status de feedback
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -210,9 +283,9 @@ export function CheckinAuditTab() {
               <div className="text-2xl font-bold text-green-600">{stats.feedbackSent}</div>
               <div className="text-xs text-muted-foreground">Feedback Enviado</div>
             </div>
-            <div className="bg-blue-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.reviewed}</div>
-              <div className="text-xs text-muted-foreground">Conferidos</div>
+            <div className="bg-red-500/10 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-red-600">{stats.unanswered}</div>
+              <div className="text-xs text-muted-foreground">Sem Resposta</div>
             </div>
           </div>
 
@@ -250,12 +323,13 @@ export function CheckinAuditTab() {
             </div>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[200px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="unanswered">Enviado sem Resposta</SelectItem>
                 <SelectItem value="no_feedback">Sem Feedback</SelectItem>
                 <SelectItem value="pending">Pendente Revisão</SelectItem>
                 <SelectItem value="sent">Feedback Enviado</SelectItem>
@@ -288,9 +362,9 @@ export function CheckinAuditTab() {
                 <TableRow>
                   <TableHead>Atleta</TableHead>
                   <TableHead>Periodicidade</TableHead>
-                  <TableHead>Respondido em</TableHead>
+                  <TableHead>Data</TableHead>
                   <TableHead>Formulário</TableHead>
-                  <TableHead>Status Feedback</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -313,15 +387,19 @@ export function CheckinAuditTab() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {format(parseISO(item.submitted_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                          {format(parseISO(item.date), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                         </TableCell>
                         <TableCell className="text-sm">{item.form_title}</TableCell>
                         <TableCell>{getStatusBadge(item.feedback_status)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => navigate(`/checkin-review/${item.id}`)} className="h-8 w-8 p-0" title="Revisar">
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
+                            {item.response_id ? (
+                              <Button size="sm" variant="ghost" onClick={() => navigate(`/checkin-review/${item.response_id}`)} className="h-8 w-8 p-0" title="Revisar">
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
