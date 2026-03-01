@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText, Link, CheckSquare, Activity, Network, ClipboardCheck, PhoneCall } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText, Link, CheckSquare, Activity, Network, ClipboardCheck, PhoneCall, CalendarPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ const iconMap: Record<string, any> = {
   '/link-bio': Link,
   '/forms': ClipboardList,
   '/calls': PhoneCall,
+  '/scheduling-links': CalendarPlus,
   '/settings': Settings,
 };
 

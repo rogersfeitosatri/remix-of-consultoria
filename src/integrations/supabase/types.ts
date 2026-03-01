@@ -988,6 +988,213 @@ export type Database = {
           },
         ]
       }
+      call_bookings: {
+        Row: {
+          booking_date: string
+          booking_time: string
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          confirmation_sent_at: string | null
+          created_at: string
+          duration_minutes: number
+          id: string
+          lead_email: string | null
+          lead_name: string | null
+          lead_phone: string | null
+          meeting_link: string | null
+          notes: string | null
+          reminder_15m_sent_at: string | null
+          reminder_24h_sent_at: string | null
+          reminder_2h_sent_at: string | null
+          scheduling_link_id: string
+          status: string
+          strategic_call_id: string | null
+          strategic_call_response_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          booking_date: string
+          booking_time: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          confirmation_sent_at?: string | null
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          lead_email?: string | null
+          lead_name?: string | null
+          lead_phone?: string | null
+          meeting_link?: string | null
+          notes?: string | null
+          reminder_15m_sent_at?: string | null
+          reminder_24h_sent_at?: string | null
+          reminder_2h_sent_at?: string | null
+          scheduling_link_id: string
+          status?: string
+          strategic_call_id?: string | null
+          strategic_call_response_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          booking_date?: string
+          booking_time?: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          confirmation_sent_at?: string | null
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          lead_email?: string | null
+          lead_name?: string | null
+          lead_phone?: string | null
+          meeting_link?: string | null
+          notes?: string | null
+          reminder_15m_sent_at?: string | null
+          reminder_24h_sent_at?: string | null
+          reminder_2h_sent_at?: string | null
+          scheduling_link_id?: string
+          status?: string
+          strategic_call_id?: string | null
+          strategic_call_response_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_bookings_scheduling_link_id_fkey"
+            columns: ["scheduling_link_id"]
+            isOneToOne: false
+            referencedRelation: "call_scheduling_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_bookings_strategic_call_id_fkey"
+            columns: ["strategic_call_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_bookings_strategic_call_response_id_fkey"
+            columns: ["strategic_call_response_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_call_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_scheduling_links: {
+        Row: {
+          allow_multiple_per_lead: boolean
+          blocked_dates: Json
+          buffer_after_minutes: number
+          buffer_before_minutes: number
+          cancellation_template: string | null
+          confirmation_template: string | null
+          created_at: string
+          daily_limit: number | null
+          description: string | null
+          extra_dates: Json
+          id: string
+          max_advance_days: number
+          meeting_link: string | null
+          min_advance_hours: number
+          reminder_15m_template: string | null
+          reminder_24h_template: string | null
+          reminder_2h_template: string | null
+          require_manual_confirmation: boolean
+          send_reminder_15m: boolean
+          send_reminder_24h: boolean
+          send_reminder_2h: boolean
+          slot_capacity: number
+          slot_duration_minutes: number
+          slug: string
+          status: string
+          strategic_call_id: string | null
+          timezone: string
+          title: string
+          updated_at: string
+          user_id: string
+          weekly_availability: Json
+        }
+        Insert: {
+          allow_multiple_per_lead?: boolean
+          blocked_dates?: Json
+          buffer_after_minutes?: number
+          buffer_before_minutes?: number
+          cancellation_template?: string | null
+          confirmation_template?: string | null
+          created_at?: string
+          daily_limit?: number | null
+          description?: string | null
+          extra_dates?: Json
+          id?: string
+          max_advance_days?: number
+          meeting_link?: string | null
+          min_advance_hours?: number
+          reminder_15m_template?: string | null
+          reminder_24h_template?: string | null
+          reminder_2h_template?: string | null
+          require_manual_confirmation?: boolean
+          send_reminder_15m?: boolean
+          send_reminder_24h?: boolean
+          send_reminder_2h?: boolean
+          slot_capacity?: number
+          slot_duration_minutes?: number
+          slug: string
+          status?: string
+          strategic_call_id?: string | null
+          timezone?: string
+          title: string
+          updated_at?: string
+          user_id: string
+          weekly_availability?: Json
+        }
+        Update: {
+          allow_multiple_per_lead?: boolean
+          blocked_dates?: Json
+          buffer_after_minutes?: number
+          buffer_before_minutes?: number
+          cancellation_template?: string | null
+          confirmation_template?: string | null
+          created_at?: string
+          daily_limit?: number | null
+          description?: string | null
+          extra_dates?: Json
+          id?: string
+          max_advance_days?: number
+          meeting_link?: string | null
+          min_advance_hours?: number
+          reminder_15m_template?: string | null
+          reminder_24h_template?: string | null
+          reminder_2h_template?: string | null
+          require_manual_confirmation?: boolean
+          send_reminder_15m?: boolean
+          send_reminder_24h?: boolean
+          send_reminder_2h?: boolean
+          slot_capacity?: number
+          slot_duration_minutes?: number
+          slug?: string
+          status?: string
+          strategic_call_id?: string | null
+          timezone?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          weekly_availability?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_scheduling_links_strategic_call_id_fkey"
+            columns: ["strategic_call_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       challenge_activities: {
         Row: {
           created_at: string
@@ -4780,10 +4987,29 @@ export type Database = {
         Args: { p_cadence_weeks: number; p_last_appointment_at: string }
         Returns: string
       }
+      create_call_booking: {
+        Args: {
+          p_booking_date: string
+          p_booking_time: string
+          p_lead_email?: string
+          p_lead_name?: string
+          p_lead_phone?: string
+          p_scheduling_link_id: string
+          p_strategic_call_response_id?: string
+        }
+        Returns: string
+      }
       create_public_booking_appointment: {
         Args: { p_date: string; p_time: string; p_token: string }
         Returns: {
           appointment_id: string
+        }[]
+      }
+      get_call_available_slots: {
+        Args: { p_date: string; p_scheduling_link_id: string }
+        Returns: {
+          available: boolean
+          slot_time: string
         }[]
       }
       get_pending_booking_invites: {

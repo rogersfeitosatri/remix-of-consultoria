@@ -28,6 +28,7 @@ import Tasks from "./pages/Tasks";
 import NutritionalPeriodization from "./pages/NutritionalPeriodization";
 import MetabolicWeb from "./pages/MetabolicWeb";
 import StrategicCalls from "./pages/StrategicCalls";
+import CallScheduling from "./pages/CallScheduling";
 
 // Eager load frequently accessed detail pages
 import AthleteHistory from "./pages/AthleteHistory";
@@ -55,6 +56,8 @@ const PublicMetabolicScreening = lazy(() => import("./pages/PublicMetabolicScree
 const StrategicCallBuilder = lazy(() => import("./pages/StrategicCallBuilder"));
 const StrategicCallResponses = lazy(() => import("./pages/StrategicCallResponses"));
 const PublicStrategicCall = lazy(() => import("./pages/PublicStrategicCall"));
+const CallSchedulingConfig = lazy(() => import("./pages/CallSchedulingConfig"));
+const PublicCallBooking = lazy(() => import("./pages/PublicCallBooking"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -130,6 +133,7 @@ function AppRoutes() {
         <Route path="/form/:formId" element={<PublicCheckinForm />} />
         <Route path="/anamnese-form/:formId" element={<PublicAnamneseForm />} />
         <Route path="/agendar/:slug" element={<PublicBooking />} />
+        <Route path="/agendar-call/:slug" element={<PublicCallBooking />} />
         <Route path="/booking/:token" element={<PublicBookingConsult />} />
         <Route path="/metabolic-screening" element={<PublicMetabolicScreening />} />
         <Route path="/call/:slug" element={<PublicStrategicCall />} />
@@ -160,6 +164,8 @@ function AppRoutes() {
         <Route path="/calls" element={<ProtectedRoute adminOnly><StrategicCalls /></ProtectedRoute>} />
         <Route path="/calls/:callId" element={<ProtectedRoute adminOnly><StrategicCallBuilder /></ProtectedRoute>} />
         <Route path="/calls/:callId/responses" element={<ProtectedRoute adminOnly><StrategicCallResponses /></ProtectedRoute>} />
+        <Route path="/scheduling-links" element={<ProtectedRoute adminOnly><CallScheduling /></ProtectedRoute>} />
+        <Route path="/scheduling-links/:linkId" element={<ProtectedRoute adminOnly><CallSchedulingConfig /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
