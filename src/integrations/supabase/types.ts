@@ -4425,6 +4425,7 @@ export type Database = {
           button_text: string | null
           closing_date: string | null
           created_at: string
+          google_form_url: string | null
           id: string
           name: string
           page_image_url: string | null
@@ -4442,6 +4443,7 @@ export type Database = {
           button_text?: string | null
           closing_date?: string | null
           created_at?: string
+          google_form_url?: string | null
           id?: string
           name: string
           page_image_url?: string | null
@@ -4459,6 +4461,7 @@ export type Database = {
           button_text?: string | null
           closing_date?: string | null
           created_at?: string
+          google_form_url?: string | null
           id?: string
           name?: string
           page_image_url?: string | null
