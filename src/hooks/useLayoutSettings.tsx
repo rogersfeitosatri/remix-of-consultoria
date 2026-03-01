@@ -34,6 +34,7 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItemConfig[] = [
   { key: '/link-bio', label: 'Link da Bio', visible: true },
   { key: '/forms', label: 'Formulários', visible: true },
   { key: '/calls', label: 'Call', visible: true },
+  { key: '/scheduling-links', label: 'Agendamento Calls', visible: true },
   { key: '/settings', label: 'Configurações', visible: true },
 ];
 
