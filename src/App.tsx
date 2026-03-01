@@ -27,6 +27,7 @@ import Forms from "./pages/Forms";
 import Tasks from "./pages/Tasks";
 import NutritionalPeriodization from "./pages/NutritionalPeriodization";
 import MetabolicWeb from "./pages/MetabolicWeb";
+import StrategicCalls from "./pages/StrategicCalls";
 
 // Eager load frequently accessed detail pages
 import AthleteHistory from "./pages/AthleteHistory";
@@ -51,6 +52,9 @@ const AppointmentDetail = lazy(() => import("./pages/AppointmentDetail"));
 const AnamneseResponseDetail = lazy(() => import("./pages/AnamneseResponseDetail"));
 const PlansLanding = lazy(() => import("./pages/PlansLanding"));
 const PublicMetabolicScreening = lazy(() => import("./pages/PublicMetabolicScreening"));
+const StrategicCallBuilder = lazy(() => import("./pages/StrategicCallBuilder"));
+const StrategicCallResponses = lazy(() => import("./pages/StrategicCallResponses"));
+const PublicStrategicCall = lazy(() => import("./pages/PublicStrategicCall"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -128,6 +132,7 @@ function AppRoutes() {
         <Route path="/agendar/:slug" element={<PublicBooking />} />
         <Route path="/booking/:token" element={<PublicBookingConsult />} />
         <Route path="/metabolic-screening" element={<PublicMetabolicScreening />} />
+        <Route path="/call/:slug" element={<PublicStrategicCall />} />
         <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
         <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
@@ -152,6 +157,9 @@ function AppRoutes() {
         <Route path="/checkin-review/:responseId" element={<ProtectedRoute adminOnly><CheckinReview /></ProtectedRoute>} />
         <Route path="/anamnese-response/:responseId" element={<ProtectedRoute adminOnly><AnamneseResponseDetail /></ProtectedRoute>} />
         <Route path="/appointments/:appointmentId" element={<ProtectedRoute adminOnly><AppointmentDetail /></ProtectedRoute>} />
+        <Route path="/calls" element={<ProtectedRoute adminOnly><StrategicCalls /></ProtectedRoute>} />
+        <Route path="/calls/:callId" element={<ProtectedRoute adminOnly><StrategicCallBuilder /></ProtectedRoute>} />
+        <Route path="/calls/:callId/responses" element={<ProtectedRoute adminOnly><StrategicCallResponses /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

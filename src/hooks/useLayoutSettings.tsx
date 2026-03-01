@@ -33,6 +33,7 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItemConfig[] = [
   { key: '/content', label: 'Conteúdo Atleta', visible: true },
   { key: '/link-bio', label: 'Link da Bio', visible: true },
   { key: '/forms', label: 'Formulários', visible: true },
+  { key: '/calls', label: 'Call', visible: true },
   { key: '/settings', label: 'Configurações', visible: true },
 ];
 
