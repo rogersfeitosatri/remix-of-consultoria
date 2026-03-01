@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       try {
         const { data: callData } = await supabase
           .from('strategic_calls')
-          .select('admin_notify_phone, title')
+          .select('admin_notify_phone, name')
           .eq('id', callId)
           .single();
 
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
           if (formattedAdminPhone.startsWith('0')) formattedAdminPhone = formattedAdminPhone.substring(1);
           if (!formattedAdminPhone.startsWith('55')) formattedAdminPhone = '55' + formattedAdminPhone;
 
-          const callTitle = callData?.title || 'Call Estratégica';
+          const callTitle = callData?.name || 'Call Estratégica';
           const adminMessage = `🔔 *Nova aplicação recebida!*\n\n📋 *Formulário:* ${callTitle}\n👤 *Nome:* ${respondentName || 'Não informado'}\n📱 *Telefone:* ${phone || 'Não informado'}\n\nAcesse o painel para ver os detalhes.`;
 
           console.log('[strategic-call-whatsapp] Sending admin notification to:', formattedAdminPhone);
