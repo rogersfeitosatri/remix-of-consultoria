@@ -6,9 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useStrategicCall, useStrategicCallResponses, useStrategicCallQuestions, type StrategicCallResponse } from '@/hooks/useStrategicCalls';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Loader2, Eye, Send } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, Send, Upload } from 'lucide-react';
+import ImportResponsesDialog from '@/components/strategic/ImportResponsesDialog';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -32,6 +33,8 @@ export default function StrategicCallResponses() {
   const { data: questions = [] } = useStrategicCallQuestions(callId);
   const [selected, setSelected] = useState<StrategicCallResponse | null>(null);
   const [sendingLinkTo, setSendingLinkTo] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   // Fetch scheduling link associated with this strategic call
   const { data: schedulingLink } = useQuery({
@@ -111,6 +114,7 @@ export default function StrategicCallResponses() {
     <Layout>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-1">
           <Button variant="ghost" size="icon" onClick={() => navigate(`/calls/${callId}`)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -118,6 +122,11 @@ export default function StrategicCallResponses() {
             <h1 className="text-2xl font-bold text-foreground">Respostas: {call?.name}</h1>
             <p className="text-sm text-muted-foreground">{responses.length} aplicações recebidas</p>
           </div>
+        </div>
+        <Button variant="outline" onClick={() => setImportOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          Importar do Google Forms
+        </Button>
         </div>
 
         {isLoading ? (
@@ -225,6 +234,13 @@ export default function StrategicCallResponses() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ImportResponsesDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        callId={callId!}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['strategic-call-responses', callId] })}
+      />
     </Layout>
   );
 }
