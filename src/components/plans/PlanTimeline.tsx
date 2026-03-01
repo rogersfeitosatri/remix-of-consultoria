@@ -1,96 +1,40 @@
-import { ClipboardList, Utensils, RefreshCw, MessageCircle, Activity, Calendar, FileText, Dumbbell } from 'lucide-react';
+import { ClipboardList, Utensils, RefreshCw, MessageCircle, Activity, Calendar, FileText, Dumbbell, Target, Award, Zap, Users, Heart, Star, Check, Gift, LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import type { OfferItem } from '@/hooks/useLandingPageSettings';
 
-const consultasSteps = [
-  {
-    icon: Calendar,
-    title: 'Consulta a cada 6 semanas',
-    description: 'Consultas periódicas para avaliar evolução, ajustar metas e refinar o plano.',
-  },
-  {
-    icon: Utensils,
-    title: 'Plano alimentar e suplementar',
-    description: 'Receba seu plano alimentar com quantidades, alimentos, porções personalizadas e substituições de preferência, além de estratégias de suplementação pré, intra e pós-treino.',
-  },
-  {
-    icon: ClipboardList,
-    title: 'Avaliação semanal',
-    description: 'Formulário semanal para coleta de sensações e acompanhamento contínuo da evolução.',
-  },
-  {
-    icon: RefreshCw,
-    title: 'Ajustes ilimitados',
-    description: 'Solicite ajustes no plano alimentar sempre que precisar, sem limite.',
-  },
-  {
-    icon: Dumbbell,
-    title: 'Zona Nutri',
-    description: 'Acesso ao sistema de estratégia suplementar para elaborar a nutrição do treino longo.',
-  },
-  {
-    icon: MessageCircle,
-    title: 'Suporte diário no WhatsApp',
-    description: 'Tire dúvidas diretamente com o Nutri todos os dias pelo WhatsApp.',
-  },
-];
+const ICON_MAP: Record<string, LucideIcon> = {
+  Calendar, Utensils, ClipboardList, RefreshCw, MessageCircle,
+  Dumbbell, FileText, Activity, Target, Award, Zap, Users,
+  Heart, Star, Check, Gift,
+};
 
-const consultoriaSteps = [
-  {
-    icon: FileText,
-    title: 'Formulário inicial',
-    description: 'Preencha o formulário de anamnese para o Nutri conhecer sua rotina e objetivos.',
-  },
-  {
-    icon: Utensils,
-    title: 'Plano alimentar e suplementar',
-    description: 'Receba seu plano alimentar personalizado para a fase atual do ciclo de treino com estratégias de suplementação.',
-  },
-  {
-    icon: RefreshCw,
-    title: 'Avaliação quinzenal',
-    description: 'Avaliação quinzenal via formulário para coleta de sensações e ajustes no plano se necessário.',
-  },
-  {
-    icon: Activity,
-    title: '🎁 Bônus: Zona Nutri',
-    description: 'Acesso ao sistema de ajuste estratégico de géis e suplementação nos treinos de corrida — incluso como bônus exclusivo.',
-  },
-  {
-    icon: MessageCircle,
-    title: 'Suporte no WhatsApp',
-    description: 'Tire dúvidas diretamente com o Nutri pelo WhatsApp.',
-  },
-];
-
-function TimelineSteps({ steps, variant }: { steps: typeof consultasSteps; variant: 'light' | 'dark' }) {
+function TimelineSteps({ steps, variant }: { steps: OfferItem[]; variant: 'light' | 'dark' }) {
   const isLight = variant === 'light';
 
   return (
     <div className="relative">
-      {/* Vertical line */}
       <div className={`absolute left-5 top-8 bottom-8 w-px ${isLight ? 'bg-black/15' : 'bg-white/15'}`} />
-
       <div className="space-y-8">
-        {steps.map((step, index) => (
-          <div key={index} className="flex items-start gap-5 relative">
-            {/* Icon circle */}
-            <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-              isLight ? 'bg-primary-foreground text-white' : 'bg-white text-primary-foreground'
-            }`}>
-              <step.icon className="h-5 w-5" />
+        {steps.map((step, index) => {
+          const Icon = ICON_MAP[step.icon] || Check;
+          return (
+            <div key={step.id || index} className="flex items-start gap-5 relative">
+              <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                isLight ? 'bg-primary-foreground text-white' : 'bg-white text-primary-foreground'
+              }`}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="pt-1">
+                <h4 className={`font-semibold text-base mb-1 ${isLight ? 'text-primary-foreground' : 'text-white'}`}>
+                  {step.title}
+                </h4>
+                <p className={`text-sm leading-relaxed ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>
+                  {step.description}
+                </p>
+              </div>
             </div>
-
-            {/* Content */}
-            <div className="pt-1">
-              <h4 className={`font-semibold text-base mb-1 ${isLight ? 'text-primary-foreground' : 'text-white'}`}>
-                {step.title}
-              </h4>
-              <p className={`text-sm leading-relaxed ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>
-                {step.description}
-              </p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -106,6 +50,8 @@ interface PlanTimelineProps {
   consultasSectionTitle?: string;
   consultoriaCtaLabel?: string;
   consultasCtaLabel?: string;
+  consultoriaOffers?: OfferItem[];
+  consultasOffers?: OfferItem[];
 }
 
 export default function PlanTimeline({
@@ -118,6 +64,8 @@ export default function PlanTimeline({
   consultasSectionTitle = 'Plano Consultas',
   consultoriaCtaLabel = 'Quero o Plano Consultoria',
   consultasCtaLabel = 'Quero o Plano Consultas',
+  consultoriaOffers = [],
+  consultasOffers = [],
 }: PlanTimelineProps) {
   return (
     <section id="planos" className="py-20 md:py-28 bg-zinc-950">
@@ -135,7 +83,7 @@ export default function PlanTimeline({
             <h3 className="text-xl md:text-2xl font-bold text-white mb-8">
               {consultoriaSectionTitle}
             </h3>
-            <TimelineSteps steps={consultoriaSteps} variant="dark" />
+            <TimelineSteps steps={consultoriaOffers} variant="dark" />
             <Button
               className="w-full h-14 text-lg font-semibold bg-white text-primary-foreground hover:bg-gray-200 mt-10"
               onClick={() => window.open(consultoriaUrl, '_blank')}
@@ -154,7 +102,7 @@ export default function PlanTimeline({
             <h3 className="text-xl md:text-2xl font-bold text-primary-foreground mb-8">
               {consultasSectionTitle}
             </h3>
-            <TimelineSteps steps={consultasSteps} variant="light" />
+            <TimelineSteps steps={consultasOffers} variant="light" />
             <Button
               className="w-full h-14 text-lg font-semibold bg-black text-white hover:bg-zinc-800 mt-10"
               onClick={() => window.open(consultasUrl, '_blank')}

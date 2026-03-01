@@ -177,6 +177,8 @@ export default function PlansLanding() {
         consultasSectionTitle={s?.timeline_consultas_title}
         consultoriaCtaLabel={s?.timeline_cta_consultoria}
         consultasCtaLabel={s?.timeline_cta_consultas}
+        consultoriaOffers={s?.consultoria_offers || []}
+        consultasOffers={s?.consultas_offers || []}
       />
 
       {/* Zona Nutri Section */}

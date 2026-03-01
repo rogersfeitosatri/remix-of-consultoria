@@ -7,6 +7,30 @@ export const DEFAULT_PLANS_LINKS = {
   plans_consultas_whatsapp_url: 'https://wa.me/5599984817697?text=Ol%C3%A1%2C%20quero%20saber%20mais%20sobre%20o%20plano%20consultas.%20Meu%20objetivo%20%C3%A9%20...',
 };
 
+export interface OfferItem {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+}
+
+export const DEFAULT_CONSULTAS_OFFERS: OfferItem[] = [
+  { id: '1', icon: 'Calendar', title: 'Consulta a cada 6 semanas', description: 'Consultas periódicas para avaliar evolução, ajustar metas e refinar o plano.' },
+  { id: '2', icon: 'Utensils', title: 'Plano alimentar e suplementar', description: 'Receba seu plano alimentar com quantidades, alimentos, porções personalizadas e substituições de preferência, além de estratégias de suplementação pré, intra e pós-treino.' },
+  { id: '3', icon: 'ClipboardList', title: 'Avaliação semanal', description: 'Formulário semanal para coleta de sensações e acompanhamento contínuo da evolução.' },
+  { id: '4', icon: 'RefreshCw', title: 'Ajustes ilimitados', description: 'Solicite ajustes no plano alimentar sempre que precisar, sem limite.' },
+  { id: '5', icon: 'Dumbbell', title: 'Zona Nutri', description: 'Acesso ao sistema de estratégia suplementar para elaborar a nutrição do treino longo.' },
+  { id: '6', icon: 'MessageCircle', title: 'Suporte diário no WhatsApp', description: 'Tire dúvidas diretamente com o Nutri todos os dias pelo WhatsApp.' },
+];
+
+export const DEFAULT_CONSULTORIA_OFFERS: OfferItem[] = [
+  { id: '1', icon: 'FileText', title: 'Formulário inicial', description: 'Preencha o formulário de anamnese para o Nutri conhecer sua rotina e objetivos.' },
+  { id: '2', icon: 'Utensils', title: 'Plano alimentar e suplementar', description: 'Receba seu plano alimentar personalizado para a fase atual do ciclo de treino com estratégias de suplementação.' },
+  { id: '3', icon: 'RefreshCw', title: 'Avaliação quinzenal', description: 'Avaliação quinzenal via formulário para coleta de sensações e ajustes no plano se necessário.' },
+  { id: '4', icon: 'Activity', title: '🎁 Bônus: Zona Nutri', description: 'Acesso ao sistema de ajuste estratégico de géis e suplementação nos treinos de corrida — incluso como bônus exclusivo.' },
+  { id: '5', icon: 'MessageCircle', title: 'Suporte no WhatsApp', description: 'Tire dúvidas diretamente com o Nutri pelo WhatsApp.' },
+];
+
 export const DEFAULT_PLANS_TEXTS = {
   // Hero
   hero_badge: 'Nutrição Esportiva Especializada',
@@ -52,7 +76,29 @@ export const DEFAULT_PLANS_TEXTS = {
 
 export type PlansTexts = typeof DEFAULT_PLANS_TEXTS;
 export type PlansLinks = typeof DEFAULT_PLANS_LINKS;
-export type LandingPageSettings = PlansLinks & PlansTexts;
+export type LandingPageSettings = PlansLinks & PlansTexts & {
+  consultas_offers?: OfferItem[];
+  consultoria_offers?: OfferItem[];
+};
+
+function parseSettings(data: any[]): LandingPageSettings {
+  const settings: Record<string, any> = {};
+  data?.forEach((item: any) => {
+    if (item.setting_key === 'consultas_offers' || item.setting_key === 'consultoria_offers') {
+      try { settings[item.setting_key] = JSON.parse(item.setting_value); } catch { /* ignore */ }
+    } else {
+      settings[item.setting_key] = item.setting_value;
+    }
+  });
+
+  return {
+    ...DEFAULT_PLANS_LINKS,
+    ...DEFAULT_PLANS_TEXTS,
+    consultas_offers: DEFAULT_CONSULTAS_OFFERS,
+    consultoria_offers: DEFAULT_CONSULTORIA_OFFERS,
+    ...settings,
+  } as LandingPageSettings;
+}
 
 export function useLandingPageSettings() {
   const { user } = useAuth();
@@ -66,17 +112,7 @@ export function useLandingPageSettings() {
         .eq('user_id', user?.id);
 
       if (error) throw error;
-
-      const settings: Record<string, string> = {};
-      data?.forEach((item: any) => {
-        settings[item.setting_key] = item.setting_value;
-      });
-
-      return {
-        ...DEFAULT_PLANS_LINKS,
-        ...DEFAULT_PLANS_TEXTS,
-        ...settings,
-      } as LandingPageSettings;
+      return parseSettings(data || []);
     },
     enabled: !!user,
     staleTime: 1000 * 60 * 10,
@@ -94,21 +130,23 @@ export function usePublicLandingPageSettings() {
       if (error) throw error;
 
       if (!data || data.length === 0) {
-        return { ...DEFAULT_PLANS_LINKS, ...DEFAULT_PLANS_TEXTS } as LandingPageSettings;
+        return {
+          ...DEFAULT_PLANS_LINKS,
+          ...DEFAULT_PLANS_TEXTS,
+          consultas_offers: DEFAULT_CONSULTAS_OFFERS,
+          consultoria_offers: DEFAULT_CONSULTORIA_OFFERS,
+        } as LandingPageSettings;
       }
 
-      const settings: Record<string, string> = {};
-      data?.forEach((item: any) => {
-        if (!settings[item.setting_key]) {
-          settings[item.setting_key] = item.setting_value;
-        }
+      // Deduplicate by key (first occurrence wins)
+      const seen = new Set<string>();
+      const deduped = data.filter((item: any) => {
+        if (seen.has(item.setting_key)) return false;
+        seen.add(item.setting_key);
+        return true;
       });
 
-      return {
-        ...DEFAULT_PLANS_LINKS,
-        ...DEFAULT_PLANS_TEXTS,
-        ...settings,
-      } as LandingPageSettings;
+      return parseSettings(deduped);
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -119,17 +157,18 @@ export function useSaveLandingPageSettings() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (settings: Record<string, string>) => {
+    mutationFn: async (settings: Record<string, any>) => {
       if (!user) throw new Error('Not authenticated');
 
       for (const [key, value] of Object.entries(settings)) {
+        const settingValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
         const { error } = await supabase
           .from('landing_page_settings')
           .upsert(
             {
               user_id: user.id,
               setting_key: key,
-              setting_value: value,
+              setting_value: settingValue,
             },
             {
               onConflict: 'user_id,setting_key',
