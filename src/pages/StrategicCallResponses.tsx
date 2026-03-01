@@ -70,8 +70,8 @@ export default function StrategicCallResponses() {
       if (formattedPhone.startsWith('0')) formattedPhone = formattedPhone.substring(1);
       if (!formattedPhone.startsWith('55')) formattedPhone = '55' + formattedPhone;
 
-      await supabase.functions.invoke('send-whatsapp', {
-        body: { phone: formattedPhone, message },
+      await supabase.functions.invoke('send-strategic-call-whatsapp', {
+        body: { phone: formattedPhone, message, respondentName: contact.name, callId },
       });
 
       toast.success('Link de agendamento enviado via WhatsApp!');
