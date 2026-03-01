@@ -34,6 +34,128 @@ async function sendZapi(phone: string, message: string) {
   return result;
 }
 
+// ─── Google Calendar + Meet ─────────────────────────────────────────────────
+async function refreshGoogleToken(
+  refreshToken: string,
+  clientId: string,
+  clientSecret: string,
+  supabase: any,
+  userId: string
+): Promise<{ success: boolean; access_token?: string; error?: string }> {
+  try {
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+    const tokenData = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokenData.access_token) {
+      if (tokenData.error === 'invalid_grant') {
+        await supabase.from('google_oauth_connections').update({
+          access_token: null, token_expires_at: null, updated_at: new Date().toISOString(),
+        }).eq('user_id', userId);
+      }
+      return { success: false, error: tokenData.error_description || 'Token refresh failed' };
+    }
+    const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000);
+    await supabase.from('google_oauth_connections').update({
+      access_token: tokenData.access_token,
+      token_expires_at: expiresAt.toISOString(),
+      ...(tokenData.refresh_token && { refresh_token: tokenData.refresh_token }),
+      updated_at: new Date().toISOString(),
+    }).eq('user_id', userId);
+    return { success: true, access_token: tokenData.access_token };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+async function getGoogleAccessToken(supabase: any, userId: string): Promise<string | null> {
+  const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
+  const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
+  if (!clientId || !clientSecret) return null;
+
+  const { data: conn } = await supabase
+    .from('google_oauth_connections')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (!conn?.access_token || !conn?.refresh_token) return null;
+
+  const TOKEN_BUFFER = 5 * 60 * 1000;
+  const expiresAt = conn.token_expires_at ? new Date(conn.token_expires_at).getTime() : 0;
+  if (expiresAt < Date.now() + TOKEN_BUFFER) {
+    const res = await refreshGoogleToken(conn.refresh_token, clientId, clientSecret, supabase, userId);
+    return res.success ? res.access_token! : null;
+  }
+  return conn.access_token;
+}
+
+async function createCalendarEventForBooking(
+  supabase: any,
+  booking: any,
+  linkTitle: string,
+  accessToken: string
+): Promise<{ eventId?: string; meetLink?: string }> {
+  const timezone = 'America/Sao_Paulo';
+  const bookingTime = booking.booking_time.length === 5 ? `${booking.booking_time}:00` : booking.booking_time;
+  const [h, m] = bookingTime.split(':').map(Number);
+  const endMin = h * 60 + m + (booking.duration_minutes || 30);
+  const endH = Math.floor(endMin / 60) % 24;
+  const endM = endMin % 60;
+  const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:00`;
+
+  const startDT = `${booking.booking_date}T${bookingTime}`;
+  const endDT = `${booking.booking_date}T${endTime}`;
+
+  const eventData = {
+    summary: `Call - ${booking.lead_name || 'Lead'}`,
+    description: `Call "${linkTitle}"\nNome: ${booking.lead_name || 'N/A'}\nEmail: ${booking.lead_email || 'N/A'}\nTelefone: ${booking.lead_phone || 'N/A'}`,
+    start: { dateTime: startDT, timeZone: timezone },
+    end: { dateTime: endDT, timeZone: timezone },
+    conferenceData: {
+      createRequest: {
+        requestId: crypto.randomUUID(),
+        conferenceSolutionKey: { type: 'hangoutsMeet' },
+      },
+    },
+    reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 15 }] },
+    attendees: booking.lead_email ? [{ email: booking.lead_email, displayName: booking.lead_name || '' }] : undefined,
+  };
+
+  const res = await fetch(
+    'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=none',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(eventData),
+    }
+  );
+  const created = await res.json();
+  if (!res.ok) {
+    console.error('[call-reminders] Google Calendar error:', created);
+    return {};
+  }
+
+  const meetLink = created.conferenceData?.entryPoints?.find((ep: any) => ep.entryPointType === 'video')?.uri || created.hangoutLink || null;
+
+  // Persist on booking
+  await supabase.from('call_bookings').update({
+    google_calendar_event_id: created.id,
+    meeting_link: meetLink,
+  }).eq('id', booking.id);
+
+  console.log('[call-reminders] Calendar event created:', created.id, 'Meet:', meetLink);
+  return { eventId: created.id, meetLink: meetLink || undefined };
+}
+
+// ─── Main Handler ───────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -45,12 +167,11 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json().catch(() => ({}));
-    const mode = body.mode || 'reminders'; // 'confirmation' | 'reminders'
+    const mode = body.mode || 'reminders';
 
     const results: { id: string; type: string; success: boolean; error?: string }[] = [];
 
     if (mode === 'confirmation') {
-      // Send confirmation message for a specific booking
       const { bookingId } = body;
       if (!bookingId) throw new Error('bookingId is required for confirmation mode');
 
@@ -63,8 +184,22 @@ Deno.serve(async (req) => {
       if (bErr || !booking) throw new Error('Booking not found');
 
       const link = (booking as any).call_scheduling_links;
+
+      // ── Step 1: Create Google Calendar event with Meet ──
+      let meetLink = booking.meeting_link || link?.meeting_link || '';
+      const accessToken = await getGoogleAccessToken(supabase, link.user_id);
+      if (accessToken) {
+        const calResult = await createCalendarEventForBooking(supabase, booking, link?.title || '', accessToken);
+        if (calResult.meetLink) {
+          meetLink = calResult.meetLink;
+        }
+      } else {
+        console.log('[call-reminders] Google OAuth not available, skipping calendar event');
+      }
+
+      // ── Step 2: Send WhatsApp confirmation ──
       if (!booking.lead_phone) {
-        return new Response(JSON.stringify({ success: false, error: 'No phone' }), {
+        return new Response(JSON.stringify({ success: true, meetLink, note: 'No phone, skipped WhatsApp' }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -78,7 +213,7 @@ Deno.serve(async (req) => {
         data_horario: `${formattedDate} às ${formattedTime}`,
         data: formattedDate,
         horario: formattedTime,
-        link_call: booking.meeting_link || link?.meeting_link || '',
+        link_call: meetLink,
         responsavel: 'Rogers Feitosa',
         titulo: link?.title || '',
       };
@@ -105,7 +240,6 @@ Deno.serve(async (req) => {
       // CRON MODE: send reminders for upcoming bookings
       const now = new Date();
 
-      // Define reminder windows
       const windows = [
         { type: 'reminder_24h', hoursAhead: [23, 25], sentCol: 'reminder_24h_sent_at', enableCol: 'send_reminder_24h', templateCol: 'reminder_24h_template' },
         { type: 'reminder_2h', hoursAhead: [1.75, 2.25], sentCol: 'reminder_2h_sent_at', enableCol: 'send_reminder_2h', templateCol: 'reminder_2h_template' },

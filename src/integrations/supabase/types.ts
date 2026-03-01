@@ -997,6 +997,7 @@ export type Database = {
           confirmation_sent_at: string | null
           created_at: string
           duration_minutes: number
+          google_calendar_event_id: string | null
           id: string
           lead_email: string | null
           lead_name: string | null
@@ -1021,6 +1022,7 @@ export type Database = {
           confirmation_sent_at?: string | null
           created_at?: string
           duration_minutes?: number
+          google_calendar_event_id?: string | null
           id?: string
           lead_email?: string | null
           lead_name?: string | null
@@ -1045,6 +1047,7 @@ export type Database = {
           confirmation_sent_at?: string | null
           created_at?: string
           duration_minutes?: number
+          google_calendar_event_id?: string | null
           id?: string
           lead_email?: string | null
           lead_name?: string | null
