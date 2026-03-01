@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useStrategicCallBySlug, useStrategicCallQuestions, useSubmitStrategicCallResponse, type StrategicCallQuestion } from '@/hooks/useStrategicCalls';
 import { supabase } from '@/integrations/supabase/client';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -58,10 +59,26 @@ export default function PublicStrategicCall() {
     return 'low';
   };
 
-  // Extract name, email, phone from answers by field_name
+  // Extract name, email, phone from answers by field_name or question_type
   const getContactField = (fieldName: string) => {
-    const q = questions.find(q => q.field_name === fieldName);
-    return q ? answers[q.id] || '' : '';
+    // Try by field_name first
+    const byField = questions.find(q => q.field_name === fieldName);
+    if (byField && answers[byField.id]) return answers[byField.id];
+    // Fallback: match by question_type
+    const typeMap: Record<string, string[]> = {
+      nome: ['short_text'],
+      name: ['short_text'],
+      email: ['email'],
+      telefone: ['phone'],
+      phone: ['phone'],
+      whatsapp: ['phone'],
+    };
+    const types = typeMap[fieldName];
+    if (types) {
+      const byType = questions.find(q => types.includes(q.question_type) && answers[q.id]);
+      if (byType) return answers[byType.id];
+    }
+    return '';
   };
 
   const handleSubmit = async () => {
@@ -200,7 +217,7 @@ function QuestionInput({ question, value, onChange }: { question: StrategicCallQ
     case 'date':
       return <Input type="date" value={value || ''} onChange={e => onChange(e.target.value)} className="text-base" />;
     case 'phone':
-      return <Input type="tel" value={value || ''} onChange={e => onChange(e.target.value)} placeholder="(11) 99999-9999" className="text-base" />;
+      return <PhoneInput value={value || ''} onChange={onChange} placeholder="(11) 99999-9999" className="text-base" />;
     case 'email':
       return <Input type="email" value={value || ''} onChange={e => onChange(e.target.value)} placeholder="seu@email.com" className="text-base" />;
     case 'single_choice':
