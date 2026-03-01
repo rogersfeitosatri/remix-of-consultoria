@@ -4420,6 +4420,7 @@ export type Database = {
       }
       strategic_calls: {
         Row: {
+          admin_notify_phone: string | null
           button_color: string | null
           button_text: string | null
           closing_date: string | null
@@ -4436,6 +4437,7 @@ export type Database = {
           whatsapp_message: string | null
         }
         Insert: {
+          admin_notify_phone?: string | null
           button_color?: string | null
           button_text?: string | null
           closing_date?: string | null
@@ -4452,6 +4454,7 @@ export type Database = {
           whatsapp_message?: string | null
         }
         Update: {
+          admin_notify_phone?: string | null
           button_color?: string | null
           button_text?: string | null
           closing_date?: string | null
