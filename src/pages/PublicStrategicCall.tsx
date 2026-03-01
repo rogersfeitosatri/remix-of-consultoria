@@ -156,6 +156,31 @@ export default function PublicStrategicCall() {
     );
   }
 
+  // Handle Google Form confirmation
+  const handleGoogleFormConfirm = async () => {
+    setSubmitting(true);
+    try {
+      // Send WhatsApp notifications (respondent + admin)
+      try {
+        await supabase.functions.invoke('send-strategic-call-whatsapp', {
+          body: {
+            phone: null,
+            message: call?.whatsapp_message || null,
+            respondentName: 'Aplicante',
+            callId: call!.id,
+          },
+        });
+      } catch (wpErr) {
+        console.error('WhatsApp send error:', wpErr);
+      }
+      setPhase('done');
+    } catch (err: any) {
+      toast.error('Erro ao confirmar: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // GOOGLE FORM EMBED
   if (phase === 'wizard' && call.google_form_url) {
     return (
@@ -163,13 +188,27 @@ export default function PublicStrategicCall() {
         <div className="w-full max-w-3xl mx-auto px-4 pt-6">
           <Button variant="ghost" onClick={() => setPhase('landing')} className="mb-4">← Voltar</Button>
         </div>
-        <div className="flex-1 flex justify-center px-4 pb-8">
-          <iframe
-            src={call.google_form_url}
-            className="w-full max-w-3xl border-0 rounded-xl"
-            style={{ minHeight: '80vh' }}
-            title="Formulário"
-          />
+        <div className="flex-1 flex justify-center px-4">
+          <div className="w-full max-w-3xl space-y-4">
+            <iframe
+              src={call.google_form_url}
+              className="w-full border-0 rounded-xl"
+              style={{ minHeight: '75vh' }}
+              title="Formulário"
+            />
+            <div className="text-center pb-8 space-y-3">
+              <p className="text-sm text-muted-foreground">Após preencher e enviar o formulário acima, clique no botão abaixo para confirmar.</p>
+              <Button
+                onClick={handleGoogleFormConfirm}
+                disabled={submitting}
+                size="lg"
+                className="text-lg px-8 py-6"
+                style={{ backgroundColor: call.button_color }}
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : '✅ Já enviei o formulário'}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );
