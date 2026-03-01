@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useStrategicCall, useStrategicCallQuestions, useUpdateStrategicCall, useSaveStrategicCallQuestions, type StrategicCallQuestion } from '@/hooks/useStrategicCalls';
-import { ArrowLeft, Plus, Trash2, GripVertical, Loader2, Eye, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, GripVertical, Loader2, Eye, Save, Copy } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -162,6 +162,13 @@ export default function StrategicCallBuilder() {
             <h1 className="text-2xl font-bold text-foreground">{call.name}</h1>
             <p className="text-sm text-muted-foreground">/{call.slug}</p>
           </div>
+          <Button variant="outline" onClick={() => {
+            const url = `${window.location.origin}/call/${call.slug}`;
+            navigator.clipboard.writeText(url);
+            toast.success('Link copiado!', { description: url });
+          }} className="gap-2">
+            <Copy className="h-4 w-4" /> Copiar Link
+          </Button>
           <Button variant="outline" onClick={() => window.open(`/call/${call.slug}`, '_blank')} className="gap-2">
             <Eye className="h-4 w-4" /> Visualizar como atleta
           </Button>
