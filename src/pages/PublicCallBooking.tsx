@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCallSchedulingLinkBySlug, useCallAvailableSlots, useCreateCallBooking } from '@/hooks/useCallScheduling';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CheckCircle2, Calendar, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, addDays, startOfWeek, isBefore, isAfter, addMonths } from 'date-fns';
@@ -56,7 +57,7 @@ export default function PublicCallBooking() {
       return;
     }
     try {
-      await createBooking.mutateAsync({
+      const bookingId = await createBooking.mutateAsync({
         scheduling_link_id: link.id,
         booking_date: selectedDate,
         booking_time: selectedTime,
@@ -64,6 +65,12 @@ export default function PublicCallBooking() {
         lead_email: email || undefined,
         lead_phone: phone || undefined,
       });
+      // Fire-and-forget confirmation WhatsApp
+      if (phone && bookingId) {
+        supabase.functions.invoke('send-call-booking-reminders', {
+          body: { mode: 'confirmation', bookingId },
+        }).catch(() => {});
+      }
       setPhase('done');
     } catch {
       // error is handled by the hook

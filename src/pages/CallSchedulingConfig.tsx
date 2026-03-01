@@ -58,6 +58,13 @@ export default function CallSchedulingConfig() {
   const [weeklyAvailability, setWeeklyAvailability] = useState<WeeklySlot[]>([]);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [newBlockedDate, setNewBlockedDate] = useState('');
+  // Reminder states
+  const [sendReminder24h, setSendReminder24h] = useState(true);
+  const [sendReminder2h, setSendReminder2h] = useState(false);
+  const [sendReminder15m, setSendReminder15m] = useState(false);
+  const [reminder24hTemplate, setReminder24hTemplate] = useState('');
+  const [reminder2hTemplate, setReminder2hTemplate] = useState('');
+  const [reminder15mTemplate, setReminder15mTemplate] = useState('');
 
   useEffect(() => {
     if (link) {
@@ -77,6 +84,12 @@ export default function CallSchedulingConfig() {
       setConfirmationTemplate(link.confirmation_template || '');
       setWeeklyAvailability(Array.isArray(link.weekly_availability) ? link.weekly_availability : []);
       setBlockedDates(Array.isArray(link.blocked_dates) ? link.blocked_dates : []);
+      setSendReminder24h(link.send_reminder_24h);
+      setSendReminder2h(link.send_reminder_2h);
+      setSendReminder15m(link.send_reminder_15m);
+      setReminder24hTemplate(link.reminder_24h_template || '');
+      setReminder2hTemplate(link.reminder_2h_template || '');
+      setReminder15mTemplate(link.reminder_15m_template || '');
     }
   }, [link]);
 
@@ -100,6 +113,12 @@ export default function CallSchedulingConfig() {
       confirmation_template: confirmationTemplate || null,
       weekly_availability: weeklyAvailability,
       blocked_dates: blockedDates,
+      send_reminder_24h: sendReminder24h,
+      send_reminder_2h: sendReminder2h,
+      send_reminder_15m: sendReminder15m,
+      reminder_24h_template: reminder24hTemplate || null,
+      reminder_2h_template: reminder2hTemplate || null,
+      reminder_15m_template: reminder15mTemplate || null,
     } as any);
   };
 
@@ -351,12 +370,48 @@ export default function CallSchedulingConfig() {
             <Card>
               <CardHeader><CardTitle>Mensagem de Confirmação</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">Placeholders: {'{{nome}}'}, {'{{data_horario}}'}, {'{{link_call}}'}, {'{{responsavel}}'}</p>
-                <Textarea value={confirmationTemplate} onChange={e => setConfirmationTemplate(e.target.value)} rows={5} />
+                <p className="text-sm text-muted-foreground">Enviada automaticamente ao lead após agendar. Placeholders: {'{{nome}}'}, {'{{data_horario}}'}, {'{{link_call}}'}, {'{{responsavel}}'}, {'{{titulo}}'}</p>
+                <Textarea value={confirmationTemplate} onChange={e => setConfirmationTemplate(e.target.value)} rows={4} placeholder="Deixe vazio para usar a mensagem padrão" />
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Lembretes Automáticos</CardTitle></CardHeader>
+              <CardContent className="space-y-5">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Switch checked={sendReminder24h} onCheckedChange={setSendReminder24h} />
+                    <Label className="font-medium">Lembrete 24 horas antes</Label>
+                  </div>
+                  {sendReminder24h && (
+                    <Textarea value={reminder24hTemplate} onChange={e => setReminder24hTemplate(e.target.value)} rows={3} placeholder="Mensagem personalizada (opcional)" />
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Switch checked={sendReminder2h} onCheckedChange={setSendReminder2h} />
+                    <Label className="font-medium">Lembrete 2 horas antes</Label>
+                  </div>
+                  {sendReminder2h && (
+                    <Textarea value={reminder2hTemplate} onChange={e => setReminder2hTemplate(e.target.value)} rows={3} placeholder="Mensagem personalizada (opcional)" />
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Switch checked={sendReminder15m} onCheckedChange={setSendReminder15m} />
+                    <Label className="font-medium">Lembrete 15 minutos antes</Label>
+                  </div>
+                  {sendReminder15m && (
+                    <Textarea value={reminder15mTemplate} onChange={e => setReminder15mTemplate(e.target.value)} rows={3} placeholder="Mensagem personalizada (opcional)" />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             <Button onClick={handleSave} disabled={updateLink.isPending} className="gap-2">
-              <Save className="h-4 w-4" /> Salvar
+              <Save className="h-4 w-4" /> Salvar Notificações
             </Button>
           </TabsContent>
         </Tabs>

@@ -6,9 +6,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCallSchedulingLinks, useCreateCallSchedulingLink, useCallBookings } from '@/hooks/useCallScheduling';
 import { useStrategicCalls } from '@/hooks/useStrategicCalls';
-import { Plus, Loader2, Calendar, Link2, Copy, Settings } from 'lucide-react';
+import CallBookingsCalendar from '@/components/scheduling/CallBookingsCalendar';
+import { Plus, Loader2, Calendar, Link2, Copy, Settings, CalendarDays } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -64,47 +66,60 @@ export default function CallScheduling() {
           </Button>
         </div>
 
-        {isLoading ? (
-          <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-        ) : links.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Nenhum link de agendamento criado.</p>
-              <Button onClick={() => setShowCreate(true)} variant="outline" className="mt-4">Criar primeiro link</Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {links.map(link => (
-              <Card key={link.id} className="hover:border-primary/50 transition-colors">
-                <CardHeader className="flex flex-row items-center justify-between py-4">
-                  <div className="space-y-1 cursor-pointer flex-1" onClick={() => navigate(`/scheduling-links/${link.id}`)}>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Link2 className="h-4 w-4 text-primary" />
-                      {link.title}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">/agendar-call/{link.slug} · {link.slot_duration_minutes}min · {link.timezone}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={link.status === 'active' ? 'default' : 'secondary'}>
-                      {link.status === 'active' ? 'Ativo' : 'Inativo'}
-                    </Badge>
-                    <div className="text-sm text-muted-foreground">
-                      <BookingCount linkId={link.id} /> reservas
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => copyLink(link.slug)} title="Copiar link">
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/scheduling-links/${link.id}`)} className="gap-1">
-                      <Settings className="h-4 w-4" /> Configurar
-                    </Button>
-                  </div>
-                </CardHeader>
+        <Tabs defaultValue="links">
+          <TabsList>
+            <TabsTrigger value="links" className="gap-1.5"><Link2 className="h-4 w-4" /> Links</TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-1.5"><CalendarDays className="h-4 w-4" /> Calendário</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="links" className="space-y-4 mt-4">
+            {isLoading ? (
+              <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+            ) : links.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Nenhum link de agendamento criado.</p>
+                  <Button onClick={() => setShowCreate(true)} variant="outline" className="mt-4">Criar primeiro link</Button>
+                </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+            ) : (
+              <div className="grid gap-4">
+                {links.map(link => (
+                  <Card key={link.id} className="hover:border-primary/50 transition-colors">
+                    <CardHeader className="flex flex-row items-center justify-between py-4">
+                      <div className="space-y-1 cursor-pointer flex-1" onClick={() => navigate(`/scheduling-links/${link.id}`)}>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Link2 className="h-4 w-4 text-primary" />
+                          {link.title}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">/agendar-call/{link.slug} · {link.slot_duration_minutes}min · {link.timezone}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge variant={link.status === 'active' ? 'default' : 'secondary'}>
+                          {link.status === 'active' ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                        <div className="text-sm text-muted-foreground">
+                          <BookingCount linkId={link.id} /> reservas
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => copyLink(link.slug)} title="Copiar link">
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/scheduling-links/${link.id}`)} className="gap-1">
+                          <Settings className="h-4 w-4" /> Configurar
+                        </Button>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="calendar" className="mt-4">
+            <CallBookingsCalendar />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
