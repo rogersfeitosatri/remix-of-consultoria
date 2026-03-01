@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Save, ExternalLink, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
-import { useLandingPageSettings, useSaveLandingPageSettings, DEFAULT_PLANS_LINKS, DEFAULT_PLANS_TEXTS, LandingPageSettings } from '@/hooks/useLandingPageSettings';
+import { useLandingPageSettings, useSaveLandingPageSettings, DEFAULT_PLANS_LINKS, DEFAULT_PLANS_TEXTS, DEFAULT_CONSULTAS_OFFERS, DEFAULT_CONSULTORIA_OFFERS, LandingPageSettings, OfferItem } from '@/hooks/useLandingPageSettings';
+import { OfferItemsEditor } from './OfferItemsEditor';
 
 type EditableTexts = LandingPageSettings;
 
@@ -45,7 +46,7 @@ export function LandingPageSettingsSection() {
   const { data: settings, isLoading } = useLandingPageSettings();
   const saveMutation = useSaveLandingPageSettings();
 
-  const [texts, setTexts] = useState<EditableTexts>({ ...DEFAULT_PLANS_LINKS, ...DEFAULT_PLANS_TEXTS });
+  const [texts, setTexts] = useState<EditableTexts>({ ...DEFAULT_PLANS_LINKS, ...DEFAULT_PLANS_TEXTS, consultas_offers: DEFAULT_CONSULTAS_OFFERS, consultoria_offers: DEFAULT_CONSULTORIA_OFFERS });
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export function LandingPageSettingsSection() {
 
   const handleSave = async () => {
     try {
-      await saveMutation.mutateAsync(texts as Record<string, string>);
+      await saveMutation.mutateAsync(texts as Record<string, any>);
       toast.success('Configurações salvas com sucesso!');
       setIsDirty(false);
     } catch (error) {
@@ -70,13 +71,15 @@ export function LandingPageSettingsSection() {
     }
   };
 
-  const handleReset = (section: 'links' | 'texts' | 'all') => {
+  const handleReset = (section: 'links' | 'texts' | 'offers' | 'all') => {
     if (section === 'links') {
       setTexts(prev => ({ ...prev, ...DEFAULT_PLANS_LINKS }));
     } else if (section === 'texts') {
       setTexts(prev => ({ ...prev, ...DEFAULT_PLANS_TEXTS }));
+    } else if (section === 'offers') {
+      setTexts(prev => ({ ...prev, consultas_offers: DEFAULT_CONSULTAS_OFFERS, consultoria_offers: DEFAULT_CONSULTORIA_OFFERS }));
     } else {
-      setTexts({ ...DEFAULT_PLANS_LINKS, ...DEFAULT_PLANS_TEXTS });
+      setTexts({ ...DEFAULT_PLANS_LINKS, ...DEFAULT_PLANS_TEXTS, consultas_offers: DEFAULT_CONSULTAS_OFFERS, consultoria_offers: DEFAULT_CONSULTORIA_OFFERS });
     }
     setIsDirty(true);
   };
@@ -133,6 +136,7 @@ export function LandingPageSettingsSection() {
           <TabsList className="flex-wrap h-auto gap-1 mb-4">
             <TabsTrigger value="hero">Hero</TabsTrigger>
             <TabsTrigger value="planos">Planos</TabsTrigger>
+            <TabsTrigger value="ofertas">Ofertas</TabsTrigger>
             <TabsTrigger value="timeline">Timeline</TabsTrigger>
             <TabsTrigger value="cta">CTA Final</TabsTrigger>
             <TabsTrigger value="links">Links</TabsTrigger>
@@ -190,6 +194,28 @@ export function LandingPageSettingsSection() {
                 <FieldRow label="Item 3" value={texts.consultas_item_3} onChange={v => update('consultas_item_3', v)} multiline />
                 <FieldRow label="Item 4" value={texts.consultas_item_4} onChange={v => update('consultas_item_4', v)} multiline />
               </div>
+            </div>
+          </TabsContent>
+
+          {/* ── Ofertas ── */}
+          <TabsContent value="ofertas" className="space-y-6">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-muted-foreground">Itens de oferta exibidos na timeline de cada plano (arraste para reordenar)</p>
+              <Button variant="ghost" size="sm" onClick={() => handleReset('offers')} className="text-xs h-7">
+                <RotateCcw className="h-3 w-3 mr-1" /> Restaurar padrão
+              </Button>
+            </div>
+            <OfferItemsEditor
+              label="Plano Consultas"
+              items={texts.consultas_offers || []}
+              onChange={(items) => { setTexts(prev => ({ ...prev, consultas_offers: items })); setIsDirty(true); }}
+            />
+            <div className="border-t pt-4">
+              <OfferItemsEditor
+                label="Plano Consultoria"
+                items={texts.consultoria_offers || []}
+                onChange={(items) => { setTexts(prev => ({ ...prev, consultoria_offers: items })); setIsDirty(true); }}
+              />
             </div>
           </TabsContent>
 
