@@ -21,7 +21,8 @@ import {
   ClipboardCheck,
   TrendingUp,
   Snowflake,
-  Play
+  Play,
+  RefreshCw
 } from 'lucide-react';
 import { useClients, useDeleteClient, useUpdateClient } from '@/hooks/useClients';
 import { useSchedulingSettings } from '@/hooks/useScheduling';
@@ -38,6 +39,8 @@ import { AnamneseResponseSection } from '@/components/admin/AnamneseResponseSect
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
 import { ClientForm } from '@/components/clients/ClientForm';
 import { ChangeAthletePasswordDialog } from '@/components/clients/ChangeAthletePasswordDialog';
+import { RenewPlanDialog } from '@/components/clients/RenewPlanDialog';
+import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
 import { AthleteCheckinSchedules } from '@/components/admin/AthleteCheckinSchedules';
 import { useQuery } from '@tanstack/react-query';
 import { useFreezePlan } from '@/hooks/useFreezePlan';
@@ -66,6 +69,7 @@ export default function ClientDetail() {
   
   const [showEditForm, setShowEditForm] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [showRenewDialog, setShowRenewDialog] = useState(false);
   const [sendingCheckin, setSendingCheckin] = useState(false);
   const [sendingBooking, setSendingBooking] = useState(false);
   const [sendingCredentials, setSendingCredentials] = useState(false);
@@ -418,6 +422,15 @@ export default function ClientDetail() {
               </Button>
             )}
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowRenewDialog(true)}
+              className="gap-1 text-primary border-primary/30 hover:bg-primary/10"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Renovar Plano
+            </Button>
+            <Button
               size="sm"
               onClick={() => setShowEditForm(true)}
               className="gap-1 text-foreground"
@@ -453,6 +466,9 @@ export default function ClientDetail() {
         
         {/* Automação de Check-ins */}
         <AthleteCheckinSchedules clientId={client.id} />
+        
+        {/* Histórico de Planos */}
+        <PlanHistorySection clientId={client.id} />
         
         {/* Tabs */}
         <Tabs defaultValue="anamnese" className="space-y-4">
@@ -530,6 +546,15 @@ export default function ClientDetail() {
           clientId={client.id}
           clientEmail={client.email}
           clientName={client.name}
+        />
+      )}
+      
+      {/* Renew Plan Dialog */}
+      {showRenewDialog && (
+        <RenewPlanDialog
+          open={showRenewDialog}
+          onOpenChange={setShowRenewDialog}
+          client={client}
         />
       )}
     </Layout>

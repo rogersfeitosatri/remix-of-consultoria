@@ -1438,6 +1438,80 @@ export type Database = {
           },
         ]
       }
+      client_plan_history: {
+        Row: {
+          checkin_frequency: string | null
+          client_id: string
+          consultation_count: number | null
+          consultation_frequency: string | null
+          created_at: string
+          end_date: string
+          has_agenda_access: boolean | null
+          has_checkin: boolean | null
+          has_consultations: boolean | null
+          id: string
+          monthly_value: number
+          notes: string | null
+          payment_type: string | null
+          plan_duration: string | null
+          plan_type: string
+          renewed_at: string
+          service_type: string
+          start_date: string
+          user_id: string
+        }
+        Insert: {
+          checkin_frequency?: string | null
+          client_id: string
+          consultation_count?: number | null
+          consultation_frequency?: string | null
+          created_at?: string
+          end_date: string
+          has_agenda_access?: boolean | null
+          has_checkin?: boolean | null
+          has_consultations?: boolean | null
+          id?: string
+          monthly_value?: number
+          notes?: string | null
+          payment_type?: string | null
+          plan_duration?: string | null
+          plan_type: string
+          renewed_at?: string
+          service_type: string
+          start_date: string
+          user_id: string
+        }
+        Update: {
+          checkin_frequency?: string | null
+          client_id?: string
+          consultation_count?: number | null
+          consultation_frequency?: string | null
+          created_at?: string
+          end_date?: string
+          has_agenda_access?: boolean | null
+          has_checkin?: boolean | null
+          has_consultations?: boolean | null
+          id?: string
+          monthly_value?: number
+          notes?: string | null
+          payment_type?: string | null
+          plan_duration?: string | null
+          plan_type?: string
+          renewed_at?: string
+          service_type?: string
+          start_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_plan_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           admin_attention_points: string | null
