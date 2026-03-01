@@ -100,21 +100,19 @@ export default function PublicStrategicCall() {
         classification,
       });
 
-      // Send WhatsApp if phone is available
-      if (phone && call?.whatsapp_message) {
-        try {
-          const formattedPhone = phone.replace(/\D/g, '');
-          await supabase.functions.invoke('send-strategic-call-whatsapp', {
-            body: {
-              phone: formattedPhone,
-              message: call.whatsapp_message,
-              respondentName: name,
-              callId: call.id,
-            },
-          });
-        } catch (wpErr) {
-          console.error('WhatsApp send error:', wpErr);
-        }
+      // Send WhatsApp to respondent + admin notification
+      try {
+        const formattedPhone = phone ? phone.replace(/\D/g, '') : '';
+        await supabase.functions.invoke('send-strategic-call-whatsapp', {
+          body: {
+            phone: formattedPhone || null,
+            message: call?.whatsapp_message || null,
+            respondentName: name,
+            callId: call.id,
+          },
+        });
+      } catch (wpErr) {
+        console.error('WhatsApp send error:', wpErr);
       }
 
       setPhase('done');
