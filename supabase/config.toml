@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.send-strategic-call-whatsapp]
 verify_jwt = false
+
+[functions.send-call-booking-reminders]
+verify_jwt = false
