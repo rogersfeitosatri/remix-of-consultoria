@@ -156,6 +156,25 @@ export default function PublicStrategicCall() {
     );
   }
 
+  // GOOGLE FORM EMBED
+  if (phase === 'wizard' && call.google_form_url) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="w-full max-w-3xl mx-auto px-4 pt-6">
+          <Button variant="ghost" onClick={() => setPhase('landing')} className="mb-4">← Voltar</Button>
+        </div>
+        <div className="flex-1 flex justify-center px-4 pb-8">
+          <iframe
+            src={call.google_form_url}
+            className="w-full max-w-3xl border-0 rounded-xl"
+            style={{ minHeight: '80vh' }}
+            title="Formulário"
+          />
+        </div>
+      </div>
+    );
+  }
+
   // WIZARD
   if (phase === 'wizard' && currentQ) {
     return (

@@ -52,6 +52,7 @@ export default function StrategicCallBuilder() {
   const [whatsappMsg, setWhatsappMsg] = useState('');
   const [status, setStatus] = useState('active');
   const [closingDate, setClosingDate] = useState('');
+  const [googleFormUrl, setGoogleFormUrl] = useState('');
 
   // Questions state
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
@@ -65,6 +66,7 @@ export default function StrategicCallBuilder() {
       setWhatsappMsg(call.whatsapp_message || '');
       setStatus(call.status);
       setClosingDate(call.closing_date ? call.closing_date.split('T')[0] : '');
+      setGoogleFormUrl(call.google_form_url || '');
     }
   }, [call]);
 
@@ -123,7 +125,8 @@ export default function StrategicCallBuilder() {
       whatsapp_message: whatsappMsg,
       status,
       closing_date: closingDate || null,
-    });
+      google_form_url: googleFormUrl || null,
+    } as any);
   };
 
   const handleSaveQuestions = () => {
@@ -227,6 +230,17 @@ export default function StrategicCallBuilder() {
                       <Input value={buttonColor} onChange={e => setButtonColor(e.target.value)} className="flex-1" />
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Google Forms (opcional)</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">Se preenchido, o formulário do Google Forms será exibido no lugar das perguntas internas.</p>
+                <div>
+                  <Label>URL do Google Forms (embed)</Label>
+                  <Input value={googleFormUrl} onChange={e => setGoogleFormUrl(e.target.value)} placeholder="https://docs.google.com/forms/d/e/.../viewform?embedded=true" />
                 </div>
               </CardContent>
             </Card>

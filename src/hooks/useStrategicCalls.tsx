@@ -16,6 +16,7 @@ export interface StrategicCall {
   button_color: string;
   page_image_url: string | null;
   whatsapp_message: string;
+  google_form_url: string | null;
   created_at: string;
   updated_at: string;
 }

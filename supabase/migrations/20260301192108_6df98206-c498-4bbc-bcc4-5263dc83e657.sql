@@ -1,0 +1,1 @@
+ALTER TABLE public.strategic_calls ADD COLUMN google_form_url text DEFAULT null;
