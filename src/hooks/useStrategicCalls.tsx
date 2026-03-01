@@ -191,13 +191,11 @@ export function useSaveStrategicCallQuestions() {
 export function useSubmitStrategicCallResponse() {
   return useMutation({
     mutationFn: async (input: Omit<StrategicCallResponse, 'id' | 'submitted_at' | 'whatsapp_sent'>) => {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('strategic_call_responses')
-        .insert(input as any)
-        .select()
-        .single();
+        .insert(input as any);
       if (error) throw error;
-      return data;
+      return true;
     },
   });
 }
