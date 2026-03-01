@@ -4114,6 +4114,151 @@ export type Database = {
           },
         ]
       }
+      strategic_call_questions: {
+        Row: {
+          call_id: string
+          created_at: string
+          field_name: string | null
+          id: string
+          is_required: boolean
+          options: Json | null
+          order_index: number
+          question_text: string
+          question_type: string
+          score_map: Json | null
+        }
+        Insert: {
+          call_id: string
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          is_required?: boolean
+          options?: Json | null
+          order_index?: number
+          question_text: string
+          question_type?: string
+          score_map?: Json | null
+        }
+        Update: {
+          call_id?: string
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          is_required?: boolean
+          options?: Json | null
+          order_index?: number
+          question_text?: string
+          question_type?: string
+          score_map?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategic_call_questions_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategic_call_responses: {
+        Row: {
+          answers: Json
+          call_id: string
+          classification: string | null
+          id: string
+          respondent_email: string | null
+          respondent_name: string | null
+          respondent_phone: string | null
+          submitted_at: string
+          total_score: number | null
+          whatsapp_sent: boolean | null
+        }
+        Insert: {
+          answers?: Json
+          call_id: string
+          classification?: string | null
+          id?: string
+          respondent_email?: string | null
+          respondent_name?: string | null
+          respondent_phone?: string | null
+          submitted_at?: string
+          total_score?: number | null
+          whatsapp_sent?: boolean | null
+        }
+        Update: {
+          answers?: Json
+          call_id?: string
+          classification?: string | null
+          id?: string
+          respondent_email?: string | null
+          respondent_name?: string | null
+          respondent_phone?: string | null
+          submitted_at?: string
+          total_score?: number | null
+          whatsapp_sent?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategic_call_responses_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "strategic_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategic_calls: {
+        Row: {
+          button_color: string | null
+          button_text: string | null
+          closing_date: string | null
+          created_at: string
+          id: string
+          name: string
+          page_image_url: string | null
+          page_text: string | null
+          page_title: string | null
+          slug: string
+          status: string
+          updated_at: string
+          user_id: string
+          whatsapp_message: string | null
+        }
+        Insert: {
+          button_color?: string | null
+          button_text?: string | null
+          closing_date?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          page_image_url?: string | null
+          page_text?: string | null
+          page_title?: string | null
+          slug: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          whatsapp_message?: string | null
+        }
+        Update: {
+          button_color?: string | null
+          button_text?: string | null
+          closing_date?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          page_image_url?: string | null
+          page_text?: string | null
+          page_title?: string | null
+          slug?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          whatsapp_message?: string | null
+        }
+        Relationships: []
+      }
       support_materials: {
         Row: {
           category: string
