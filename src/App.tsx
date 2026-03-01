@@ -55,7 +55,7 @@ const PlansLanding = lazy(() => import("./pages/PlansLanding"));
 const PublicMetabolicScreening = lazy(() => import("./pages/PublicMetabolicScreening"));
 const StrategicCallBuilder = lazy(() => import("./pages/StrategicCallBuilder"));
 const StrategicCallResponses = lazy(() => import("./pages/StrategicCallResponses"));
-import PublicStrategicCall from "./pages/PublicStrategicCall";
+const PublicStrategicCall = lazy(() => import("./pages/PublicStrategicCall"));
 const CallSchedulingConfig = lazy(() => import("./pages/CallSchedulingConfig"));
 const PublicCallBooking = lazy(() => import("./pages/PublicCallBooking"));
 
