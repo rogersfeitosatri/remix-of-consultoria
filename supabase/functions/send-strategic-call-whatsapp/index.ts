@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { phone, message, respondentName, callId } = await req.json();
+    const { phone, message, respondentName, callId, skipAdminNotification } = await req.json();
 
     const zapiInstanceId = Deno.env.get('ZAPI_INSTANCE_ID');
     const zapiToken = Deno.env.get('ZAPI_TOKEN');
@@ -58,8 +58,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2) Always send admin notification when callId is provided
-    if (callId) {
+    // 2) Send admin notification only for new applications (not scheduling link sends)
+    if (callId && !skipAdminNotification) {
       try {
         const { data: callData } = await supabase
           .from('strategic_calls')
