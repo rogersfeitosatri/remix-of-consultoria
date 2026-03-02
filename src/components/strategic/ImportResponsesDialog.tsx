@@ -27,14 +27,14 @@ export default function ImportResponsesDialog({ open, onOpenChange, callId, onSu
   const [columns, setColumns] = useState<string[]>([]);
   const [rows, setRows] = useState<Record<string, any>[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({ name: '', email: '', phone: '' });
-  const [result, setResult] = useState({ imported: 0, skipped: 0 });
+  const [result, setResult] = useState({ imported: 0, skipped: 0, duplicates: 0 });
 
   const reset = () => {
     setStep('upload');
     setColumns([]);
     setRows([]);
     setMapping({ name: '', email: '', phone: '' });
-    setResult({ imported: 0, skipped: 0 });
+    setResult({ imported: 0, skipped: 0, duplicates: 0 });
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,10 +98,28 @@ export default function ImportResponsesDialog({ open, onOpenChange, callId, onSu
     setStep('importing');
     let imported = 0;
     let skipped = 0;
+    let duplicates = 0;
 
     const answerColumns = columns.filter(
       c => c !== mapping.name && c !== mapping.email && c !== mapping.phone
       && !c.toLowerCase().includes('carimbo') && !c.toLowerCase().includes('timestamp')
+    );
+
+    // Fetch existing responses for this call to detect duplicates
+    const { data: existingResponses } = await supabase
+      .from('strategic_call_responses')
+      .select('respondent_name, respondent_email, respondent_phone')
+      .eq('call_id', callId);
+
+    const existingSet = new Set(
+      (existingResponses || []).map(r => {
+        const parts = [
+          (r.respondent_name || '').trim().toLowerCase(),
+          (r.respondent_email || '').trim().toLowerCase(),
+          (r.respondent_phone || '').trim(),
+        ];
+        return parts.join('|');
+      })
     );
 
     for (const row of rows) {
@@ -112,6 +130,13 @@ export default function ImportResponsesDialog({ open, onOpenChange, callId, onSu
 
         if (!name && !email && !phone) {
           skipped++;
+          continue;
+        }
+
+        // Check duplicate
+        const key = [name.toLowerCase(), email.toLowerCase(), phone].join('|');
+        if (existingSet.has(key)) {
+          duplicates++;
           continue;
         }
 
@@ -140,13 +165,14 @@ export default function ImportResponsesDialog({ open, onOpenChange, callId, onSu
           skipped++;
         } else {
           imported++;
+          existingSet.add(key); // prevent duplicates within the same file
         }
       } catch {
         skipped++;
       }
     }
 
-    setResult({ imported, skipped });
+    setResult({ imported, skipped, duplicates });
     setStep('done');
     if (imported > 0) onSuccess();
   };
@@ -235,6 +261,9 @@ export default function ImportResponsesDialog({ open, onOpenChange, callId, onSu
           <div className="flex flex-col items-center py-6 gap-3">
             <CheckCircle2 className="h-10 w-10 text-green-500" />
             <p className="text-sm font-medium">{result.imported} respostas importadas com sucesso!</p>
+            {result.duplicates > 0 && (
+              <p className="text-xs text-muted-foreground">{result.duplicates} já existentes (ignoradas)</p>
+            )}
             {result.skipped > 0 && (
               <p className="text-xs text-muted-foreground">{result.skipped} linhas ignoradas (vazias ou com erro)</p>
             )}
