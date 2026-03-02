@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useStrategicCall, useStrategicCallResponses, useStrategicCallQuestions, type StrategicCallResponse } from '@/hooks/useStrategicCalls';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Loader2, Eye, Send, Upload } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, Send, Upload, Trash2 } from 'lucide-react';
 import ImportResponsesDialog from '@/components/strategic/ImportResponsesDialog';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -35,6 +36,25 @@ export default function StrategicCallResponses() {
   const [sendingLinkTo, setSendingLinkTo] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const queryClient = useQueryClient();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteResponse = async (id: string) => {
+    setDeletingId(id);
+    try {
+      const { error } = await supabase
+        .from('strategic_call_responses')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['strategic-call-responses', callId] });
+      toast.success('Resposta excluída com sucesso!');
+      if (selected?.id === id) setSelected(null);
+    } catch (err: any) {
+      toast.error('Erro ao excluir: ' + err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // Fetch scheduling link associated with this strategic call
   const { data: schedulingLink } = useQuery({
@@ -184,6 +204,27 @@ export default function StrategicCallResponses() {
                               {sendingLinkTo === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 text-green-600" />}
                             </Button>
                           )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" title="Excluir resposta" disabled={deletingId === r.id}>
+                                {deletingId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Excluir resposta?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Esta ação não pode ser desfeita. A resposta de {contact.name || 'este respondente'} será removida permanentemente.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteResponse(r.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </TableCell>
                       </TableRow>
                     );
