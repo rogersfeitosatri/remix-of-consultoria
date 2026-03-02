@@ -218,17 +218,37 @@ export default function StrategicCallResponses() {
                 </Button>
               )}
               <div className="space-y-3">
-                {questions.map(q => {
-                  const answer = (selected.answers as Record<string, any>)?.[q.id];
-                  return (
-                    <div key={q.id} className="border-b border-border pb-3">
-                      <p className="text-sm font-medium text-foreground">{q.question_text}</p>
+                {(() => {
+                  const answers = selected.answers as Record<string, any> | null;
+                  if (!answers) return <p className="text-sm text-muted-foreground">(sem respostas)</p>;
+
+                  // Check if answers are keyed by question IDs or by column names
+                  const hasQuestionIdKeys = questions.length > 0 && questions.some(q => answers[q.id] !== undefined);
+
+                  if (hasQuestionIdKeys) {
+                    return questions.map(q => {
+                      const answer = answers[q.id];
+                      return (
+                        <div key={q.id} className="border-b border-border pb-3">
+                          <p className="text-sm font-medium text-foreground">{q.question_text}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {Array.isArray(answer) ? answer.join(', ') : answer || '(sem resposta)'}
+                          </p>
+                        </div>
+                      );
+                    });
+                  }
+
+                  // Imported responses: answers keyed by column name
+                  return Object.entries(answers).map(([col, val]) => (
+                    <div key={col} className="border-b border-border pb-3">
+                      <p className="text-sm font-medium text-foreground">{col}</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {Array.isArray(answer) ? answer.join(', ') : answer || '(sem resposta)'}
+                        {Array.isArray(val) ? val.join(', ') : String(val || '(sem resposta)')}
                       </p>
                     </div>
-                  );
-                })}
+                  ));
+                })()}
               </div>
             </div>
           )}
