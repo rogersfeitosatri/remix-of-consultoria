@@ -37,6 +37,51 @@ export default function StrategicCallResponses() {
   const [importOpen, setImportOpen] = useState(false);
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [removingDuplicates, setRemovingDuplicates] = useState(false);
+
+  const handleRemoveDuplicates = async () => {
+    if (responses.length === 0) return;
+    setRemovingDuplicates(true);
+    try {
+      const seen = new Map<string, string>();
+      const idsToDelete: string[] = [];
+
+      for (const r of responses) {
+        const contact = getContactFromAnswers(r);
+        // Build a dedup key from normalized name + email + phone + answers JSON
+        const key = [
+          (contact.name || '').trim().toLowerCase(),
+          (contact.email || '').trim().toLowerCase(),
+          (contact.phone || '').replace(/\D/g, ''),
+          JSON.stringify(r.answers || {}),
+        ].join('|');
+
+        if (seen.has(key)) {
+          idsToDelete.push(r.id);
+        } else {
+          seen.set(key, r.id);
+        }
+      }
+
+      if (idsToDelete.length === 0) {
+        toast.info('Nenhuma resposta duplicada encontrada.');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('strategic_call_responses')
+        .delete()
+        .in('id', idsToDelete);
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['strategic-call-responses', callId] });
+      toast.success(`${idsToDelete.length} resposta(s) duplicada(s) removida(s)!`);
+    } catch (err: any) {
+      toast.error('Erro ao remover duplicatas: ' + err.message);
+    } finally {
+      setRemovingDuplicates(false);
+    }
+  };
 
   const handleDeleteResponse = async (id: string) => {
     setDeletingId(id);
@@ -143,10 +188,16 @@ export default function StrategicCallResponses() {
             <p className="text-sm text-muted-foreground">{responses.length} aplicações recebidas</p>
           </div>
         </div>
-        <Button variant="outline" onClick={() => setImportOpen(true)}>
-          <Upload className="h-4 w-4 mr-2" />
-          Importar do Google Forms
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleRemoveDuplicates} disabled={removingDuplicates || responses.length === 0}>
+            {removingDuplicates ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+            Remover duplicatas
+          </Button>
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Importar do Google Forms
+          </Button>
+        </div>
         </div>
 
         {isLoading ? (
