@@ -232,11 +232,15 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
         meetStatus = 'failed';
       }
       
-      // Only send WhatsApp if Meet was successfully created
-      if (sendWhatsApp && selectedClient && meetLink && meetStatus === 'created') {
+      // Send WhatsApp confirmation (with or without Meet link)
+      if (sendWhatsApp && selectedClient) {
         try {
           const formattedDate = format(selectedDate, "dd 'de' MMMM", { locale: ptBR });
-          const message = `✅ Consulta agendada!\n\n📅 Data: ${formattedDate}\n⏰ Horário: ${selectedTime}\n\n🎥 Link da videochamada:\n${meetLink}\n\nAté lá!`;
+          let message = `✅ Consulta agendada!\n\n📅 Data: ${formattedDate}\n⏰ Horário: ${selectedTime}`;
+          if (meetLink) {
+            message += `\n\n🎥 Link da videochamada:\n${meetLink}`;
+          }
+          message += `\n\nAté lá!`;
 
           await supabase.functions.invoke('send-whatsapp', {
             body: {
@@ -249,9 +253,6 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
           console.error('WhatsApp send failed:', whatsappError);
           toast.success('Consulta agendada! (WhatsApp falhou)');
         }
-      } else if (sendWhatsApp && meetStatus === 'failed') {
-        // Meet failed - warn admin to reprocess
-        toast.warning('Consulta agendada, mas Meet não foi gerado. Reprocesse na tela de detalhes.');
       } else {
         toast.success('Consulta agendada com sucesso!');
       }
