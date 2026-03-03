@@ -48,7 +48,10 @@ export default function PublicCallBooking() {
     enabled: !!link?.strategic_call_id,
   });
 
-  const isClosedByLinkedCall = linkedCall?.closing_date && new Date(linkedCall.closing_date + 'T23:59:59') < new Date();
+  const isClosedByLinkedCall = linkedCall && (
+    linkedCall.status === 'inactive' ||
+    (linkedCall.closing_date && new Date(linkedCall.closing_date + 'T23:59:59') < new Date())
+  );
 
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));

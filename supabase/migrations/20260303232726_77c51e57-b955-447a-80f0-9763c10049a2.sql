@@ -1,0 +1,1 @@
+UPDATE public.call_scheduling_links SET status = 'inactive', updated_at = now() WHERE strategic_call_id = 'c2daecff-a857-417a-985f-d2325ae63f8c' AND status = 'active';
