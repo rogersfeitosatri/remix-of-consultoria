@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useStrategicCall, useStrategicCallQuestions, useUpdateStrategicCall, useSaveStrategicCallQuestions, type StrategicCallQuestion } from '@/hooks/useStrategicCalls';
+import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Plus, Trash2, GripVertical, Loader2, Eye, Save, Copy } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -114,7 +115,7 @@ export default function StrategicCallBuilder() {
     setQuestions(copy.map((q, i) => ({ ...q, order_index: i })));
   };
 
-  const handleSavePage = () => {
+  const handleSavePage = async () => {
     if (!callId) return;
     updateCall.mutate({
       id: callId,
@@ -127,6 +128,14 @@ export default function StrategicCallBuilder() {
       closing_date: closingDate || null,
       google_form_url: googleFormUrl || null,
     } as any);
+
+    // Sync linked scheduling links status
+    if (status === 'inactive') {
+      await supabase
+        .from('call_scheduling_links')
+        .update({ status: 'inactive' } as any)
+        .eq('strategic_call_id', callId);
+    }
   };
 
   const handleSaveQuestions = () => {
