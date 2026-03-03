@@ -111,31 +111,32 @@ export default function ImportResponsesDialog({ open, onOpenChange, callId, onSu
       .select('respondent_name, respondent_email, respondent_phone')
       .eq('call_id', callId);
 
-    const existingSet = new Set(
-      (existingResponses || []).map(r => {
-        const parts = [
-          (r.respondent_name || '').trim().toLowerCase(),
-          (r.respondent_email || '').trim().toLowerCase(),
-          (r.respondent_phone || '').trim(),
-        ];
-        return parts.join('|');
-      })
-    );
+    // Build multiple dedup sets for robust matching
+    const existingByFull = new Set<string>();
+    const existingByName = new Set<string>();
+    (existingResponses || []).forEach(r => {
+      const n = (r.respondent_name || '').trim().toLowerCase();
+      const e = (r.respondent_email || '').trim().toLowerCase();
+      const p = (r.respondent_phone || '').replace(/\D/g, '');
+      existingByFull.add([n, e, p].join('|'));
+      if (n) existingByName.add(n);
+    });
 
     for (const row of rows) {
       try {
         const name = row[mapping.name] ? String(row[mapping.name]).trim() : '';
-        const email = mapping.email && row[mapping.email] ? String(row[mapping.email]).trim() : '';
-        const phone = formatPhone(mapping.phone ? row[mapping.phone] : '');
+        const email = mapping.email && row[mapping.email] && mapping.email !== '__none__' ? String(row[mapping.email]).trim() : '';
+        const phone = formatPhone(mapping.phone && mapping.phone !== '__none__' ? row[mapping.phone] : '');
 
         if (!name && !email && !phone) {
           skipped++;
           continue;
         }
 
-        // Check duplicate
-        const key = [name.toLowerCase(), email.toLowerCase(), phone].join('|');
-        if (existingSet.has(key)) {
+        // Check duplicate by full key or by name alone
+        const fullKey = [name.toLowerCase(), email.toLowerCase(), phone.replace(/\D/g, '')].join('|');
+        const nameKey = name.toLowerCase();
+        if (existingByFull.has(fullKey) || (nameKey && existingByName.has(nameKey))) {
           duplicates++;
           continue;
         }
@@ -165,7 +166,8 @@ export default function ImportResponsesDialog({ open, onOpenChange, callId, onSu
           skipped++;
         } else {
           imported++;
-          existingSet.add(key); // prevent duplicates within the same file
+          existingByFull.add(fullKey);
+          if (nameKey) existingByName.add(nameKey);
         }
       } catch {
         skipped++;
