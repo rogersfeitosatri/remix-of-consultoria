@@ -11,6 +11,7 @@ import { Loader2, CheckCircle2, Calendar, Clock, ChevronLeft, ChevronRight } fro
 import { toast } from 'sonner';
 import { format, addDays, startOfWeek, isBefore, isAfter, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useQuery } from '@tanstack/react-query';
 
 type Phase = 'landing' | 'calendar' | 'contact' | 'done';
 
@@ -31,6 +32,23 @@ export default function PublicCallBooking() {
 
   const { data: slots = [], isLoading: slotsLoading } = useCallAvailableSlots(link?.id, selectedDate || undefined);
   const createBooking = useCreateCallBooking();
+
+  // Fetch linked strategic call to check closing_date
+  const { data: linkedCall, isLoading: linkedCallLoading } = useQuery({
+    queryKey: ['linked-strategic-call', link?.strategic_call_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('strategic_calls')
+        .select('closing_date, status')
+        .eq('id', link!.strategic_call_id!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!link?.strategic_call_id,
+  });
+
+  const isClosedByLinkedCall = linkedCall?.closing_date && new Date(linkedCall.closing_date + 'T23:59:59') < new Date();
 
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -77,12 +95,23 @@ export default function PublicCallBooking() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || linkedCallLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   if (!link) {
     return <div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground text-lg">Página não encontrada ou inativa.</p></div>;
+  }
+
+  if (isClosedByLinkedCall) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="text-center space-y-4 max-w-md">
+          <h2 className="text-2xl font-bold text-foreground">Agendamento encerrado</h2>
+          <p className="text-muted-foreground">O período de agendamento para esta call já foi encerrado.</p>
+        </div>
+      </div>
+    );
   }
 
   // DONE

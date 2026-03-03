@@ -143,6 +143,19 @@ export default function PublicStrategicCall() {
     return <div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground text-lg">Call não encontrada ou encerrada.</p></div>;
   }
 
+  // Check if call is past closing date
+  const isClosedByDate = call.closing_date && new Date(call.closing_date + 'T23:59:59') < new Date();
+  if (isClosedByDate) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="text-center space-y-4 max-w-md">
+          <h2 className="text-2xl font-bold text-foreground">Inscrições encerradas</h2>
+          <p className="text-muted-foreground">O período de inscrição para esta call já foi encerrado.</p>
+        </div>
+      </div>
+    );
+  }
+
   // DONE
   if (phase === 'done') {
     return (
