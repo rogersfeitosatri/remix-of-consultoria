@@ -2,15 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { UtensilsCrossed, ChevronRight, Loader2, Clock, AlertTriangle, CheckCircle, Link2Off } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { UtensilsCrossed, ChevronRight, ChevronDown, Loader2, Clock, AlertTriangle, CheckCircle, Link2Off } from 'lucide-react';
 import { usePendingMealPlans, useMarkMealPlanSent, useUnlinkedAnamneseForMealPlan, MealPlanStatusWithClient, UnlinkedAnamneseItem } from '@/hooks/useMealPlanStatus';
 import { useNavigate } from 'react-router-dom';
 import { ptBR } from 'date-fns/locale';
 import { format, parseISO, isWeekend, addDays } from 'date-fns';
+import { useState } from 'react';
 
-/**
- * Calculate business days elapsed since a date (excludes weekends).
- */
 function businessDaysSince(fromDate: Date): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -71,6 +70,7 @@ export function PendingMealPlansAlert() {
   const { data: pendingPlans = [], isLoading: loadingPlans } = usePendingMealPlans();
   const { data: unlinkedAnamnese = [], isLoading: loadingUnlinked } = useUnlinkedAnamneseForMealPlan();
   const markAsSent = useMarkMealPlanSent();
+  const [isOpen, setIsOpen] = useState(true);
 
   const isLoading = loadingPlans || loadingUnlinked;
 
@@ -86,7 +86,6 @@ export function PendingMealPlansAlert() {
     );
   }
 
-  // Combine linked and unlinked into a single sorted list
   const combined: CombinedItem[] = [];
 
   for (const plan of pendingPlans) {
@@ -108,6 +107,14 @@ export function PendingMealPlansAlert() {
   const handleMarkSent = async (clientId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     markAsSent.mutate(clientId);
+  };
+
+  const handleNavigateToAnamnese = (plan: MealPlanStatusWithClient) => {
+    if (plan.anamnese_response_id) {
+      navigate(`/anamnese-response/${plan.anamnese_response_id}`);
+    } else {
+      navigate(`/clients/${plan.client_id}`);
+    }
   };
 
   const renderDeadlineBadge = (remaining: number) => {
@@ -136,108 +143,123 @@ export function PendingMealPlansAlert() {
   };
 
   return (
-    <Card className="border-orange-200 dark:border-orange-900 bg-orange-50/50 dark:bg-orange-950/20">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base font-medium text-orange-800 dark:text-orange-200">
-          <UtensilsCrossed className="h-5 w-5" />
-          Planos Alimentares Pendentes
-          <Badge variant="secondary" className="ml-auto bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-            {combined.length}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <p className="text-xs text-muted-foreground mb-2">
-          Prazo: 4 dias úteis a partir da resposta da anamnese
-        </p>
-        {combined.slice(0, 8).map((item) => {
-          if (item.type === 'linked') {
-            const plan = item.data;
-            const info = getDeadlineInfoForPlan(plan);
-            return (
-              <div
-                key={`linked-${plan.id}`}
-                className="flex items-center justify-between rounded-lg border border-orange-200 dark:border-orange-800 bg-white dark:bg-background p-3 hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    checked={false}
-                    onCheckedChange={() => {}}
-                    onClick={(e) => handleMarkSent(plan.client_id, e)}
-                    disabled={markAsSent.isPending}
-                    className="border-orange-400 data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600"
-                  />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm text-foreground">{plan.client_name}</p>
-                      {renderDeadlineBadge(info.remaining)}
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="border-orange-200 dark:border-orange-900 bg-orange-50/50 dark:bg-orange-950/20">
+        <CollapsibleTrigger asChild>
+          <CardHeader className="pb-2 cursor-pointer hover:bg-orange-100/30 dark:hover:bg-orange-950/30 transition-colors">
+            <CardTitle className="flex items-center gap-2 text-base font-medium text-orange-800 dark:text-orange-200">
+              <UtensilsCrossed className="h-5 w-5" />
+              Planos Alimentares Pendentes
+              <Badge variant="secondary" className="ml-auto bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                {combined.length}
+              </Badge>
+              <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? '' : '-rotate-90'}`} />
+            </CardTitle>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground mb-2">
+              Prazo: 4 dias úteis a partir da resposta da anamnese
+            </p>
+            {combined.slice(0, 8).map((item) => {
+              if (item.type === 'linked') {
+                const plan = item.data;
+                const info = getDeadlineInfoForPlan(plan);
+                return (
+                  <div
+                    key={`linked-${plan.id}`}
+                    className="flex items-center justify-between rounded-lg border border-orange-200 dark:border-orange-800 bg-white dark:bg-background p-3 hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={false}
+                        onCheckedChange={() => {}}
+                        onClick={(e) => handleMarkSent(plan.client_id, e)}
+                        disabled={markAsSent.isPending}
+                        className="border-orange-400 data-[state=checked]:bg-orange-600 data-[state=checked]:border-orange-600"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="font-medium text-sm text-foreground hover:underline text-left"
+                            onClick={() => handleNavigateToAnamnese(plan)}
+                          >
+                            {plan.client_name}
+                          </button>
+                          {renderDeadlineBadge(info.remaining)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {info.label} em {format(info.referenceDate, "dd/MM/yyyy", { locale: ptBR })}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {info.label} em {format(info.referenceDate, "dd/MM/yyyy", { locale: ptBR })}
-                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-orange-700 hover:text-orange-900 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-900/30"
+                      onClick={() => handleNavigateToAnamnese(plan)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-orange-700 hover:text-orange-900 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-900/30"
-                  onClick={() => navigate(`/clients/${plan.client_id}`)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            );
-          } else {
-            const anamnese = item.data;
-            const info = getDeadlineInfoForUnlinked(anamnese);
-            return (
-              <div
-                key={`unlinked-${anamnese.id}`}
-                className="flex items-center justify-between rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-3 hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <Link2Off className="h-4 w-4 text-amber-600 shrink-0" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm text-foreground">
-                        {anamnese.respondent_name || 'Sem nome'}
-                      </p>
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-700 dark:text-amber-300">
-                        Não vinculado
-                      </Badge>
-                      {renderDeadlineBadge(info.remaining)}
+                );
+              } else {
+                const anamnese = item.data;
+                const info = getDeadlineInfoForUnlinked(anamnese);
+                return (
+                  <div
+                    key={`unlinked-${anamnese.id}`}
+                    className="flex items-center justify-between rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-3 hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Link2Off className="h-4 w-4 text-amber-600 shrink-0" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="font-medium text-sm text-foreground hover:underline text-left"
+                            onClick={() => navigate(`/anamnese-response/${anamnese.id}`)}
+                          >
+                            {anamnese.respondent_name || 'Sem nome'}
+                          </button>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-400 text-amber-700 dark:text-amber-300">
+                            Não vinculado
+                          </Badge>
+                          {renderDeadlineBadge(info.remaining)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Anamnese respondida em {format(info.referenceDate, "dd/MM/yyyy", { locale: ptBR })}
+                          {anamnese.respondent_email && ` • ${anamnese.respondent_email}`}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Anamnese respondida em {format(info.referenceDate, "dd/MM/yyyy", { locale: ptBR })}
-                      {anamnese.respondent_email && ` • ${anamnese.respondent_email}`}
-                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-amber-700 hover:text-amber-900 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/30"
+                      onClick={() => navigate(`/anamnese-response/${anamnese.id}`)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-amber-700 hover:text-amber-900 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/30"
-                  onClick={() => navigate(`/forms?tab=reviews`)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            );
-          }
-        })}
+                );
+              }
+            })}
 
-        {combined.length > 8 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full text-orange-700 hover:text-orange-900 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-900/30"
-            onClick={() => navigate('/tasks')}
-          >
-            Ver todos ({combined.length})
-            <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+            {combined.length > 8 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-orange-700 hover:text-orange-900 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-900/30"
+                onClick={() => navigate('/tasks')}
+              >
+                Ver todos ({combined.length})
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
