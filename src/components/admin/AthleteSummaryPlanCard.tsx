@@ -1,11 +1,13 @@
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calendar, DollarSign, RefreshCw } from 'lucide-react';
+import { Calendar, DollarSign, RefreshCw, Archive } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 import { Client } from '@/hooks/useClients';
+import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
 
 const PLAN_LABELS: Record<string, string> = {
   consultoria: 'Consultoria',
@@ -119,6 +121,27 @@ export function AthleteSummaryPlanCard({ client, onRenewPlan }: AthleteSummaryPl
               Renovar
             </Button>
           )}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1 gap-1"
+              >
+                <Archive className="h-3 w-3" />
+                Histórico
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Archive className="h-5 w-5" />
+                  Histórico de Planos
+                </DialogTitle>
+              </DialogHeader>
+              <PlanHistorySection clientId={client.id} />
+            </DialogContent>
+          </Dialog>
           <Button 
             variant="outline" 
             size="sm" 
