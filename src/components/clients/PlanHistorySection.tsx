@@ -26,9 +26,11 @@ export function PlanHistorySection({ clientId }: { clientId: string }) {
         .eq('client_id', clientId)
         .order('renewed_at', { ascending: false });
       if (error) throw error;
-      return data;
+      return data ?? [];
     },
     enabled: !!clientId,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   if (isLoading) {
