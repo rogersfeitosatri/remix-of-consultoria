@@ -57,9 +57,8 @@ export function DietAdjustmentAlert() {
     );
   }
 
-  if (entries.length === 0) {
-    return null;
-  }
+  // Always visible — show empty state if no entries
+  const hasEntries = entries.length > 0;
 
   // Group entries by Monday
   const today = startOfDay(new Date());
@@ -135,6 +134,13 @@ export function DietAdjustmentAlert() {
             <p className="text-sm text-muted-foreground mb-4">
               Ciclos mensais a partir da data de início do plano. Ajustes otimizados para a segunda-feira mais próxima.
             </p>
+            {!hasEntries ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <Utensils className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">Nenhum atleta elegível para ajuste de dieta este mês.</p>
+                <p className="text-xs mt-1">Atletas de Consultoria/Consulta Única com check-in mensal ou quinzenal aparecerão aqui.</p>
+              </div>
+            ) : (
             <div className="space-y-2">
               {sortedGroups.map(group => (
                 <div
@@ -238,6 +244,7 @@ export function DietAdjustmentAlert() {
                 </div>
               ))}
             </div>
+            )}
           </CardContent>
         </CollapsibleContent>
       </Card>
