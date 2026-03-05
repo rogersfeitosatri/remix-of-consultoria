@@ -17,7 +17,7 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 export function PlanHistorySection({ clientId }: { clientId: string }) {
-  const { data: history = [] } = useQuery({
+  const { data: history = [], isLoading } = useQuery({
     queryKey: ['client-plan-history', clientId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -31,7 +31,13 @@ export function PlanHistorySection({ clientId }: { clientId: string }) {
     enabled: !!clientId,
   });
 
-  if (history.length === 0) return null;
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>;
+  }
+
+  if (history.length === 0) {
+    return <p className="text-sm text-muted-foreground text-center py-4">Nenhum plano anterior registrado.</p>;
+  }
 
   return (
     <Card>
