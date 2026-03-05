@@ -17,6 +17,7 @@ export interface MealPlanStatus {
 export interface MealPlanStatusWithClient extends MealPlanStatus {
   client_name: string;
   client_phone: string | null;
+  anamnese_submitted_at: string | null;
 }
 
 export function useMealPlanStatus() {
@@ -68,13 +69,31 @@ export function usePendingMealPlans() {
 
       if (clientError) throw clientError;
 
+      // Fetch anamnese submitted_at for each client
+      const { data: anamneseData } = await supabase
+        .from('anamnese_responses')
+        .select('client_id, submitted_at')
+        .in('client_id', clientIds)
+        .order('submitted_at', { ascending: false });
+
+      // Map: client_id -> most recent submitted_at
+      const anamneseMap = new Map<string, string>();
+      for (const a of anamneseData || []) {
+        if (a.client_id && !anamneseMap.has(a.client_id)) {
+          anamneseMap.set(a.client_id, a.submitted_at);
+        }
+      }
+
       const clientMap = new Map(clients?.map(c => [c.id, c]) || []);
 
-      return mealPlanData.map(mp => ({
-        ...mp,
-        client_name: clientMap.get(mp.client_id)?.name || 'Desconhecido',
-        client_phone: clientMap.get(mp.client_id)?.phone || null,
-      })) as MealPlanStatusWithClient[];
+      return mealPlanData
+        .map(mp => ({
+          ...mp,
+          client_name: clientMap.get(mp.client_id)?.name || 'Desconhecido',
+          client_phone: clientMap.get(mp.client_id)?.phone || null,
+          anamnese_submitted_at: anamneseMap.get(mp.client_id) || null,
+        }))
+        .filter(mp => clientMap.has(mp.client_id)) as MealPlanStatusWithClient[];
     },
     enabled: !!user?.id,
   });
