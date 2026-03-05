@@ -58,24 +58,30 @@ function nearestMonday(date: Date): Date {
 }
 
 /**
- * Calculate all monthly cycle Mondays for a given athlete within a date range.
+ * Calculate all monthly cycle Mondays for a given athlete within a date range,
+ * stopping 30 days before planEndDate.
  */
 function getAthleteCycleMondays(
   startDate: Date,
   rangeStart: Date,
   rangeEnd: Date,
+  planEndDate: Date,
 ): { anniversary: Date; monday: Date; cycleNumber: number }[] {
   const results: { anniversary: Date; monday: Date; cycleNumber: number }[] = [];
-  // Start from cycle 1 (first month after start)
+  // Stop generating cycles 30 days before plan end
+  const cutoff = new Date(planEndDate);
+  cutoff.setDate(cutoff.getDate() - 30);
+
   for (let i = 1; i <= 36; i++) {
     const anniversary = addMonths(startDate, i);
+    // Stop if anniversary is past the cutoff (30 days before plan end)
+    if (isAfter(anniversary, cutoff)) break;
+    // Stop if past our display range
     if (isAfter(anniversary, rangeEnd)) break;
+
     const monday = nearestMonday(anniversary);
-    // Include if the Monday falls within the range (with a few days tolerance)
-    if (
-      !isBefore(monday, rangeStart) &&
-      !isAfter(monday, rangeEnd)
-    ) {
+    // Include if the Monday falls within the display range
+    if (!isBefore(monday, rangeStart) && !isAfter(monday, rangeEnd)) {
       results.push({ anniversary, monday, cycleNumber: i });
     }
   }
@@ -91,18 +97,14 @@ export function useDietCycleAlerts() {
       // 1. Fetch eligible clients
       const { data: clients, error: clientsError } = await supabase
         .from('clients')
-        .select('id, name, plan_type, checkin_frequency, consultation_frequency, start_date, is_active')
+        .select('id, name, plan_type, checkin_frequency, consultation_frequency, consultation_count, start_date, end_date, is_active')
         .eq('is_active', true)
         .or('plan_type.eq.consultoria,plan_type.eq.consulta_unica');
 
       if (clientsError) throw clientsError;
 
-      // Filter: monthly or biweekly checkin, no recurring consultations
-      const eligible = (clients || []).filter(c => {
-        if (c.consultation_frequency) return false;
-        const freq = c.checkin_frequency;
-        return freq === 'monthly' || freq === 'biweekly';
-      });
+      // All consultoria/consulta_unica active athletes are eligible for monthly diet adjustments
+      const eligible = (clients || []).filter(c => c.start_date && c.end_date);
 
       if (eligible.length === 0) return [];
 
@@ -131,9 +133,10 @@ export function useDietCycleAlerts() {
       const entries: DietCycleEntry[] = [];
 
       for (const client of eligible) {
-        if (!client.start_date) continue;
+        if (!client.start_date || !client.end_date) continue;
         const startDate = parseISO(client.start_date);
-        const cycles = getAthleteCycleMondays(startDate, rangeStart, rangeEnd);
+        const planEndDate = parseISO(client.end_date);
+        const cycles = getAthleteCycleMondays(startDate, rangeStart, rangeEnd, planEndDate);
 
         for (const cycle of cycles) {
           const existingAlert = alertMap.get(client.id);
