@@ -1,7 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { addWeeks, isPast, differenceInDays } from 'date-fns';
+import {
+  addMonths,
+  startOfMonth,
+  endOfMonth,
+  nextMonday,
+  previousMonday,
+  isMonday,
+  differenceInDays,
+  isBefore,
+  isAfter,
+  format,
+  parseISO,
+  addWeeks,
+} from 'date-fns';
 
 export interface DietAdjustmentAlert {
   id: string;
@@ -12,27 +25,154 @@ export interface DietAdjustmentAlert {
   status: 'pending' | 'completed';
   created_at: string;
   updated_at: string;
-  client?: {
-    id: string;
-    name: string;
-    plan_type: string;
-    consultation_count: number | null;
-    is_active: boolean;
-  };
 }
 
-export interface PendingDietAlert {
+export interface DietCycleEntry {
   client_id: string;
   client_name: string;
   plan_type: string;
-  consultation_count: number | null;
   checkin_frequency: string | null;
-  last_adjustment_at: string | null;
-  next_alert_at: string | null;
-  is_pending: boolean;
+  start_date: string;
+  /** The exact monthly anniversary date */
+  anniversary_date: Date;
+  /** The nearest Monday to the anniversary */
+  adjustment_monday: Date;
+  /** How many months since start */
+  cycle_number: number;
+  /** Whether the adjustment was already marked done */
+  is_done: boolean;
   alert_id: string | null;
-  last_checkin_at: string | null;
-  days_since_adjustment: number | null;
+  last_adjustment_at: string | null;
+}
+
+/**
+ * Find the nearest Monday to a given date.
+ */
+function nearestMonday(date: Date): Date {
+  if (isMonday(date)) return date;
+  const prev = previousMonday(date);
+  const next = nextMonday(date);
+  const diffPrev = Math.abs(differenceInDays(date, prev));
+  const diffNext = Math.abs(differenceInDays(next, date));
+  return diffPrev <= diffNext ? prev : next;
+}
+
+/**
+ * Calculate all monthly cycle Mondays for a given athlete within a date range.
+ */
+function getAthleteCycleMondays(
+  startDate: Date,
+  rangeStart: Date,
+  rangeEnd: Date,
+): { anniversary: Date; monday: Date; cycleNumber: number }[] {
+  const results: { anniversary: Date; monday: Date; cycleNumber: number }[] = [];
+  // Start from cycle 1 (first month after start)
+  for (let i = 1; i <= 36; i++) {
+    const anniversary = addMonths(startDate, i);
+    if (isAfter(anniversary, rangeEnd)) break;
+    const monday = nearestMonday(anniversary);
+    // Include if the Monday falls within the range (with a few days tolerance)
+    if (
+      !isBefore(monday, rangeStart) &&
+      !isAfter(monday, rangeEnd)
+    ) {
+      results.push({ anniversary, monday, cycleNumber: i });
+    }
+  }
+  return results;
+}
+
+export function useDietCycleAlerts() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['diet-cycle-alerts', user?.id],
+    queryFn: async () => {
+      // 1. Fetch eligible clients
+      const { data: clients, error: clientsError } = await supabase
+        .from('clients')
+        .select('id, name, plan_type, checkin_frequency, consultation_frequency, start_date, is_active')
+        .eq('is_active', true)
+        .or('plan_type.eq.consultoria,plan_type.eq.consulta_unica');
+
+      if (clientsError) throw clientsError;
+
+      // Filter: monthly or biweekly checkin, no recurring consultations
+      const eligible = (clients || []).filter(c => {
+        if (c.consultation_frequency) return false;
+        const freq = c.checkin_frequency;
+        return freq === 'monthly' || freq === 'biweekly';
+      });
+
+      if (eligible.length === 0) return [];
+
+      // 2. Fetch existing diet adjustment alerts
+      const clientIds = eligible.map(c => c.id);
+      const { data: alerts } = await supabase
+        .from('diet_adjustment_alerts')
+        .select('*')
+        .in('client_id', clientIds);
+
+      const alertMap = new Map<string, any>();
+      for (const a of alerts || []) {
+        alertMap.set(a.client_id, a);
+      }
+
+      // 3. Calculate cycles for current month
+      const now = new Date();
+      const monthStart = startOfMonth(now);
+      const monthEnd = endOfMonth(now);
+      // Extend range a bit to catch Mondays that spill over
+      const rangeStart = new Date(monthStart);
+      rangeStart.setDate(rangeStart.getDate() - 3);
+      const rangeEnd = new Date(monthEnd);
+      rangeEnd.setDate(rangeEnd.getDate() + 3);
+
+      const entries: DietCycleEntry[] = [];
+
+      for (const client of eligible) {
+        if (!client.start_date) continue;
+        const startDate = parseISO(client.start_date);
+        const cycles = getAthleteCycleMondays(startDate, rangeStart, rangeEnd);
+
+        for (const cycle of cycles) {
+          const existingAlert = alertMap.get(client.id);
+          // Check if adjustment was done within 7 days of this Monday
+          let isDone = false;
+          if (existingAlert?.last_adjustment_at) {
+            const lastAdj = new Date(existingAlert.last_adjustment_at);
+            const diff = Math.abs(differenceInDays(lastAdj, cycle.monday));
+            isDone = diff <= 7;
+          }
+
+          entries.push({
+            client_id: client.id,
+            client_name: client.name,
+            plan_type: client.plan_type,
+            checkin_frequency: client.checkin_frequency,
+            start_date: client.start_date,
+            anniversary_date: cycle.anniversary,
+            adjustment_monday: cycle.monday,
+            cycle_number: cycle.cycleNumber,
+            is_done: isDone,
+            alert_id: existingAlert?.id || null,
+            last_adjustment_at: existingAlert?.last_adjustment_at || null,
+          });
+        }
+      }
+
+      // Sort by monday date ascending
+      entries.sort((a, b) => a.adjustment_monday.getTime() - b.adjustment_monday.getTime());
+
+      return entries;
+    },
+    enabled: !!user,
+  });
+}
+
+// Keep legacy hooks for backward compat
+export function usePendingDietAlerts() {
+  return useDietCycleAlerts();
 }
 
 export function useDietAdjustmentAlerts() {
@@ -46,124 +186,12 @@ export function useDietAdjustmentAlerts() {
         .select(`
           *,
           client:clients!diet_adjustment_alerts_client_id_fkey (
-            id,
-            name,
-            plan_type,
-            consultation_count,
-            is_active
+            id, name, plan_type, consultation_count, is_active
           )
         `)
         .order('next_alert_at', { ascending: true });
-
       if (error) throw error;
       return data as DietAdjustmentAlert[];
-    },
-    enabled: !!user,
-  });
-}
-
-export function usePendingDietAlerts() {
-  const { user } = useAuth();
-
-  return useQuery({
-    queryKey: ['pending-diet-alerts', user?.id],
-    queryFn: async () => {
-      // Fetch eligible clients: Consultoria or Consulta Única, with monthly/biweekly checkin
-      const { data: eligibleClients, error: clientsError } = await supabase
-        .from('clients')
-        .select('id, name, plan_type, consultation_count, consultation_frequency, checkin_frequency, is_active')
-        .eq('is_active', true)
-        .or('plan_type.eq.consultoria,plan_type.eq.consulta_unica');
-
-      if (clientsError) throw clientsError;
-
-      // Fetch existing alerts
-      const { data: alerts, error: alertsError } = await supabase
-        .from('diet_adjustment_alerts')
-        .select('*');
-
-      if (alertsError) throw alertsError;
-
-      // Filter: only monthly or biweekly checkin, no recurring consultations
-      const filtered = (eligibleClients || []).filter(c => {
-        if (c.consultation_frequency) return false;
-        const freq = c.checkin_frequency;
-        return freq === 'monthly' || freq === 'biweekly';
-      });
-
-      if (filtered.length === 0) return [];
-
-      // Fetch last checkin response for each client
-      const clientIds = filtered.map(c => c.id);
-      const { data: checkinData } = await supabase
-        .from('checkin_responses')
-        .select('client_id, submitted_at')
-        .in('client_id', clientIds)
-        .order('submitted_at', { ascending: false });
-
-      const lastCheckinMap = new Map<string, string>();
-      for (const cr of checkinData || []) {
-        if (cr.client_id && !lastCheckinMap.has(cr.client_id)) {
-          lastCheckinMap.set(cr.client_id, cr.submitted_at);
-        }
-      }
-
-      const now = new Date();
-      const pendingAlerts: PendingDietAlert[] = [];
-
-      for (const client of filtered) {
-        const existingAlert = alerts?.find(a => a.client_id === client.id);
-        const lastCheckinAt = lastCheckinMap.get(client.id) || null;
-
-        if (!existingAlert) {
-          pendingAlerts.push({
-            client_id: client.id,
-            client_name: client.name,
-            plan_type: client.plan_type,
-            consultation_count: client.consultation_count,
-            checkin_frequency: client.checkin_frequency,
-            last_adjustment_at: null,
-            next_alert_at: null,
-            is_pending: true,
-            alert_id: null,
-            last_checkin_at: lastCheckinAt,
-            days_since_adjustment: null,
-          });
-        } else {
-          const nextAlertDate = existingAlert.next_alert_at ? new Date(existingAlert.next_alert_at) : null;
-          const isPending = !nextAlertDate || isPast(nextAlertDate);
-
-          if (isPending) {
-            const daysSince = existingAlert.last_adjustment_at
-              ? differenceInDays(now, new Date(existingAlert.last_adjustment_at))
-              : null;
-
-            pendingAlerts.push({
-              client_id: client.id,
-              client_name: client.name,
-              plan_type: client.plan_type,
-              consultation_count: client.consultation_count,
-              checkin_frequency: client.checkin_frequency,
-              last_adjustment_at: existingAlert.last_adjustment_at,
-              next_alert_at: existingAlert.next_alert_at,
-              is_pending: true,
-              alert_id: existingAlert.id,
-              last_checkin_at: lastCheckinAt,
-              days_since_adjustment: daysSince,
-            });
-          }
-        }
-      }
-
-      // Sort: never adjusted first, then by days_since_adjustment descending
-      pendingAlerts.sort((a, b) => {
-        if (a.days_since_adjustment === null && b.days_since_adjustment !== null) return -1;
-        if (a.days_since_adjustment !== null && b.days_since_adjustment === null) return 1;
-        if (a.days_since_adjustment === null && b.days_since_adjustment === null) return 0;
-        return (b.days_since_adjustment ?? 0) - (a.days_since_adjustment ?? 0);
-      });
-
-      return pendingAlerts;
     },
     enabled: !!user,
   });
@@ -191,7 +219,6 @@ export function useMarkDietAdjustmentDone() {
           .eq('id', alertId)
           .select()
           .single();
-
         if (error) throw error;
         return data;
       } else {
@@ -206,13 +233,13 @@ export function useMarkDietAdjustmentDone() {
           })
           .select()
           .single();
-
         if (error) throw error;
         return data;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['diet-adjustment-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['diet-cycle-alerts'] });
       queryClient.invalidateQueries({ queryKey: ['pending-diet-alerts'] });
     },
   });
