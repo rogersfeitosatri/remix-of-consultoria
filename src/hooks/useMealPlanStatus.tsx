@@ -99,6 +99,41 @@ export function usePendingMealPlans() {
   });
 }
 
+export interface UnlinkedAnamneseItem {
+  id: string;
+  respondent_name: string | null;
+  respondent_email: string | null;
+  submitted_at: string;
+}
+
+export function useUnlinkedAnamneseForMealPlan() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['unlinked-anamnese-meal-plan', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      // Fetch anamnese responses with no client_id (unlinked)
+      const { data, error } = await supabase
+        .from('anamnese_responses')
+        .select('id, respondent_name, respondent_email, submitted_at, client_id')
+        .is('client_id', null)
+        .order('submitted_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map(r => ({
+        id: r.id,
+        respondent_name: r.respondent_name,
+        respondent_email: r.respondent_email,
+        submitted_at: r.submitted_at,
+      })) as UnlinkedAnamneseItem[];
+    },
+    enabled: !!user?.id,
+  });
+}
+
 export function useCreateMealPlanStatus() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
