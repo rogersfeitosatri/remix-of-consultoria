@@ -6,6 +6,7 @@ import { PendingReviewsList } from '@/components/forms/PendingReviewsList';
 import { ScheduledCheckinsSection } from '@/components/forms/ScheduledCheckinsSection';
 import { CheckinAuditTab } from '@/components/forms/CheckinAuditTab';
 import { UnresponsiveAthletesAlert } from '@/components/checkin/UnresponsiveAthletesAlert';
+import { CheckinResponseAlert } from '@/components/checkin/CheckinResponseAlert';
 
 export default function CheckinHub() {
   const [activeTab, setActiveTab] = useState('pendentes');
@@ -20,8 +21,11 @@ export default function CheckinHub() {
           </p>
         </div>
 
-        {/* Alert for unresponsive athletes */}
-        <UnresponsiveAthletesAlert />
+        {/* Alerts for athlete engagement */}
+        <div className="space-y-4">
+          <CheckinResponseAlert />
+          <UnresponsiveAthletesAlert />
+        </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3 max-w-2xl">
