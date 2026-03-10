@@ -282,23 +282,23 @@ export default function PublicCheckinForm() {
         return;
       }
 
-      // Check if link has expired (24h after sent_at)
-      const { data: scheduledCheckin } = await supabase
-        .from('scheduled_checkins')
+      // Check if link has expired (36h after sent_at)
+      const { data: dispatch } = await supabase
+        .from('checkin_dispatches')
         .select('sent_at')
         .eq('client_id', data.clientId)
-        .eq('form_id', formId)
+        .eq('checkin_form_id', formId)
         .eq('status', 'sent')
         .order('sent_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (scheduledCheckin?.sent_at) {
-        const sentAt = new Date(scheduledCheckin.sent_at);
+      if (dispatch?.sent_at) {
+        const sentAt = new Date(dispatch.sent_at);
         const now = new Date();
         const hoursSinceSent = (now.getTime() - sentAt.getTime()) / (1000 * 60 * 60);
         
-        if (hoursSinceSent > 24) {
+        if (hoursSinceSent > 36) {
           setLinkExpired(true);
           return;
         }
