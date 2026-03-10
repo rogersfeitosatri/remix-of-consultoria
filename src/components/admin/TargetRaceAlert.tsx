@@ -304,19 +304,6 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
     );
   }
 
-  // Fetch anamnese suggestion when no target race
-  const { data: anamneseSuggestion } = useQuery({
-    queryKey: ['anamnese-race-suggestion', clientId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('athlete_profiles')
-        .select('specific_target')
-        .eq('client_id', clientId)
-        .maybeSingle();
-      return data?.specific_target || null;
-    },
-    enabled: !alertData?.hasTargetRace && !isEditing,
-  });
 
   // No target race
   if (!alertData?.hasTargetRace) {
