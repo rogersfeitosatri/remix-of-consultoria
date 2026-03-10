@@ -50,6 +50,20 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
   const [newRaceInput, setNewRaceInput] = useState('');
   const [isAddingNew, setIsAddingNew] = useState(false);
 
+  // Fetch anamnese suggestion when no target race
+  const { data: anamneseSuggestion } = useQuery({
+    queryKey: ['anamnese-race-suggestion', clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('specific_target')
+        .eq('client_id', clientId)
+        .maybeSingle();
+      return data?.specific_target || null;
+    },
+    enabled: !alertData?.hasTargetRace && !isEditing,
+  });
+
   const handleStartEdit = () => {
     setTargetRace(alertData?.targetRace || '');
     setTargetDeadline(alertData?.targetDeadline || '');
