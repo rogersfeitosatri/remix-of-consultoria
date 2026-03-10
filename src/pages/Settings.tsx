@@ -17,6 +17,7 @@ import { ChangePasswordForm } from '@/components/athlete/ChangePasswordForm';
 import { MessageTemplatesSection } from '@/components/settings/MessageTemplatesSection';
 import { LandingPageSettingsSection } from '@/components/settings/LandingPageSettingsSection';
 import { LayoutCustomizationSection } from '@/components/settings/LayoutCustomizationSection';
+import { ScanAnamneseTargetRaces } from '@/components/admin/ScanAnamneseTargetRaces';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
