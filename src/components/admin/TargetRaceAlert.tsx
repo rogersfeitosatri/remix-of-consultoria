@@ -23,7 +23,7 @@ import { useTargetRaceAlert } from '@/hooks/useTargetRaceAlert';
 import { useMarkDietAdjustmentDone } from '@/hooks/useDietAdjustmentAlerts';
 import { useTargetRaces, useCreateTargetRace } from '@/hooks/useTargetRaces';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
