@@ -282,23 +282,23 @@ export default function PublicCheckinForm() {
         return;
       }
 
-      // Check if link has expired (24h after sent_at)
-      const { data: scheduledCheckin } = await supabase
-        .from('scheduled_checkins')
+      // Check if link has expired (36h after sent_at)
+      const { data: dispatch } = await supabase
+        .from('checkin_dispatches')
         .select('sent_at')
         .eq('client_id', data.clientId)
-        .eq('form_id', formId)
+        .eq('checkin_form_id', formId)
         .eq('status', 'sent')
         .order('sent_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (scheduledCheckin?.sent_at) {
-        const sentAt = new Date(scheduledCheckin.sent_at);
+      if (dispatch?.sent_at) {
+        const sentAt = new Date(dispatch.sent_at);
         const now = new Date();
         const hoursSinceSent = (now.getTime() - sentAt.getTime()) / (1000 * 60 * 60);
         
-        if (hoursSinceSent > 24) {
+        if (hoursSinceSent > 36) {
           setLinkExpired(true);
           return;
         }
@@ -425,12 +425,12 @@ export default function PublicCheckinForm() {
           <div className="rounded-full bg-orange-500/10 p-4 w-fit mx-auto mb-6">
             <Clock className="h-12 w-12 text-orange-500" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">Prazo Expirado</h1>
+          <h1 className="text-2xl font-bold mb-2">Prazo Encerrado</h1>
           <p className="text-muted-foreground mb-4">
-            O prazo de 24 horas para preencher este check-in já passou.
+            O prazo de 36 horas para preencher este check-in já foi encerrado.
           </p>
           <p className="text-muted-foreground mb-6">
-            Caso queira enviar um feedback de como está se sentindo com o plano, entre em contato com o suporte.
+            Caso queira informar algo ao seu nutricionista, envie diretamente pelo contato abaixo.
           </p>
           <Button 
             variant="default" 
