@@ -492,6 +492,12 @@ export default function AthleteAnamneseForm() {
 
       if (updateError) throw updateError;
 
+      // Auto-fill target_race from meta_especifica if provided
+      if (formData.meta_especifica) {
+        const { autoFillTargetRace } = await import('@/lib/extractTargetRace');
+        await autoFillTargetRace(client.id, formData.meta_especifica, null);
+      }
+
       toast({
         title: 'Anamnese enviada com sucesso!',
         description: 'Seus dados foram salvos. Aguarde a análise.',
