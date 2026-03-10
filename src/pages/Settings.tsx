@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useClients, usePayments, useAddClient, Client } from '@/hooks/useClients';
-import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock, ExternalLink, Palette } from 'lucide-react';
+import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock, ExternalLink, Palette, Flag } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
 import * as XLSX from 'xlsx';
