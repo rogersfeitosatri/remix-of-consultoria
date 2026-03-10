@@ -893,7 +893,24 @@ export default function Settings() {
             </AccordionContent>
           </AccordionItem>
 
-          {/* Full Backup Card */}
+          {/* Scan Anamnese Target Races */}
+          <AccordionItem value="scan-races" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <Flag className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Varredura de Provas Alvo</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Escaneia anamneses preenchidas e preenche automaticamente a prova alvo dos atletas
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <ScanAnamneseTargetRaces />
+            </AccordionContent>
+          </AccordionItem>
+
           <AccordionItem value="backup" className="border border-primary/30 rounded-lg bg-card px-4">
             <AccordionTrigger className="hover:no-underline py-4">
               <div className="flex items-center gap-2 text-left">
