@@ -243,7 +243,20 @@ export default function AthleteDynamicAnamneseForm() {
 
       if (profileError) {
         console.error('Error updating athlete profile:', profileError);
-        // Don't throw - the main response was saved successfully
+      }
+
+      // Auto-fill target_race from dynamic anamnese responses
+      try {
+        const { extractRaceFromDynamicResponses, autoFillTargetRace } = await import('@/lib/extractTargetRace');
+        const { raceName, raceDate } = extractRaceFromDynamicResponses(
+          questions.map(q => ({ id: q.id, question_text: q.question_text, question_type: q.question_type })),
+          responsesWithComments
+        );
+        if (raceName) {
+          await autoFillTargetRace(client.id, raceName, raceDate);
+        }
+      } catch (e) {
+        console.error('Error auto-filling target race:', e);
       }
 
       toast.success('Anamnese enviada com sucesso!');
