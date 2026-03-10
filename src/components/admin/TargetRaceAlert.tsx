@@ -290,6 +290,20 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
     );
   }
 
+  // Fetch anamnese suggestion when no target race
+  const { data: anamneseSuggestion } = useQuery({
+    queryKey: ['anamnese-race-suggestion', clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('specific_target')
+        .eq('client_id', clientId)
+        .maybeSingle();
+      return data?.specific_target || null;
+    },
+    enabled: !alertData?.hasTargetRace && !isEditing,
+  });
+
   // No target race
   if (!alertData?.hasTargetRace) {
     return (
@@ -303,6 +317,27 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
                 Adicione uma prova alvo para acompanhar a evolução da dieta
               </p>
             </div>
+            {anamneseSuggestion && (
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 text-left space-y-2">
+                <p className="text-xs font-medium text-primary flex items-center gap-1">
+                  <Search className="h-3 w-3" />
+                  Identificado na anamnese:
+                </p>
+                <p className="text-sm font-medium">{anamneseSuggestion}</p>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="w-full"
+                  onClick={() => {
+                    setTargetRace(anamneseSuggestion);
+                    setIsEditing(true);
+                  }}
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Usar como Prova Alvo
+                </Button>
+              </div>
+            )}
             <Button variant="outline" size="sm" onClick={handleStartEdit}>
               <Plus className="h-4 w-4 mr-2" />
               Adicionar Prova Alvo
