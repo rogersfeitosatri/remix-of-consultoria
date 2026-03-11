@@ -99,7 +99,17 @@ Deno.serve(async (req) => {
         const ok = normalizedDb === normalizedInput;
 
         if (ok) {
-          return new Response(JSON.stringify({ valid: true, clientId: client.id }), {
+          // Check 36h expiration if formId provided
+          if (body.formId) {
+            const expired = await checkCheckinExpired(supabase, client.id, body.formId);
+            if (expired) {
+              return new Response(JSON.stringify({ valid: true, clientId: client.id, expired: true }), {
+                status: 200,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+          }
+          return new Response(JSON.stringify({ valid: true, clientId: client.id, expired: false }), {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
