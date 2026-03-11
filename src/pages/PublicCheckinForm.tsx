@@ -331,6 +331,21 @@ export default function PublicCheckinForm() {
     try {
       const clientId = verifiedClientId;
 
+      // Re-check 36h expiration at submission time
+      const { data: recheck } = await supabase.functions.invoke('verify-checkin-phone', {
+        body: {
+          clientId: clientId,
+          phone: athletePhone,
+          formId: formId,
+        },
+      });
+
+      if (recheck?.expired) {
+        setLinkExpired(true);
+        setSubmitting(false);
+        return;
+      }
+
       // Prepare responses with comments
       const responsesWithComments: Record<string, any> = {};
       questions.forEach((q) => {
