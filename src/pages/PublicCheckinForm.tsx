@@ -271,6 +271,7 @@ export default function PublicCheckinForm() {
         body: {
           clientId: clientParam,
           phone: normalizedInputPhone,
+          formId: formId,
         },
       });
 
@@ -282,26 +283,10 @@ export default function PublicCheckinForm() {
         return;
       }
 
-      // Check if link has expired (36h after sent_at)
-      const { data: dispatch } = await supabase
-        .from('checkin_dispatches')
-        .select('sent_at')
-        .eq('client_id', data.clientId)
-        .eq('checkin_form_id', formId)
-        .eq('status', 'sent')
-        .order('sent_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (dispatch?.sent_at) {
-        const sentAt = new Date(dispatch.sent_at);
-        const now = new Date();
-        const hoursSinceSent = (now.getTime() - sentAt.getTime()) / (1000 * 60 * 60);
-        
-        if (hoursSinceSent > 36) {
-          setLinkExpired(true);
-          return;
-        }
+      // Server-side 36h expiration check
+      if (data?.expired) {
+        setLinkExpired(true);
+        return;
       }
 
       setVerifiedClientId(data.clientId);
@@ -345,6 +330,21 @@ export default function PublicCheckinForm() {
 
     try {
       const clientId = verifiedClientId;
+
+      // Re-check 36h expiration at submission time
+      const { data: recheck } = await supabase.functions.invoke('verify-checkin-phone', {
+        body: {
+          clientId: clientId,
+          phone: athletePhone,
+          formId: formId,
+        },
+      });
+
+      if (recheck?.expired) {
+        setLinkExpired(true);
+        setSubmitting(false);
+        return;
+      }
 
       // Prepare responses with comments
       const responsesWithComments: Record<string, any> = {};

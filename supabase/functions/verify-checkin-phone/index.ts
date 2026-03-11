@@ -8,7 +8,28 @@ const corsHeaders = {
 type VerifyRequest = {
   clientId?: string;
   phone: string;
+  formId?: string;
 };
+
+async function checkCheckinExpired(supabase: any, clientId: string, formId: string): Promise<boolean> {
+  const { data: dispatch } = await supabase
+    .from('checkin_dispatches')
+    .select('sent_at')
+    .eq('client_id', clientId)
+    .eq('checkin_form_id', formId)
+    .eq('status', 'sent')
+    .order('sent_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (dispatch?.sent_at) {
+    const sentAt = new Date(dispatch.sent_at).getTime();
+    const now = Date.now();
+    const hoursSinceSent = (now - sentAt) / (1000 * 60 * 60);
+    return hoursSinceSent > 36;
+  }
+  return false; // No dispatch found = allow access
+}
 
 function normalizePhoneToE164(phone: string): string {
   let digits = phone.replace(/\D/g, "");
@@ -78,7 +99,17 @@ Deno.serve(async (req) => {
         const ok = normalizedDb === normalizedInput;
 
         if (ok) {
-          return new Response(JSON.stringify({ valid: true, clientId: client.id }), {
+          // Check 36h expiration if formId provided
+          if (body.formId) {
+            const expired = await checkCheckinExpired(supabase, client.id, body.formId);
+            if (expired) {
+              return new Response(JSON.stringify({ valid: true, clientId: client.id, expired: true }), {
+                status: 200,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+          }
+          return new Response(JSON.stringify({ valid: true, clientId: client.id, expired: false }), {
             status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -119,7 +150,13 @@ Deno.serve(async (req) => {
       from += pageSize;
     }
 
-    return new Response(JSON.stringify({ valid: !!matchedClientId, clientId: matchedClientId }), {
+    // Check 36h expiration for fallback match
+    let expired = false;
+    if (matchedClientId && body.formId) {
+      expired = await checkCheckinExpired(supabase, matchedClientId, body.formId);
+    }
+
+    return new Response(JSON.stringify({ valid: !!matchedClientId, clientId: matchedClientId, expired }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
