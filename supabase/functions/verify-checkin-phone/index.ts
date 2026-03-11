@@ -150,7 +150,13 @@ Deno.serve(async (req) => {
       from += pageSize;
     }
 
-    return new Response(JSON.stringify({ valid: !!matchedClientId, clientId: matchedClientId }), {
+    // Check 36h expiration for fallback match
+    let expired = false;
+    if (matchedClientId && body.formId) {
+      expired = await checkCheckinExpired(supabase, matchedClientId, body.formId);
+    }
+
+    return new Response(JSON.stringify({ valid: !!matchedClientId, clientId: matchedClientId, expired }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
