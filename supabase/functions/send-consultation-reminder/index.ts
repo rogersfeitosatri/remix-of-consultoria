@@ -109,6 +109,23 @@ Deno.serve(async (req) => {
         message += `Por favor, esteja pronto(a) no horário. Caso precise reagendar, entre em contato o mais breve possível.\n\n`;
         message += `Até amanhã! 🙂`;
 
+        // Re-verify appointment hasn't been rescheduled since initial query
+        const { data: freshAppointment } = await supabase
+          .from('appointments')
+          .select('appointment_date, appointment_time, status, reminder_sent_at')
+          .eq('id', appointment.id)
+          .single();
+
+        if (!freshAppointment 
+            || freshAppointment.status !== 'confirmed'
+            || freshAppointment.reminder_sent_at !== null
+            || freshAppointment.appointment_date !== appointment.appointment_date
+            || freshAppointment.appointment_time !== appointment.appointment_time) {
+          console.log('Appointment changed since query, skipping:', appointment.id);
+          results.push({ appointmentId: appointment.id, success: false, error: 'Appointment rescheduled or updated' });
+          continue;
+        }
+
         console.log('Sending reminder to:', phone, 'for appointment:', appointment.id);
 
         // Send WhatsApp message via ZAPI
