@@ -289,6 +289,23 @@ Deno.serve(async (req) => {
           ? `*${rendered.title}*\n\n${rendered.body}`
           : rendered.body;
 
+        // Re-verify appointment hasn't been rescheduled since initial query
+        const { data: freshAppointment } = await supabase
+          .from('appointments')
+          .select('appointment_date, appointment_time, status, reminder_15m_sent_at')
+          .eq('id', appointment.id)
+          .single();
+
+        if (!freshAppointment 
+            || freshAppointment.status !== 'confirmed'
+            || freshAppointment.reminder_15m_sent_at !== null
+            || freshAppointment.appointment_date !== appointment.appointment_date
+            || freshAppointment.appointment_time !== appointment.appointment_time) {
+          console.log('Appointment changed since query, skipping:', appointment.id);
+          results.push({ appointmentId: appointment.id, status: 'skipped', error: 'Appointment changed (rescheduled or updated)' });
+          continue;
+        }
+
         console.log('Sending reminder to:', client.phone, 'for appointment:', appointment.id);
         console.log('Using template updated_at:', template.updated_at);
 
