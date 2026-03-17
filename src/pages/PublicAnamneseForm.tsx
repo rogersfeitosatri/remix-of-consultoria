@@ -160,14 +160,20 @@ export default function PublicAnamneseForm() {
     setSubmitting(true);
 
     try {
-      // Try to find client by email (optional - form is now open)
-      const { data: clients } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('email', athleteEmail.toLowerCase().trim())
-        .limit(1);
-
-      const clientId = clients && clients.length > 0 ? clients[0].id : null;
+      // Try to find client by email (optional - form is fully public)
+      // This query may return empty for anonymous users due to RLS - that's fine
+      let clientId: string | null = null;
+      try {
+        const { data: clients } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('email', athleteEmail.toLowerCase().trim())
+          .limit(1);
+        clientId = clients && clients.length > 0 ? clients[0].id : null;
+      } catch {
+        // Anonymous users can't read clients table - proceed without linking
+        clientId = null;
+      }
 
       // Prepare responses with comments
       const responsesWithComments: Record<string, any> = {};
@@ -294,9 +300,9 @@ export default function PublicAnamneseForm() {
                   placeholder="Use o email cadastrado pelo seu assessor"
                   required
                 />
-                <p className="text-xs text-muted-foreground">
-                  Use o mesmo email que seu assessor cadastrou no sistema
-                </p>
+                 <p className="text-xs text-muted-foreground">
+                   Informe seu melhor email para contato
+                 </p>
               </div>
             </CardContent>
           </Card>
@@ -338,14 +344,14 @@ export default function PublicAnamneseForm() {
 
                     {question.question_type === 'select' && question.options && (
                       <Select
-                        value={answers[question.id] || ''}
+                        value={answers[question.id] || undefined}
                         onValueChange={(value) => handleAnswerChange(question.id, value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione uma opção" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(question.options as string[]).map((option, i) => (
+                          {(question.options as string[]).filter(Boolean).map((option, i) => (
                             <SelectItem key={i} value={option}>
                               {option}
                             </SelectItem>
@@ -373,7 +379,7 @@ export default function PublicAnamneseForm() {
 
                     {question.question_type === 'multiple_choice' && question.options && (
                       <RadioGroup
-                        value={answers[question.id] || ''}
+                        value={answers[question.id] || undefined}
                         onValueChange={(value) => handleAnswerChange(question.id, value)}
                       >
                         {(question.options as string[]).map((option, i) => (
