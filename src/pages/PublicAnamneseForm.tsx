@@ -338,14 +338,14 @@ export default function PublicAnamneseForm() {
 
                     {question.question_type === 'select' && question.options && (
                       <Select
-                        value={answers[question.id] || ''}
+                        value={answers[question.id] || undefined}
                         onValueChange={(value) => handleAnswerChange(question.id, value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione uma opção" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(question.options as string[]).map((option, i) => (
+                          {(question.options as string[]).filter(Boolean).map((option, i) => (
                             <SelectItem key={i} value={option}>
                               {option}
                             </SelectItem>
