@@ -298,6 +298,17 @@ Deno.serve(async (req) => {
         }
       });
 
+      // Auto-update consultation_schedules status to 'sent' when booking invite sent successfully
+      if (sendResult.success && messageType === 'booking_invite') {
+        const todayStr = new Date().toISOString().split('T')[0];
+        await supabase
+          .from('consultation_schedules')
+          .update({ status: 'sent', updated_at: new Date().toISOString() })
+          .eq('client_id', clientId)
+          .eq('status', 'pending')
+          .lte('send_link_date', todayStr);
+      }
+
       return new Response(
         JSON.stringify({ success: sendResult.success, result: sendResult }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
