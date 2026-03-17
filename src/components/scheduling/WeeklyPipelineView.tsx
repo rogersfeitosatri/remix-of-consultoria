@@ -137,14 +137,14 @@ export function WeeklyPipelineView({
         if (matchingAppointment) {
           const aptDate = parseISO(matchingAppointment.appointment_date);
           status = isBefore(aptDate, today) ? 'completed' : 'booked';
-        } else if (schedule.status === 'sent' || schedule.status === 'link_sent') {
+        } else if (schedule.status === 'sent' || (schedule.status as string) === 'link_sent') {
           const daysSince = Math.floor((today.getTime() - sendDate.getTime()) / (1000 * 60 * 60 * 24));
           status = daysSince >= 3 ? 'no_show' : 'link_sent';
         } else {
           status = 'link_pending';
         }
 
-        const daysSinceSent = schedule.status === 'sent' || schedule.status === 'link_sent'
+        const daysSinceSent = schedule.status === 'sent' || (schedule.status as string) === 'link_sent'
           ? Math.floor((today.getTime() - sendDate.getTime()) / (1000 * 60 * 60 * 24))
           : undefined;
 
