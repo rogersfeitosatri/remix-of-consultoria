@@ -300,9 +300,9 @@ export default function PublicAnamneseForm() {
                   placeholder="Use o email cadastrado pelo seu assessor"
                   required
                 />
-                <p className="text-xs text-muted-foreground">
-                  Use o mesmo email que seu assessor cadastrou no sistema
-                </p>
+                 <p className="text-xs text-muted-foreground">
+                   Informe seu melhor email para contato
+                 </p>
               </div>
             </CardContent>
           </Card>
