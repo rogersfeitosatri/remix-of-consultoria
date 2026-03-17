@@ -160,14 +160,20 @@ export default function PublicAnamneseForm() {
     setSubmitting(true);
 
     try {
-      // Try to find client by email (optional - form is now open)
-      const { data: clients } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('email', athleteEmail.toLowerCase().trim())
-        .limit(1);
-
-      const clientId = clients && clients.length > 0 ? clients[0].id : null;
+      // Try to find client by email (optional - form is fully public)
+      // This query may return empty for anonymous users due to RLS - that's fine
+      let clientId: string | null = null;
+      try {
+        const { data: clients } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('email', athleteEmail.toLowerCase().trim())
+          .limit(1);
+        clientId = clients && clients.length > 0 ? clients[0].id : null;
+      } catch {
+        // Anonymous users can't read clients table - proceed without linking
+        clientId = null;
+      }
 
       // Prepare responses with comments
       const responsesWithComments: Record<string, any> = {};
