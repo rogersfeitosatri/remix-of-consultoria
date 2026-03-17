@@ -119,13 +119,20 @@ export default function Clients() {
     setShowForm(false);
     setEditingClient(undefined);
 
+    // Show immediate feedback
+    const isEditing = !!editingClient;
+    toast({
+      title: isEditing ? 'Salvando alterações...' : 'Cadastrando atleta...',
+      description: 'Processando em segundo plano.',
+    });
+
     // Processar em background (sem bloquear a UI)
     const processInBackground = async () => {
       try {
-        if (editingClient) {
-          await updateClient.mutateAsync({ id: editingClient.id, ...data });
+        if (isEditing) {
+          await updateClient.mutateAsync({ id: editingClient!.id, ...data });
           toast({
-            title: 'Atleta atualizado',
+            title: '✅ Atleta atualizado',
             description: 'Os dados foram salvos com sucesso.',
           });
         } else {
@@ -176,7 +183,7 @@ export default function Clients() {
                       });
                     } else {
                       toast({
-                        title: 'Credenciais enviadas',
+                        title: '✅ Credenciais enviadas',
                         description: 'Mensagem de boas-vindas enviada via WhatsApp com sucesso!',
                       });
                     }
@@ -205,7 +212,7 @@ export default function Clients() {
                 });
               } else {
                 toast({
-                  title: 'Link enviado',
+                  title: '✅ Link enviado',
                   description: 'Link de agendamento enviado via WhatsApp com sucesso!',
                 });
               }
@@ -216,7 +223,7 @@ export default function Clients() {
           
           if (!options?.sendCredentials && !options?.sendBookingLink) {
             toast({
-              title: 'Atleta cadastrado',
+              title: '✅ Atleta cadastrado',
               description: 'O novo atleta foi adicionado com sucesso.',
             });
           }

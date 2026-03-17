@@ -607,11 +607,12 @@ export function useUpdateClient() {
       if (consultationFieldsChanged && user) {
         const updatedClient = data as Client;
 
-        // Delete existing schedules for this client
+        // Delete only pending/future schedules — preserve completed history
         await supabase
           .from('consultation_schedules')
           .delete()
-          .eq('client_id', id);
+          .eq('client_id', id)
+          .in('status', ['pending', 'sent', 'link_sent']);
 
         // Regenerate if consultations are enabled
         if (updatedClient.has_consultations && updatedClient.consultation_frequency) {
