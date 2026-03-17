@@ -379,7 +379,7 @@ export default function PublicAnamneseForm() {
 
                     {question.question_type === 'multiple_choice' && question.options && (
                       <RadioGroup
-                        value={answers[question.id] || ''}
+                        value={answers[question.id] || undefined}
                         onValueChange={(value) => handleAnswerChange(question.id, value)}
                       >
                         {(question.options as string[]).map((option, i) => (
