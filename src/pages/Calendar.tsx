@@ -15,7 +15,7 @@ import {
 import { useConsultationAppointments } from '@/hooks/useConsultations';
 import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2, Phone, Mail, ExternalLink, History } from 'lucide-react';
+import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2, Phone, Mail, ExternalLink, History, LayoutList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -38,10 +38,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MondaySendView } from '@/components/scheduling/MondaySendView';
-import { ScheduledAppointmentsView } from '@/components/scheduling/ScheduledAppointmentsView';
 import { ConsultationHistoryView } from '@/components/scheduling/ConsultationHistoryView';
 import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog';
+import { WeeklyPipelineView } from '@/components/scheduling/WeeklyPipelineView';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
@@ -50,8 +49,8 @@ export default function CalendarPage() {
   const { data: allClients = [], isLoading: clientsLoading } = useClients();
   const { data: consultations = [], isLoading: consultationsLoading } = useConsultationSchedules();
   const { data: appointments = [] } = useConsultationAppointments();
-  const [activeTab, setActiveTab] = useState('calendar');
-  
+  const [activeTab, setActiveTab] = useState('pipeline');
+
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isManualBookingOpen, setIsManualBookingOpen] = useState(false);
@@ -59,7 +58,7 @@ export default function CalendarPage() {
   const [newScheduleDate, setNewScheduleDate] = useState<Date | undefined>();
   const [editingSchedule, setEditingSchedule] = useState<(ConsultationSchedule & { client_name: string }) | null>(null);
   const [newSendLinkDate, setNewSendLinkDate] = useState<Date | undefined>();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   const updateSchedule = useUpdateConsultationSchedule();
   const deleteSchedule = useDeleteConsultationSchedule();
@@ -74,56 +73,41 @@ export default function CalendarPage() {
     return map;
   }, [allClients]);
 
-  // Calculate consultation number for each schedule
   const getConsultationNumber = (schedule: ConsultationSchedule): { current: number; total: number } | null => {
     const client = clientsById.get(schedule.client_id);
     if (!client || !client.consultation_count) return null;
-
-    // Get all consultations for this client ordered by date
     const clientConsultations = consultations
       .filter(c => c.client_id === schedule.client_id)
       .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
-
     const index = clientConsultations.findIndex(c => c.id === schedule.id);
     if (index === -1) return null;
-
-    return {
-      current: index + 1,
-      total: client.consultation_count
-    };
+    return { current: index + 1, total: client.consultation_count };
   };
 
-  // Check if row is first consultation
   const isFirstConsultationRow = (s: ConsultationSchedule) => {
     const first = clientsById.get(s.client_id)?.first_consultation_date;
     return !!first && s.scheduled_date === first && s.send_link_date === first;
   };
 
-  // Check if row is a send link task (not first consultation)
   const isSendLinkEventRow = (s: ConsultationSchedule) => {
     return !isFirstConsultationRow(s) && s.status === 'pending';
   };
 
-  // Generate calendar days for the current month view
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
     const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
     const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
-    
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   }, [currentMonth]);
 
-  // Get events for a specific date
   const getEventsForDate = (date: Date) => {
     const events: { type: 'first' | 'sendLink' | 'appointment'; schedule?: ConsultationSchedule & { client_name: string }; client?: Client; appointment?: typeof appointments[0] }[] = [];
 
-    // First consultations from clients (only those without a real appointment)
     activeClients
       .filter(c => {
         if (!c.first_consultation_date) return false;
         if (!isSameDay(parseISO(c.first_consultation_date), date)) return false;
-        // If there's already a real appointment for this client on this date, skip (will show as appointment)
         const hasAppointment = (appointments || []).some(
           apt => apt.client_id === c.id && apt.appointment_date === format(date, 'yyyy-MM-dd')
         );
@@ -133,9 +117,8 @@ export default function CalendarPage() {
         events.push({ type: 'first', client });
       });
 
-    // Real scheduled appointments from the appointments table
     (appointments || [])
-      .filter(apt => 
+      .filter(apt =>
         (apt.status === 'scheduled' || apt.status === 'confirmed') &&
         apt.appointment_date === format(date, 'yyyy-MM-dd')
       )
@@ -143,7 +126,6 @@ export default function CalendarPage() {
         events.push({ type: 'appointment', appointment: apt });
       });
 
-    // Send link tasks (pending only) - using send_link_date
     consultations
       .filter(c => isSendLinkEventRow(c) && isSameDay(parseISO(c.send_link_date), date))
       .forEach(schedule => {
@@ -155,6 +137,7 @@ export default function CalendarPage() {
 
   const handleSendBookingLink = async (id: string) => {
     try {
+      setIsSending(true);
       toast.loading('Enviando link de agendamento...');
       const { error } = await supabase.functions.invoke('send-booking-link', {
         body: { consultationScheduleId: id },
@@ -162,9 +145,12 @@ export default function CalendarPage() {
       toast.dismiss();
       if (error) throw error;
       toast.success('Link de agendamento enviado via WhatsApp!');
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
     } catch (error: any) {
       toast.dismiss();
       toast.error(error.message || 'Erro ao enviar link. Configure o agendamento primeiro.');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -188,7 +174,6 @@ export default function CalendarPage() {
 
   const handleSaveEdit = async () => {
     if (!editingSchedule || !newSendLinkDate) return;
-    
     try {
       await updateSchedule.mutateAsync({
         id: editingSchedule.id,
@@ -207,13 +192,6 @@ export default function CalendarPage() {
       toast.error('Selecione o atleta e a data');
       return;
     }
-
-    const dayOfWeek = getDay(newScheduleDate);
-    if (dayOfWeek !== 1) {
-      toast.error('A data deve ser uma segunda-feira');
-      return;
-    }
-
     try {
       await addSchedule.mutateAsync({
         client_id: selectedClientId,
@@ -228,23 +206,6 @@ export default function CalendarPage() {
       toast.error('Erro ao adicionar tarefa');
     }
   };
-
-  // Search filter for athletes
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    
-    const query = searchQuery.toLowerCase();
-    const results: { client: Client; schedules: (ConsultationSchedule & { client_name: string })[] }[] = [];
-    
-    activeClients
-      .filter(c => c.name.toLowerCase().includes(query))
-      .forEach(client => {
-        const clientSchedules = consultations.filter(s => s.client_id === client.id);
-        results.push({ client, schedules: clientSchedules });
-      });
-    
-    return results;
-  }, [searchQuery, activeClients, consultations]);
 
   const isLoading = clientsLoading || consultationsLoading;
   const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -262,7 +223,6 @@ export default function CalendarPage() {
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6">
-        {/* Header with tabs */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div>
@@ -271,100 +231,22 @@ export default function CalendarPage() {
                 Calendário de Consultas
               </h1>
               <p className="text-sm text-muted-foreground">
-                Gerencie envios de link e consultas agendadas
+                Acompanhe o pipeline de envios, agendamentos e consultas
               </p>
             </div>
-          </div>
-          
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full max-w-lg grid-cols-4">
-              <TabsTrigger value="calendar" className="gap-1">
-                <CalendarDays className="h-4 w-4" />
-                <span className="hidden sm:inline">Calendário</span>
-              </TabsTrigger>
-              <TabsTrigger value="monday-sends" className="gap-1">
-                <Send className="h-4 w-4" />
-                <span className="hidden sm:inline">Envios (Seg)</span>
-              </TabsTrigger>
-              <TabsTrigger value="scheduled" className="gap-1">
-                <CalendarCheck2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Agendadas</span>
-              </TabsTrigger>
-              <TabsTrigger value="history" className="gap-1">
-                <History className="h-4 w-4" />
-                <span className="hidden sm:inline">Histórico</span>
-              </TabsTrigger>
-            </TabsList>
-            
-            {/* Tab: Monday Sends */}
-            <TabsContent value="monday-sends" className="mt-4">
-              <MondaySendView 
-                consultations={consultations}
-                clients={allClients}
-                onMarkAsSent={handleMarkAsSent}
-                onSendLink={handleSendBookingLink}
-              />
-            </TabsContent>
-            
-            {/* Tab: Scheduled Appointments */}
-            <TabsContent value="scheduled" className="mt-4">
-              <div className="space-y-4">
-                <div className="flex justify-end">
-                  <Button 
-                    size="sm" 
-                    className="gap-1"
-                    onClick={() => setIsManualBookingOpen(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Agendar Manualmente
-                  </Button>
-                </div>
-                <ScheduledAppointmentsView />
-              </div>
-            </TabsContent>
-            
-            {/* Tab: History */}
-            <TabsContent value="history" className="mt-4">
-              <ConsultationHistoryView 
-                consultations={consultations}
-                clients={allClients}
-              />
-            </TabsContent>
-            
-            <ManualBookingDialog
-              open={isManualBookingOpen}
-              onOpenChange={setIsManualBookingOpen}
-              onSuccess={() => {
-                queryClient.invalidateQueries({ queryKey: ['appointments'] });
-              }}
-            />
-            
-            {/* Tab: Calendar View */}
-            <TabsContent value="calendar" className="mt-4">
-        <Card className="border-border bg-card">
-          <CardHeader className="p-4 sm:p-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-foreground text-base sm:text-lg">
-                  <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                  Visão Mensal
-                </CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  Tarefas de envio de link e primeiras consultas
-                </CardDescription>
-              </div>
+            <div className="flex gap-2">
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline" className="gap-1">
                     <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Adicionar Tarefa</span>
+                    <span className="hidden sm:inline">Tarefa</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Adicionar Tarefa de Envio de Link</DialogTitle>
+                    <DialogTitle>Adicionar Tarefa de Envio</DialogTitle>
                     <DialogDescription>
-                      Adicione manualmente uma tarefa de envio de link para um atleta em uma segunda-feira.
+                      Adicione uma tarefa de envio de link para um atleta.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
@@ -384,25 +266,13 @@ export default function CalendarPage() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Segunda-feira</label>
+                      <label className="text-sm font-medium">Data de envio</label>
                       <Calendar
                         mode="single"
                         selected={newScheduleDate}
-                        onSelect={(date) => {
-                          if (date && getDay(date) === 1) {
-                            setNewScheduleDate(date);
-                          } else if (date) {
-                            toast.error('Selecione uma segunda-feira');
-                          }
-                        }}
+                        onSelect={setNewScheduleDate}
                         locale={ptBR}
                         className="rounded-md border pointer-events-auto mx-auto"
-                        modifiers={{
-                          monday: (date) => getDay(date) === 1
-                        }}
-                        modifiersStyles={{
-                          monday: { fontWeight: 'bold' }
-                        }}
                       />
                     </div>
                   </div>
@@ -416,365 +286,214 @@ export default function CalendarPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent className="p-2 sm:p-4 lg:p-6">
-            {/* Search */}
-            <div className="mb-4">
-              <div className="relative max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Buscar atleta..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
-            {/* Search Results */}
-            {searchQuery.trim() && (
-              <div className="mb-6 p-4 rounded-lg border border-border bg-muted/50">
-                <h4 className="text-sm font-semibold mb-3">Resultados da busca</h4>
-                {searchResults.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum atleta encontrado.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {searchResults.map(({ client, schedules }) => (
-                      <div key={client.id} className="p-3 rounded-lg bg-background border border-border">
-                        <div className="flex items-center gap-2 mb-2">
-                          <User className="h-4 w-4 text-primary" />
-                          <span className="font-medium">{client.name}</span>
-                        </div>
-                        {client.first_consultation_date && (
-                          <p className="text-xs text-muted-foreground mb-1">
-                            1ª Consulta: {format(parseISO(client.first_consultation_date), "dd/MM/yyyy")}
-                          </p>
-                        )}
-                        {schedules.length > 0 ? (
-                          <div className="space-y-1 mt-2">
-                            <p className="text-xs font-medium text-muted-foreground">Tarefas:</p>
-                            {schedules.map(schedule => {
-                              const consultNum = getConsultationNumber(schedule);
-                              return (
-                                <div key={schedule.id} className="text-xs flex items-center gap-2 p-1.5 rounded bg-muted">
-                                  <Send className="h-3 w-3 text-warning" />
-                                  <span>
-                                    Enviar Link - {format(parseISO(schedule.send_link_date), "dd/MM/yyyy")}
-                                    {consultNum && ` (${consultNum.current}/${consultNum.total})`}
-                                  </span>
-                                  <span className={cn(
-                                    "ml-auto px-1.5 py-0.5 rounded text-[10px]",
-                                    schedule.status === 'sent' ? "bg-success/20 text-success" : "bg-warning/20 text-warning"
-                                  )}>
-                                    {schedule.status === 'sent' ? 'Enviado' : 'Pendente'}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">Nenhuma tarefa cadastrada.</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Month Navigation */}
-            <div className="flex items-center justify-between mb-4">
               <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+                size="sm"
+                className="gap-1"
+                onClick={() => setIsManualBookingOpen(true)}
               >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <h3 className="text-lg font-semibold text-foreground capitalize">
-                {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
-              </h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              >
-                <ChevronRight className="h-5 w-5" />
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Agendar</span>
               </Button>
             </div>
+          </div>
 
-            {/* Legend */}
-            <div className="flex flex-wrap gap-4 mb-4 text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500" />
-                <span className="text-muted-foreground">1ª Consulta</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500" />
-                <span className="text-muted-foreground">Enviar Link</span>
-              </div>
-            </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full max-w-md grid-cols-3">
+              <TabsTrigger value="pipeline" className="gap-1">
+                <LayoutList className="h-4 w-4" />
+                <span className="hidden sm:inline">Pipeline</span>
+              </TabsTrigger>
+              <TabsTrigger value="calendar" className="gap-1">
+                <CalendarDays className="h-4 w-4" />
+                <span className="hidden sm:inline">Calendário</span>
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-1">
+                <History className="h-4 w-4" />
+                <span className="hidden sm:inline">Histórico</span>
+              </TabsTrigger>
+            </TabsList>
 
-            {/* Calendar Grid */}
-            <div className="border border-border rounded-lg overflow-hidden">
-              {/* Week days header */}
-              <div className="grid grid-cols-7 bg-muted/50">
-                {weekDays.map(day => (
-                  <div
-                    key={day}
-                    className="p-2 text-center text-xs font-semibold text-foreground border-b border-border"
-                  >
-                    {day}
+            {/* Tab: Pipeline (NEW DEFAULT) */}
+            <TabsContent value="pipeline" className="mt-4">
+              <WeeklyPipelineView
+                consultations={consultations}
+                clients={allClients}
+                appointments={appointments}
+                onSendLink={handleSendBookingLink}
+                onMarkAsSent={handleMarkAsSent}
+                isSending={isSending}
+              />
+            </TabsContent>
+
+            {/* Tab: Calendar View */}
+            <TabsContent value="calendar" className="mt-4">
+              <Card className="border-border bg-card">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-foreground text-base sm:text-lg">
+                    <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+                    Visão Mensal
+                  </CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
+                    Consultas agendadas, tarefas de envio e primeiras consultas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-2 sm:p-4 lg:p-6">
+                  {/* Month Navigation */}
+                  <div className="flex items-center justify-between mb-4">
+                    <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                    <h3 className="text-lg font-semibold text-foreground capitalize">
+                      {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+                    </h3>
+                    <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                      <ChevronRight className="h-5 w-5" />
+                    </Button>
                   </div>
-                ))}
-              </div>
 
-              {/* Calendar days grid */}
-              <div className="grid grid-cols-7">
-                {calendarDays.map((day, index) => {
-                  const events = getEventsForDate(day);
-                  const isCurrentMonth = isSameMonth(day, currentMonth);
-                  const isToday = isSameDay(day, new Date());
-
-                  return (
-                    <div
-                      key={day.toISOString()}
-                      className={cn(
-                        "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative",
-                        !isCurrentMonth && "bg-muted/30",
-                        isToday && "bg-primary/5",
-                        index % 7 === 0 && "border-l-0",
-                        index < 7 && "border-t-0"
-                      )}
-                    >
-                      {/* Day number */}
-                      <div className={cn(
-                        "text-sm font-medium mb-1",
-                        !isCurrentMonth && "text-muted-foreground/50",
-                        isToday && "text-primary font-bold"
-                      )}>
-                        {format(day, 'd')}
-                      </div>
-
-                      {/* Events */}
-                      <div className="space-y-1 overflow-y-auto max-h-[70px] sm:max-h-[85px]">
-                        {events.map((event, eventIndex) => {
-                          if (event.type === 'appointment' && event.appointment) {
-                            const apt = event.appointment;
-                            const clientName = typeof apt.client?.name === 'string' ? apt.client.name : 'Cliente';
-                            return (
-                              <Popover key={`apt-${apt.id}`}>
-                                <PopoverTrigger asChild>
-                                  <div
-                                    className="text-[10px] sm:text-xs p-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-foreground truncate cursor-pointer hover:bg-emerald-500/30 transition-colors"
-                                    title={`Consulta: ${clientName} - ${apt.appointment_time?.substring(0,5)}`}
-                                  >
-                                    <span className="hidden sm:inline">1ª </span>
-                                    {clientName}
-                                  </div>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-72 p-3" align="start">
-                                  <div className="space-y-3">
-                                    <div>
-                                      <p className="font-medium text-sm">{clientName}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {format(parseISO(apt.appointment_date), "dd/MM/yyyy")} • {apt.appointment_time?.substring(0,5)}
-                                      </p>
-                                    </div>
-                                    <div className="space-y-1.5 text-xs">
-                                      {apt.client?.phone && (
-                                        <div className="flex items-center gap-2">
-                                          <Phone className="h-3 w-3 text-muted-foreground" />
-                                          <span>{apt.client.phone}</span>
-                                        </div>
-                                      )}
-                                      {apt.client?.email && (
-                                        <div className="flex items-center gap-2">
-                                          <Mail className="h-3 w-3 text-muted-foreground" />
-                                          <span className="truncate">{apt.client.email}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-2 pt-1">
-                                      <Button size="sm" variant="outline" className="flex-1 text-xs" asChild>
-                                        <Link to={`/appointments/${apt.id}`}>
-                                          <CalendarCheck2 className="h-3 w-3 mr-1" />
-                                          Detalhes
-                                        </Link>
-                                      </Button>
-                                      <Button size="sm" variant="outline" className="flex-1 text-xs" asChild>
-                                        <Link to={`/clients?search=${encodeURIComponent(clientName)}`}>
-                                          <User className="h-3 w-3 mr-1" />
-                                          Ver atleta
-                                        </Link>
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            );
-                          }
-
-                          if (event.type === 'first' && event.client) {
-                            return (
-                              <Popover key={`first-${event.client.id}`}>
-                                <PopoverTrigger asChild>
-                                  <div
-                                    className="text-[10px] sm:text-xs p-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-foreground truncate cursor-pointer hover:bg-emerald-500/30 transition-colors"
-                                    title={`1ª Consulta: ${event.client.name}`}
-                                  >
-                                    <span className="hidden sm:inline">1ª </span>
-                                    {event.client.name}
-                                  </div>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-72 p-3" align="start">
-                                  <div className="space-y-3">
-                                    <div>
-                                      <p className="font-medium text-sm">{event.client.name}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        1ª Consulta: {format(parseISO(event.client.first_consultation_date!), "dd/MM/yyyy")}
-                                      </p>
-                                    </div>
-                                    <div className="space-y-1.5 text-xs">
-                                      {event.client.phone && (
-                                        <div className="flex items-center gap-2">
-                                          <Phone className="h-3 w-3 text-muted-foreground" />
-                                          <span>{event.client.phone}</span>
-                                        </div>
-                                      )}
-                                      {event.client.email && (
-                                        <div className="flex items-center gap-2">
-                                          <Mail className="h-3 w-3 text-muted-foreground" />
-                                          <span className="truncate">{event.client.email}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex gap-2 pt-1">
-                                      <Button size="sm" variant="outline" className="flex-1 text-xs" asChild>
-                                        <Link to={`/clients?search=${encodeURIComponent(event.client.name)}`}>
-                                          <User className="h-3 w-3 mr-1" />
-                                          Ver atleta
-                                        </Link>
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            );
-                          }
-
-                          if (event.type === 'sendLink' && event.schedule) {
-                            const consultNum = getConsultationNumber(event.schedule);
-                            const displayName = consultNum 
-                              ? `${event.schedule.client_name} - ${consultNum.current}/${consultNum.total}`
-                              : event.schedule.client_name;
-
-                            return (
-                              <Popover key={`link-${event.schedule.id}`}>
-                                <PopoverTrigger asChild>
-                                  <div
-                                    className="text-[10px] sm:text-xs p-1 rounded bg-amber-500/20 border border-amber-500/30 text-foreground truncate cursor-pointer hover:bg-amber-500/30 transition-colors"
-                                    title={`Enviar Link: ${displayName}`}
-                                  >
-                                    <Send className="h-2.5 w-2.5 inline mr-0.5 sm:mr-1" />
-                                    <span className="hidden sm:inline">{displayName}</span>
-                                    <span className="sm:hidden">{event.schedule.client_name.split(' ')[0]}</span>
-                                  </div>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-64 p-3" align="start">
-                                  <div className="space-y-3">
-                                    <div>
-                                      <p className="font-medium text-sm">{displayName}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        Enviar link: {format(parseISO(event.schedule.send_link_date), "dd/MM/yyyy")}
-                                      </p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="flex-1 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
-                                        onClick={() => handleMarkAsSent(event.schedule!.id)}
-                                      >
-                                        <Check className="h-3.5 w-3.5 mr-1" />
-                                        Enviado
-                                      </Button>
-                                      <Popover>
-                                        <PopoverTrigger asChild>
-                                          <Button size="sm" variant="outline">
-                                            <Edit2 className="h-3.5 w-3.5" />
-                                          </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-3" align="start">
-                                          <p className="text-sm font-medium mb-2">Mover para outra segunda-feira:</p>
-                                          <Calendar
-                                            mode="single"
-                                            selected={editingSchedule?.id === event.schedule!.id ? newSendLinkDate : parseISO(event.schedule!.send_link_date)}
-                                            onSelect={(date) => {
-                                              if (date && getDay(date) === 1) {
-                                                setEditingSchedule(event.schedule!);
-                                                setNewSendLinkDate(date);
-                                              } else if (date) {
-                                                toast.error('Selecione uma segunda-feira');
-                                              }
-                                            }}
-                                            locale={ptBR}
-                                            className="rounded-md border pointer-events-auto"
-                                            modifiers={{
-                                              monday: (date) => getDay(date) === 1
-                                            }}
-                                            modifiersStyles={{
-                                              monday: { fontWeight: 'bold' }
-                                            }}
-                                          />
-                                          {editingSchedule?.id === event.schedule!.id && newSendLinkDate && (
-                                            <div className="flex gap-2 mt-2">
-                                              <Button size="sm" onClick={handleSaveEdit} className="flex-1">
-                                                Salvar
-                                              </Button>
-                                              <Button 
-                                                size="sm" 
-                                                variant="outline" 
-                                                onClick={() => {
-                                                  setEditingSchedule(null);
-                                                  setNewSendLinkDate(undefined);
-                                                }}
-                                              >
-                                                Cancelar
-                                              </Button>
-                                            </div>
-                                          )}
-                                        </PopoverContent>
-                                      </Popover>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        onClick={() => handleDeleteSchedule(event.schedule!.id)}
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            );
-                          }
-
-                          return null;
-                        })}
-                      </div>
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-4 mb-4 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500" />
+                      <span className="text-muted-foreground">Consulta Agendada</span>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded bg-primary/20 border border-primary" />
+                      <span className="text-muted-foreground">1ª Consulta</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500" />
+                      <span className="text-muted-foreground">Enviar Link</span>
+                    </div>
+                  </div>
+
+                  {/* Calendar Grid */}
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-7 bg-muted/50">
+                      {weekDays.map(day => (
+                        <div key={day} className="p-2 text-center text-xs font-semibold text-foreground border-b border-border">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7">
+                      {calendarDays.map((day, index) => {
+                        const events = getEventsForDate(day);
+                        const isCurrentMonth = isSameMonth(day, currentMonth);
+                        const isToday = isSameDay(day, new Date());
+
+                        return (
+                          <div
+                            key={day.toISOString()}
+                            className={cn(
+                              "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative",
+                              !isCurrentMonth && "bg-muted/30",
+                              isToday && "bg-primary/5",
+                              index % 7 === 0 && "border-l-0",
+                              index < 7 && "border-t-0"
+                            )}
+                          >
+                            <div className={cn(
+                              "text-sm font-medium mb-1",
+                              !isCurrentMonth && "text-muted-foreground/50",
+                              isToday && "text-primary font-bold"
+                            )}>
+                              {format(day, 'd')}
+                            </div>
+                            <div className="space-y-1 overflow-y-auto max-h-[70px] sm:max-h-[85px]">
+                              {events.map((event) => {
+                                if (event.type === 'appointment' && event.appointment) {
+                                  const apt = event.appointment;
+                                  const clientName = typeof apt.client?.name === 'string' ? apt.client.name : 'Cliente';
+                                  return (
+                                    <Popover key={`apt-${apt.id}`}>
+                                      <PopoverTrigger asChild>
+                                        <div className="text-[10px] sm:text-xs p-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-foreground truncate cursor-pointer hover:bg-emerald-500/30 transition-colors">
+                                          <CalendarCheck2 className="h-2.5 w-2.5 inline mr-0.5" />
+                                          {apt.appointment_time?.substring(0, 5)} {clientName}
+                                        </div>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-72 p-3" align="start">
+                                        <div className="space-y-3">
+                                          <div>
+                                            <p className="font-medium text-sm">{clientName}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {format(parseISO(apt.appointment_date), "dd/MM/yyyy")} • {apt.appointment_time?.substring(0, 5)}
+                                            </p>
+                                          </div>
+                                          <div className="flex gap-2">
+                                            <Button size="sm" variant="outline" className="flex-1 text-xs" asChild>
+                                              <Link to={`/appointments/${apt.id}`}>Detalhes</Link>
+                                            </Button>
+                                            <Button size="sm" variant="outline" className="flex-1 text-xs" asChild>
+                                              <Link to={`/clients?search=${encodeURIComponent(clientName)}`}>Ver atleta</Link>
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
+                                  );
+                                }
+
+                                if (event.type === 'first' && event.client) {
+                                  return (
+                                    <div
+                                      key={`first-${event.client.id}`}
+                                      className="text-[10px] sm:text-xs p-1 rounded bg-primary/20 border border-primary/30 text-foreground truncate"
+                                      title={`1ª Consulta: ${event.client.name}`}
+                                    >
+                                      <span className="hidden sm:inline">1ª </span>
+                                      {event.client.name}
+                                    </div>
+                                  );
+                                }
+
+                                if (event.type === 'sendLink' && event.schedule) {
+                                  const consultNum = getConsultationNumber(event.schedule);
+                                  return (
+                                    <div
+                                      key={`link-${event.schedule.id}`}
+                                      className="text-[10px] sm:text-xs p-1 rounded bg-amber-500/20 border border-amber-500/30 text-foreground truncate"
+                                      title={`Enviar Link: ${event.schedule.client_name}`}
+                                    >
+                                      <Send className="h-2.5 w-2.5 inline mr-0.5" />
+                                      <span className="hidden sm:inline">
+                                        {event.schedule.client_name}
+                                        {consultNum && ` ${consultNum.current}/${consultNum.total}`}
+                                      </span>
+                                      <span className="sm:hidden">{event.schedule.client_name.split(' ')[0]}</span>
+                                    </div>
+                                  );
+                                }
+
+                                return null;
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab: History */}
+            <TabsContent value="history" className="mt-4">
+              <ConsultationHistoryView
+                consultations={consultations}
+                clients={allClients}
+              />
             </TabsContent>
           </Tabs>
+
+          <ManualBookingDialog
+            open={isManualBookingOpen}
+            onOpenChange={setIsManualBookingOpen}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['appointments'] });
+            }}
+          />
         </div>
       </div>
     </Layout>
