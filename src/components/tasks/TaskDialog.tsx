@@ -120,7 +120,7 @@ export function TaskDialog({
       due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : undefined,
       due_time: dueTime || undefined,
       label_ids: selectedLabels,
-      client_id: clientId || undefined,
+      client_id: clientId && clientId !== 'none' ? clientId : undefined,
       task_type: taskType,
       priority,
     });
