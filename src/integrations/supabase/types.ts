@@ -4600,6 +4600,8 @@ export type Database = {
       }
       tasks: {
         Row: {
+          client_id: string | null
+          completed_at: string | null
           created_at: string
           day_of_week: number
           description: string | null
@@ -4609,11 +4611,17 @@ export type Database = {
           is_archived: boolean
           is_pinned: boolean
           order_index: number
+          priority: Database["public"]["Enums"]["task_priority"]
+          source: Database["public"]["Enums"]["task_source"]
+          status: Database["public"]["Enums"]["task_status"]
+          task_type: Database["public"]["Enums"]["task_type"]
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          client_id?: string | null
+          completed_at?: string | null
           created_at?: string
           day_of_week: number
           description?: string | null
@@ -4623,11 +4631,17 @@ export type Database = {
           is_archived?: boolean
           is_pinned?: boolean
           order_index?: number
+          priority?: Database["public"]["Enums"]["task_priority"]
+          source?: Database["public"]["Enums"]["task_source"]
+          status?: Database["public"]["Enums"]["task_status"]
+          task_type?: Database["public"]["Enums"]["task_type"]
           title: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          client_id?: string | null
+          completed_at?: string | null
           created_at?: string
           day_of_week?: number
           description?: string | null
@@ -4637,11 +4651,23 @@ export type Database = {
           is_archived?: boolean
           is_pinned?: boolean
           order_index?: number
+          priority?: Database["public"]["Enums"]["task_priority"]
+          source?: Database["public"]["Enums"]["task_source"]
+          status?: Database["public"]["Enums"]["task_status"]
+          task_type?: Database["public"]["Enums"]["task_type"]
           title?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -5087,6 +5113,20 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "athlete"
+      task_priority: "low" | "medium" | "high" | "urgent"
+      task_source:
+        | "manual"
+        | "auto_anamnese"
+        | "auto_checkin"
+        | "auto_consultation"
+        | "auto_diet"
+      task_status: "pending" | "in_progress" | "done" | "overdue"
+      task_type:
+        | "meal_plan"
+        | "checkin_response"
+        | "consultation_prep"
+        | "diet_adjustment"
+        | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5215,6 +5255,22 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "athlete"],
+      task_priority: ["low", "medium", "high", "urgent"],
+      task_source: [
+        "manual",
+        "auto_anamnese",
+        "auto_checkin",
+        "auto_consultation",
+        "auto_diet",
+      ],
+      task_status: ["pending", "in_progress", "done", "overdue"],
+      task_type: [
+        "meal_plan",
+        "checkin_response",
+        "consultation_prep",
+        "diet_adjustment",
+        "custom",
+      ],
     },
   },
 } as const
