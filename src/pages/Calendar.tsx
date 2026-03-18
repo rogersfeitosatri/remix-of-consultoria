@@ -478,6 +478,15 @@ export default function CalendarPage() {
                   </div>
                 </CardContent>
               </Card>
+              {/* Day Agenda Panel - visible on calendar tab */}
+              {activeTab === 'calendar' && (
+                <div className="mt-4">
+                  <DayAgendaPanel
+                    date={selectedAgendaDay}
+                    appointments={appointments}
+                  />
+                </div>
+              )}
             </TabsContent>
 
             {/* Tab: History */}
