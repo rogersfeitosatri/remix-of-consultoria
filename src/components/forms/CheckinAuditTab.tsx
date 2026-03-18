@@ -196,7 +196,7 @@ export function CheckinAuditTab() {
   const paginatedItems = filteredItems.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   // Reset page when filters change
-  useMemo(() => { setPage(0); }, [statusFilter, frequencyFilter, searchQuery, specificDate, currentMonth]);
+  useEffect(() => { setPage(0); }, [statusFilter, frequencyFilter, searchQuery, specificDate, currentMonth]);
 
   const stats = useMemo(() => {
     const total = filteredItems.filter(i => i.type === 'response').length;
