@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import {
   DndContext,
   DragEndEvent,
-  DragOverEvent,
   DragStartEvent,
   PointerSensor,
   useSensor,
@@ -14,7 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Archive, Loader2, UtensilsCrossed, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Archive, Loader2, UtensilsCrossed, Plus, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { TaskColumn } from './TaskColumn';
 import { TaskCard } from './TaskCard';
 import { TaskDialog } from './TaskDialog';
@@ -25,10 +25,10 @@ import {
   useCreateTask,
   useUpdateTask,
   useDeleteTask,
+  useCompleteTask,
   TaskWithLabels,
 } from '@/hooks/useTasks';
 import { useMealPlanStatus, useMarkMealPlanSent } from '@/hooks/useMealPlanStatus';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -57,49 +57,48 @@ export function TaskBoard() {
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const completeTask = useCompleteTask();
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
+
+  // Summary counts
+  const overdueCount = useMemo(() => tasks.filter(t => t.status === 'overdue' && !t.is_archived).length, [tasks]);
+  const todayCount = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return tasks.filter(t => t.due_date === today && t.status !== 'done' && !t.is_archived).length;
+  }, [tasks]);
+  const pendingCount = useMemo(() => tasks.filter(t => (t.status === 'pending' || t.status === 'in_progress') && !t.is_archived).length, [tasks]);
 
   const tasksByDay = useMemo(() => {
     const grouped: Record<number, TaskWithLabels[]> = {};
-    for (let i = 0; i < 7; i++) {
-      grouped[i] = [];
-    }
+    for (let i = 0; i < 7; i++) grouped[i] = [];
     tasks.forEach((task) => {
       if (!showArchived && task.is_archived) return;
       grouped[task.day_of_week]?.push(task);
     });
-    // Sort each day: pinned first, then by order_index
     Object.keys(grouped).forEach((key) => {
       grouped[Number(key)].sort((a, b) => {
+        // Overdue first, then pinned, then by priority, then order_index
+        if (a.status === 'overdue' && b.status !== 'overdue') return -1;
+        if (a.status !== 'overdue' && b.status === 'overdue') return 1;
         if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+        const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+        const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+        if (pDiff !== 0) return pDiff;
         return a.order_index - b.order_index;
       });
     });
     return grouped;
   }, [tasks, showArchived]);
 
-  const activeTask = activeId
-    ? tasks.find((t) => t.id === activeId)
-    : null;
+  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    // Optional: could implement preview here
-  };
+  const handleDragStart = (event: DragStartEvent) => setActiveId(event.active.id as string);
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
-
     const { active, over } = event;
     if (!over) return;
 
@@ -107,37 +106,25 @@ export function TaskBoard() {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
-    // Check if dropped on a column
     const overData = over.data.current;
     let targetDay = task.day_of_week;
 
     if (overData?.dayOfWeek !== undefined) {
       targetDay = overData.dayOfWeek;
     } else {
-      // Dropped on another task
       const overTask = tasks.find((t) => t.id === over.id);
-      if (overTask) {
-        targetDay = overTask.day_of_week;
-      }
+      if (overTask) targetDay = overTask.day_of_week;
     }
 
     if (targetDay !== task.day_of_week) {
-      updateTask.mutate({
-        id: taskId,
-        day_of_week: targetDay,
-      });
+      updateTask.mutate({ id: taskId, day_of_week: targetDay });
     } else if (over.id !== active.id) {
-      // Reorder within same column
       const oldIndex = tasksByDay[targetDay].findIndex((t) => t.id === active.id);
       const newIndex = tasksByDay[targetDay].findIndex((t) => t.id === over.id);
-
       if (oldIndex !== -1 && newIndex !== -1) {
         const newOrder = arrayMove(tasksByDay[targetDay], oldIndex, newIndex);
-        // Update order_index for affected tasks
         newOrder.forEach((t, index) => {
-          if (t.order_index !== index) {
-            updateTask.mutate({ id: t.id, order_index: index });
-          }
+          if (t.order_index !== index) updateTask.mutate({ id: t.id, order_index: index });
         });
       }
     }
@@ -155,39 +142,26 @@ export function TaskBoard() {
     setDialogOpen(true);
   };
 
-  const handleArchiveTask = (task: TaskWithLabels) => {
-    updateTask.mutate({
-      id: task.id,
-      is_archived: !task.is_archived,
-    });
+  const handleCompleteTask = (task: TaskWithLabels) => {
+    completeTask.mutate(task.id);
   };
 
-  const handleDeleteTask = (task: TaskWithLabels) => {
-    setDeleteConfirm(task);
+  const handleArchiveTask = (task: TaskWithLabels) => {
+    updateTask.mutate({ id: task.id, is_archived: !task.is_archived });
   };
+
+  const handleDeleteTask = (task: TaskWithLabels) => setDeleteConfirm(task);
 
   const handleTogglePin = (task: TaskWithLabels) => {
-    updateTask.mutate({
-      id: task.id,
-      is_pinned: !task.is_pinned,
-    });
+    updateTask.mutate({ id: task.id, is_pinned: !task.is_pinned });
   };
 
-  // Handle marking meal plan as sent from task board
   const handleMarkMealPlanSent = async (task: TaskWithLabels) => {
-    // Find the meal plan status associated with this task
     const mealPlanStatus = mealPlanStatuses.find(mp => mp.task_id === task.id);
-    
     if (mealPlanStatus) {
-      // Use the mutation to mark as sent (which also archives the task)
       markMealPlanSent.mutate(mealPlanStatus.client_id);
     } else {
-      // If no meal plan status found, just archive the task
-      updateTask.mutate({
-        id: task.id,
-        is_archived: true,
-      });
-      toast.success('Tarefa arquivada');
+      completeTask.mutate(task.id);
     }
   };
 
@@ -198,12 +172,12 @@ export function TaskBoard() {
     due_date?: string;
     due_time?: string;
     label_ids: string[];
+    client_id?: string;
+    task_type?: any;
+    priority?: any;
   }) => {
     if (editingTask) {
-      updateTask.mutate({
-        id: editingTask.id,
-        ...data,
-      });
+      updateTask.mutate({ id: editingTask.id, ...data });
     } else {
       createTask.mutate(data);
     }
@@ -228,7 +202,30 @@ export function TaskBoard() {
     <Card>
       <CardHeader className="pb-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-lg">Quadro de Tarefas</CardTitle>
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-lg">Quadro de Tarefas</CardTitle>
+            {/* Summary badges */}
+            <div className="flex items-center gap-1.5">
+              {overdueCount > 0 && (
+                <Badge variant="destructive" className="gap-1 text-xs">
+                  <AlertTriangle className="h-3 w-3" />
+                  {overdueCount} atrasada{overdueCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+              {todayCount > 0 && (
+                <Badge variant="secondary" className="gap-1 text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                  <Clock className="h-3 w-3" />
+                  {todayCount} hoje
+                </Badge>
+              )}
+              {pendingCount > 0 && overdueCount === 0 && todayCount === 0 && (
+                <Badge variant="secondary" className="gap-1 text-xs">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {pendingCount} pendente{pendingCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
@@ -241,11 +238,7 @@ export function TaskBoard() {
               <Plus className="h-3 w-3" />
             </Button>
             <div className="flex items-center gap-2">
-              <Switch
-                id="show-archived"
-                checked={showArchived}
-                onCheckedChange={setShowArchived}
-              />
+              <Switch id="show-archived" checked={showArchived} onCheckedChange={setShowArchived} />
               <Label htmlFor="show-archived" className="text-sm flex items-center gap-1.5">
                 <Archive className="h-4 w-4" />
                 <span className="hidden sm:inline">Mostrar arquivadas</span>
@@ -258,7 +251,6 @@ export function TaskBoard() {
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-4 overflow-x-auto pb-4">
@@ -272,6 +264,7 @@ export function TaskBoard() {
                 onArchiveTask={handleArchiveTask}
                 onDeleteTask={handleDeleteTask}
                 onTogglePin={handleTogglePin}
+                onCompleteTask={handleCompleteTask}
                 onMarkMealPlanSent={handleMarkMealPlanSent}
               />
             ))}
@@ -311,8 +304,7 @@ export function TaskBoard() {
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta ação não pode ser desfeita. A tarefa "{deleteConfirm?.title}" será
-                excluída permanentemente.
+                Esta ação não pode ser desfeita. A tarefa "{deleteConfirm?.title}" será excluída permanentemente.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
