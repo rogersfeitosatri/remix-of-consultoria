@@ -3,6 +3,33 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
+export type TaskType = 'meal_plan' | 'checkin_response' | 'consultation_prep' | 'diet_adjustment' | 'custom';
+export type TaskStatus = 'pending' | 'in_progress' | 'done' | 'overdue';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type TaskSource = 'manual' | 'auto_anamnese' | 'auto_checkin' | 'auto_consultation' | 'auto_diet';
+
+export const TASK_TYPE_LABELS: Record<TaskType, string> = {
+  meal_plan: 'Plano Alimentar',
+  checkin_response: 'Check-in',
+  consultation_prep: 'Consulta',
+  diet_adjustment: 'Ajuste Dieta',
+  custom: 'Geral',
+};
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  pending: 'Pendente',
+  in_progress: 'Em andamento',
+  done: 'Concluída',
+  overdue: 'Atrasada',
+};
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: 'Baixa',
+  medium: 'Média',
+  high: 'Alta',
+  urgent: 'Urgente',
+};
+
 export interface TaskLabel {
   id: string;
   user_id: string;
@@ -22,9 +49,16 @@ export interface Task {
   is_pinned: boolean;
   is_archived: boolean;
   order_index: number;
+  client_id: string | null;
+  task_type: TaskType;
+  status: TaskStatus;
+  priority: TaskPriority;
+  source: TaskSource;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
   labels?: TaskLabel[];
+  client_name?: string;
 }
 
 export interface TaskWithLabels extends Task {
@@ -73,7 +107,7 @@ export function useTasks(includeArchived = false) {
       if (tasksError) throw tasksError;
 
       // Fetch label assignments
-      const taskIds = tasks.map((t: Task) => t.id);
+      const taskIds = tasks.map((t: any) => t.id);
       if (taskIds.length === 0) return [];
 
       const { data: assignments, error: assignError } = await supabase
@@ -88,17 +122,78 @@ export function useTasks(includeArchived = false) {
         .eq('user_id', user.id);
       if (labelsError) throw labelsError;
 
+      // Fetch client names for tasks with client_id
+      const clientIds = [...new Set(tasks.filter((t: any) => t.client_id).map((t: any) => t.client_id))];
+      let clientMap = new Map<string, string>();
+      if (clientIds.length > 0) {
+        const { data: clients } = await supabase
+          .from('clients')
+          .select('id, name')
+          .in('id', clientIds);
+        if (clients) {
+          clientMap = new Map(clients.map((c: any) => [c.id, c.name]));
+        }
+      }
+
       const labelMap = new Map(labels.map((l: TaskLabel) => [l.id, l]));
 
-      return tasks.map((task: Task) => ({
-        ...task,
-        labels: assignments
-          .filter((a: { task_id: string; label_id: string }) => a.task_id === task.id)
-          .map((a: { task_id: string; label_id: string }) => labelMap.get(a.label_id))
-          .filter(Boolean) as TaskLabel[],
-      })) as TaskWithLabels[];
+      // Auto-calculate overdue status
+      const today = new Date().toISOString().split('T')[0];
+
+      return tasks.map((task: any) => {
+        let computedStatus = task.status as TaskStatus;
+        if (task.due_date && task.due_date < today && task.status === 'pending') {
+          computedStatus = 'overdue';
+        }
+
+        // Auto-calculate priority based on due date
+        let computedPriority = task.priority as TaskPriority;
+        if (computedStatus === 'overdue') {
+          computedPriority = 'urgent';
+        } else if (task.due_date === today && task.priority === 'medium') {
+          computedPriority = 'high';
+        }
+
+        return {
+          ...task,
+          status: computedStatus,
+          priority: computedPriority,
+          client_name: task.client_id ? clientMap.get(task.client_id) || null : null,
+          labels: (assignments || [])
+            .filter((a: { task_id: string; label_id: string }) => a.task_id === task.id)
+            .map((a: { task_id: string; label_id: string }) => labelMap.get(a.label_id))
+            .filter(Boolean) as TaskLabel[],
+        };
+      }) as TaskWithLabels[];
     },
     enabled: !!user?.id,
+  });
+}
+
+export function useTasksByDate(date?: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['tasks-by-date', user?.id, date],
+    queryFn: async () => {
+      if (!user?.id || !date) return [];
+      
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*, clients(name)')
+        .eq('user_id', user.id)
+        .eq('due_date', date)
+        .eq('is_archived', false)
+        .order('priority')
+        .order('created_at');
+
+      if (error) throw error;
+      return (data || []).map((t: any) => ({
+        ...t,
+        client_name: t.clients?.name || null,
+      })) as Task[];
+    },
+    enabled: !!user?.id && !!date,
   });
 }
 
@@ -114,6 +209,9 @@ export function useCreateTask() {
       due_date?: string;
       due_time?: string;
       label_ids?: string[];
+      client_id?: string;
+      task_type?: TaskType;
+      priority?: TaskPriority;
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
@@ -126,6 +224,10 @@ export function useCreateTask() {
           day_of_week: data.day_of_week,
           due_date: data.due_date || null,
           due_time: data.due_time || null,
+          client_id: data.client_id || null,
+          task_type: data.task_type || 'custom',
+          priority: data.priority || 'medium',
+          source: 'manual',
         })
         .select()
         .single();
@@ -172,6 +274,11 @@ export function useUpdateTask() {
       is_archived?: boolean;
       order_index?: number;
       label_ids?: string[];
+      status?: TaskStatus;
+      priority?: TaskPriority;
+      client_id?: string | null;
+      task_type?: TaskType;
+      completed_at?: string | null;
     }) => {
       const { id, label_ids, ...updateData } = data;
 
@@ -183,13 +290,11 @@ export function useUpdateTask() {
       if (error) throw error;
 
       if (label_ids !== undefined) {
-        // Remove existing assignments
         await supabase
           .from('task_label_assignments')
           .delete()
           .eq('task_id', id);
 
-        // Add new assignments
         if (label_ids.length > 0) {
           const { error: assignError } = await supabase
             .from('task_label_assignments')
@@ -228,6 +333,31 @@ export function useDeleteTask() {
     onError: (error) => {
       console.error('Error deleting task:', error);
       toast.error('Erro ao excluir tarefa');
+    },
+  });
+}
+
+export function useCompleteTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          status: 'done',
+          completed_at: new Date().toISOString(),
+          is_archived: true,
+        })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast.success('Tarefa concluída!');
+    },
+    onError: () => {
+      toast.error('Erro ao concluir tarefa');
     },
   });
 }

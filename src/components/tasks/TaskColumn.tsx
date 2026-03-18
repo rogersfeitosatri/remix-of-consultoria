@@ -2,6 +2,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { TaskCard } from './TaskCard';
 import { TaskWithLabels } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ interface TaskColumnProps {
   onArchiveTask: (task: TaskWithLabels) => void;
   onDeleteTask: (task: TaskWithLabels) => void;
   onTogglePin: (task: TaskWithLabels) => void;
+  onCompleteTask?: (task: TaskWithLabels) => void;
   onMarkMealPlanSent?: (task: TaskWithLabels) => void;
 }
 
@@ -35,6 +37,7 @@ export function TaskColumn({
   onArchiveTask,
   onDeleteTask,
   onTogglePin,
+  onCompleteTask,
   onMarkMealPlanSent,
 }: TaskColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -44,6 +47,9 @@ export function TaskColumn({
 
   const today = new Date().getDay();
   const isToday = dayOfWeek === today;
+
+  const overdueCount = tasks.filter(t => t.status === 'overdue').length;
+  const pendingCount = tasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length;
 
   return (
     <div
@@ -62,9 +68,16 @@ export function TaskColumn({
           {WEEKDAY_NAMES[dayOfWeek]}
           {isToday && <span className="ml-2 text-xs font-normal">(Hoje)</span>}
         </h3>
-        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-          {tasks.length}
-        </span>
+        <div className="flex items-center gap-1">
+          {overdueCount > 0 && (
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-4">
+              {overdueCount} atrasada{overdueCount > 1 ? 's' : ''}
+            </Badge>
+          )}
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+            {tasks.length}
+          </span>
+        </div>
       </div>
 
       <Button
@@ -90,6 +103,7 @@ export function TaskColumn({
               onArchive={onArchiveTask}
               onDelete={onDeleteTask}
               onTogglePin={onTogglePin}
+              onComplete={onCompleteTask}
               onMarkMealPlanSent={onMarkMealPlanSent}
             />
           ))}
