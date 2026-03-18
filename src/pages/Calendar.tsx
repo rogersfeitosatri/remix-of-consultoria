@@ -387,10 +387,12 @@ export default function CalendarPage() {
                         return (
                           <div
                             key={day.toISOString()}
+                            onClick={() => setSelectedAgendaDay(day)}
                             className={cn(
-                              "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative",
+                              "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative cursor-pointer hover:bg-muted/50 transition-colors",
                               !isCurrentMonth && "bg-muted/30",
                               isToday && "bg-primary/5",
+                              isSameDay(day, selectedAgendaDay) && "ring-2 ring-primary ring-inset",
                               index % 7 === 0 && "border-l-0",
                               index < 7 && "border-t-0"
                             )}
