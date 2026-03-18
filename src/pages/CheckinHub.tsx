@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ClipboardCheck, CalendarCheck, AlertCircle, History } from 'lucide-react';
+import { ClipboardCheck, CalendarCheck, History } from 'lucide-react';
 import { PendingReviewsList } from '@/components/forms/PendingReviewsList';
 import { ScheduledCheckinsSection } from '@/components/forms/ScheduledCheckinsSection';
 import { CheckinAuditTab } from '@/components/forms/CheckinAuditTab';
-import { UnresponsiveAthletesAlert } from '@/components/checkin/UnresponsiveAthletesAlert';
-import { CheckinResponseAlert } from '@/components/checkin/CheckinResponseAlert';
+import { CheckinAlertsBanner } from '@/components/checkin/CheckinAlertsBanner';
 
 export default function CheckinHub() {
   const [activeTab, setActiveTab] = useState('pendentes');
@@ -21,11 +20,7 @@ export default function CheckinHub() {
           </p>
         </div>
 
-        {/* Alerts for athlete engagement */}
-        <div className="space-y-4">
-          <CheckinResponseAlert />
-          <UnresponsiveAthletesAlert />
-        </div>
+        <CheckinAlertsBanner />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3 max-w-2xl">
