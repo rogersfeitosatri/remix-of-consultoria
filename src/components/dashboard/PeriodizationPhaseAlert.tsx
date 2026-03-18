@@ -32,11 +32,11 @@ export function PeriodizationPhaseAlert() {
   const navigate = useNavigate();
 
   const { data: periodizations = [] } = useQuery({
-    queryKey: ['dashboard-athlete-periodizations', user?.id],
+    queryKey: ['dashboard-periodization-overview', user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('athlete_periodization')
-        .select('client_id, timeline_blocks')
+        .select('client_id, timeline_blocks, race_date')
         .eq('user_id', user!.id);
       return data || [];
     },
