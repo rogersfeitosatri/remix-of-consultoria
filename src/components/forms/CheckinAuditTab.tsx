@@ -23,12 +23,14 @@ import { useNavigate } from 'react-router-dom';
 type AuditItem = {
   id: string;
   client_id: string;
-  date: string; // submitted_at or sent created_at
+  date: string;
   form_title: string;
   type: 'response' | 'unanswered';
   feedback_status: 'pending' | 'sent' | 'reviewed' | 'no_feedback' | 'unanswered';
   response_id?: string;
 };
+
+const PAGE_SIZE = 30;
 
 export function CheckinAuditTab() {
   const { user } = useAuth();
@@ -40,15 +42,22 @@ export function CheckinAuditTab() {
   const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [specificDate, setSpecificDate] = useState<Date | undefined>(undefined);
+  const [page, setPage] = useState(0);
 
-  // Fetch checkin responses (the actual submitted check-ins)
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+
+  // Fetch checkin responses filtered by month
   const { data: responses = [], isLoading: responsesLoading } = useQuery({
-    queryKey: ['checkin-audit-responses'],
+    queryKey: ['checkin-audit-responses', monthStart.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('checkin_responses')
         .select('id, client_id, form_id, submitted_at, checkin_forms(title)')
-        .order('submitted_at', { ascending: false });
+        .gte('submitted_at', monthStart.toISOString())
+        .lte('submitted_at', monthEnd.toISOString())
+        .order('submitted_at', { ascending: false })
+        .limit(500);
       if (error) throw error;
       return data || [];
     },
@@ -56,30 +65,36 @@ export function CheckinAuditTab() {
     staleTime: 60_000,
   });
 
-  // Fetch feedbacks to determine review status
+  // Fetch feedbacks for these responses
+  const responseIds = responses.map(r => r.id);
   const { data: feedbacks = [], isLoading: feedbacksLoading } = useQuery({
-    queryKey: ['checkin-audit-feedbacks'],
+    queryKey: ['checkin-audit-feedbacks', responseIds.join(',')],
     queryFn: async () => {
+      if (responseIds.length === 0) return [];
       const { data, error } = await supabase
         .from('checkin_feedbacks')
-        .select('checkin_response_id, status, sent_at, final_feedback');
+        .select('checkin_response_id, status, sent_at')
+        .in('checkin_response_id', responseIds);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user,
+    enabled: !!user && responseIds.length > 0,
     staleTime: 60_000,
   });
 
-  // Fetch whatsapp_message_logs for checkin_reminder sends
+  // Fetch whatsapp sends for the month
   const { data: checkinSends = [], isLoading: sendsLoading } = useQuery({
-    queryKey: ['checkin-audit-sends', user?.id],
+    queryKey: ['checkin-audit-sends', user?.id, monthStart.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('whatsapp_message_logs')
         .select('id, client_id, created_at, status')
         .eq('user_id', user!.id)
         .eq('template_key', 'checkin_reminder')
-        .order('created_at', { ascending: false });
+        .gte('created_at', monthStart.toISOString())
+        .lte('created_at', monthEnd.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(500);
       if (error) throw error;
       return data || [];
     },
@@ -89,29 +104,16 @@ export function CheckinAuditTab() {
 
   const isLoading = responsesLoading || clientsLoading || feedbacksLoading || sendsLoading;
 
-  // Clients map
   const clientsMap = useMemo(() => {
     return clients.reduce((acc, c) => { acc[c.id] = c; return acc; }, {} as Record<string, typeof clients[0]>);
   }, [clients]);
 
-  // Feedback map: response_id -> feedback
   const feedbackMap = useMemo(() => {
     const map = new Map<string, { status: string; sent_at: string | null }>();
     feedbacks.forEach(f => map.set(f.checkin_response_id, { status: f.status, sent_at: f.sent_at }));
     return map;
   }, [feedbacks]);
 
-  // Build a set of (client_id + date_key) for responses to detect unanswered sends
-  const responseKeys = useMemo(() => {
-    const keys = new Set<string>();
-    responses.forEach(r => {
-      // Use date only (YYYY-MM-DD) to match send date window (response within 7 days of send)
-      keys.add(r.client_id);
-    });
-    return keys;
-  }, [responses]);
-
-  // For each send, check if the client responded within 7 days after the send
   const respondedSendIds = useMemo(() => {
     const set = new Set<string>();
     checkinSends.forEach(send => {
@@ -127,11 +129,9 @@ export function CheckinAuditTab() {
     return set;
   }, [checkinSends, responses]);
 
-  // Build audit items: responses + unanswered sends
   const auditItems = useMemo((): AuditItem[] => {
     const items: AuditItem[] = [];
 
-    // Add responses
     responses.forEach(r => {
       const fb = feedbackMap.get(r.id);
       let feedback_status: AuditItem['feedback_status'] = 'no_feedback';
@@ -151,7 +151,6 @@ export function CheckinAuditTab() {
       });
     });
 
-    // Add unanswered sends
     checkinSends.forEach(send => {
       if (!respondedSendIds.has(send.id)) {
         items.push({
@@ -168,16 +167,11 @@ export function CheckinAuditTab() {
     return items;
   }, [responses, feedbackMap, checkinSends, respondedSendIds]);
 
-  // Filter
   const filteredItems = useMemo(() => {
-    const monthStart = startOfMonth(currentMonth);
-    const monthEnd = endOfMonth(currentMonth);
-
     return auditItems
       .filter(item => {
-        const itemDate = parseISO(item.date);
-        if (specificDate) return isSameDay(itemDate, specificDate);
-        return itemDate >= monthStart && itemDate <= monthEnd;
+        if (specificDate) return isSameDay(parseISO(item.date), specificDate);
+        return true; // already filtered by month in query
       })
       .filter(item => {
         if (statusFilter === 'all') return true;
@@ -195,9 +189,15 @@ export function CheckinAuditTab() {
         return client?.name?.toLowerCase().includes(searchQuery.toLowerCase());
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [auditItems, currentMonth, specificDate, statusFilter, frequencyFilter, searchQuery, clientsMap]);
+  }, [auditItems, specificDate, statusFilter, frequencyFilter, searchQuery, clientsMap]);
 
-  // Stats
+  // Pagination
+  const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
+  const paginatedItems = filteredItems.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  // Reset page when filters change
+  useMemo(() => { setPage(0); }, [statusFilter, frequencyFilter, searchQuery, specificDate, currentMonth]);
+
   const stats = useMemo(() => {
     const total = filteredItems.filter(i => i.type === 'response').length;
     const pendingReview = filteredItems.filter(i => i.feedback_status === 'pending' || i.feedback_status === 'no_feedback').length;
@@ -212,7 +212,7 @@ export function CheckinAuditTab() {
         return (
           <Badge className="bg-green-500/20 text-green-700 border-green-500/30">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Feedback Enviado
+            Enviado
           </Badge>
         );
       case 'reviewed':
@@ -226,7 +226,7 @@ export function CheckinAuditTab() {
         return (
           <Badge variant="outline" className="text-amber-600 border-amber-500/30">
             <Clock className="h-3 w-3 mr-1" />
-            Pendente Revisão
+            Pendente
           </Badge>
         );
       case 'no_feedback':
@@ -240,7 +240,7 @@ export function CheckinAuditTab() {
         return (
           <Badge className="bg-red-500/20 text-red-700 border-red-500/30">
             <Send className="h-3 w-3 mr-1" />
-            Enviado sem Resposta
+            Sem Resposta
           </Badge>
         );
       default:
@@ -265,11 +265,11 @@ export function CheckinAuditTab() {
             Conferência de Check-ins
           </CardTitle>
           <CardDescription>
-            Histórico de check-ins enviados, respondidos e status de feedback
+            Histórico mensal de check-ins enviados, respondidos e feedback
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Stats Cards */}
+          {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-muted/50 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold">{stats.total}</div>
@@ -308,7 +308,7 @@ export function CheckinAuditTab() {
                 <PopoverTrigger asChild>
                   <Button variant={specificDate ? "default" : "outline"} size="sm" className="gap-2">
                     <CalendarDays className="h-4 w-4" />
-                    {specificDate ? format(specificDate, 'dd/MM/yyyy', { locale: ptBR }) : 'Data específica'}
+                    {specificDate ? format(specificDate, 'dd/MM', { locale: ptBR }) : 'Data'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -323,13 +323,13 @@ export function CheckinAuditTab() {
             </div>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="unanswered">Enviado sem Resposta</SelectItem>
+                <SelectItem value="unanswered">Sem Resposta</SelectItem>
                 <SelectItem value="no_feedback">Sem Feedback</SelectItem>
                 <SelectItem value="pending">Pendente Revisão</SelectItem>
                 <SelectItem value="sent">Feedback Enviado</SelectItem>
@@ -338,7 +338,7 @@ export function CheckinAuditTab() {
             </Select>
 
             <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Periodicidade" />
               </SelectTrigger>
               <SelectContent>
@@ -351,56 +351,52 @@ export function CheckinAuditTab() {
 
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar atleta..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+              <Input placeholder="Buscar atleta..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9" />
             </div>
           </div>
 
           {/* Table */}
-          <ScrollArea className="h-[500px] rounded-md border">
+          <ScrollArea className="h-[450px] rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Atleta</TableHead>
-                  <TableHead>Periodicidade</TableHead>
+                  <TableHead>Freq.</TableHead>
                   <TableHead>Data</TableHead>
-                  <TableHead>Formulário</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems.length === 0 ? (
+                {paginatedItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       Nenhum check-in encontrado para este período.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredItems.map((item) => {
+                  paginatedItems.map((item) => {
                     const client = clientsMap[item.client_id];
                     return (
                       <TableRow key={item.id}>
-                        <TableCell className="font-medium">{client?.name || 'Não encontrado'}</TableCell>
+                        <TableCell className="font-medium text-sm">{client?.name || '—'}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {client?.checkin_frequency === 'weekly' ? 'Semanal' : client?.checkin_frequency === 'biweekly' ? 'Quinzenal' : client?.checkin_frequency === 'monthly' ? 'Mensal' : '-'}
+                          <Badge variant="outline" className="text-[10px]">
+                            {client?.checkin_frequency === 'weekly' ? 'Sem' : client?.checkin_frequency === 'biweekly' ? 'Quin' : client?.checkin_frequency === 'monthly' ? 'Men' : '-'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {format(parseISO(item.date), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                        <TableCell className="text-xs text-muted-foreground">
+                          {format(parseISO(item.date), 'dd/MM HH:mm', { locale: ptBR })}
                         </TableCell>
-                        <TableCell className="text-sm">{item.form_title}</TableCell>
                         <TableCell>{getStatusBadge(item.feedback_status)}</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {item.response_id ? (
-                              <Button size="sm" variant="ghost" onClick={() => navigate(`/checkin-review/${item.response_id}`)} className="h-8 w-8 p-0" title="Revisar">
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </div>
+                          {item.response_id ? (
+                            <Button size="sm" variant="ghost" onClick={() => navigate(`/checkin-review/${item.response_id}`)} className="h-7 w-7 p-0" title="Revisar">
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -409,6 +405,23 @@ export function CheckinAuditTab() {
               </TableBody>
             </Table>
           </ScrollArea>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-muted-foreground">
+                {filteredItems.length} registros · Página {page + 1}/{totalPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ClipboardCheck, ChevronRight, CheckCircle, AlertCircle, Target } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ClipboardCheck, ChevronRight, CheckCircle, AlertCircle, Target, Clock, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { parseISO, format } from 'date-fns';
+import { parseISO, format, differenceInHours, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { CHECKIN_LABELS, type CheckinFrequency } from '@/types/client';
@@ -42,11 +43,24 @@ const FREQUENCY_OPTIONS = [
   { value: 'quarterly', label: 'Trimestral' },
 ];
 
+function getWaitingLabel(submittedAt: string): { text: string; urgent: boolean } {
+  const now = new Date();
+  const submitted = parseISO(submittedAt);
+  const hours = differenceInHours(now, submitted);
+  const days = differenceInDays(now, submitted);
+
+  if (hours < 24) return { text: `${hours}h`, urgent: false };
+  if (days <= 2) return { text: `${days}d`, urgent: false };
+  if (days <= 5) return { text: `${days}d`, urgent: true };
+  return { text: `${days}d`, urgent: true };
+}
+
 export function PendingReviewsList() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [frequencyFilter, setFrequencyFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: pendingResponses = [], isLoading } = useQuery({
     queryKey: ['pending_checkin_reviews', user?.id],
@@ -62,32 +76,23 @@ export function PendingReviewsList() {
           checkin_forms (title)
         `)
         .order('submitted_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
 
       const responseIds = responses?.map(r => r.id) || [];
       if (responseIds.length === 0) return [];
 
-      // Fetch feedbacks
-      const { data: feedbacks, error: feedbackError } = await supabase
-        .from('checkin_feedbacks')
-        .select('checkin_response_id, status')
-        .in('checkin_response_id', responseIds);
+      // Batch fetch feedbacks + target races
+      const [feedbacksResult, profilesResult] = await Promise.all([
+        supabase.from('checkin_feedbacks').select('checkin_response_id, status').in('checkin_response_id', responseIds),
+        supabase.from('athlete_profiles').select('client_id, target_race')
+          .in('client_id', [...new Set(responses?.map(r => r.client_id) || [])])
+          .not('target_race', 'is', null),
+      ]);
 
-      if (feedbackError) throw feedbackError;
-
-      const feedbackMap = new Map(feedbacks?.map(f => [f.checkin_response_id, f.status]) || []);
-
-      // Fetch target races for all clients
-      const clientIds = [...new Set(responses?.map(r => r.client_id) || [])];
-      const { data: profiles } = await supabase
-        .from('athlete_profiles')
-        .select('client_id, target_race')
-        .in('client_id', clientIds)
-        .not('target_race', 'is', null);
-
-      const targetRaceMap = new Map(profiles?.map(p => [p.client_id, p.target_race]) || []);
+      const feedbackMap = new Map(feedbacksResult.data?.map(f => [f.checkin_response_id, f.status]) || []);
+      const targetRaceMap = new Map(profilesResult.data?.map(p => [p.client_id, p.target_race]) || []);
 
       return responses
         ?.filter(r => {
@@ -149,10 +154,27 @@ export function PendingReviewsList() {
     },
   });
 
-  const filteredResponses = pendingResponses.filter(r => {
-    if (frequencyFilter === 'all') return true;
-    return r.clients?.checkin_frequency === frequencyFilter;
-  });
+  const filteredResponses = useMemo(() => {
+    return pendingResponses.filter(r => {
+      if (frequencyFilter !== 'all' && r.clients?.checkin_frequency !== frequencyFilter) return false;
+      if (searchQuery && !(r.clients?.name || '').toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      return true;
+    });
+  }, [pendingResponses, frequencyFilter, searchQuery]);
+
+  // Split into urgency groups
+  const { urgent, recent } = useMemo(() => {
+    const urgentItems: PendingCheckinResponse[] = [];
+    const recentItems: PendingCheckinResponse[] = [];
+
+    filteredResponses.forEach(r => {
+      const days = differenceInDays(new Date(), parseISO(r.submitted_at));
+      if (days >= 3) urgentItems.push(r);
+      else recentItems.push(r);
+    });
+
+    return { urgent: urgentItems, recent: recentItems };
+  }, [filteredResponses]);
 
   if (isLoading) {
     return (
@@ -173,6 +195,93 @@ export function PendingReviewsList() {
     );
   }
 
+  const renderResponseItem = (response: PendingCheckinResponse) => {
+    const freq = response.clients?.checkin_frequency as CheckinFrequency | undefined;
+    const waiting = getWaitingLabel(response.submitted_at);
+
+    return (
+      <div
+        key={response.id}
+        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+      >
+        <div 
+          className="flex items-center gap-3 flex-1 cursor-pointer min-w-0"
+          onClick={() => navigate(`/checkin-review/${response.id}`)}
+        >
+          <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+            waiting.urgent ? 'bg-destructive/10' : 'bg-orange-500/10'
+          }`}>
+            {waiting.urgent ? (
+              <AlertCircle className="h-5 w-5 text-destructive" />
+            ) : (
+              <Clock className="h-5 w-5 text-orange-500" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-sm truncate">{response.clients?.name}</p>
+              <Badge 
+                variant="outline" 
+                className={`text-[10px] px-1.5 py-0 h-5 ${
+                  waiting.urgent 
+                    ? 'bg-destructive/10 text-destructive border-destructive/20' 
+                    : 'bg-orange-500/10 text-orange-600 border-orange-500/20'
+                }`}
+              >
+                <Clock className="h-2.5 w-2.5 mr-0.5" />
+                {waiting.text}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {response.checkin_forms?.title} · {format(parseISO(response.submitted_at), "dd/MM HH:mm", { locale: ptBR })}
+            </p>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {freq && CHECKIN_LABELS[freq] && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-primary/5 text-primary border-primary/20">
+                  {CHECKIN_LABELS[freq]}
+                </Badge>
+              )}
+              {response.targetRace && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-accent text-accent-foreground border-accent gap-0.5">
+                  <Target className="h-3 w-3" />
+                  {response.targetRace}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Badge 
+            variant="outline" 
+            className={response.feedbackStatus === 'approved' 
+              ? "bg-blue-500/10 text-blue-500 border-blue-500/20" 
+              : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+            }
+          >
+            {response.feedbackStatus === 'approved' ? 'Pronto' : 'Pendente'}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={(e) => {
+              e.stopPropagation();
+              markAsReviewed.mutate(response.id);
+            }}
+            disabled={markAsReviewed.isPending}
+            title="Marcar como revisado"
+          >
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </Button>
+          <ChevronRight 
+            className="h-4 w-4 text-muted-foreground cursor-pointer" 
+            onClick={() => navigate(`/checkin-review/${response.id}`)}
+          />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -191,90 +300,63 @@ export function PendingReviewsList() {
               Check-ins enviados aguardando análise/feedback
             </CardDescription>
           </div>
-          <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Filtrar frequência" />
-            </SelectTrigger>
-            <SelectContent>
-              {FREQUENCY_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar atleta..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9 w-[150px]"
+              />
+            </div>
+            <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="Frequência" />
+              </SelectTrigger>
+              <SelectContent>
+                {FREQUENCY_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
         {filteredResponses.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            {frequencyFilter !== 'all' ? 'Nenhum check-in pendente com essa frequência' : '✓ Todos os check-ins foram revisados'}
+            {frequencyFilter !== 'all' || searchQuery ? 'Nenhum check-in pendente com esses filtros' : '✓ Todos os check-ins foram revisados'}
           </p>
         ) : (
-          <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {filteredResponses.map((response) => {
-              const freq = response.clients?.checkin_frequency as CheckinFrequency | undefined;
-              return (
-                <div
-                  key={response.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                >
-                  <div 
-                    className="flex items-center gap-3 flex-1 cursor-pointer min-w-0"
-                    onClick={() => navigate(`/checkin-review/${response.id}`)}
-                  >
-                    <div className="h-10 w-10 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                      <AlertCircle className="h-5 w-5 text-orange-500" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{response.clients?.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {response.checkin_forms?.title} - {format(parseISO(response.submitted_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        {freq && CHECKIN_LABELS[freq] && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-primary/5 text-primary border-primary/20">
-                            {CHECKIN_LABELS[freq]}
-                          </Badge>
-                        )}
-                        {response.targetRace && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-accent text-accent-foreground border-accent gap-0.5">
-                            <Target className="h-3 w-3" />
-                            {response.targetRace}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Badge 
-                      variant="outline" 
-                      className={response.feedbackStatus === 'approved' 
-                        ? "bg-blue-500/10 text-blue-500 border-blue-500/20" 
-                        : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
-                      }
-                    >
-                      {response.feedbackStatus === 'approved' ? 'Pronto' : 'Pendente'}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        markAsReviewed.mutate(response.id);
-                      }}
-                      disabled={markAsReviewed.isPending}
-                      title="Marcar como revisado"
-                    >
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    </Button>
-                    <ChevronRight 
-                      className="h-4 w-4 text-muted-foreground cursor-pointer" 
-                      onClick={() => navigate(`/checkin-review/${response.id}`)}
-                    />
-                  </div>
+          <div className="space-y-4 max-h-[500px] overflow-y-auto">
+            {/* Urgent block: waiting 3+ days */}
+            {urgent.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                  <span className="text-xs font-semibold text-destructive uppercase tracking-wide">
+                    Urgente · {urgent.length} aguardando há 3+ dias
+                  </span>
                 </div>
-              );
-            })}
+                {urgent.map(renderResponseItem)}
+              </div>
+            )}
+
+            {/* Recent block */}
+            {recent.length > 0 && (
+              <div className="space-y-2">
+                {urgent.length > 0 && (
+                  <div className="flex items-center gap-2 pt-2">
+                    <div className="h-2 w-2 rounded-full bg-orange-500" />
+                    <span className="text-xs font-semibold text-orange-600 uppercase tracking-wide">
+                      Recentes · {recent.length}
+                    </span>
+                  </div>
+                )}
+                {recent.map(renderResponseItem)}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
