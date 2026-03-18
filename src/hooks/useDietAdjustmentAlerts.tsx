@@ -173,31 +173,9 @@ export function useDietCycleAlerts() {
   });
 }
 
-// Keep legacy hooks for backward compat
+// Legacy alias — kept for backward compat, points to same query
 export function usePendingDietAlerts() {
   return useDietCycleAlerts();
-}
-
-export function useDietAdjustmentAlerts() {
-  const { user } = useAuth();
-
-  return useQuery({
-    queryKey: ['diet-adjustment-alerts', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('diet_adjustment_alerts')
-        .select(`
-          *,
-          client:clients!diet_adjustment_alerts_client_id_fkey (
-            id, name, plan_type, consultation_count, is_active
-          )
-        `)
-        .order('next_alert_at', { ascending: true });
-      if (error) throw error;
-      return data as DietAdjustmentAlert[];
-    },
-    enabled: !!user,
-  });
 }
 
 export function useMarkDietAdjustmentDone() {
