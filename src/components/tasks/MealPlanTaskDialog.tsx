@@ -82,6 +82,10 @@ export function MealPlanTaskDialog({ open, onOpenChange }: MealPlanTaskDialogPro
           description: `Pendente: enviar plano alimentar para o atleta ${selectedClient.name}`,
           day_of_week: dayOfWeek === 0 ? 1 : dayOfWeek,
           is_pinned: true,
+          client_id: selectedClientId,
+          task_type: 'meal_plan',
+          priority: 'high',
+          source: 'manual',
         })
         .select('id')
         .single();

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { DayAgendaPanel } from '@/components/calendar/DayAgendaPanel';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -50,6 +51,7 @@ export default function CalendarPage() {
   const { data: consultations = [], isLoading: consultationsLoading } = useConsultationSchedules();
   const { data: appointments = [] } = useConsultationAppointments();
   const [activeTab, setActiveTab] = useState('pipeline');
+  const [selectedAgendaDay, setSelectedAgendaDay] = useState<Date>(new Date());
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -385,10 +387,12 @@ export default function CalendarPage() {
                         return (
                           <div
                             key={day.toISOString()}
+                            onClick={() => setSelectedAgendaDay(day)}
                             className={cn(
-                              "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative",
+                              "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative cursor-pointer hover:bg-muted/50 transition-colors",
                               !isCurrentMonth && "bg-muted/30",
                               isToday && "bg-primary/5",
+                              isSameDay(day, selectedAgendaDay) && "ring-2 ring-primary ring-inset",
                               index % 7 === 0 && "border-l-0",
                               index < 7 && "border-t-0"
                             )}
@@ -476,6 +480,15 @@ export default function CalendarPage() {
                   </div>
                 </CardContent>
               </Card>
+              {/* Day Agenda Panel - visible on calendar tab */}
+              {activeTab === 'calendar' && (
+                <div className="mt-4">
+                  <DayAgendaPanel
+                    date={selectedAgendaDay}
+                    appointments={appointments}
+                  />
+                </div>
+              )}
             </TabsContent>
 
             {/* Tab: History */}
