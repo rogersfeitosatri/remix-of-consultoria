@@ -399,7 +399,7 @@ export default function CheckinReview() {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={() => navigate(checkinResponse?.client_id ? `/clients/${checkinResponse.client_id}/history` : '/clients')} 
+            onClick={() => navigate('/forms?tab=reviews')} 
             className="gap-2 w-fit"
           >
             <ArrowLeft className="h-4 w-4" />
