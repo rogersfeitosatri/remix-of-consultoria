@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.send-call-booking-reminders]
 verify_jwt = false
+
+[functions.process-anamnese-submission]
+verify_jwt = false
