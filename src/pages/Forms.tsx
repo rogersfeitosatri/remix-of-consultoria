@@ -5,10 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library, Sparkles, FileSearch, ClipboardCheck } from 'lucide-react';
+import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library, Sparkles, ClipboardCheck } from 'lucide-react';
 import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm, useCreateDefaultCheckinForm } from '@/hooks/useCheckinForms';
 import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm, useCreateDefaultAnamneseForm } from '@/hooks/useAnamneseForms';
 import { useToast } from '@/hooks/use-toast';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,11 +40,11 @@ import { ScheduledCheckinsSection } from '@/components/forms/ScheduledCheckinsSe
 import { QuestionBankSection } from '@/components/forms/QuestionBankSection';
 import { AnamneseResponsesTab } from '@/components/forms/AnamneseResponsesTab';
 import { CheckinAuditTab } from '@/components/forms/CheckinAuditTab';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
-// Map URL param values to internal tab values for backwards compat
 const TAB_PARAM_MAP: Record<string, string> = {
   reviews: 'checkin',
-  respostas: 'respostas',
+  respostas: 'anamnese',
   anamnese: 'anamnese',
   checkin: 'checkin',
   agendados: 'agendados',
@@ -49,24 +52,23 @@ const TAB_PARAM_MAP: Record<string, string> = {
   banco: 'banco',
 };
 
-const VALID_TABS = ['checkin', 'agendados', 'conferencia', 'anamnese', 'respostas', 'banco'];
+const VALID_TABS = ['checkin', 'agendados', 'conferencia', 'anamnese', 'banco'];
 
 export default function Forms() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const tabFromUrl = searchParams.get('tab') || '';
   const resolvedTab = TAB_PARAM_MAP[tabFromUrl] || 'checkin';
   const [activeTab, setActiveTab] = useState(VALID_TABS.includes(resolvedTab) ? resolvedTab : 'checkin');
 
-  // Sync tab changes to URL
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     setSearchParams({ tab }, { replace: true });
   };
 
-  // Sync URL changes to tab (e.g. browser back)
   useEffect(() => {
     const t = searchParams.get('tab') || '';
     const mapped = TAB_PARAM_MAP[t];
@@ -74,7 +76,9 @@ export default function Forms() {
       setActiveTab(mapped);
     }
   }, [searchParams]);
+
   const [showNewFormDialog, setShowNewFormDialog] = useState(false);
+  const [newFormType, setNewFormType] = useState<'checkin' | 'anamnese'>('checkin');
   const [newFormData, setNewFormData] = useState({ title: '', description: '' });
 
   // Checkin forms
@@ -89,18 +93,69 @@ export default function Forms() {
   const createAnamneseForm = useCreateAnamneseForm();
   const createDefaultAnamneseForm = useCreateDefaultAnamneseForm();
 
+  // Badge counts
+  const { data: pendingCheckinCount = 0 } = useQuery({
+    queryKey: ['pending_checkin_count', user?.id],
+    queryFn: async () => {
+      const { data: responses, error } = await supabase
+        .from('checkin_responses')
+        .select('id', { count: 'exact', head: false })
+        .limit(200);
+      if (error) return 0;
+      
+      const ids = responses?.map(r => r.id) || [];
+      if (ids.length === 0) return 0;
+      
+      const { data: feedbacks } = await supabase
+        .from('checkin_feedbacks')
+        .select('checkin_response_id')
+        .in('checkin_response_id', ids)
+        .eq('status', 'sent');
+      
+      const sentIds = new Set(feedbacks?.map(f => f.checkin_response_id) || []);
+      return ids.filter(id => !sentIds.has(id)).length;
+    },
+    enabled: !!user,
+    staleTime: 30000,
+  });
+
+  const { data: pendingAnamneseCount = 0 } = useQuery({
+    queryKey: ['pending_anamnese_count', user?.id],
+    queryFn: async () => {
+      // Unlinked responses
+      const { data: forms } = await supabase
+        .from('anamnese_forms')
+        .select('id')
+        .eq('user_id', user?.id);
+      if (!forms?.length) return 0;
+      
+      const { count: unlinkedCount } = await supabase
+        .from('anamnese_responses')
+        .select('id', { count: 'exact', head: true })
+        .in('form_id', forms.map(f => f.id))
+        .is('client_id', null);
+
+      // Pending anamnese clients
+      const { count: pendingCount } = await supabase
+        .from('clients')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user?.id)
+        .eq('athlete_status', 'pending_anamnese');
+
+      return (unlinkedCount || 0) + (pendingCount || 0);
+    },
+    enabled: !!user,
+    staleTime: 30000,
+  });
+
   const handleCreateForm = async () => {
     if (!newFormData.title.trim()) {
-      toast({
-        title: 'Erro',
-        description: 'O título é obrigatório.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro', description: 'O título é obrigatório.', variant: 'destructive' });
       return;
     }
 
     try {
-      if (activeTab === 'checkin') {
+      if (newFormType === 'checkin') {
         const form = await createCheckinForm.mutateAsync({
           title: newFormData.title,
           description: newFormData.description || null,
@@ -115,12 +170,8 @@ export default function Forms() {
       }
       setShowNewFormDialog(false);
       setNewFormData({ title: '', description: '' });
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível criar o formulário.',
-        variant: 'destructive',
-      });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível criar o formulário.', variant: 'destructive' });
     }
   };
 
@@ -128,12 +179,8 @@ export default function Forms() {
     try {
       await deleteCheckinForm.mutateAsync(id);
       toast({ title: 'Formulário excluído com sucesso!' });
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível excluir o formulário.',
-        variant: 'destructive',
-      });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível excluir.', variant: 'destructive' });
     }
   };
 
@@ -141,335 +188,260 @@ export default function Forms() {
     try {
       await deleteAnamneseForm.mutateAsync(id);
       toast({ title: 'Formulário excluído com sucesso!' });
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível excluir o formulário.',
-        variant: 'destructive',
-      });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível excluir.', variant: 'destructive' });
     }
   };
 
   const copyFormLink = (formId: string, type: 'checkin' | 'anamnese') => {
     const baseUrl = window.location.origin;
-    const link = type === 'checkin' 
-      ? `${baseUrl}/form/${formId}`
-      : `${baseUrl}/anamnese-form/${formId}`;
+    const link = type === 'checkin' ? `${baseUrl}/form/${formId}` : `${baseUrl}/anamnese-form/${formId}`;
     navigator.clipboard.writeText(link);
-    toast({ title: 'Link copiado para a área de transferência!' });
+    toast({ title: 'Link copiado!' });
   };
 
   const handleCreateDefaultForm = async () => {
     try {
       const form = await createDefaultCheckinForm.mutateAsync();
-      toast({ 
-        title: 'Formulário padrão criado!',
-        description: 'O formulário com as perguntas do banco foi criado com sucesso.',
-      });
+      toast({ title: 'Formulário padrão criado!' });
       navigate(`/checkin/${form.id}`);
     } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Não foi possível criar o formulário padrão.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro', description: error.message || 'Não foi possível criar.', variant: 'destructive' });
     }
   };
 
   const handleCreateDefaultAnamneseForm = async () => {
     try {
       const form = await createDefaultAnamneseForm.mutateAsync();
-      toast({ 
-        title: 'Formulário padrão criado!',
-        description: 'A anamnese com as perguntas do banco foi criada com sucesso.',
-      });
+      toast({ title: 'Anamnese padrão criada!' });
       navigate(`/anamnese/${form.id}`);
     } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Não foi possível criar a anamnese padrão.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erro', description: error.message || 'Não foi possível criar.', variant: 'destructive' });
     }
   };
 
+  const openNewFormDialog = (type: 'checkin' | 'anamnese') => {
+    setNewFormType(type);
+    setNewFormData({ title: '', description: '' });
+    setShowNewFormDialog(true);
+  };
+
+  // Contextual actions per tab
+  const renderActions = () => {
+    if (activeTab === 'checkin') {
+      return (
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCreateDefaultForm} disabled={createDefaultCheckinForm.isPending}>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Criar Padrão</span>
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => openNewFormDialog('checkin')}>
+            <Plus className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Novo Checkin</span>
+          </Button>
+        </div>
+      );
+    }
+    if (activeTab === 'anamnese') {
+      return (
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCreateDefaultAnamneseForm} disabled={createDefaultAnamneseForm.isPending}>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Criar Padrão</span>
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => openNewFormDialog('anamnese')}>
+            <Plus className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Nova Anamnese</span>
+          </Button>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const renderFormCard = (form: any, type: 'checkin' | 'anamnese') => (
+    <Card key={form.id} className="hover:border-primary/50 transition-colors">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-sm font-medium truncate">{form.title}</CardTitle>
+            {form.description && (
+              <CardDescription className="mt-1 line-clamp-2 text-xs">{form.description}</CardDescription>
+            )}
+          </div>
+          <div className="flex gap-1 flex-shrink-0">
+            {type === 'anamnese' && form.is_required && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 h-5">Obrigatório</Badge>
+            )}
+            <Badge variant={form.is_active ? 'default' : 'secondary'} className="text-[10px] px-1.5 h-5">
+              {form.is_active ? 'Ativo' : 'Inativo'}
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="flex flex-wrap gap-1.5">
+          <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"
+            onClick={() => navigate(type === 'checkin' ? `/checkin/${form.id}` : `/anamnese/${form.id}`)}>
+            <Edit className="h-3 w-3" /> Editar
+          </Button>
+          <Button size="sm" variant="outline" className="gap-1 h-7 text-xs"
+            onClick={() => copyFormLink(form.id, type)}>
+            <Copy className="h-3 w-3" /> Link
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="ghost" className="gap-1 h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir formulário?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação não pode ser desfeita. Todas as respostas serão perdidas.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => type === 'checkin' ? handleDeleteCheckin(form.id) : handleDeleteAnamnese(form.id)}>
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Formulários</h1>
-            <p className="text-muted-foreground">
-              Gerencie seus formulários de checkin e anamnese
-            </p>
+            <h1 className="text-xl font-bold">Formulários</h1>
+            <p className="text-xs text-muted-foreground">Check-ins, anamneses e banco de perguntas</p>
           </div>
-          <div className="flex gap-2">
-            {activeTab === 'checkin' && (
-              <Button 
-                onClick={handleCreateDefaultForm}
-                variant="outline"
-                className="gap-2"
-                disabled={createDefaultCheckinForm.isPending}
-              >
-                <Sparkles className="h-4 w-4" />
-                <span className="hidden sm:inline">Criar Padrão</span>
-              </Button>
-            )}
-            {activeTab === 'anamnese' && (
-              <Button 
-                onClick={handleCreateDefaultAnamneseForm}
-                variant="outline"
-                className="gap-2"
-                disabled={createDefaultAnamneseForm.isPending}
-              >
-                <Sparkles className="h-4 w-4" />
-                <span className="hidden sm:inline">Criar Padrão</span>
-              </Button>
-            )}
-            <Button 
-              onClick={() => setShowNewFormDialog(true)}
-              className="gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Novo Formulário
-            </Button>
-          </div>
+          {renderActions()}
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-6 max-w-4xl">
-            <TabsTrigger value="checkin" className="gap-2">
-              <ClipboardList className="h-4 w-4" />
-              <span className="hidden sm:inline">Checkin</span>
-            </TabsTrigger>
-            <TabsTrigger value="agendados" className="gap-2">
-              <CalendarCheck className="h-4 w-4" />
-              <span className="hidden sm:inline">Agendados</span>
-            </TabsTrigger>
-            <TabsTrigger value="conferencia" className="gap-2">
-              <ClipboardCheck className="h-4 w-4" />
-              <span className="hidden sm:inline">Conferência</span>
-            </TabsTrigger>
-            <TabsTrigger value="anamnese" className="gap-2">
-              <FileText className="h-4 w-4" />
-              <span className="hidden sm:inline">Anamnese</span>
-            </TabsTrigger>
-            <TabsTrigger value="respostas" className="gap-2">
-              <FileSearch className="h-4 w-4" />
-              <span className="hidden sm:inline">Respostas</span>
-            </TabsTrigger>
-            <TabsTrigger value="banco" className="gap-2">
-              <Library className="h-4 w-4" />
-              <span className="hidden sm:inline">Perguntas</span>
-            </TabsTrigger>
-          </TabsList>
+          {/* Scrollable tabs for mobile */}
+          <ScrollArea className="w-full">
+            <TabsList className="inline-flex w-auto min-w-full sm:w-full sm:grid sm:grid-cols-5 h-auto p-1">
+              <TabsTrigger value="checkin" className="gap-1.5 text-xs px-3 py-2 relative">
+                <ClipboardList className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Check-in</span>
+                {pendingCheckinCount > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] flex items-center justify-center">
+                    {pendingCheckinCount > 99 ? '99+' : pendingCheckinCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="agendados" className="gap-1.5 text-xs px-3 py-2">
+                <CalendarCheck className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Agendados</span>
+              </TabsTrigger>
+              <TabsTrigger value="conferencia" className="gap-1.5 text-xs px-3 py-2">
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Conferência</span>
+              </TabsTrigger>
+              <TabsTrigger value="anamnese" className="gap-1.5 text-xs px-3 py-2 relative">
+                <FileText className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Anamnese</span>
+                {pendingAnamneseCount > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] flex items-center justify-center">
+                    {pendingAnamneseCount > 99 ? '99+' : pendingAnamneseCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="banco" className="gap-1.5 text-xs px-3 py-2">
+                <Library className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Perguntas</span>
+              </TabsTrigger>
+            </TabsList>
+            <ScrollBar orientation="horizontal" className="sm:hidden" />
+          </ScrollArea>
 
-          {/* Scheduled Checkins Tab */}
-          <TabsContent value="agendados" className="space-y-6 mt-6">
-            <ScheduledCheckinsSection />
-          </TabsContent>
-
-          {/* Checkin Audit Tab */}
-          <TabsContent value="conferencia" className="space-y-6 mt-6">
-            <CheckinAuditTab />
-          </TabsContent>
-
-          {/* Anamnese Responses Tab */}
-          <TabsContent value="respostas" className="space-y-6 mt-6">
-            <AnamneseResponsesTab />
-          </TabsContent>
-
-          {/* Question Bank Tab */}
-          <TabsContent value="banco" className="space-y-6 mt-6">
-            <QuestionBankSection />
-          </TabsContent>
-
-          {/* Checkin Forms */}
-          <TabsContent value="checkin" className="space-y-6 mt-6">
-            {/* Pending Reviews List */}
+          {/* Check-in Tab: Pending reviews + form templates */}
+          <TabsContent value="checkin" className="space-y-4 mt-4">
             <PendingReviewsList />
 
-            {/* Forms List */}
             {checkinLoading ? (
               <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
               </div>
             ) : checkinForms.length === 0 ? (
               <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Nenhum formulário de checkin</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Crie seu primeiro formulário de checkin para acompanhar seus atletas
-                  </p>
-                  <Button onClick={() => setShowNewFormDialog(true)} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Criar Formulário
+                <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+                  <ClipboardList className="h-10 w-10 text-muted-foreground mb-3" />
+                  <h3 className="text-base font-semibold mb-1">Nenhum formulário de checkin</h3>
+                  <p className="text-sm text-muted-foreground mb-3">Crie seu primeiro formulário para acompanhar seus atletas</p>
+                  <Button size="sm" onClick={() => openNewFormDialog('checkin')} className="gap-1.5">
+                    <Plus className="h-3.5 w-3.5" /> Criar Formulário
                   </Button>
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {checkinForms.map((form: any) => (
-                  <Card key={form.id} className="hover:border-primary/50 transition-colors">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-base truncate">{form.title}</CardTitle>
-                          {form.description && (
-                            <CardDescription className="mt-1 line-clamp-2">
-                              {form.description}
-                            </CardDescription>
-                          )}
-                        </div>
-                        <Badge variant={form.is_active ? 'default' : 'secondary'}>
-                          {form.is_active ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => navigate(`/checkin/${form.id}`)}
-                          className="gap-1"
-                        >
-                          <Edit className="h-3 w-3" />
-                          Editar
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => copyFormLink(form.id, 'checkin')}
-                          className="gap-1"
-                        >
-                          <Copy className="h-3 w-3" />
-                          Copiar Link
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="destructive" className="gap-1">
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Excluir formulário?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação não pode ser desfeita. Todas as respostas serão perdidas.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteCheckin(form.id)}>
-                                Excluir
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {checkinForms.map((form: any) => renderFormCard(form, 'checkin'))}
               </div>
             )}
           </TabsContent>
 
-          {/* Anamnese Forms */}
-          <TabsContent value="anamnese" className="space-y-6 mt-6">
-            {/* Pending Anamnese List */}
+          {/* Scheduled Checkins */}
+          <TabsContent value="agendados" className="space-y-4 mt-4">
+            <ScheduledCheckinsSection />
+          </TabsContent>
+
+          {/* Checkin Audit */}
+          <TabsContent value="conferencia" className="space-y-4 mt-4">
+            <CheckinAuditTab />
+          </TabsContent>
+
+          {/* Anamnese Tab: Pending + Responses + Form templates */}
+          <TabsContent value="anamnese" className="space-y-4 mt-4">
+            {/* Pending anamnese clients */}
             <PendingAnamneseList />
 
-            {anamneseLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : anamneseForms.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Nenhum formulário de anamnese</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Crie formulários de anamnese para coletar informações detalhadas dos atletas
-                  </p>
-                  <Button onClick={() => { setActiveTab('anamnese'); setShowNewFormDialog(true); }} className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Criar Anamnese
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {anamneseForms.map((form: any) => (
-                  <Card key={form.id} className="hover:border-primary/50 transition-colors">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-base truncate">{form.title}</CardTitle>
-                          {form.description && (
-                            <CardDescription className="mt-1 line-clamp-2">
-                              {form.description}
-                            </CardDescription>
-                          )}
-                        </div>
-                        <div className="flex gap-1">
-                          {form.is_required && (
-                            <Badge variant="destructive">Obrigatório</Badge>
-                          )}
-                          <Badge variant={form.is_active ? 'default' : 'secondary'}>
-                            {form.is_active ? 'Ativo' : 'Inativo'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => navigate(`/anamnese/${form.id}`)}
-                          className="gap-1"
-                        >
-                          <Edit className="h-3 w-3" />
-                          Editar
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => copyFormLink(form.id, 'anamnese')}
-                          className="gap-1"
-                        >
-                          <Copy className="h-3 w-3" />
-                          Copiar Link
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="destructive" className="gap-1">
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Excluir formulário?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação não pode ser desfeita. Todas as respostas serão perdidas.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteAnamnese(form.id)}>
-                                Excluir
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            {/* Anamnese responses (linked + unlinked) */}
+            <AnamneseResponsesTab />
+
+            {/* Anamnese form templates (collapsible section) */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  Modelos de Anamnese
+                  <Badge variant="secondary" className="text-[10px] px-1.5 h-5">{anamneseForms.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {anamneseLoading ? (
+                  <div className="flex justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                  </div>
+                ) : anamneseForms.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-sm text-muted-foreground mb-3">Nenhum formulário de anamnese criado</p>
+                    <Button size="sm" onClick={() => openNewFormDialog('anamnese')} className="gap-1.5">
+                      <Plus className="h-3.5 w-3.5" /> Criar Anamnese
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {anamneseForms.map((form: any) => renderFormCard(form, 'anamnese'))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Question Bank */}
+          <TabsContent value="banco" className="space-y-4 mt-4">
+            <QuestionBankSection />
           </TabsContent>
         </Tabs>
       </div>
@@ -479,10 +451,10 @@ export default function Forms() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              Novo Formulário de {activeTab === 'checkin' ? 'Checkin' : 'Anamnese'}
+              Novo Formulário de {newFormType === 'checkin' ? 'Checkin' : 'Anamnese'}
             </DialogTitle>
             <DialogDescription>
-              Crie um novo formulário para {activeTab === 'checkin' ? 'acompanhar seus atletas' : 'coletar informações detalhadas'}
+              Crie um novo formulário para {newFormType === 'checkin' ? 'acompanhar seus atletas' : 'coletar informações detalhadas'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -492,7 +464,7 @@ export default function Forms() {
                 id="title"
                 value={newFormData.title}
                 onChange={(e) => setNewFormData({ ...newFormData, title: e.target.value })}
-                placeholder={activeTab === 'checkin' ? 'Ex: Checkin Semanal' : 'Ex: Anamnese Inicial'}
+                placeholder={newFormType === 'checkin' ? 'Ex: Checkin Semanal' : 'Ex: Anamnese Inicial'}
               />
             </div>
             <div className="space-y-2">
@@ -507,13 +479,8 @@ export default function Forms() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNewFormDialog(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleCreateForm}
-              disabled={createCheckinForm.isPending || createAnamneseForm.isPending}
-            >
+            <Button variant="outline" onClick={() => setShowNewFormDialog(false)}>Cancelar</Button>
+            <Button onClick={handleCreateForm} disabled={createCheckinForm.isPending || createAnamneseForm.isPending}>
               Criar Formulário
             </Button>
           </DialogFooter>

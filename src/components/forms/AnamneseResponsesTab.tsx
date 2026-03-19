@@ -513,16 +513,6 @@ export function AnamneseResponsesTab() {
         </Card>
       )}
 
-      {/* Pending athletes note - redirect to anamnese tab */}
-      {filteredPending.length > 0 && (
-        <Card>
-          <CardContent className="py-4">
-            <p className="text-sm text-muted-foreground text-center">
-              {filteredPending.length} atleta(s) aguardando preenchimento de anamnese — veja na aba <strong>Anamnese</strong>.
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Empty State */}
       {filteredResponses.length === 0 && filteredPending.length === 0 && filteredUnlinked.length === 0 && (
