@@ -160,21 +160,6 @@ export default function PublicAnamneseForm() {
     setSubmitting(true);
 
     try {
-      // Try to find client by email (optional - form is fully public)
-      // This query may return empty for anonymous users due to RLS - that's fine
-      let clientId: string | null = null;
-      try {
-        const { data: clients } = await supabase
-          .from('clients')
-          .select('id')
-          .eq('email', athleteEmail.toLowerCase().trim())
-          .limit(1);
-        clientId = clients && clients.length > 0 ? clients[0].id : null;
-      } catch {
-        // Anonymous users can't read clients table - proceed without linking
-        clientId = null;
-      }
-
       // Prepare responses with comments
       const responsesWithComments: Record<string, any> = {};
       questions.forEach((q) => {
@@ -184,19 +169,18 @@ export default function PublicAnamneseForm() {
         };
       });
 
-      // Submit response - can be without client_id (will be linked later by admin)
-      // Cast to any since new columns may not be in types yet
-      const { error: submitError } = await (supabase
-        .from('anamnese_responses') as any)
-        .insert({
+      // Use edge function for auto-linking and auto-creation
+      const { data, error: fnError } = await supabase.functions.invoke('process-anamnese-submission', {
+        body: {
           form_id: formId,
-          client_id: clientId,
           respondent_name: athleteName.trim(),
           respondent_email: athleteEmail.toLowerCase().trim(),
           responses: responsesWithComments,
-        });
+        },
+      });
 
-      if (submitError) throw submitError;
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
 
       setSubmitted(true);
       toast.success('Anamnese enviada com sucesso!');
