@@ -67,6 +67,10 @@ export function AnamneseResponsesTab() {
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [responseToDelete, setResponseToDelete] = useState<UnlinkedResponse | null>(null);
+  const [linkMode, setLinkMode] = useState<'existing' | 'new'>('existing');
+  const [newAthleteName, setNewAthleteName] = useState('');
+  const [newAthleteEmail, setNewAthleteEmail] = useState('');
+  const [newAthletePhone, setNewAthletePhone] = useState('');
 
   // Fetch all anamnese responses with client info (linked responses)
   const { data: anamneseResponses = [], isLoading } = useQuery({
