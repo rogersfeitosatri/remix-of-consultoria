@@ -38,10 +38,42 @@ import { QuestionBankSection } from '@/components/forms/QuestionBankSection';
 import { AnamneseResponsesTab } from '@/components/forms/AnamneseResponsesTab';
 import { CheckinAuditTab } from '@/components/forms/CheckinAuditTab';
 
+// Map URL param values to internal tab values for backwards compat
+const TAB_PARAM_MAP: Record<string, string> = {
+  reviews: 'checkin',
+  respostas: 'respostas',
+  anamnese: 'anamnese',
+  checkin: 'checkin',
+  agendados: 'agendados',
+  conferencia: 'conferencia',
+  banco: 'banco',
+};
+
+const VALID_TABS = ['checkin', 'agendados', 'conferencia', 'anamnese', 'respostas', 'banco'];
+
 export default function Forms() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('checkin');
+
+  const tabFromUrl = searchParams.get('tab') || '';
+  const resolvedTab = TAB_PARAM_MAP[tabFromUrl] || 'checkin';
+  const [activeTab, setActiveTab] = useState(VALID_TABS.includes(resolvedTab) ? resolvedTab : 'checkin');
+
+  // Sync tab changes to URL
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setSearchParams({ tab }, { replace: true });
+  };
+
+  // Sync URL changes to tab (e.g. browser back)
+  useEffect(() => {
+    const t = searchParams.get('tab') || '';
+    const mapped = TAB_PARAM_MAP[t];
+    if (mapped && mapped !== activeTab) {
+      setActiveTab(mapped);
+    }
+  }, [searchParams]);
   const [showNewFormDialog, setShowNewFormDialog] = useState(false);
   const [newFormData, setNewFormData] = useState({ title: '', description: '' });
 
