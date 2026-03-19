@@ -513,51 +513,13 @@ export function AnamneseResponsesTab() {
         </Card>
       )}
 
-      {/* Pending (No Response Yet) */}
+      {/* Pending athletes note - redirect to anamnese tab */}
       {filteredPending.length > 0 && (
         <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-base flex items-center gap-2">
-              Pendentes
-              <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
-                {filteredPending.length}
-              </Badge>
-            </CardTitle>
-            <CardDescription>
-              Atletas que ainda não preencheram a anamnese
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-              {filteredPending.map((client) => (
-                <div
-                  key={client.id}
-                  className="flex items-center justify-between p-4 rounded-lg border bg-muted/30"
-                >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <User className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{client.name}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {client.email || 'Sem email'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-sm text-muted-foreground">
-                        Cadastrado em {format(parseISO(client.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
-                      Pendente
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <CardContent className="py-4">
+            <p className="text-sm text-muted-foreground text-center">
+              {filteredPending.length} atleta(s) aguardando preenchimento de anamnese — veja na aba <strong>Anamnese</strong>.
+            </p>
           </CardContent>
         </Card>
       )}
