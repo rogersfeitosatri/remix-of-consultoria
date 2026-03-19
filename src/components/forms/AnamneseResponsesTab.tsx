@@ -236,7 +236,7 @@ export function AnamneseResponsesTab() {
         .from('anamnese_responses')
         .delete()
         .eq('id', responseId)
-        .is('client_id', null); // Extra safety: only delete if unlinked
+        .is('client_id', null);
 
       if (error) throw error;
     },
@@ -252,7 +252,72 @@ export function AnamneseResponsesTab() {
     },
   });
 
-  // Also fetch clients without anamnese (pending)
+  // Mutation to create new athlete and link response
+  const createAndLinkMutation = useMutation({
+    mutationFn: async ({ responseId, name, email, phone }: { responseId: string; name: string; email: string; phone: string }) => {
+      const today = new Date().toISOString().split('T')[0];
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 3);
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      // Create the client
+      const { data: newClient, error: clientError } = await supabase
+        .from('clients')
+        .insert({
+          user_id: user!.id,
+          name: name.trim(),
+          email: email.toLowerCase().trim(),
+          phone: phone.trim() || null,
+          service_type: 'nutrition',
+          plan_type: 'consultoria',
+          start_date: today,
+          end_date: endDateStr,
+          monthly_value: 0,
+          is_active: true,
+          has_checkin: false,
+          athlete_status: 'active',
+          registration_source: 'anamnese_manual',
+        })
+        .select('id')
+        .single();
+
+      if (clientError) throw clientError;
+
+      // Create athlete profile
+      await supabase
+        .from('athlete_profiles')
+        .insert({
+          client_id: newClient.id,
+          full_name: name.trim(),
+          anamnese_completed: true,
+          anamnese_submitted_at: new Date().toISOString(),
+        });
+
+      // Link the response
+      const { error: linkError } = await supabase
+        .from('anamnese_responses')
+        .update({ client_id: newClient.id })
+        .eq('id', responseId);
+
+      if (linkError) throw linkError;
+
+      return newClient.id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all_anamnese_responses'] });
+      queryClient.invalidateQueries({ queryKey: ['unlinked_anamnese_responses'] });
+      queryClient.invalidateQueries({ queryKey: ['pending_anamnese_clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success('Atleta criado e anamnese vinculada com sucesso!');
+      setLinkDialogOpen(false);
+      setSelectedUnlinked(null);
+      resetDialogState();
+    },
+    onError: (error) => {
+      console.error('Error creating athlete:', error);
+      toast.error('Erro ao criar atleta');
+    },
+  });
   const { data: pendingClients = [] } = useQuery({
     queryKey: ['pending_anamnese_for_list', user?.id],
     queryFn: async () => {
