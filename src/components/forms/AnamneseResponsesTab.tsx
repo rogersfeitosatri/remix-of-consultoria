@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, FileText, Eye, User, Link2, AlertCircle, Trash2 } from 'lucide-react';
+import { Search, FileText, Eye, User, Link2, AlertCircle, Trash2, UserPlus } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -66,6 +67,10 @@ export function AnamneseResponsesTab() {
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [responseToDelete, setResponseToDelete] = useState<UnlinkedResponse | null>(null);
+  const [linkMode, setLinkMode] = useState<'existing' | 'new'>('existing');
+  const [newAthleteName, setNewAthleteName] = useState('');
+  const [newAthleteEmail, setNewAthleteEmail] = useState('');
+  const [newAthletePhone, setNewAthletePhone] = useState('');
 
   // Fetch all anamnese responses with client info (linked responses)
   const { data: anamneseResponses = [], isLoading } = useQuery({
@@ -231,7 +236,7 @@ export function AnamneseResponsesTab() {
         .from('anamnese_responses')
         .delete()
         .eq('id', responseId)
-        .is('client_id', null); // Extra safety: only delete if unlinked
+        .is('client_id', null);
 
       if (error) throw error;
     },
@@ -247,7 +252,72 @@ export function AnamneseResponsesTab() {
     },
   });
 
-  // Also fetch clients without anamnese (pending)
+  // Mutation to create new athlete and link response
+  const createAndLinkMutation = useMutation({
+    mutationFn: async ({ responseId, name, email, phone }: { responseId: string; name: string; email: string; phone: string }) => {
+      const today = new Date().toISOString().split('T')[0];
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 3);
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      // Create the client
+      const { data: newClient, error: clientError } = await supabase
+        .from('clients')
+        .insert({
+          user_id: user!.id,
+          name: name.trim(),
+          email: email.toLowerCase().trim(),
+          phone: phone.trim() || null,
+          service_type: 'nutrition',
+          plan_type: 'consultoria',
+          start_date: today,
+          end_date: endDateStr,
+          monthly_value: 0,
+          is_active: true,
+          has_checkin: false,
+          athlete_status: 'active',
+          registration_source: 'anamnese_manual',
+        })
+        .select('id')
+        .single();
+
+      if (clientError) throw clientError;
+
+      // Create athlete profile
+      await supabase
+        .from('athlete_profiles')
+        .insert({
+          client_id: newClient.id,
+          full_name: name.trim(),
+          anamnese_completed: true,
+          anamnese_submitted_at: new Date().toISOString(),
+        });
+
+      // Link the response
+      const { error: linkError } = await supabase
+        .from('anamnese_responses')
+        .update({ client_id: newClient.id })
+        .eq('id', responseId);
+
+      if (linkError) throw linkError;
+
+      return newClient.id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all_anamnese_responses'] });
+      queryClient.invalidateQueries({ queryKey: ['unlinked_anamnese_responses'] });
+      queryClient.invalidateQueries({ queryKey: ['pending_anamnese_clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success('Atleta criado e anamnese vinculada com sucesso!');
+      setLinkDialogOpen(false);
+      setSelectedUnlinked(null);
+      resetDialogState();
+    },
+    onError: (error) => {
+      console.error('Error creating athlete:', error);
+      toast.error('Erro ao criar atleta');
+    },
+  });
   const { data: pendingClients = [] } = useQuery({
     queryKey: ['pending_anamnese_for_list', user?.id],
     queryFn: async () => {
@@ -313,9 +383,20 @@ export function AnamneseResponsesTab() {
     );
   }, [pendingClients, searchTerm]);
 
+  const resetDialogState = () => {
+    setSelectedClientId('');
+    setLinkMode('existing');
+    setNewAthleteName('');
+    setNewAthleteEmail('');
+    setNewAthletePhone('');
+  };
+
   const openLinkDialog = (response: UnlinkedResponse) => {
     setSelectedUnlinked(response);
-    setSelectedClientId('');
+    resetDialogState();
+    // Pre-fill new athlete fields from response data
+    setNewAthleteName(response.respondent_name || '');
+    setNewAthleteEmail(response.respondent_email || '');
     setLinkDialogOpen(true);
   };
 
@@ -334,6 +415,16 @@ export function AnamneseResponsesTab() {
     linkToClientMutation.mutate({
       responseId: selectedUnlinked.id,
       clientId: selectedClientId,
+    });
+  };
+
+  const handleCreateAndLink = () => {
+    if (!selectedUnlinked || !newAthleteName.trim() || !newAthleteEmail.trim()) return;
+    createAndLinkMutation.mutate({
+      responseId: selectedUnlinked.id,
+      name: newAthleteName,
+      email: newAthleteEmail,
+      phone: newAthletePhone,
     });
   };
 
@@ -532,43 +623,92 @@ export function AnamneseResponsesTab() {
       )}
 
       {/* Link Dialog */}
-      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
-        <DialogContent>
+      <Dialog open={linkDialogOpen} onOpenChange={(open) => { setLinkDialogOpen(open); if (!open) resetDialogState(); }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Vincular Anamnese a Atleta</DialogTitle>
+            <DialogTitle>Vincular Anamnese</DialogTitle>
             <DialogDescription>
-              Selecione o atleta para vincular esta resposta de anamnese.
+              Vincule a um atleta existente ou crie um novo cadastro.
             </DialogDescription>
           </DialogHeader>
 
           {selectedUnlinked && (
-            <div className="py-4 space-y-4">
-              <div className="p-4 rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground">Resposta de:</p>
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                <p className="text-muted-foreground">Resposta de:</p>
                 <p className="font-medium">{selectedUnlinked.respondent_name || 'Sem nome'}</p>
-                <p className="text-sm text-muted-foreground">
-                  {selectedUnlinked.respondent_email || 'Sem email'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Enviada em {format(parseISO(selectedUnlinked.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                <p className="text-muted-foreground text-xs">
+                  {selectedUnlinked.respondent_email || 'Sem email'} · {format(parseISO(selectedUnlinked.submitted_at), "dd/MM/yyyy", { locale: ptBR })}
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Vincular ao atleta:</label>
-                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um atleta..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientsForLinking.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name} {client.email ? `(${client.email})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Mode toggle */}
+              <div className="flex gap-2">
+                <Button
+                  variant={linkMode === 'existing' ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-1 gap-2"
+                  onClick={() => setLinkMode('existing')}
+                >
+                  <Link2 className="h-4 w-4" />
+                  Atleta existente
+                </Button>
+                <Button
+                  variant={linkMode === 'new' ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-1 gap-2"
+                  onClick={() => setLinkMode('new')}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Criar novo
+                </Button>
               </div>
+
+              {linkMode === 'existing' ? (
+                <div className="space-y-2">
+                  <Label>Vincular ao atleta:</Label>
+                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um atleta..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientsForLinking.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name} {client.email ? `(${client.email})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Nome *</Label>
+                    <Input
+                      value={newAthleteName}
+                      onChange={(e) => setNewAthleteName(e.target.value)}
+                      placeholder="Nome completo"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Email *</Label>
+                    <Input
+                      type="email"
+                      value={newAthleteEmail}
+                      onChange={(e) => setNewAthleteEmail(e.target.value)}
+                      placeholder="email@exemplo.com"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Telefone</Label>
+                    <Input
+                      value={newAthletePhone}
+                      onChange={(e) => setNewAthletePhone(e.target.value)}
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -576,12 +716,21 @@ export function AnamneseResponsesTab() {
             <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button 
-              onClick={handleLinkToClient} 
-              disabled={!selectedClientId || linkToClientMutation.isPending}
-            >
-              {linkToClientMutation.isPending ? 'Vinculando...' : 'Vincular'}
-            </Button>
+            {linkMode === 'existing' ? (
+              <Button
+                onClick={handleLinkToClient}
+                disabled={!selectedClientId || linkToClientMutation.isPending}
+              >
+                {linkToClientMutation.isPending ? 'Vinculando...' : 'Vincular'}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleCreateAndLink}
+                disabled={!newAthleteName.trim() || !newAthleteEmail.trim() || createAndLinkMutation.isPending}
+              >
+                {createAndLinkMutation.isPending ? 'Criando...' : 'Criar e Vincular'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
