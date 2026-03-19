@@ -623,43 +623,92 @@ export function AnamneseResponsesTab() {
       )}
 
       {/* Link Dialog */}
-      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
-        <DialogContent>
+      <Dialog open={linkDialogOpen} onOpenChange={(open) => { setLinkDialogOpen(open); if (!open) resetDialogState(); }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Vincular Anamnese a Atleta</DialogTitle>
+            <DialogTitle>Vincular Anamnese</DialogTitle>
             <DialogDescription>
-              Selecione o atleta para vincular esta resposta de anamnese.
+              Vincule a um atleta existente ou crie um novo cadastro.
             </DialogDescription>
           </DialogHeader>
 
           {selectedUnlinked && (
-            <div className="py-4 space-y-4">
-              <div className="p-4 rounded-lg bg-muted/50">
-                <p className="text-sm text-muted-foreground">Resposta de:</p>
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                <p className="text-muted-foreground">Resposta de:</p>
                 <p className="font-medium">{selectedUnlinked.respondent_name || 'Sem nome'}</p>
-                <p className="text-sm text-muted-foreground">
-                  {selectedUnlinked.respondent_email || 'Sem email'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Enviada em {format(parseISO(selectedUnlinked.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                <p className="text-muted-foreground text-xs">
+                  {selectedUnlinked.respondent_email || 'Sem email'} · {format(parseISO(selectedUnlinked.submitted_at), "dd/MM/yyyy", { locale: ptBR })}
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Vincular ao atleta:</label>
-                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um atleta..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clientsForLinking.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name} {client.email ? `(${client.email})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Mode toggle */}
+              <div className="flex gap-2">
+                <Button
+                  variant={linkMode === 'existing' ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-1 gap-2"
+                  onClick={() => setLinkMode('existing')}
+                >
+                  <Link2 className="h-4 w-4" />
+                  Atleta existente
+                </Button>
+                <Button
+                  variant={linkMode === 'new' ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-1 gap-2"
+                  onClick={() => setLinkMode('new')}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Criar novo
+                </Button>
               </div>
+
+              {linkMode === 'existing' ? (
+                <div className="space-y-2">
+                  <Label>Vincular ao atleta:</Label>
+                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um atleta..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientsForLinking.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name} {client.email ? `(${client.email})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Nome *</Label>
+                    <Input
+                      value={newAthleteName}
+                      onChange={(e) => setNewAthleteName(e.target.value)}
+                      placeholder="Nome completo"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Email *</Label>
+                    <Input
+                      type="email"
+                      value={newAthleteEmail}
+                      onChange={(e) => setNewAthleteEmail(e.target.value)}
+                      placeholder="email@exemplo.com"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Telefone</Label>
+                    <Input
+                      value={newAthletePhone}
+                      onChange={(e) => setNewAthletePhone(e.target.value)}
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -667,12 +716,21 @@ export function AnamneseResponsesTab() {
             <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button 
-              onClick={handleLinkToClient} 
-              disabled={!selectedClientId || linkToClientMutation.isPending}
-            >
-              {linkToClientMutation.isPending ? 'Vinculando...' : 'Vincular'}
-            </Button>
+            {linkMode === 'existing' ? (
+              <Button
+                onClick={handleLinkToClient}
+                disabled={!selectedClientId || linkToClientMutation.isPending}
+              >
+                {linkToClientMutation.isPending ? 'Vinculando...' : 'Vincular'}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleCreateAndLink}
+                disabled={!newAthleteName.trim() || !newAthleteEmail.trim() || createAndLinkMutation.isPending}
+              >
+                {createAndLinkMutation.isPending ? 'Criando...' : 'Criar e Vincular'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
