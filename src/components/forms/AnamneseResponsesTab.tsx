@@ -383,9 +383,20 @@ export function AnamneseResponsesTab() {
     );
   }, [pendingClients, searchTerm]);
 
+  const resetDialogState = () => {
+    setSelectedClientId('');
+    setLinkMode('existing');
+    setNewAthleteName('');
+    setNewAthleteEmail('');
+    setNewAthletePhone('');
+  };
+
   const openLinkDialog = (response: UnlinkedResponse) => {
     setSelectedUnlinked(response);
-    setSelectedClientId('');
+    resetDialogState();
+    // Pre-fill new athlete fields from response data
+    setNewAthleteName(response.respondent_name || '');
+    setNewAthleteEmail(response.respondent_email || '');
     setLinkDialogOpen(true);
   };
 
@@ -404,6 +415,16 @@ export function AnamneseResponsesTab() {
     linkToClientMutation.mutate({
       responseId: selectedUnlinked.id,
       clientId: selectedClientId,
+    });
+  };
+
+  const handleCreateAndLink = () => {
+    if (!selectedUnlinked || !newAthleteName.trim() || !newAthleteEmail.trim()) return;
+    createAndLinkMutation.mutate({
+      responseId: selectedUnlinked.id,
+      name: newAthleteName,
+      email: newAthleteEmail,
+      phone: newAthletePhone,
     });
   };
 
