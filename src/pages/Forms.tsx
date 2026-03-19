@@ -236,7 +236,7 @@ export default function Forms() {
           </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="grid w-full grid-cols-6 max-w-4xl">
             <TabsTrigger value="checkin" className="gap-2">
               <ClipboardList className="h-4 w-4" />
