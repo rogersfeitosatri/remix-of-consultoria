@@ -45,6 +45,7 @@ export function PendingAnamneseList() {
       const { data: clients, error } = await supabase
         .from('clients')
         .select('id, name, email, athlete_status, created_at')
+        .eq('user_id', user?.id)
         .eq('athlete_status', 'pending_anamnese')
         .order('created_at', { ascending: false });
 
