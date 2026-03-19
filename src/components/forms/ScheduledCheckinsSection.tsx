@@ -122,31 +122,14 @@ export function ScheduledCheckinsSection() {
     }
   };
 
-  if (checkinsLoading || clientsLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <ClipboardCheck className="h-5 w-5" />
-            Check-ins Agendados
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   const SAO_PAULO_TZ = 'America/Sao_Paulo';
   const nowInSaoPaulo = toZonedTime(new Date(), SAO_PAULO_TZ);
   const todayStart = startOfDay(nowInSaoPaulo);
   const next7Days = addDays(todayStart, 7);
 
-  // Compute flat list of relevant checkins
-  const pendingCheckins = checkins.filter(c => c.status === 'pending' || c.status === 'skipped');
+  const pendingCheckins = useMemo(() => {
+    return checkins.filter(c => c.status === 'pending' || c.status === 'skipped');
+  }, [checkins]);
 
   const categorized = useMemo(() => {
     const overdue: (ScheduledCheckin & { client_name_resolved: string })[] = [];
@@ -284,6 +267,24 @@ export function ScheduledCheckinsSection() {
       </div>
     );
   };
+
+  if (checkinsLoading || clientsLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ClipboardCheck className="h-5 w-5" />
+            Check-ins Agendados
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
