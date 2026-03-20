@@ -148,7 +148,7 @@ export default function AthleteHistory() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/clients')} className="gap-2 w-fit">
+          <Button variant="ghost" size="sm" onClick={goBack} className="gap-2 w-fit">
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </Button>
