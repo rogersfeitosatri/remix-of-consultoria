@@ -206,15 +206,19 @@ export default function NutritionalPeriodization() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="periodization">
+              <TabsContent value="periodization" className="mt-3">
                 <NPPeriodizationTab clientId={selectedClientId} client={selectedClient} consultationId={selectedConsultationId} consultation={selectedConsultation} />
               </TabsContent>
-              <TabsContent value="patient">
-                {selectedConsultation ? (
-                  <NPPatientDataTab consultation={selectedConsultation} client={selectedClient} onSave={(data: any) => saveConsultation.mutate({ ...data, id: selectedConsultationId })} />
-                ) : (
-                  <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">Carregando dados...</CardContent></Card>
-                )}
+              <TabsContent value="patient" className="mt-3" forceMount={activeTab === 'patient' ? true : undefined}>
+                <NPPatientDataTab consultation={selectedConsultation || {}} client={selectedClient} onSave={(data: any) => {
+                  if (selectedConsultationId) {
+                    saveConsultation.mutate({ ...data, id: selectedConsultationId });
+                  } else {
+                    saveConsultation.mutate({ ...data, client_id: selectedClientId }, {
+                      onSuccess: (res: any) => setSelectedConsultationId(res.id),
+                    });
+                  }
+                }} />
               </TabsContent>
             </Tabs>
 
@@ -230,7 +234,7 @@ export default function NutritionalPeriodization() {
                     <User className="h-3.5 w-3.5" /> Perfil do Atleta
                     <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="w-full justify-start text-xs gap-2 h-8" onClick={() => navigate(`/checkin-hub`)}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start text-xs gap-2 h-8" onClick={() => navigate(`/checkin-hub?client=${selectedClientId}`)}>
                     <ClipboardCheck className="h-3.5 w-3.5" /> Check-ins
                     <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
                   </Button>
