@@ -234,7 +234,7 @@ export default function NutritionalPeriodization() {
                     <User className="h-3.5 w-3.5" /> Perfil do Atleta
                     <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="w-full justify-start text-xs gap-2 h-8" onClick={() => navigate(`/checkin-hub`)}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start text-xs gap-2 h-8" onClick={() => navigate(`/checkin-hub?client=${selectedClientId}`)}>
                     <ClipboardCheck className="h-3.5 w-3.5" /> Check-ins
                     <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
                   </Button>
