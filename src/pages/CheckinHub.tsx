@@ -12,15 +12,27 @@ import { CheckinAlertsBanner } from '@/components/checkin/CheckinAlertsBanner';
 
 export default function CheckinHub() {
   const [activeTab, setActiveTab] = useState('pendentes');
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const fromPeriodization = searchParams.get('from') === 'periodization';
+  const clientParam = searchParams.get('client');
 
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Check-ins</h1>
-          <p className="text-muted-foreground">
-            Controle total dos check-ins dos seus atletas
-          </p>
+        <div className="flex items-center gap-3">
+          {fromPeriodization && clientParam && (
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/nutritional-periodization?client=${clientParam}`)} className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </Button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold">Check-ins</h1>
+            <p className="text-muted-foreground">
+              Controle total dos check-ins dos seus atletas
+            </p>
+          </div>
         </div>
 
         <CheckinAlertsBanner />
