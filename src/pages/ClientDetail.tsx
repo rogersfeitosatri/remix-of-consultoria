@@ -60,6 +60,12 @@ const PLAN_LABELS: Record<string, string> = {
 export default function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromPeriodization = searchParams.get('from') === 'periodization';
+  const goBack = () => {
+    if (fromPeriodization && clientId) navigate(`/nutritional-periodization?client=${clientId}`);
+    else navigate('/clients');
+  };
   
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const deleteClientMutation = useDeleteClient();

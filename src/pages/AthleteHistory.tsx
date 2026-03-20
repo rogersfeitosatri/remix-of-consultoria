@@ -29,6 +29,12 @@ interface CheckinResponse {
 export default function AthleteHistory() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromPeriodization = searchParams.get('from') === 'periodization';
+  const goBack = () => {
+    if (fromPeriodization && clientId) navigate(`/nutritional-periodization?client=${clientId}`);
+    else navigate('/clients');
+  };
   
   const { data: clients = [] } = useClients();
   const client = clients.find(c => c.id === clientId);
