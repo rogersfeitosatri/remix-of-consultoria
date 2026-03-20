@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -60,6 +60,12 @@ const PLAN_LABELS: Record<string, string> = {
 export default function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromPeriodization = searchParams.get('from') === 'periodization';
+  const goBack = () => {
+    if (fromPeriodization && clientId) navigate(`/nutritional-periodization?client=${clientId}`);
+    else navigate('/clients');
+  };
   
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const deleteClientMutation = useDeleteClient();
@@ -261,7 +267,7 @@ export default function ClientDetail() {
       <Layout>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Atleta não encontrado</p>
-          <Button variant="link" onClick={() => navigate('/clients')}>
+          <Button variant="link" onClick={goBack}>
             Voltar para lista
           </Button>
         </div>
@@ -275,7 +281,7 @@ export default function ClientDetail() {
         {/* Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/clients')} className="gap-2">
+            <Button variant="ghost" size="sm" onClick={goBack} className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               Voltar
             </Button>

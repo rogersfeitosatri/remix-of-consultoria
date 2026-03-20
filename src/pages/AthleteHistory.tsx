@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,12 @@ interface CheckinResponse {
 export default function AthleteHistory() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromPeriodization = searchParams.get('from') === 'periodization';
+  const goBack = () => {
+    if (fromPeriodization && clientId) navigate(`/nutritional-periodization?client=${clientId}`);
+    else navigate('/clients');
+  };
   
   const { data: clients = [] } = useClients();
   const client = clients.find(c => c.id === clientId);
@@ -114,7 +120,7 @@ export default function AthleteHistory() {
       <Layout>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Atleta não encontrado</p>
-          <Button variant="link" onClick={() => navigate('/clients')}>
+          <Button variant="link" onClick={goBack}>
             Voltar para lista
           </Button>
         </div>
@@ -142,7 +148,7 @@ export default function AthleteHistory() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/clients')} className="gap-2 w-fit">
+          <Button variant="ghost" size="sm" onClick={goBack} className="gap-2 w-fit">
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </Button>
