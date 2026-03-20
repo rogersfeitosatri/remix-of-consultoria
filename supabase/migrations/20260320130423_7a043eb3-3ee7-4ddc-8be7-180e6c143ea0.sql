@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Allow public anamnese submission" ON public.anamnese_responses;
