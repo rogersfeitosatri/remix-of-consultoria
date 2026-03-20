@@ -230,15 +230,15 @@ export default function NutritionalPeriodization() {
                   <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ações Rápidas</CardTitle>
                 </CardHeader>
                 <CardContent className="px-3 pb-3 space-y-1.5">
-                  <Button variant="ghost" size="sm" className="w-full justify-start text-xs gap-2 h-8" onClick={() => navigate(`/clients/${selectedClientId}`)}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start text-xs gap-2 h-8" onClick={() => navigate(`/clients/${selectedClientId}?from=periodization`)}>
                     <User className="h-3.5 w-3.5" /> Perfil do Atleta
                     <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="w-full justify-start text-xs gap-2 h-8" onClick={() => navigate(`/checkin-hub?client=${selectedClientId}`)}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start text-xs gap-2 h-8" onClick={() => navigate(`/checkin-hub?client=${selectedClientId}&from=periodization`)}>
                     <ClipboardCheck className="h-3.5 w-3.5" /> Check-ins
                     <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="w-full justify-start text-xs gap-2 h-8" onClick={() => navigate(`/athlete-history/${selectedClientId}`)}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start text-xs gap-2 h-8" onClick={() => navigate(`/athlete-history/${selectedClientId}?from=periodization`)}>
                     <Calendar className="h-3.5 w-3.5" /> Histórico
                     <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
                   </Button>
