@@ -267,7 +267,7 @@ export default function ClientDetail() {
       <Layout>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Atleta não encontrado</p>
-          <Button variant="link" onClick={() => navigate('/clients')}>
+          <Button variant="link" onClick={goBack}>
             Voltar para lista
           </Button>
         </div>
