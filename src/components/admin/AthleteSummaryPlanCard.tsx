@@ -1,10 +1,11 @@
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calendar, DollarSign, RefreshCw, Archive } from 'lucide-react';
+import { Calendar, DollarSign, RefreshCw, Archive, Utensils, Dumbbell, UtensilsCrossed } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { useNavigate } from 'react-router-dom';
 import { Client } from '@/hooks/useClients';
 import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
@@ -12,6 +13,12 @@ import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
 const PLAN_LABELS: Record<string, string> = {
   consultoria: 'Consultoria',
   premium: 'Premium',
+};
+
+const SERVICE_LABELS: Record<string, { label: string; icon: typeof Utensils }> = {
+  nutrition: { label: 'Nutrição', icon: Utensils },
+  training: { label: 'Treino', icon: Dumbbell },
+  both: { label: 'Nutri + Treino', icon: UtensilsCrossed },
 };
 
 const DURATION_LABELS: Record<string, string> = {
@@ -32,11 +39,13 @@ export function AthleteSummaryPlanCard({ client, onRenewPlan }: AthleteSummaryPl
   const navigate = useNavigate();
   
   const today = new Date();
+  const startDate = parseISO(client.start_date);
   const endDate = parseISO(client.end_date);
+  const totalDays = differenceInDays(endDate, startDate);
   const daysRemaining = differenceInDays(endDate, today);
-  const weeksRemaining = Math.floor(daysRemaining / 7);
+  const daysElapsed = differenceInDays(today, startDate);
+  const progressPercent = totalDays > 0 ? Math.min(100, Math.max(0, (daysElapsed / totalDays) * 100)) : 0;
   
-  // Calcular status do plano
   let planStatus: 'active' | 'expiring' | 'expired' = 'active';
   let statusLabel = 'Ativo';
   let statusVariant: 'default' | 'secondary' | 'destructive' = 'default';
@@ -47,9 +56,12 @@ export function AthleteSummaryPlanCard({ client, onRenewPlan }: AthleteSummaryPl
     statusVariant = 'destructive';
   } else if (daysRemaining <= 14) {
     planStatus = 'expiring';
-    statusLabel = 'A vencer';
+    statusLabel = `${daysRemaining}d restantes`;
     statusVariant = 'secondary';
   }
+
+  const serviceInfo = SERVICE_LABELS[client.service_type] || SERVICE_LABELS.nutrition;
+  const ServiceIcon = serviceInfo.icon;
   
   return (
     <Card className="h-full">
@@ -59,49 +71,48 @@ export function AthleteSummaryPlanCard({ client, onRenewPlan }: AthleteSummaryPl
             <Calendar className="h-4 w-4 text-primary" />
             Plano & Vigência
           </CardTitle>
-          <Badge variant={statusVariant}>
-            {statusLabel}
-          </Badge>
+          <Badge variant={statusVariant}>{statusLabel}</Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Tipo de Plano */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Plano</span>
-          <span className="font-medium">
+      <CardContent className="space-y-3">
+        {/* Tipo + Serviço */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="gap-1">
+            <ServiceIcon className="h-3 w-3" />
+            {serviceInfo.label}
+          </Badge>
+          <Badge variant="outline">
             {PLAN_LABELS[client.plan_type] || client.plan_type}
-            {client.plan_duration && ` - ${DURATION_LABELS[client.plan_duration] || client.plan_duration}`}
-          </span>
+            {client.plan_duration && ` · ${DURATION_LABELS[client.plan_duration] || client.plan_duration}`}
+          </Badge>
         </div>
         
-        {/* Período */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Período</span>
-          <span className="text-sm">
-            {format(parseISO(client.start_date), 'dd/MM/yy', { locale: ptBR })} - {format(endDate, 'dd/MM/yy', { locale: ptBR })}
-          </span>
-        </div>
-        
-        {/* Tempo Restante */}
-        <div className="p-3 rounded-lg bg-muted/50">
-          <p className="text-xs text-muted-foreground mb-1">Tempo Restante</p>
-          <p className={`text-lg font-bold ${planStatus === 'expired' ? 'text-destructive' : planStatus === 'expiring' ? 'text-warning' : 'text-primary'}`}>
-            {planStatus === 'expired' ? (
-              `Vencido há ${Math.abs(daysRemaining)} dias`
-            ) : (
-              <>
-                {daysRemaining} dias
-                {weeksRemaining > 0 && <span className="text-sm font-normal text-muted-foreground"> ({weeksRemaining} semanas)</span>}
-              </>
-            )}
+        {/* Barra de progresso do plano */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{format(startDate, 'dd/MM/yy', { locale: ptBR })}</span>
+            <span>{format(endDate, 'dd/MM/yy', { locale: ptBR })}</span>
+          </div>
+          <Progress 
+            value={progressPercent} 
+            className={`h-2 ${planStatus === 'expired' ? '[&>div]:bg-destructive' : planStatus === 'expiring' ? '[&>div]:bg-yellow-500' : ''}`}
+          />
+          <p className={`text-center text-sm font-semibold ${
+            planStatus === 'expired' ? 'text-destructive' : 
+            planStatus === 'expiring' ? 'text-yellow-600 dark:text-yellow-400' : 'text-primary'
+          }`}>
+            {planStatus === 'expired' 
+              ? `Vencido há ${Math.abs(daysRemaining)} dias`
+              : `${daysRemaining} dias restantes`
+            }
           </p>
         </div>
         
-        {/* Valor Mensal */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground flex items-center gap-1">
+        {/* Valor */}
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground flex items-center gap-1">
             <DollarSign className="h-3 w-3" />
-            Valor Mensal
+            Mensal
           </span>
           <span className="font-semibold text-primary">
             R$ {client.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -109,25 +120,16 @@ export function AthleteSummaryPlanCard({ client, onRenewPlan }: AthleteSummaryPl
         </div>
         
         {/* Ações */}
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 pt-1">
           {onRenewPlan && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex-1 gap-1"
-              onClick={onRenewPlan}
-            >
+            <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs h-8" onClick={onRenewPlan}>
               <RefreshCw className="h-3 w-3" />
               Renovar
             </Button>
           )}
           <Dialog>
             <DialogTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="flex-1 gap-1"
-              >
+              <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs h-8">
                 <Archive className="h-3 w-3" />
                 Histórico
               </Button>
@@ -142,15 +144,6 @@ export function AthleteSummaryPlanCard({ client, onRenewPlan }: AthleteSummaryPl
               <PlanHistorySection clientId={client.id} />
             </DialogContent>
           </Dialog>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex-1 gap-1"
-            onClick={() => navigate('/financial')}
-          >
-            <DollarSign className="h-3 w-3" />
-            Financeiro
-          </Button>
         </div>
       </CardContent>
     </Card>

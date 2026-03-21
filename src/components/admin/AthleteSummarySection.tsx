@@ -10,6 +10,7 @@ import { AthleteSummaryConsultCard } from './AthleteSummaryConsultCard';
 import { AthleteSummaryCheckinsCard } from './AthleteSummaryCheckinsCard';
 import { AthleteSummaryGoalsCard } from './AthleteSummaryGoalsCard';
 import { AthleteAttachmentsSection } from './AthleteAttachmentsSection';
+import { Badge } from '@/components/ui/badge';
 
 interface AthleteSummarySectionProps {
   client: Client;
@@ -32,11 +33,8 @@ export function AthleteSummarySection({ client, onEditClient, onRenewPlan }: Ath
   
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-6 w-6" />
-          <Skeleton className="h-6 w-40" />
-        </div>
+      <div className="space-y-4">
+        <Skeleton className="h-6 w-48" />
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
@@ -47,23 +45,35 @@ export function AthleteSummarySection({ client, onEditClient, onRenewPlan }: Ath
     );
   }
   
+  // Determine athlete status badge
+  const statusConfig = {
+    pending_anamnese: { label: 'Aguardando Anamnese', variant: 'secondary' as const },
+    active: { label: 'Ativo', variant: 'default' as const },
+    paused: { label: 'Pausado', variant: 'secondary' as const },
+    completed: { label: 'Concluído', variant: 'outline' as const },
+  };
+  const athleteStatus = client.athlete_status ? statusConfig[client.athlete_status] : null;
+  
   return (
-    <div className="space-y-6">
-      {/* Título */}
-      <div className="flex items-center gap-2">
-        <span className="text-lg">✅</span>
+    <div className="space-y-4">
+      {/* Título com status */}
+      <div className="flex items-center gap-3">
         <h2 className="text-lg font-semibold">Resumo do Atleta</h2>
+        {athleteStatus && (
+          <Badge variant={athleteStatus.variant}>{athleteStatus.label}</Badge>
+        )}
+        {!client.is_active && (
+          <Badge variant="destructive">Inativo</Badge>
+        )}
       </div>
       
       {/* Grid de 4 Cartões */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Cartão 1: Plano & Vigência */}
         <AthleteSummaryPlanCard 
           client={client} 
           onRenewPlan={onRenewPlan}
         />
         
-        {/* Cartão 2: Consultas */}
         <AthleteSummaryConsultCard 
           client={client}
           adminNotesShort={summaryData?.admin_notes_short || null}
@@ -71,12 +81,8 @@ export function AthleteSummarySection({ client, onEditClient, onRenewPlan }: Ath
           isSaving={updateSummary.isPending}
         />
         
-        {/* Cartão 3: Check-ins & Formulários */}
-        <AthleteSummaryCheckinsCard 
-          client={client}
-        />
+        <AthleteSummaryCheckinsCard client={client} />
         
-        {/* Cartão 4: Objetivos & Evolução */}
         <AthleteSummaryGoalsCard 
           client={client}
           summaryData={summaryData || null}
@@ -85,7 +91,7 @@ export function AthleteSummarySection({ client, onEditClient, onRenewPlan }: Ath
         />
       </div>
       
-      {/* Seção de Anexos */}
+      {/* Anexos */}
       <AthleteAttachmentsSection clientId={client.id} />
     </div>
   );
