@@ -1,6 +1,6 @@
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ClipboardCheck, FileText, AlertCircle, CheckCircle2, History, FilePlus } from 'lucide-react';
+import { ClipboardCheck, FileText, AlertCircle, CheckCircle2, History, FilePlus, Send, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,16 @@ import { useNavigate } from 'react-router-dom';
 import { useCheckinStats, useAnamneseData } from '@/hooks/useAthleteSummary';
 import { Client } from '@/hooks/useClients';
 
-const CHECKIN_DAYS_THRESHOLD = 7; // Dias para considerar "em dia"
+// Map frequency to expected days between check-ins
+const FREQUENCY_DAYS: Record<string, number> = {
+  daily: 2,
+  weekly: 9,
+  biweekly: 16,
+  three_weeks: 23,
+  monthly: 35,
+  bimonthly: 65,
+  quarterly: 95,
+};
 
 interface AthleteSummaryCheckinsCardProps {
   client: Client;
@@ -22,12 +31,26 @@ export function AthleteSummaryCheckinsCard({ client }: AthleteSummaryCheckinsCar
   
   const isLoading = loadingCheckins || loadingAnamnese;
   
-  // Calcular status do check-in
+  // Dynamic threshold based on actual frequency
+  const threshold = client.checkin_frequency 
+    ? (FREQUENCY_DAYS[client.checkin_frequency] || 9)
+    : 9;
+  
   const daysSinceLastCheckin = checkinStats?.lastCheckinAt
     ? differenceInDays(new Date(), parseISO(checkinStats.lastCheckinAt))
     : null;
     
-  const isCheckinUpToDate = daysSinceLastCheckin !== null && daysSinceLastCheckin <= CHECKIN_DAYS_THRESHOLD;
+  const isCheckinUpToDate = daysSinceLastCheckin !== null && daysSinceLastCheckin <= threshold;
+
+  const FREQ_LABELS: Record<string, string> = {
+    daily: 'Diário',
+    weekly: 'Semanal',
+    biweekly: 'Quinzenal',
+    three_weeks: '3 Semanas',
+    monthly: 'Mensal',
+    bimonthly: 'Bimestral',
+    quarterly: 'Trimestral',
+  };
   
   if (isLoading) {
     return (
@@ -41,7 +64,6 @@ export function AthleteSummaryCheckinsCard({ client }: AthleteSummaryCheckinsCar
         <CardContent className="space-y-3">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-8 w-full" />
         </CardContent>
       </Card>
     );
@@ -65,46 +87,59 @@ export function AthleteSummaryCheckinsCard({ client }: AthleteSummaryCheckinsCar
           )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Estatísticas de Check-in */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 rounded-lg bg-muted/50">
-            <p className="text-xs text-muted-foreground mb-1">Total de Check-ins</p>
-            <p className="text-lg font-bold text-primary">{checkinStats?.total || 0}</p>
+      <CardContent className="space-y-3">
+        {/* Frequência + Stats */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="p-2.5 rounded-lg bg-muted/50 text-center">
+            <p className="text-xs text-muted-foreground mb-0.5">Frequência</p>
+            <p className="text-sm font-semibold">
+              {client.has_checkin && client.checkin_frequency 
+                ? FREQ_LABELS[client.checkin_frequency] || client.checkin_frequency
+                : 'Sem'}
+            </p>
           </div>
-          
-          <div className="p-3 rounded-lg bg-muted/50">
-            <p className="text-xs text-muted-foreground mb-1">Último Mês</p>
-            <p className="text-lg font-bold">{checkinStats?.lastMonth || 0}</p>
+          <div className="p-2.5 rounded-lg bg-muted/50 text-center">
+            <p className="text-xs text-muted-foreground mb-0.5">Total</p>
+            <p className="text-sm font-bold text-primary">{checkinStats?.total || 0}</p>
+          </div>
+          <div className="p-2.5 rounded-lg bg-muted/50 text-center">
+            <p className="text-xs text-muted-foreground mb-0.5">Mês</p>
+            <p className="text-sm font-bold">{checkinStats?.lastMonth || 0}</p>
           </div>
         </div>
         
         {/* Último check-in */}
-        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-          <div>
-            <p className="text-xs text-muted-foreground">Último check-in</p>
-            <p className="text-sm font-medium">
-              {checkinStats?.lastCheckinAt 
-                ? format(parseISO(checkinStats.lastCheckinAt), "dd/MM/yyyy", { locale: ptBR })
-                : 'Nenhum'}
-            </p>
+        <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50">
+          <div className="flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Último check-in</p>
+              <p className="text-sm font-medium">
+                {checkinStats?.lastCheckinAt 
+                  ? format(parseISO(checkinStats.lastCheckinAt), "dd/MM/yyyy", { locale: ptBR })
+                  : 'Nenhum'}
+              </p>
+            </div>
           </div>
           {daysSinceLastCheckin !== null && (
-            <Badge variant="outline" className="text-xs">
-              há {daysSinceLastCheckin} dias
+            <Badge 
+              variant="outline" 
+              className={`text-xs ${daysSinceLastCheckin > threshold ? 'border-destructive/50 text-destructive' : ''}`}
+            >
+              há {daysSinceLastCheckin}d
             </Badge>
           )}
         </div>
         
         {/* Anamnese */}
-        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+        <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
             <div>
-              <p className="text-sm font-medium">Anamnese</p>
+              <p className="text-xs text-muted-foreground">Anamnese</p>
               {anamneseData?.submittedAt && (
-                <p className="text-xs text-muted-foreground">
-                  {format(parseISO(anamneseData.submittedAt), "dd/MM/yyyy", { locale: ptBR })}
+                <p className="text-xs">
+                  {format(parseISO(anamneseData.submittedAt), "dd/MM/yy", { locale: ptBR })}
                 </p>
               )}
             </div>
@@ -114,41 +149,33 @@ export function AthleteSummaryCheckinsCard({ client }: AthleteSummaryCheckinsCar
             className={anamneseData?.hasAnamnese ? 'bg-green-500/10 text-green-500 border-green-500/20' : ''}
           >
             {anamneseData?.hasAnamnese ? (
-              <>
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Sim
-              </>
+              <><CheckCircle2 className="h-3 w-3 mr-1" />Preenchida</>
             ) : (
-              <>
-                <AlertCircle className="h-3 w-3 mr-1" />
-                Não
-              </>
+              <><AlertCircle className="h-3 w-3 mr-1" />Pendente</>
             )}
           </Badge>
         </div>
         
         {/* Ações */}
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 pt-1">
           <Button 
             variant="outline" 
             size="sm" 
-            className="flex-1 gap-1"
+            className="flex-1 gap-1 text-xs h-8"
             onClick={() => navigate(`/clients/${client.id}/history`)}
           >
             <History className="h-3 w-3" />
             Histórico
           </Button>
-          {!anamneseData?.hasAnamnese && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="flex-1 gap-1"
-              onClick={() => navigate('/forms')}
-            >
-              <FilePlus className="h-3 w-3" />
-              Anamnese
-            </Button>
-          )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex-1 gap-1 text-xs h-8"
+            onClick={() => navigate('/checkin-hub')}
+          >
+            <Send className="h-3 w-3" />
+            Check-ins
+          </Button>
         </div>
       </CardContent>
     </Card>
