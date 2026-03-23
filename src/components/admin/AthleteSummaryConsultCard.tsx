@@ -1,23 +1,46 @@
 import { useState } from 'react';
-import { differenceInDays, parseISO, format } from 'date-fns';
+import { differenceInDays, parseISO, format, isPast, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarCheck, Clock, Video, Calendar, Edit2, Save, X, Send, ListTodo } from 'lucide-react';
+import { 
+  CalendarCheck, Clock, Video, Calendar, Edit2, Save, X, 
+  ListTodo, CheckCircle2, Send, Link2, AlertTriangle, ChevronDown, ChevronUp
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useNavigate } from 'react-router-dom';
 import { useConsultationStats } from '@/hooks/useAthleteSummary';
 import { Client } from '@/hooks/useClients';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 interface AthleteSummaryConsultCardProps {
   client: Client;
   adminNotesShort: string | null;
   onSaveNotes: (notes: string | null) => void;
   isSaving?: boolean;
+}
+
+interface AppointmentRow {
+  id: string;
+  appointment_date: string;
+  appointment_time: string;
+  status: string;
+  google_meet_link: string | null;
+  notes_admin: string | null;
+}
+
+interface ScheduleRow {
+  id: string;
+  scheduled_date: string;
+  send_link_date: string;
+  status: string;
+  scheduled_time: string | null;
 }
 
 export function AthleteSummaryConsultCard({ 
@@ -30,8 +53,38 @@ export function AthleteSummaryConsultCard({
   const { data: stats, isLoading } = useConsultationStats(client.id);
   const [isEditing, setIsEditing] = useState(false);
   const [notes, setNotes] = useState(adminNotesShort || '');
+  const [showHistory, setShowHistory] = useState(false);
+  const [showPipeline, setShowPipeline] = useState(false);
 
-  // Pending tasks count for this athlete
+  // All appointments for this athlete
+  const { data: appointments = [] } = useQuery({
+    queryKey: ['athlete-appointments', client.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('id, appointment_date, appointment_time, status, google_meet_link, notes_admin')
+        .eq('client_id', client.id)
+        .order('appointment_date', { ascending: false });
+      if (error) throw error;
+      return (data || []) as AppointmentRow[];
+    },
+  });
+
+  // Consultation schedules (link pipeline)
+  const { data: schedules = [] } = useQuery({
+    queryKey: ['athlete-consultation-schedules', client.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('consultation_schedules')
+        .select('id, scheduled_date, send_link_date, status, scheduled_time')
+        .eq('client_id', client.id)
+        .order('send_link_date', { ascending: true });
+      if (error) throw error;
+      return (data || []) as ScheduleRow[];
+    },
+  });
+
+  // Pending tasks count
   const { data: pendingTasksCount = 0 } = useQuery({
     queryKey: ['athlete-pending-tasks', client.id],
     queryFn: async () => {
@@ -58,15 +111,28 @@ export function AthleteSummaryConsultCard({
       return data;
     },
   });
-  
+
   const today = new Date();
+  const completedAppointments = appointments.filter(a => a.status === 'completed');
+  const upcomingAppointments = appointments.filter(a => 
+    ['scheduled', 'confirmed'].includes(a.status) && !isPast(parseISO(a.appointment_date))
+  );
+  const nextAppointment = upcomingAppointments.length > 0 
+    ? upcomingAppointments[upcomingAppointments.length - 1] 
+    : null;
+
+  // Pipeline: future/pending schedules
+  const pendingSchedules = schedules.filter(s => ['pending', 'sent', 'link_sent'].includes(s.status));
+  const scheduledSchedules = schedules.filter(s => s.status === 'scheduled');
+  const completedSchedules = schedules.filter(s => s.status === 'completed');
+  
   const daysSinceLastConsult = stats?.lastCompletedAt 
     ? differenceInDays(today, parseISO(stats.lastCompletedAt))
     : null;
-  const daysUntilNextConsult = stats?.nextScheduledAt
-    ? differenceInDays(parseISO(stats.nextScheduledAt), today)
+  const daysUntilNextConsult = nextAppointment
+    ? differenceInDays(parseISO(nextAppointment.appointment_date), today)
     : null;
-  
+
   const handleSave = () => {
     onSaveNotes(notes.trim() || null);
     setIsEditing(false);
@@ -75,6 +141,28 @@ export function AthleteSummaryConsultCard({
   const handleCancel = () => {
     setNotes(adminNotesShort || '');
     setIsEditing(false);
+  };
+
+  const getScheduleStatusBadge = (status: string, sendDate: string) => {
+    const sendDateParsed = parseISO(sendDate);
+    const isOverdue = isPast(sendDateParsed) && !isToday(sendDateParsed) && status === 'pending';
+
+    switch (status) {
+      case 'completed':
+        return <Badge className="text-[10px] bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Realizada</Badge>;
+      case 'scheduled':
+        return <Badge className="text-[10px] bg-blue-500/10 text-blue-500 border-blue-500/20">Agendada</Badge>;
+      case 'sent':
+      case 'link_sent':
+        return <Badge className="text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/20">Link Enviado</Badge>;
+      case 'pending':
+        if (isOverdue) {
+          return <Badge className="text-[10px] bg-red-500/10 text-red-500 border-red-500/20">Atrasado</Badge>;
+        }
+        return <Badge variant="secondary" className="text-[10px]">Pendente</Badge>;
+      default:
+        return <Badge variant="outline" className="text-[10px]">{status}</Badge>;
+    }
   };
   
   if (isLoading) {
@@ -111,14 +199,14 @@ export function AthleteSummaryConsultCard({
             )}
             {client.has_consultations && client.consultation_count > 0 && (
               <Badge variant="outline" className="text-xs">
-                {client.remaining_consultations ?? client.consultation_count}/{client.consultation_count}
+                {completedAppointments.length}/{client.consultation_count}
               </Badge>
             )}
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {/* Consultas */}
+        {/* Quick stats */}
         <div className="grid grid-cols-2 gap-2">
           <div className="p-2.5 rounded-lg bg-muted/50">
             <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
@@ -139,8 +227,8 @@ export function AthleteSummaryConsultCard({
               <Calendar className="h-3 w-3" /> Próxima
             </p>
             <p className="text-sm font-medium">
-              {stats?.nextScheduledAt 
-                ? format(parseISO(stats.nextScheduledAt), "dd/MM/yy", { locale: ptBR })
+              {nextAppointment 
+                ? format(parseISO(nextAppointment.appointment_date), "dd/MM/yy", { locale: ptBR })
                 : '—'}
             </p>
             {daysUntilNextConsult !== null && daysUntilNextConsult >= 0 && (
@@ -149,13 +237,124 @@ export function AthleteSummaryConsultCard({
           </div>
         </div>
 
+        {/* Google Meet for next appointment */}
+        {nextAppointment?.google_meet_link && (
+          <Button variant="outline" size="sm" className="w-full gap-2 h-8 text-xs" asChild>
+            <a href={nextAppointment.google_meet_link} target="_blank" rel="noopener noreferrer">
+              <Video className="h-3 w-3" />
+              Abrir Google Meet
+            </a>
+          </Button>
+        )}
+
+        {/* Pipeline de Links (Scheduled Consultations) */}
+        {schedules.length > 0 && (
+          <Collapsible open={showPipeline} onOpenChange={setShowPipeline}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs px-2.5">
+                <span className="flex items-center gap-1.5">
+                  <Send className="h-3 w-3 text-primary" />
+                  Pipeline de Consultas
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                    {pendingSchedules.length} pendente{pendingSchedules.length !== 1 ? 's' : ''}
+                  </Badge>
+                </span>
+                {showPipeline ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-1.5">
+              <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                {schedules.map((schedule, index) => (
+                  <div 
+                    key={schedule.id}
+                    className={cn(
+                      "flex items-center justify-between p-2 rounded-md text-xs border",
+                      schedule.status === 'completed' && "bg-emerald-500/5 border-emerald-500/20",
+                      schedule.status === 'scheduled' && "bg-blue-500/5 border-blue-500/20",
+                      ['sent', 'link_sent'].includes(schedule.status) && "bg-amber-500/5 border-amber-500/20",
+                      schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date))
+                        ? "bg-red-500/5 border-red-500/20"
+                        : schedule.status === 'pending' && "bg-muted/30 border-border",
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground font-mono w-4 text-center">{index + 1}</span>
+                      <div>
+                        <p className="font-medium">
+                          {format(parseISO(schedule.send_link_date), "dd/MM/yy")}
+                        </p>
+                        {schedule.scheduled_time && (
+                          <p className="text-muted-foreground text-[10px]">
+                            {schedule.scheduled_time.slice(0, 5)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {getScheduleStatusBadge(schedule.status, schedule.send_link_date)}
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        {/* Histórico de Consultas Realizadas */}
+        {completedAppointments.length > 0 && (
+          <Collapsible open={showHistory} onOpenChange={setShowHistory}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs px-2.5">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                  Consultas Realizadas
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                    {completedAppointments.length}
+                  </Badge>
+                </span>
+                {showHistory ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-1.5">
+              <div className="space-y-1 max-h-[160px] overflow-y-auto">
+                {completedAppointments.map((apt) => (
+                  <div 
+                    key={apt.id}
+                    className="flex items-center justify-between p-2 rounded-md bg-muted/30 border border-border text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                      <div>
+                        <p className="font-medium">
+                          {format(parseISO(apt.appointment_date), "dd/MM/yyyy", { locale: ptBR })}
+                        </p>
+                        <p className="text-muted-foreground text-[10px]">
+                          {apt.appointment_time.slice(0, 5)}
+                        </p>
+                      </div>
+                    </div>
+                    {apt.notes_admin && (
+                      <span className="text-muted-foreground truncate max-w-[100px]" title={apt.notes_admin}>
+                        {apt.notes_admin}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
+        <Separator />
+
         {/* Meal plan status */}
         {(client.service_type === 'nutrition' || client.service_type === 'both') && (
           <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50">
             <span className="text-xs text-muted-foreground">Plano Alimentar</span>
             <Badge 
               variant={mealPlanStatus?.status === 'sent' ? 'default' : 'secondary'}
-              className={`text-xs ${mealPlanStatus?.status === 'sent' ? 'bg-green-500/10 text-green-500 border-green-500/20' : ''}`}
+              className={cn(
+                "text-xs",
+                mealPlanStatus?.status === 'sent' && 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+              )}
             >
               {mealPlanStatus?.status === 'sent' 
                 ? `Enviado ${mealPlanStatus.sent_at ? format(parseISO(mealPlanStatus.sent_at), 'dd/MM', { locale: ptBR }) : ''}`
@@ -164,16 +363,6 @@ export function AthleteSummaryConsultCard({
                   : 'Não criado'}
             </Badge>
           </div>
-        )}
-
-        {/* Google Meet */}
-        {stats?.nextMeetLink && (
-          <Button variant="outline" size="sm" className="w-full gap-2 h-8 text-xs" asChild>
-            <a href={stats.nextMeetLink} target="_blank" rel="noopener noreferrer">
-              <Video className="h-3 w-3" />
-              Abrir Google Meet
-            </a>
-          </Button>
         )}
         
         {/* Observações rápidas */}
