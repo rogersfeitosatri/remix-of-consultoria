@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import logoRF from '@/assets/logo-rf.jpg';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PersonStanding, Send, CheckCircle2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { PersonStanding, Send, CheckCircle2, Pencil, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,9 @@ export default function PublicAnamneseForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [loadingPrevious, setLoadingPrevious] = useState(false);
+  const [previousLoaded, setPreviousLoaded] = useState(false);
 
   const [athleteName, setAthleteName] = useState('');
   const [athleteEmail, setAthleteEmail] = useState('');
@@ -77,22 +81,7 @@ export default function PublicAnamneseForm() {
         setQuestions(typedQuestions);
 
         // Initialize answers and comments
-        const initialAnswers: Record<string, any> = {};
-        const initialComments: Record<string, string> = {};
-        typedQuestions.forEach((q) => {
-          if (q.question_type === 'checkbox' || q.question_type === 'multiselect') {
-            initialAnswers[q.id] = [];
-          } else if (q.question_type === 'scale') {
-            initialAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
-          } else {
-            initialAnswers[q.id] = '';
-          }
-          if (q.has_comment_field) {
-            initialComments[q.id] = '';
-          }
-        });
-        setAnswers(initialAnswers);
-        setComments(initialComments);
+        initializeEmptyAnswers(typedQuestions);
       } catch (error) {
         console.error('Error fetching form:', error);
         toast.error('Formulário não encontrado ou inativo');
@@ -103,6 +92,90 @@ export default function PublicAnamneseForm() {
 
     fetchForm();
   }, [formId]);
+
+  const initializeEmptyAnswers = (qs: Question[]) => {
+    const initialAnswers: Record<string, any> = {};
+    const initialComments: Record<string, string> = {};
+    qs.forEach((q) => {
+      if (q.question_type === 'checkbox' || q.question_type === 'multiselect') {
+        initialAnswers[q.id] = [];
+      } else if (q.question_type === 'scale') {
+        initialAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
+      } else {
+        initialAnswers[q.id] = '';
+      }
+      if (q.has_comment_field) {
+        initialComments[q.id] = '';
+      }
+    });
+    setAnswers(initialAnswers);
+    setComments(initialComments);
+  };
+
+  // Load previous responses when email loses focus
+  const handleEmailBlur = useCallback(async () => {
+    if (!formId || !athleteEmail.trim() || previousLoaded) return;
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(athleteEmail)) return;
+
+    setLoadingPrevious(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('load-anamnese-responses', {
+        body: { form_id: formId, email: athleteEmail.trim() },
+      });
+
+      if (error) throw error;
+
+      if (data?.found && data.response) {
+        const prev = data.response;
+        // Pre-fill name if available
+        if (prev.respondent_name && !athleteName.trim()) {
+          setAthleteName(prev.respondent_name);
+        }
+
+        // Pre-fill answers from previous responses
+        const prevResponses = prev.responses as Record<string, any>;
+        const filledAnswers: Record<string, any> = {};
+        const filledComments: Record<string, string> = {};
+
+        questions.forEach((q) => {
+          const prevResponse = prevResponses[q.id];
+          if (prevResponse !== undefined) {
+            if (typeof prevResponse === 'object' && prevResponse?.answer !== undefined) {
+              filledAnswers[q.id] = prevResponse.answer;
+              if (q.has_comment_field && prevResponse.comment) {
+                filledComments[q.id] = prevResponse.comment;
+              }
+            } else {
+              filledAnswers[q.id] = prevResponse;
+            }
+          } else {
+            if (q.question_type === 'checkbox' || q.question_type === 'multiselect') {
+              filledAnswers[q.id] = [];
+            } else if (q.question_type === 'scale') {
+              filledAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
+            } else {
+              filledAnswers[q.id] = '';
+            }
+          }
+          if (q.has_comment_field && !filledComments[q.id]) {
+            filledComments[q.id] = '';
+          }
+        });
+
+        setAnswers(filledAnswers);
+        setComments(filledComments);
+        setIsEditMode(true);
+        setPreviousLoaded(true);
+        toast.info('Respostas anteriores carregadas. Edite o que precisar e envie novamente.');
+      }
+    } catch (error) {
+      console.error('Error loading previous responses:', error);
+    } finally {
+      setLoadingPrevious(false);
+    }
+  }, [formId, athleteEmail, athleteName, questions, previousLoaded]);
 
   const handleAnswerChange = (questionId: string, value: any) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -131,14 +204,12 @@ export default function PublicAnamneseForm() {
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(athleteEmail)) {
       toast.error('Email inválido');
       return;
     }
 
-    // Validate required questions
     for (const question of questions) {
       if (question.is_required) {
         const answer = answers[question.id];
@@ -147,7 +218,6 @@ export default function PublicAnamneseForm() {
           return;
         }
       }
-      // Validate required comment fields
       if (question.has_comment_field && question.comment_field_required) {
         const comment = comments[question.id];
         if (!comment || !comment.trim()) {
@@ -160,7 +230,6 @@ export default function PublicAnamneseForm() {
     setSubmitting(true);
 
     try {
-      // Prepare responses with comments
       const responsesWithComments: Record<string, any> = {};
       questions.forEach((q) => {
         responsesWithComments[q.id] = {
@@ -169,7 +238,6 @@ export default function PublicAnamneseForm() {
         };
       });
 
-      // Use edge function for auto-linking and auto-creation
       const { data, error: fnError } = await supabase.functions.invoke('process-anamnese-submission', {
         body: {
           form_id: formId,
@@ -183,13 +251,18 @@ export default function PublicAnamneseForm() {
       if (data?.error) throw new Error(data.error);
 
       setSubmitted(true);
-      toast.success('Anamnese enviada com sucesso!');
+      toast.success(isEditMode ? 'Respostas atualizadas com sucesso!' : 'Anamnese enviada com sucesso!');
     } catch (error) {
       console.error('Error submitting form:', error);
       toast.error('Erro ao enviar formulário. Tente novamente.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditAgain = () => {
+    setSubmitted(false);
+    setIsEditMode(true);
   };
 
   // Group questions by section while preserving order_index order
@@ -230,13 +303,23 @@ export default function PublicAnamneseForm() {
           <div className="rounded-full bg-green-500/10 p-4 w-fit mx-auto mb-6">
             <CheckCircle2 className="h-12 w-12 text-green-500" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">Anamnese Enviada!</h1>
+          <h1 className="text-2xl font-bold mb-2">
+            {isEditMode ? 'Respostas Atualizadas!' : 'Anamnese Enviada!'}
+          </h1>
           <p className="text-muted-foreground mb-6">
-            Suas respostas foram registradas com sucesso. Seu assessor receberá uma notificação.
+            {isEditMode
+              ? 'Suas respostas foram atualizadas com sucesso. Seu assessor será notificado das alterações.'
+              : 'Suas respostas foram registradas com sucesso. Seu assessor receberá uma notificação.'}
           </p>
-          <Button variant="outline" onClick={() => window.close()}>
-            Fechar
-          </Button>
+          <div className="flex flex-col gap-3">
+            <Button variant="outline" onClick={handleEditAgain} className="gap-2">
+              <Pencil className="h-4 w-4" />
+              Editar respostas
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => window.close()}>
+              Fechar
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -280,18 +363,35 @@ export default function PublicAnamneseForm() {
                   id="email"
                   type="email"
                   value={athleteEmail}
-                  onChange={(e) => setAthleteEmail(e.target.value)}
+                  onChange={(e) => {
+                    setAthleteEmail(e.target.value);
+                    setPreviousLoaded(false);
+                  }}
+                  onBlur={handleEmailBlur}
                   placeholder="Use o email cadastrado pelo seu assessor"
                   required
                 />
-                 <p className="text-xs text-muted-foreground">
-                   Informe seu melhor email para contato
-                 </p>
+                <p className="text-xs text-muted-foreground">
+                  Informe seu melhor email para contato
+                </p>
+                {loadingPrevious && (
+                  <p className="text-xs text-primary animate-pulse">Verificando respostas anteriores...</p>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Questions by Section - maintaining order_index order */}
+          {/* Edit mode banner */}
+          {isEditMode && (
+            <Alert className="mb-6 border-primary/30 bg-primary/5">
+              <Info className="h-4 w-4 text-primary" />
+              <AlertDescription className="text-sm">
+                Suas respostas anteriores foram carregadas. Edite o que precisar e clique em <strong>"Atualizar Anamnese"</strong> para salvar.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Questions by Section */}
           {orderedSections.map((section) => (
             <Card key={section} className="mb-6">
               <CardHeader>
@@ -412,7 +512,6 @@ export default function PublicAnamneseForm() {
                       </div>
                     )}
 
-                    {/* Comment attachment field */}
                     {question.has_comment_field && (
                       <div className="mt-4 pt-4 border-t border-border/50">
                         <Label 
@@ -446,12 +545,12 @@ export default function PublicAnamneseForm() {
               {submitting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
-                  Enviando...
+                  {isEditMode ? 'Atualizando...' : 'Enviando...'}
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4" />
-                  Enviar Anamnese
+                  {isEditMode ? 'Atualizar Anamnese' : 'Enviar Anamnese'}
                 </>
               )}
             </Button>
