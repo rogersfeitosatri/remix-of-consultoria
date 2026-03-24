@@ -125,6 +125,13 @@ export function AthleteSummaryConsultCard({
   const pendingSchedules = schedules.filter(s => ['pending', 'sent', 'link_sent'].includes(s.status));
   const scheduledSchedules = schedules.filter(s => s.status === 'scheduled');
   const completedSchedules = schedules.filter(s => s.status === 'completed');
+
+  // Determine consultation frequency label
+  const frequencyLabel = client.consultation_frequency === 'six_weeks' 
+    ? 'a cada 6 semanas' 
+    : client.consultation_frequency === 'monthly' 
+      ? 'mensal' 
+      : 'única';
   
   const daysSinceLastConsult = stats?.lastCompletedAt 
     ? differenceInDays(today, parseISO(stats.lastCompletedAt))
