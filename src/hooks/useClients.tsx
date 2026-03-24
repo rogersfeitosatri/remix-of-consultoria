@@ -685,6 +685,7 @@ export function useUpdateClient() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules'] });
       queryClient.invalidateQueries({ queryKey: ['scheduled_checkins'] });
     },
   });
