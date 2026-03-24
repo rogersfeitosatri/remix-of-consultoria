@@ -170,12 +170,12 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     return Math.max(1, Math.ceil(months));
   }, [formData.plan_duration, formData.consultation_frequency, client]);
 
-  // Update consultation_count when plan changes (for continuation mode)
+  // Update consultation_count when plan changes (for both new and continuation mode)
   useEffect(() => {
-    if (formData.onboarding_type === 'continuation' && !client) {
+    if (!client && formData.has_consultations && formData.consultation_frequency !== 'once') {
       setFormData(prev => ({ ...prev, consultation_count: getTotalConsultationsForPlan }));
     }
-  }, [getTotalConsultationsForPlan, formData.onboarding_type, client]);
+  }, [getTotalConsultationsForPlan, formData.onboarding_type, formData.has_consultations, formData.consultation_frequency, client]);
 
   // Auto-suggest consultation index based on dates
   // When admin fills last_consultation_at, calculate suggested index
