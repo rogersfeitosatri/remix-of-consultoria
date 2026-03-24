@@ -51,10 +51,34 @@ export function useFreezePlan() {
         .eq('id', clientId);
       if (error) throw error;
 
+      // Shift pending consultation schedules by frozenDays
+      const { data: pendingSchedules } = await supabase
+        .from('consultation_schedules')
+        .select('id, scheduled_date, send_link_date')
+        .eq('client_id', clientId)
+        .in('status', ['pending', 'sent', 'link_sent']);
+
+      if (pendingSchedules && pendingSchedules.length > 0) {
+        for (const schedule of pendingSchedules) {
+          const newScheduledDate = format(addDays(new Date(schedule.scheduled_date), frozenDays), 'yyyy-MM-dd');
+          const newSendLinkDate = format(addDays(new Date(schedule.send_link_date), frozenDays), 'yyyy-MM-dd');
+          
+          await supabase
+            .from('consultation_schedules')
+            .update({
+              scheduled_date: newScheduledDate,
+              send_link_date: newSendLinkDate,
+            })
+            .eq('id', schedule.id);
+        }
+      }
+
       return { frozenDays, newEndDate };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules'] });
       toast.success(`Plano reativado! ${data.frozenDays} dias adicionados. Nova data de término: ${format(new Date(data.newEndDate + 'T12:00:00'), 'dd/MM/yyyy')}`);
     },
     onError: (err: any) => {
