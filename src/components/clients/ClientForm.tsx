@@ -845,20 +845,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               {formData.onboarding_type === 'new' && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="consultationCount">Quantidade de Consultas</Label>
-                    <Input
-                      id="consultationCount"
-                      type="number"
-                      min="1"
-                      value={formData.consultation_count}
-                      onChange={(e) => setFormData({ ...formData, consultation_count: parseInt(e.target.value) || 1 })}
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <Label>Periodicidade das Consultas</Label>
                     <Select
                       value={formData.consultation_frequency || 'monthly'}
-                      onValueChange={(v) => setFormData({ ...formData, consultation_frequency: v as 'once' | 'monthly' | 'six_weeks' })}
+                      onValueChange={(v) => {
+                        const newFreq = v as 'once' | 'monthly' | 'six_weeks';
+                        setFormData({ ...formData, consultation_frequency: newFreq });
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -869,6 +862,22 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="consultationCount">Quantidade de Consultas</Label>
+                    <Input
+                      id="consultationCount"
+                      type="number"
+                      min="1"
+                      value={formData.consultation_count}
+                      onChange={(e) => setFormData({ ...formData, consultation_count: parseInt(e.target.value) || 1 })}
+                    />
+                    {formData.consultation_frequency !== 'once' && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Calculator className="h-3 w-3" />
+                        Calculado: {getTotalConsultationsForPlan} consultas para este plano
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="firstConsultation">Data da 1ª Consulta</Label>
