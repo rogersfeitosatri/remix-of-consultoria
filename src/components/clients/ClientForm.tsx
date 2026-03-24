@@ -170,12 +170,12 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     return Math.max(1, Math.ceil(months));
   }, [formData.plan_duration, formData.consultation_frequency, client]);
 
-  // Update consultation_count when plan changes (for continuation mode)
+  // Update consultation_count when plan changes (for both new and continuation mode)
   useEffect(() => {
-    if (formData.onboarding_type === 'continuation' && !client) {
+    if (!client && formData.has_consultations && formData.consultation_frequency !== 'once') {
       setFormData(prev => ({ ...prev, consultation_count: getTotalConsultationsForPlan }));
     }
-  }, [getTotalConsultationsForPlan, formData.onboarding_type, client]);
+  }, [getTotalConsultationsForPlan, formData.onboarding_type, formData.has_consultations, formData.consultation_frequency, client]);
 
   // Auto-suggest consultation index based on dates
   // When admin fills last_consultation_at, calculate suggested index
@@ -845,20 +845,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               {formData.onboarding_type === 'new' && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="consultationCount">Quantidade de Consultas</Label>
-                    <Input
-                      id="consultationCount"
-                      type="number"
-                      min="1"
-                      value={formData.consultation_count}
-                      onChange={(e) => setFormData({ ...formData, consultation_count: parseInt(e.target.value) || 1 })}
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <Label>Periodicidade das Consultas</Label>
                     <Select
                       value={formData.consultation_frequency || 'monthly'}
-                      onValueChange={(v) => setFormData({ ...formData, consultation_frequency: v as 'once' | 'monthly' | 'six_weeks' })}
+                      onValueChange={(v) => {
+                        const newFreq = v as 'once' | 'monthly' | 'six_weeks';
+                        setFormData({ ...formData, consultation_frequency: newFreq });
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -869,6 +862,22 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="consultationCount">Quantidade de Consultas</Label>
+                    <Input
+                      id="consultationCount"
+                      type="number"
+                      min="1"
+                      value={formData.consultation_count}
+                      onChange={(e) => setFormData({ ...formData, consultation_count: parseInt(e.target.value) || 1 })}
+                    />
+                    {formData.consultation_frequency !== 'once' && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Calculator className="h-3 w-3" />
+                        Calculado: {getTotalConsultationsForPlan} consultas para este plano
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="firstConsultation">Data da 1ª Consulta</Label>

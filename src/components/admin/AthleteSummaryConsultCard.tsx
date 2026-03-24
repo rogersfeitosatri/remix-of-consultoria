@@ -125,6 +125,13 @@ export function AthleteSummaryConsultCard({
   const pendingSchedules = schedules.filter(s => ['pending', 'sent', 'link_sent'].includes(s.status));
   const scheduledSchedules = schedules.filter(s => s.status === 'scheduled');
   const completedSchedules = schedules.filter(s => s.status === 'completed');
+
+  // Determine consultation frequency label
+  const frequencyLabel = client.consultation_frequency === 'six_weeks' 
+    ? 'a cada 6 semanas' 
+    : client.consultation_frequency === 'monthly' 
+      ? 'mensal' 
+      : 'única';
   
   const daysSinceLastConsult = stats?.lastCompletedAt 
     ? differenceInDays(today, parseISO(stats.lastCompletedAt))
@@ -248,52 +255,85 @@ export function AthleteSummaryConsultCard({
         )}
 
         {/* Pipeline de Links (Scheduled Consultations) */}
-        {schedules.length > 0 && (
+        {client.has_consultations && (
           <Collapsible open={showPipeline} onOpenChange={setShowPipeline}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="w-full justify-between h-8 text-xs px-2.5">
                 <span className="flex items-center gap-1.5">
                   <Send className="h-3 w-3 text-primary" />
                   Pipeline de Consultas
-                  <Badge variant="secondary" className="text-[10px] h-4 px-1">
-                    {pendingSchedules.length} pendente{pendingSchedules.length !== 1 ? 's' : ''}
-                  </Badge>
+                  {schedules.length > 0 && (
+                    <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                      {completedSchedules.length}/{schedules.length}
+                    </Badge>
+                  )}
                 </span>
                 {showPipeline ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-1.5">
-              <div className="space-y-1 max-h-[200px] overflow-y-auto">
-                {schedules.map((schedule, index) => (
-                  <div 
-                    key={schedule.id}
-                    className={cn(
-                      "flex items-center justify-between p-2 rounded-md text-xs border",
-                      schedule.status === 'completed' && "bg-emerald-500/5 border-emerald-500/20",
-                      schedule.status === 'scheduled' && "bg-blue-500/5 border-blue-500/20",
-                      ['sent', 'link_sent'].includes(schedule.status) && "bg-amber-500/5 border-amber-500/20",
-                      schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date))
-                        ? "bg-red-500/5 border-red-500/20"
-                        : schedule.status === 'pending' && "bg-muted/30 border-border",
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground font-mono w-4 text-center">{index + 1}</span>
-                      <div>
-                        <p className="font-medium">
-                          {format(parseISO(schedule.send_link_date), "dd/MM/yy")}
-                        </p>
-                        {schedule.scheduled_time && (
-                          <p className="text-muted-foreground text-[10px]">
-                            {schedule.scheduled_time.slice(0, 5)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {getScheduleStatusBadge(schedule.status, schedule.send_link_date)}
-                  </div>
-                ))}
+              {/* Plan context */}
+              <div className="p-2 rounded-md bg-muted/30 border border-border mb-2 text-xs text-muted-foreground">
+                <p>
+                  <span className="font-medium text-foreground">{client.consultation_count}</span> consulta{client.consultation_count > 1 ? 's' : ''} no plano ({frequencyLabel})
+                </p>
+                {completedSchedules.length > 0 && (
+                  <p className="mt-0.5">
+                    ✅ {completedSchedules.length} realizada{completedSchedules.length > 1 ? 's' : ''} · 
+                    {pendingSchedules.length > 0 
+                      ? ` 📅 ${pendingSchedules.length} pendente${pendingSchedules.length > 1 ? 's' : ''}` 
+                      : ' Todas concluídas'}
+                  </p>
+                )}
               </div>
+
+              {schedules.length === 0 ? (
+                <div className="p-3 text-center text-xs text-muted-foreground border border-dashed rounded-md">
+                  <AlertTriangle className="h-4 w-4 mx-auto mb-1 text-amber-500" />
+                  <p>Nenhum cronograma gerado.</p>
+                  <p className="text-[10px] mt-0.5">Edite o cadastro do atleta para gerar o pipeline.</p>
+                </div>
+              ) : (
+                <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                  {schedules.map((schedule, index) => (
+                    <div 
+                      key={schedule.id}
+                      className={cn(
+                        "flex items-center justify-between p-2 rounded-md text-xs border",
+                        schedule.status === 'completed' && "bg-emerald-500/5 border-emerald-500/20",
+                        schedule.status === 'scheduled' && "bg-blue-500/5 border-blue-500/20",
+                        ['sent', 'link_sent'].includes(schedule.status) && "bg-amber-500/5 border-amber-500/20",
+                        schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date))
+                          ? "bg-red-500/5 border-red-500/20"
+                          : schedule.status === 'pending' && "bg-muted/30 border-border",
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground font-mono w-4 text-center">{index + 1}</span>
+                        <div>
+                          <p className="font-medium">
+                            {schedule.status === 'completed' 
+                              ? format(parseISO(schedule.scheduled_date), "dd/MM/yy")
+                              : `Envio: ${format(parseISO(schedule.send_link_date), "dd/MM/yy")}`
+                            }
+                          </p>
+                          {schedule.scheduled_time && (
+                            <p className="text-muted-foreground text-[10px]">
+                              {schedule.scheduled_time.slice(0, 5)}
+                            </p>
+                          )}
+                          {schedule.status === 'pending' && !isPast(parseISO(schedule.send_link_date)) && (
+                            <p className="text-muted-foreground text-[10px]">
+                              em {differenceInDays(parseISO(schedule.send_link_date), today)}d
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {getScheduleStatusBadge(schedule.status, schedule.send_link_date)}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CollapsibleContent>
           </Collapsible>
         )}
