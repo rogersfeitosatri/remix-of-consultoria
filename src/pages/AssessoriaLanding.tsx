@@ -41,7 +41,7 @@ export default function AssessoriaLanding() {
             <img
               src={logo}
               alt="RF Assessoria Esportiva"
-              className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-contain mb-8 shadow-2xl shadow-[hsl(43,74%,49%)]/20 bg-black p-1"
+              className="w-28 h-28 md:w-36 md:h-36 rounded-2xl object-contain mb-8 bg-black p-1"
             />
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] mb-6">
