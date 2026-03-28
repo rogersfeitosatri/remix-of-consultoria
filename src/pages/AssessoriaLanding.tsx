@@ -31,7 +31,7 @@ export default function AssessoriaLanding() {
       <section className="pt-20 relative overflow-hidden min-h-[90vh] flex items-center">
         {/* Background image right side */}
         <div className="absolute inset-0 md:left-[45%] left-0">
-          <img src={heroImg} alt="Corredores" className="w-full h-full object-cover" width={1280} height={960} />
+          <img src={heroImg} alt="Rogers Feitosa correndo" className="w-full h-full object-cover object-top opacity-60" />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent md:via-black/40" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent md:hidden" />
         </div>
@@ -41,7 +41,7 @@ export default function AssessoriaLanding() {
             <img
               src={logo}
               alt="RF Assessoria Esportiva"
-              className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-contain mb-8 shadow-2xl shadow-[hsl(43,74%,49%)]/20 bg-black p-1"
+              className="w-28 h-28 md:w-36 md:h-36 rounded-2xl object-contain mb-8 bg-black p-1"
             />
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] mb-6">
