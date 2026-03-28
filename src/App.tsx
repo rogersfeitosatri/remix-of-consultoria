@@ -58,6 +58,7 @@ const StrategicCallResponses = lazy(() => import("./pages/StrategicCallResponses
 const PublicStrategicCall = lazy(() => import("./pages/PublicStrategicCall"));
 const CallSchedulingConfig = lazy(() => import("./pages/CallSchedulingConfig"));
 const PublicCallBooking = lazy(() => import("./pages/PublicCallBooking"));
+const AssessoriaLanding = lazy(() => import("./pages/AssessoriaLanding"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
