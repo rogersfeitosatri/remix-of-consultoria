@@ -28,23 +28,22 @@ export default function AssessoriaLanding() {
       </header>
 
       {/* Hero - BORA style split layout */}
-      <section className="pt-20 relative overflow-hidden min-h-[90vh] flex items-center">
-        {/* Background image right side */}
-        <div className="absolute inset-0 md:left-[45%] left-0">
-          <img src={heroImg} alt="Rogers Feitosa correndo" className="w-full h-full object-cover object-top opacity-60" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent md:via-black/40" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent md:hidden" />
+      <section className="pt-20 relative overflow-hidden min-h-[100vh] md:min-h-[90vh] flex items-end md:items-center">
+        {/* Background image - full on mobile, right side on desktop */}
+        <div className="absolute inset-0 md:left-[40%]">
+          <img src={heroImg} alt="Rogers Feitosa correndo" className="w-full h-full object-cover object-[center_20%] md:object-top opacity-50 md:opacity-60" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent md:bg-gradient-to-r md:from-black md:via-black/60 md:to-transparent" />
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-xl py-16 md:py-24">
+          <div className="max-w-xl py-10 pb-16 md:py-24">
             <img
               src={logo}
               alt="RF Assessoria Esportiva"
-              className="w-44 h-44 md:w-52 md:h-52 rounded-2xl object-contain mb-8 bg-black p-1"
+              className="w-56 h-56 md:w-72 md:h-72 lg:w-80 lg:h-80 rounded-3xl object-contain mb-8 bg-black/80 p-2 border border-gray-800"
             />
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] mb-6">
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] mb-5 md:mb-6">
               <span className="text-[hsl(43,74%,49%)] italic">A corrida{"\n"}transforma.</span>
               <br />
               E a <span className="text-[hsl(43,74%,49%)]">RF</span> vai
@@ -52,12 +51,12 @@ export default function AssessoriaLanding() {
               com você.
             </h1>
 
-            <p className="text-base md:text-lg text-gray-300 mb-8 max-w-md">
+            <p className="text-sm md:text-lg text-gray-300 mb-6 md:mb-8 max-w-md">
               A única assessoria que integra <strong className="text-white">nutrição e treinamento</strong> num só profissional. Treino e dieta sincronizados para você evoluir de verdade.
             </p>
 
             <a href="#plano">
-              <Button size="lg" className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground text-lg px-10 py-7 rounded-xl shadow-lg shadow-[hsl(43,74%,49%)]/20 font-bold">
+              <Button size="lg" className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground text-base md:text-lg px-8 md:px-10 py-6 md:py-7 rounded-xl shadow-lg shadow-[hsl(43,74%,49%)]/20 font-bold w-full md:w-auto">
                 Quero treinar com a RF!
               </Button>
             </a>
