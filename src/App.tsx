@@ -58,6 +58,7 @@ const StrategicCallResponses = lazy(() => import("./pages/StrategicCallResponses
 const PublicStrategicCall = lazy(() => import("./pages/PublicStrategicCall"));
 const CallSchedulingConfig = lazy(() => import("./pages/CallSchedulingConfig"));
 const PublicCallBooking = lazy(() => import("./pages/PublicCallBooking"));
+const AssessoriaLanding = lazy(() => import("./pages/AssessoriaLanding"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -129,6 +130,7 @@ function AppRoutes() {
         <Route path="/" element={<LinkBio />} />
         <Route path="/bio" element={<LinkBio />} />
         <Route path="/plans" element={<PlansLanding />} />
+        <Route path="/assessoria" element={<AssessoriaLanding />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/form/:formId" element={<PublicCheckinForm />} />
         <Route path="/anamnese-form/:formId" element={<PublicAnamneseForm />} />
