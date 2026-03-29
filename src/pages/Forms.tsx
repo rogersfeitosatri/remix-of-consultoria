@@ -328,42 +328,39 @@ export default function Forms() {
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          {/* Scrollable tabs for mobile */}
-          <ScrollArea className="w-full">
-            <TabsList className="inline-flex w-auto min-w-full sm:w-full sm:grid sm:grid-cols-5 h-auto p-1">
-              <TabsTrigger value="checkin" className="gap-1.5 text-xs px-3 py-2 relative">
-                <ClipboardList className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Check-in</span>
-                {pendingCheckinCount > 0 && (
-                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] flex items-center justify-center">
-                    {pendingCheckinCount > 99 ? '99+' : pendingCheckinCount}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="agendados" className="gap-1.5 text-xs px-3 py-2">
-                <CalendarCheck className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Agendados</span>
-              </TabsTrigger>
-              <TabsTrigger value="conferencia" className="gap-1.5 text-xs px-3 py-2">
-                <ClipboardCheck className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Conferência</span>
-              </TabsTrigger>
-              <TabsTrigger value="anamnese" className="gap-1.5 text-xs px-3 py-2 relative">
-                <FileText className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Anamnese</span>
-                {pendingAnamneseCount > 0 && (
-                  <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 text-[10px] flex items-center justify-center">
-                    {pendingAnamneseCount > 99 ? '99+' : pendingAnamneseCount}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="banco" className="gap-1.5 text-xs px-3 py-2">
-                <Library className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Perguntas</span>
-              </TabsTrigger>
-            </TabsList>
-            <ScrollBar orientation="horizontal" className="sm:hidden" />
-          </ScrollArea>
+          {/* Mobile-optimized tabs with labels always visible */}
+          <TabsList className="w-full grid grid-cols-5 h-auto p-1 gap-0.5">
+            <TabsTrigger value="checkin" className="flex flex-col sm:flex-row gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs px-1.5 sm:px-3 py-2 relative">
+              <ClipboardList className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+              <span className="leading-tight">Check-in</span>
+              {pendingCheckinCount > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-0.5 h-4 min-w-[16px] px-1 text-[9px] flex items-center justify-center">
+                  {pendingCheckinCount > 99 ? '99+' : pendingCheckinCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="agendados" className="flex flex-col sm:flex-row gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs px-1.5 sm:px-3 py-2">
+              <CalendarCheck className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+              <span className="leading-tight">Agenda</span>
+            </TabsTrigger>
+            <TabsTrigger value="conferencia" className="flex flex-col sm:flex-row gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs px-1.5 sm:px-3 py-2">
+              <ClipboardCheck className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+              <span className="leading-tight">Audit</span>
+            </TabsTrigger>
+            <TabsTrigger value="anamnese" className="flex flex-col sm:flex-row gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs px-1.5 sm:px-3 py-2 relative">
+              <FileText className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+              <span className="leading-tight">Anamn.</span>
+              {pendingAnamneseCount > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-0.5 h-4 min-w-[16px] px-1 text-[9px] flex items-center justify-center">
+                  {pendingAnamneseCount > 99 ? '99+' : pendingAnamneseCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="banco" className="flex flex-col sm:flex-row gap-0.5 sm:gap-1.5 text-[10px] sm:text-xs px-1.5 sm:px-3 py-2">
+              <Library className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+              <span className="leading-tight">Banco</span>
+            </TabsTrigger>
+          </TabsList>
 
           {/* Check-in Tab: Pending reviews + form templates */}
           <TabsContent value="checkin" className="space-y-4 mt-4">

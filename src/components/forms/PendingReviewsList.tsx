@@ -202,68 +202,70 @@ export function PendingReviewsList() {
     return (
       <div
         key={response.id}
-        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+        className="flex items-center gap-2 p-2.5 sm:p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer active:scale-[0.99]"
+        onClick={() => navigate(`/checkin-review/${response.id}`)}
       >
-        <div 
-          className="flex items-center gap-3 flex-1 cursor-pointer min-w-0"
-          onClick={() => navigate(`/checkin-review/${response.id}`)}
-        >
-          <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-            waiting.urgent ? 'bg-destructive/10' : 'bg-orange-500/10'
-          }`}>
-            {waiting.urgent ? (
-              <AlertCircle className="h-5 w-5 text-destructive" />
-            ) : (
-              <Clock className="h-5 w-5 text-orange-500" />
+        {/* Icon */}
+        <div className={`h-8 w-8 sm:h-10 sm:w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+          waiting.urgent ? 'bg-destructive/10' : 'bg-orange-500/10'
+        }`}>
+          {waiting.urgent ? (
+            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
+          ) : (
+            <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-medium text-xs sm:text-sm truncate max-w-[140px] sm:max-w-none">{response.clients?.name}</p>
+            <Badge 
+              variant="outline" 
+              className={`text-[9px] sm:text-[10px] px-1 py-0 h-4 sm:h-5 ${
+                waiting.urgent 
+                  ? 'bg-destructive/10 text-destructive border-destructive/20' 
+                  : 'bg-orange-500/10 text-orange-600 border-orange-500/20'
+              }`}
+            >
+              <Clock className="h-2 w-2 mr-0.5" />
+              {waiting.text}
+            </Badge>
+            <Badge 
+              variant="outline" 
+              className={`text-[9px] sm:text-[10px] px-1 py-0 h-4 sm:h-5 ${
+                response.feedbackStatus === 'approved' 
+                  ? "bg-blue-500/10 text-blue-500 border-blue-500/20" 
+                  : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+              }`}
+            >
+              {response.feedbackStatus === 'approved' ? 'Pronto' : 'Pendente'}
+            </Badge>
+          </div>
+          <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+            {response.checkin_forms?.title} · {format(parseISO(response.submitted_at), "dd/MM HH:mm", { locale: ptBR })}
+          </p>
+          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+            {freq && CHECKIN_LABELS[freq] && (
+              <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 py-0 h-4 sm:h-5 bg-primary/5 text-primary border-primary/20">
+                {CHECKIN_LABELS[freq]}
+              </Badge>
+            )}
+            {response.targetRace && (
+              <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 py-0 h-4 sm:h-5 bg-accent text-accent-foreground border-accent gap-0.5">
+                <Target className="h-2.5 w-2.5" />
+                {response.targetRace}
+              </Badge>
             )}
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <p className="font-medium text-sm truncate">{response.clients?.name}</p>
-              <Badge 
-                variant="outline" 
-                className={`text-[10px] px-1.5 py-0 h-5 ${
-                  waiting.urgent 
-                    ? 'bg-destructive/10 text-destructive border-destructive/20' 
-                    : 'bg-orange-500/10 text-orange-600 border-orange-500/20'
-                }`}
-              >
-                <Clock className="h-2.5 w-2.5 mr-0.5" />
-                {waiting.text}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {response.checkin_forms?.title} · {format(parseISO(response.submitted_at), "dd/MM HH:mm", { locale: ptBR })}
-            </p>
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              {freq && CHECKIN_LABELS[freq] && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-primary/5 text-primary border-primary/20">
-                  {CHECKIN_LABELS[freq]}
-                </Badge>
-              )}
-              {response.targetRace && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-accent text-accent-foreground border-accent gap-0.5">
-                  <Target className="h-3 w-3" />
-                  {response.targetRace}
-                </Badge>
-              )}
-            </div>
-          </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Badge 
-            variant="outline" 
-            className={response.feedbackStatus === 'approved' 
-              ? "bg-blue-500/10 text-blue-500 border-blue-500/20" 
-              : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
-            }
-          >
-            {response.feedbackStatus === 'approved' ? 'Pronto' : 'Pendente'}
-          </Badge>
+
+        {/* Actions - compact on mobile */}
+        <div className="flex items-center gap-1 flex-shrink-0">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7 sm:h-8 sm:w-8"
             onClick={(e) => {
               e.stopPropagation();
               markAsReviewed.mutate(response.id);
@@ -273,10 +275,7 @@ export function PendingReviewsList() {
           >
             <CheckCircle className="h-4 w-4 text-green-500" />
           </Button>
-          <ChevronRight 
-            className="h-4 w-4 text-muted-foreground cursor-pointer" 
-            onClick={() => navigate(`/checkin-review/${response.id}`)}
-          />
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
       </div>
     );
