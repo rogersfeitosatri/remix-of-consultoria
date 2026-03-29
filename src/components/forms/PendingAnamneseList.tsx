@@ -195,67 +195,50 @@ export function PendingAnamneseList() {
                   {submittedPending.map((client) => (
                     <div
                       key={client.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-purple-500/5 border border-purple-500/20 hover:bg-purple-500/10 transition-colors"
+                      className="flex items-center gap-2 p-2.5 sm:p-3 rounded-lg bg-purple-500/5 border border-purple-500/20 hover:bg-purple-500/10 transition-colors cursor-pointer active:scale-[0.99]"
+                      onClick={() => navigate(`/clients/${client.id}/analysis`)}
                     >
-                      <div 
-                        className="flex items-center gap-3 flex-1 cursor-pointer"
-                        onClick={() => navigate(`/clients/${client.id}/analysis`)}
-                      >
-                        <div className="h-10 w-10 rounded-full bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-                          <FileText className="h-5 w-5 text-purple-500" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{client.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Anamnese enviada - aguardando revisão
-                          </p>
-                        </div>
+                      <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20">
-                          Enviada
-                        </Badge>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-xs sm:text-sm truncate">{client.name}</p>
+                          <Badge className="text-[9px] sm:text-[10px] px-1 h-4 sm:h-5 bg-purple-500/10 text-purple-500 border-purple-500/20">
+                            Enviada
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                          Aguardando revisão
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/clients/${client.id}`);
-                          }}
-                          title="Editar atleta"
-                        >
-                          <Edit className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
+                          className="h-7 w-7"
                           onClick={(e) => {
                             e.stopPropagation();
                             markAsReviewed.mutate(client.id);
                           }}
                           disabled={markAsReviewed.isPending}
-                          title="Aprovar e ativar atleta"
+                          title="Aprovar"
                         >
                           <CheckCircle className="h-4 w-4 text-green-500" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="h-7 w-7"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteClick(client);
                           }}
-                          title="Excluir atleta"
+                          title="Excluir"
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
-                        <ChevronRight 
-                          className="h-4 w-4 text-muted-foreground cursor-pointer" 
-                          onClick={() => navigate(`/clients/${client.id}/analysis`)}
-                        />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </div>
                   ))}
@@ -273,47 +256,37 @@ export function PendingAnamneseList() {
                   {awaitingSubmission.map((client) => (
                     <div
                       key={client.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                      className="flex items-center gap-2 p-2.5 sm:p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer active:scale-[0.99]"
+                      onClick={() => navigate(`/clients/${client.id}`)}
                     >
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                          <User className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{client.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Cadastrado em {format(parseISO(client.created_at), "dd/MM/yyyy", { locale: ptBR })} - aguardando preenchimento
-                          </p>
-                        </div>
+                      <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
-                          Pendente
-                        </Badge>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-xs sm:text-sm truncate">{client.name}</p>
+                          <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 h-4 sm:h-5 bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+                            Pendente
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                          Cadastrado em {format(parseISO(client.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/clients/${client.id}`);
-                          }}
-                          title="Editar atleta"
-                        >
-                          <Edit className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
+                          className="h-7 w-7"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteClick(client);
                           }}
-                          title="Excluir atleta"
+                          title="Excluir"
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
                     </div>
                   ))}
