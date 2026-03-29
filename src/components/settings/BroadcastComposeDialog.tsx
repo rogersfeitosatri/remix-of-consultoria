@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useClients } from '@/hooks/useClients';
 import { useWhatsAppContacts, useCreateBroadcast } from '@/hooks/useBroadcasts';
-import { Send, Clock, Upload, X, Search, UserPlus, Users, Paperclip, Eye, Trash2 } from 'lucide-react';
+import { Send, Clock, Upload, X, Search, UserPlus, Users, Paperclip, Eye, Trash2, Repeat } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -36,6 +37,8 @@ interface Recipient {
   contactId?: string;
 }
 
+const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
 export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
   const { data: clients = [] } = useClients();
   const { data: contacts = [] } = useWhatsAppContacts();
@@ -56,7 +59,13 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
   const [manualName, setManualName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Pre-fill from cancelled/failed broadcast
+  // Recurrence state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceType, setRecurrenceType] = useState<'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([1]); // Monday
+  const [recurrenceTime, setRecurrenceTime] = useState('09:00');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+
   useEffect(() => {
     if (open && prefill) {
       setTitle(prefill.title || '');
@@ -127,6 +136,12 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
     setRecipients(prev => prev.filter(r => r.id !== id));
   };
 
+  const toggleRecurrenceDay = (day: number) => {
+    setRecurrenceDays(prev => 
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
+  };
+
   const handleFileUpload = async (file: File) => {
     setUploading(true);
     try {
@@ -143,7 +158,6 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
 
       setMediaUrl(urlData.publicUrl);
 
-      // Determine media type
       if (file.type.startsWith('image/')) setMediaType('image');
       else if (file.type.startsWith('video/')) setMediaType('video');
       else if (file.type.startsWith('audio/')) setMediaType('audio');
@@ -162,6 +176,7 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
     if (!body.trim()) { toast.error('Informe o corpo da mensagem'); return; }
     if (recipients.length === 0) { toast.error('Adicione pelo menos 1 destinatário'); return; }
     if (sendType === 'scheduled' && !scheduledAt) { toast.error('Informe a data/hora do agendamento'); return; }
+    if (isRecurring && recurrenceDays.length === 0) { toast.error('Selecione pelo menos 1 dia para recorrência'); return; }
 
     createBroadcast.mutate({
       internal_title: title,
@@ -170,6 +185,11 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
       media_type: mediaType,
       send_type: sendType,
       scheduled_at: sendType === 'scheduled' ? new Date(scheduledAt).toISOString() : null,
+      is_recurring: isRecurring,
+      recurrence_type: isRecurring ? recurrenceType : undefined,
+      recurrence_days: isRecurring ? recurrenceDays : undefined,
+      recurrence_time: isRecurring ? recurrenceTime : undefined,
+      recurrence_end_date: isRecurring && recurrenceEndDate ? recurrenceEndDate : undefined,
       recipients: recipients.map(r => ({
         client_id: r.clientId || null,
         contact_id: r.contactId || null,
@@ -188,14 +208,16 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
     setTitle(''); setBody(''); setSendType('immediate');
     setScheduledAt(''); setRecipients([]);
     setMediaFile(null); setMediaUrl(null); setMediaType(null);
-    setShowPreview(false);
+    setShowPreview(false); setIsRecurring(false);
+    setRecurrenceType('weekly'); setRecurrenceDays([1]);
+    setRecurrenceTime('09:00'); setRecurrenceEndDate('');
   };
 
   const insertVariable = (v: string) => {
     setBody(prev => prev + `{${v}}`);
   };
 
-  const renderPreview = (text: string) => {
+  const renderPreviewText = (text: string) => {
     return text
       .replace(/\{nome\}/g, 'João Silva')
       .replace(/\{primeiro_nome\}/g, 'João')
@@ -209,29 +231,33 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nova Mensagem WhatsApp</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5 text-emerald-500" />
+            Nova Mensagem WhatsApp
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5">
           {/* Title */}
           <div>
-            <Label>Título interno</Label>
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">Título interno</Label>
             <Input
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Ex: Lembrete check-in semanal"
+              className="mt-1"
             />
           </div>
 
           {/* Body */}
           <div>
-            <Label>Corpo da mensagem</Label>
-            <div className="flex flex-wrap gap-1 mb-2">
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">Corpo da mensagem</Label>
+            <div className="flex flex-wrap gap-1 my-1.5">
               {['nome', 'primeiro_nome', 'link_checkin', 'prazo_resposta', 'plano', 'data'].map(v => (
                 <Badge
                   key={v}
                   variant="outline"
-                  className="cursor-pointer hover:bg-primary/10"
+                  className="cursor-pointer hover:bg-primary/10 text-xs"
                   onClick={() => insertVariable(v)}
                 >
                   {`{${v}}`}
@@ -245,21 +271,21 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
               rows={5}
             />
             {body && (
-              <Button variant="ghost" size="sm" className="mt-1 gap-1" onClick={() => setShowPreview(!showPreview)}>
+              <Button variant="ghost" size="sm" className="mt-1 gap-1 text-xs" onClick={() => setShowPreview(!showPreview)}>
                 <Eye className="h-3 w-3" />
-                {showPreview ? 'Ocultar preview' : 'Preview'}
+                {showPreview ? 'Ocultar' : 'Preview'}
               </Button>
             )}
             {showPreview && (
-              <div className="mt-2 p-3 rounded-lg bg-muted/50 text-sm whitespace-pre-wrap">
-                {renderPreview(body)}
+              <div className="mt-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 text-sm whitespace-pre-wrap">
+                {renderPreviewText(body)}
               </div>
             )}
           </div>
 
           {/* Attachments */}
           <div>
-            <Label>Anexo (opcional)</Label>
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">Anexo (opcional)</Label>
             <div className="flex items-center gap-2 mt-1">
               <input
                 ref={fileInputRef}
@@ -270,11 +296,11 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
               />
               <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
                 <Paperclip className="h-4 w-4 mr-1" />
-                {uploading ? 'Enviando...' : 'Anexar arquivo'}
+                {uploading ? 'Enviando...' : 'Anexar'}
               </Button>
               {mediaFile && (
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{mediaFile.name}</Badge>
+                  <Badge variant="secondary" className="text-xs">{mediaFile.name}</Badge>
                   <Button variant="ghost" size="sm" onClick={() => { setMediaFile(null); setMediaUrl(null); setMediaType(null); }}>
                     <X className="h-3 w-3" />
                   </Button>
@@ -284,11 +310,13 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
           </div>
 
           {/* Send type */}
-          <div className="flex items-center gap-4">
-            <Label>Tipo de envio:</Label>
-            <div className="flex items-center gap-2">
-              <Switch checked={sendType === 'scheduled'} onCheckedChange={v => setSendType(v ? 'scheduled' : 'immediate')} />
-              <span className="text-sm">{sendType === 'scheduled' ? 'Agendado' : 'Imediato'}</span>
+          <div className="rounded-lg border p-3 space-y-3">
+            <div className="flex items-center gap-4">
+              <Label className="text-xs font-semibold uppercase text-muted-foreground">Tipo de envio</Label>
+              <div className="flex items-center gap-2">
+                <Switch checked={sendType === 'scheduled'} onCheckedChange={v => setSendType(v ? 'scheduled' : 'immediate')} />
+                <span className="text-sm font-medium">{sendType === 'scheduled' ? '📅 Agendado' : '⚡ Imediato'}</span>
+              </div>
             </div>
             {sendType === 'scheduled' && (
               <Input
@@ -298,27 +326,94 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
                 className="w-auto"
               />
             )}
+
+            {/* Recurrence */}
+            <div className="border-t pt-3 space-y-3">
+              <div className="flex items-center gap-2">
+                <Repeat className="h-4 w-4 text-blue-500" />
+                <Label className="text-sm font-medium">Recorrência</Label>
+                <Switch checked={isRecurring} onCheckedChange={setIsRecurring} />
+                <span className="text-xs text-muted-foreground">{isRecurring ? 'Ativada' : 'Desativada'}</span>
+              </div>
+
+              {isRecurring && (
+                <div className="space-y-3 pl-6">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Select value={recurrenceType} onValueChange={(v: any) => setRecurrenceType(v)}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Semanal</SelectItem>
+                        <SelectItem value="biweekly">Quinzenal</SelectItem>
+                        <SelectItem value="monthly">Mensal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-muted-foreground">às</span>
+                    <Input
+                      type="time"
+                      value={recurrenceTime}
+                      onChange={e => setRecurrenceTime(e.target.value)}
+                      className="w-[100px]"
+                    />
+                  </div>
+
+                  {recurrenceType !== 'monthly' && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1.5 block">Dias da semana</Label>
+                      <div className="flex gap-1.5">
+                        {DAY_LABELS.map((label, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => toggleRecurrenceDay(i)}
+                            className={`w-9 h-9 rounded-full text-xs font-medium border transition-colors ${
+                              recurrenceDays.includes(i) 
+                                ? 'bg-primary text-primary-foreground border-primary' 
+                                : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Encerrar em (opcional)</Label>
+                    <Input
+                      type="date"
+                      value={recurrenceEndDate}
+                      onChange={e => setRecurrenceEndDate(e.target.value)}
+                      className="w-auto mt-1"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Recipients */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Destinatários ({recipients.length})</Label>
+              <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                Destinatários ({recipients.length})
+              </Label>
               <div className="flex gap-2">
                 {recipients.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={() => setRecipients([])} className="gap-1 text-destructive hover:text-destructive">
+                  <Button variant="outline" size="sm" onClick={() => setRecipients([])} className="gap-1 text-destructive hover:text-destructive text-xs h-7">
                     <Trash2 className="h-3 w-3" />
-                    Limpar todos
+                    Limpar
                   </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={addAllActiveClients} className="gap-1">
+                <Button variant="outline" size="sm" onClick={addAllActiveClients} className="gap-1 text-xs h-7">
                   <Users className="h-3 w-3" />
                   Todos ativos
                 </Button>
               </div>
             </div>
 
-            {/* Search & add */}
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -375,9 +470,9 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
 
             {/* Selected recipients */}
             {recipients.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                 {recipients.map(r => (
-                  <Badge key={r.id} variant="secondary" className="gap-1">
+                  <Badge key={r.id} variant="secondary" className="gap-1 text-xs">
                     {r.name}
                     <button onClick={() => removeRecipient(r.id)}>
                       <X className="h-3 w-3" />
@@ -396,8 +491,9 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
               disabled={createBroadcast.isPending}
               className="gap-2"
             >
-              {sendType === 'immediate' ? <Send className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+              {isRecurring ? <Repeat className="h-4 w-4" /> : sendType === 'immediate' ? <Send className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
               {createBroadcast.isPending ? 'Enviando...' :
+                isRecurring ? `Criar recorrência (${recipients.length})` :
                 sendType === 'immediate' ? `Enviar para ${recipients.length}` : 'Agendar envio'}
             </Button>
           </div>
