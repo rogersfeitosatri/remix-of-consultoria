@@ -4764,8 +4764,15 @@ export type Database = {
           failed_count: number | null
           id: string
           internal_title: string
+          is_recurring: boolean | null
+          last_recurrence_at: string | null
           media_type: string | null
           media_url: string | null
+          parent_broadcast_id: string | null
+          recurrence_days: number[] | null
+          recurrence_end_date: string | null
+          recurrence_time: string | null
+          recurrence_type: string | null
           scheduled_at: string | null
           send_type: string
           sent_count: number | null
@@ -4780,8 +4787,15 @@ export type Database = {
           failed_count?: number | null
           id?: string
           internal_title: string
+          is_recurring?: boolean | null
+          last_recurrence_at?: string | null
           media_type?: string | null
           media_url?: string | null
+          parent_broadcast_id?: string | null
+          recurrence_days?: number[] | null
+          recurrence_end_date?: string | null
+          recurrence_time?: string | null
+          recurrence_type?: string | null
           scheduled_at?: string | null
           send_type?: string
           sent_count?: number | null
@@ -4796,8 +4810,15 @@ export type Database = {
           failed_count?: number | null
           id?: string
           internal_title?: string
+          is_recurring?: boolean | null
+          last_recurrence_at?: string | null
           media_type?: string | null
           media_url?: string | null
+          parent_broadcast_id?: string | null
+          recurrence_days?: number[] | null
+          recurrence_end_date?: string | null
+          recurrence_time?: string | null
+          recurrence_type?: string | null
           scheduled_at?: string | null
           send_type?: string
           sent_count?: number | null
@@ -4806,7 +4827,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_broadcasts_parent_broadcast_id_fkey"
+            columns: ["parent_broadcast_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_broadcasts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_contacts: {
         Row: {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   useWhatsAppTemplates, 
   useInitializeWhatsAppTemplates, 
@@ -13,8 +13,9 @@ import { WhatsAppScheduledTab } from './WhatsAppScheduledTab';
 import { BroadcastComposeDialog, type BroadcastPrefill } from './BroadcastComposeDialog';
 import { BroadcastsListTab } from './BroadcastsListTab';
 import { ContactsTab } from './ContactsTab';
-import { MessageSquare, History, Clock, Loader2, Send, Users, Radio } from 'lucide-react';
+import { MessageSquare, History, Clock, Loader2, Send, Users, Radio, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 export function WhatsAppControlCenter() {
   const { data: templates, isLoading: templatesLoading } = useWhatsAppTemplates();
@@ -35,7 +36,6 @@ export function WhatsAppControlCenter() {
     if (!open) setComposePrefill(undefined);
   };
 
-  // Initialize default templates if none exist
   useEffect(() => {
     if (!templatesLoading && templates && templates.length === 0 && !initialized) {
       setInitialized(true);
@@ -51,81 +51,133 @@ export function WhatsAppControlCenter() {
     );
   }
 
+  // Stats
+  const totalSent = logs?.filter(l => l.status === 'success').length || 0;
+  const totalFailed = logs?.filter(l => l.status === 'failed').length || 0;
+  const pendingScheduled = scheduledMessages?.filter(m => m.status === 'scheduled').length || 0;
+  const pendingMeet = scheduledMessages?.filter(m => m.status === 'pending_meet').length || 0;
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              Central de Mensagens WhatsApp
+    <div className="space-y-4">
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="bg-emerald-500/10 border-emerald-500/20">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/20">
+              <CheckCircle className="h-4 w-4 text-emerald-500" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Enviadas</p>
+              <p className="text-lg font-bold text-emerald-500">{totalSent}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-destructive/10 border-destructive/20">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-destructive/20">
+              <XCircle className="h-4 w-4 text-destructive" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Falhas</p>
+              <p className="text-lg font-bold text-destructive">{totalFailed}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-blue-500/10 border-blue-500/20">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/20">
+              <Clock className="h-4 w-4 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Programadas</p>
+              <p className="text-lg font-bold text-blue-500">{pendingScheduled}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-amber-500/10 border-amber-500/20">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-amber-500/20">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Sem Meet</p>
+              <p className="text-lg font-bold text-amber-500">{pendingMeet}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Card */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <MessageSquare className="h-5 w-5 text-emerald-500" />
+              Central de Mensagens
             </CardTitle>
-            <CardDescription>
-              Envie mensagens em massa, gerencie templates, contatos e acompanhe históricos
-            </CardDescription>
+            <Button onClick={() => setShowCompose(true)} size="sm" className="gap-2">
+              <Send className="h-4 w-4" />
+              Nova Mensagem
+            </Button>
           </div>
-          <Button onClick={() => setShowCompose(true)} className="gap-2">
-            <Send className="h-4 w-4" />
-            Nova Mensagem
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="broadcasts" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="broadcasts" className="flex items-center gap-1 text-xs">
-              <Radio className="h-3.5 w-3.5" />
-              Envios
-            </TabsTrigger>
-            <TabsTrigger value="templates" className="flex items-center gap-1 text-xs">
-              <MessageSquare className="h-3.5 w-3.5" />
-              Templates
-            </TabsTrigger>
-            <TabsTrigger value="contacts" className="flex items-center gap-1 text-xs">
-              <Users className="h-3.5 w-3.5" />
-              Contatos
-            </TabsTrigger>
-            <TabsTrigger value="scheduled" className="flex items-center gap-1 text-xs">
-              <Clock className="h-3.5 w-3.5" />
-              Programadas
-              {scheduledMessages && scheduledMessages.filter(m => m.status === 'scheduled').length > 0 && (
-                <span className="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">
-                  {scheduledMessages.filter(m => m.status === 'scheduled').length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="logs" className="flex items-center gap-1 text-xs">
-              <History className="h-3.5 w-3.5" />
-              Histórico
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="broadcasts" className="mt-4">
-            <BroadcastsListTab onResend={handleNewFromBroadcast} />
-          </TabsContent>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <Tabs defaultValue="broadcasts" className="w-full">
+            <TabsList className="w-full flex overflow-x-auto">
+              <TabsTrigger value="broadcasts" className="flex-1 min-w-0 flex items-center gap-1.5 text-xs">
+                <Radio className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Envios</span>
+              </TabsTrigger>
+              <TabsTrigger value="templates" className="flex-1 min-w-0 flex items-center gap-1.5 text-xs">
+                <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Templates</span>
+              </TabsTrigger>
+              <TabsTrigger value="contacts" className="flex-1 min-w-0 flex items-center gap-1.5 text-xs">
+                <Users className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Contatos</span>
+              </TabsTrigger>
+              <TabsTrigger value="scheduled" className="flex-1 min-w-0 flex items-center gap-1.5 text-xs relative">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Programadas</span>
+                {pendingScheduled > 0 && (
+                  <Badge variant="default" className="ml-1 h-4 min-w-[16px] px-1 text-[10px] leading-none">
+                    {pendingScheduled}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="logs" className="flex-1 min-w-0 flex items-center gap-1.5 text-xs">
+                <History className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">Histórico</span>
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="broadcasts" className="mt-4">
+              <BroadcastsListTab onResend={handleNewFromBroadcast} />
+            </TabsContent>
 
-          <TabsContent value="templates" className="mt-4">
-            <WhatsAppTemplatesTab templates={templates || []} />
-          </TabsContent>
+            <TabsContent value="templates" className="mt-4">
+              <WhatsAppTemplatesTab templates={templates || []} />
+            </TabsContent>
 
-          <TabsContent value="contacts" className="mt-4">
-            <ContactsTab />
-          </TabsContent>
-          
-          <TabsContent value="scheduled" className="mt-4">
-            <WhatsAppScheduledTab 
-              messages={scheduledMessages || []} 
-              isLoading={scheduledLoading} 
-            />
-          </TabsContent>
-          
-          <TabsContent value="logs" className="mt-4">
-            <WhatsAppLogsTab logs={logs || []} isLoading={logsLoading} />
-          </TabsContent>
-        </Tabs>
-      </CardContent>
+            <TabsContent value="contacts" className="mt-4">
+              <ContactsTab />
+            </TabsContent>
+            
+            <TabsContent value="scheduled" className="mt-4">
+              <WhatsAppScheduledTab 
+                messages={scheduledMessages || []} 
+                isLoading={scheduledLoading} 
+              />
+            </TabsContent>
+            
+            <TabsContent value="logs" className="mt-4">
+              <WhatsAppLogsTab logs={logs || []} isLoading={logsLoading} />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       <BroadcastComposeDialog open={showCompose} onOpenChange={handleComposeClose} prefill={composePrefill} />
-    </Card>
+    </div>
   );
 }

@@ -93,6 +93,11 @@ export function useCreateBroadcast() {
       media_type?: string | null;
       send_type: 'immediate' | 'scheduled';
       scheduled_at?: string | null;
+      is_recurring?: boolean;
+      recurrence_type?: string;
+      recurrence_days?: number[];
+      recurrence_time?: string;
+      recurrence_end_date?: string;
       recipients: Array<{
         client_id?: string | null;
         contact_id?: string | null;
@@ -115,7 +120,12 @@ export function useCreateBroadcast() {
           scheduled_at: params.scheduled_at || null,
           status: params.send_type === 'immediate' ? 'sending' : 'scheduled',
           total_recipients: params.recipients.length,
-        })
+          is_recurring: params.is_recurring || false,
+          recurrence_type: params.recurrence_type || null,
+          recurrence_days: params.recurrence_days || null,
+          recurrence_time: params.recurrence_time || null,
+          recurrence_end_date: params.recurrence_end_date || null,
+        } as any)
         .select()
         .single();
 
