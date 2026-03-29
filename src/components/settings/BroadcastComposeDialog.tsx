@@ -183,7 +183,7 @@ export function BroadcastComposeDialog({ open, onOpenChange, prefill }: Props) {
       body,
       media_url: mediaUrl,
       media_type: mediaType,
-      send_type: sendType,
+      send_type: isRecurring ? 'scheduled' : sendType,
       scheduled_at: sendType === 'scheduled' ? new Date(scheduledAt).toISOString() : null,
       is_recurring: isRecurring,
       recurrence_type: isRecurring ? recurrenceType : undefined,
