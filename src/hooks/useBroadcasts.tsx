@@ -120,7 +120,12 @@ export function useCreateBroadcast() {
           scheduled_at: params.scheduled_at || null,
           status: params.send_type === 'immediate' ? 'sending' : 'scheduled',
           total_recipients: params.recipients.length,
-        })
+          is_recurring: params.is_recurring || false,
+          recurrence_type: params.recurrence_type || null,
+          recurrence_days: params.recurrence_days || null,
+          recurrence_time: params.recurrence_time || null,
+          recurrence_end_date: params.recurrence_end_date || null,
+        } as any)
         .select()
         .single();
 
