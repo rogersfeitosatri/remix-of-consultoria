@@ -366,10 +366,14 @@ export default function Clients() {
 
         {/* Tabs */}
         <Tabs defaultValue="active" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="active" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <Users className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">Ativos</span> ({activeClients.length})
+            </TabsTrigger>
+            <TabsTrigger value="frozen" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Snowflake className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Congelados</span> ({frozenClients.length})
             </TabsTrigger>
             <TabsTrigger value="inactive" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <UserX className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -393,6 +397,31 @@ export default function Clients() {
               onEdit={handleEdit}
               onDelete={handleDelete}
             />
+          </TabsContent>
+
+          <TabsContent value="frozen" className="mt-6">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {filteredFrozenClients.length} atletas congelados
+              </span>
+              <ExportClientsButton 
+                clients={filteredFrozenClients} 
+                targetRaceAlerts={targetRaceAlerts}
+                filename="atletas_congelados"
+              />
+            </div>
+            {filteredFrozenClients.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Snowflake className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum atleta congelado</p>
+              </div>
+            ) : (
+              <FrozenClientsList
+                clients={filteredFrozenClients}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            )}
           </TabsContent>
           
           <TabsContent value="inactive" className="mt-6">
