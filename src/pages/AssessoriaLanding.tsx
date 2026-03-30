@@ -167,9 +167,8 @@ export default function AssessoriaLanding() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-5xl mx-auto">
             {[
               { step: "01", title: "Inscrição", desc: "Garanta sua vaga e preencha o formulário de diagnóstico.", icon: ClipboardCheck },
-              { step: "02", title: "Consulta Inicial", desc: "Videochamada para ajustar treino e dieta ao seu perfil.", icon: Video },
-              { step: "03", title: "Receba seus planos", desc: "Planilha de treino + plano alimentar sincronizados no app.", icon: Calendar },
-              { step: "04", title: "Evolua", desc: "Check-in mensal, ajustes contínuos e suporte direto.", icon: Trophy },
+              { step: "02", title: "Receba seus planos", desc: "Planilha de treino + plano alimentar sincronizados no app.", icon: Calendar },
+              { step: "03", title: "Evolua", desc: "Check-in mensal, ajustes contínuos e suporte direto.", icon: Trophy },
             ].map((item, index) => (
               <div key={index} className="text-center">
                 <div className="w-14 h-14 md:w-16 md:h-16 bg-[hsl(43,74%,49%)] text-primary-foreground rounded-2xl flex items-center justify-center text-xl md:text-2xl font-bold mx-auto mb-4 shadow-lg shadow-[hsl(43,74%,49%)]/20">
