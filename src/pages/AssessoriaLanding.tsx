@@ -237,7 +237,7 @@ export default function AssessoriaLanding() {
                 <p className="text-gray-400 text-sm mb-6">Nutrição + Treinamento sincronizados</p>
 
                 <div className="flex items-end justify-center gap-1 mb-2">
-                  <span className="text-4xl md:text-5xl font-extrabold text-[hsl(43,74%,49%)]">R$157</span>
+                  <span className="text-4xl md:text-5xl font-extrabold text-[hsl(43,74%,49%)]">R$179,90</span>
                   <span className="text-gray-400 text-lg mb-1">/mês</span>
                 </div>
                 <p className="text-gray-500 text-sm">no 1º ano de acompanhamento</p>
