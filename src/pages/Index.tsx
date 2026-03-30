@@ -111,6 +111,9 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* My Day Today */}
+        <MyDayTodayPanel />
+
         {/* Alerts Section */}
         <div className="space-y-4">
           <UnresponsiveAthletesAlert />
