@@ -247,7 +247,7 @@ export function LandingPageSettingsSection() {
           {/* ── Links ── */}
           <TabsContent value="links" className="space-y-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-muted-foreground">Links dos botões de WhatsApp nos planos</p>
+              <p className="text-xs text-muted-foreground">Links dos botões de WhatsApp nos planos e assessoria</p>
               <Button variant="ghost" size="sm" onClick={() => handleReset('links')} className="text-xs h-7">
                 <RotateCcw className="h-3 w-3 mr-1" /> Restaurar padrão
               </Button>
@@ -264,6 +264,15 @@ export function LandingPageSettingsSection() {
               onChange={v => update('plans_consultas_whatsapp_url', v)}
               placeholder="https://wa.me/..."
             />
+            <div className="border-t pt-4 mt-4">
+              <p className="text-xs font-medium text-muted-foreground mb-3">Página da Assessoria (/assessoria)</p>
+              <FieldRow
+                label='Link dos botões de WhatsApp na página da Assessoria'
+                value={texts.assessoria_whatsapp_url || ''}
+                onChange={v => update('assessoria_whatsapp_url', v)}
+                placeholder="https://wa.me/55..."
+              />
+            </div>
           </TabsContent>
         </Tabs>
 
