@@ -37,6 +37,10 @@ export interface Client {
   last_consultation_at: string | null;
   last_consultation_index: number | null;
   athlete_user_id: string | null;
+  // Freeze fields
+  is_frozen: boolean;
+  frozen_at: string | null;
+  total_frozen_days: number;
 }
 
 export interface Payment {

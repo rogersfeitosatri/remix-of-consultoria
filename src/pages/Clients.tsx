@@ -109,6 +109,14 @@ export default function Clients() {
     );
   }, [searchQuery, activeClients, serviceFilter, planFilter, targetRaceFilter, targetRaceAlerts]);
 
+  const filteredFrozenClients = useMemo(() => {
+    return applyFilters(frozenClients).sort((a, b) => {
+      const frozenA = (a as any).frozen_at ? new Date((a as any).frozen_at).getTime() : 0;
+      const frozenB = (b as any).frozen_at ? new Date((b as any).frozen_at).getTime() : 0;
+      return frozenB - frozenA;
+    });
+  }, [searchQuery, frozenClients, serviceFilter, planFilter, targetRaceFilter, targetRaceAlerts]);
+
   const filteredInactiveClients = useMemo(() => {
     return applyFilters(inactiveClients).sort((a, b) => 
       new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
