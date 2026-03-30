@@ -17,6 +17,7 @@ interface ScheduledCheckin {
     name: string;
     phone: string;
     athlete_user_id: string | null;
+    is_frozen: boolean;
   };
 }
 
