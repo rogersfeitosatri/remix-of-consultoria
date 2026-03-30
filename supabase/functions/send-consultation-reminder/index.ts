@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
         appointment_time,
         google_meet_link,
         client_id,
-        clients!inner(name, phone)
+        clients!inner(name, phone, is_frozen)
       `)
       .eq('status', 'confirmed')
       .is('reminder_sent_at', null)
