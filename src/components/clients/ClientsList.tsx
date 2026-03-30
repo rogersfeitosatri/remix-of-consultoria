@@ -1,4 +1,6 @@
 import { Client } from '@/hooks/useClients';
+import { calculateHealthScore } from '@/hooks/useAthleteHealthScore';
+import { HealthScoreBadge } from './HealthScoreBadge';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Phone, Mail, Calendar, DollarSign, Zap, MessageCircle, CalendarCheck, Key, Lock, Flag, Clock } from 'lucide-react';
