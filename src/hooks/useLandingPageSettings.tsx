@@ -5,6 +5,7 @@ import { useAuth } from './useAuth';
 export const DEFAULT_PLANS_LINKS = {
   plans_consultoria_whatsapp_url: 'https://wa.me/5599984817697?text=Ol%C3%A1%2C%20quero%20saber%20mais%20sobre%20o%20plano%20consultoria.%20Meu%20objetivo%20%C3%A9%20...',
   plans_consultas_whatsapp_url: 'https://wa.me/5599984817697?text=Ol%C3%A1%2C%20quero%20saber%20mais%20sobre%20o%20plano%20consultas.%20Meu%20objetivo%20%C3%A9%20...',
+  assessoria_whatsapp_url: 'https://wa.me/5500000000000?text=Quero%20saber%20mais%20sobre%20a%20RF%20Assessoria%20Esportiva',
 };
 
 export interface OfferItem {
