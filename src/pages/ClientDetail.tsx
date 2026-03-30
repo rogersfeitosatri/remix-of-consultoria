@@ -41,6 +41,7 @@ import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCha
 import { ClientForm } from '@/components/clients/ClientForm';
 import { ChangeAthletePasswordDialog } from '@/components/clients/ChangeAthletePasswordDialog';
 import { RenewPlanDialog } from '@/components/clients/RenewPlanDialog';
+import { FreezePlanDialog } from '@/components/clients/FreezePlanDialog';
 import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
 import { AthleteCheckinSchedules } from '@/components/admin/AthleteCheckinSchedules';
 import { useQuery } from '@tanstack/react-query';
