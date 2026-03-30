@@ -56,11 +56,15 @@ export default function Clients() {
   const { toast } = useToast();
 
   const activeClients = useMemo(() => {
-    return clients.filter(c => c.is_active);
+    return clients.filter(c => c.is_active && !(c as any).is_frozen);
+  }, [clients]);
+
+  const frozenClients = useMemo(() => {
+    return clients.filter(c => (c as any).is_frozen);
   }, [clients]);
 
   const inactiveClients = useMemo(() => {
-    return clients.filter(c => !c.is_active);
+    return clients.filter(c => !c.is_active && !(c as any).is_frozen);
   }, [clients]);
 
   const applyFilters = (clientList: Client[]) => {
