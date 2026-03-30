@@ -93,7 +93,14 @@ Deno.serve(async (req) => {
           }
         }
 
-        const client = checkin.clients;
+        const client = checkin.clients as any;
+
+        // Skip frozen clients
+        if (client?.is_frozen) {
+          console.log('[send-checkin-reminders] Skipping frozen client:', checkin.client_id);
+          results.push({ checkinId: checkin.id, status: 'skipped', error: 'Client frozen' });
+          continue;
+        }
 
         if (!client?.phone) {
           console.log('[send-checkin-reminders] Skipping checkin without phone:', checkin.id);
