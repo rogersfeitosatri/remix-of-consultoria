@@ -379,6 +379,24 @@ Qualquer dúvida, estou à disposição! 💪`;
                 <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
                   {client.phone && (
                     <>
+                      {/* WhatsApp direto */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const digits = client.phone!.replace(/\D/g, '');
+                          const withDDI = digits.startsWith('55') ? digits : `55${digits}`;
+                          const firstName = client.name.split(' ')[0];
+                          const msg = encodeURIComponent(`Olá ${firstName}! Tudo bem? 💪`);
+                          window.open(`https://wa.me/${withDDI}?text=${msg}`, '_blank');
+                        }}
+                        className="gap-1 text-xs text-success hover:text-success"
+                        title="Abrir WhatsApp"
+                      >
+                        <Zap className="h-3 w-3" />
+                        Msg
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -430,7 +448,7 @@ Qualquer dúvida, estou à disposição! 💪`;
                               e.stopPropagation();
                               setPasswordDialogClient(client);
                             }}
-                            className="gap-1 text-xs text-orange-600 hover:text-orange-700"
+                            className="gap-1 text-xs text-destructive hover:text-destructive"
                             title="Alterar Senha do Atleta"
                           >
                             <Lock className="h-3 w-3" />
