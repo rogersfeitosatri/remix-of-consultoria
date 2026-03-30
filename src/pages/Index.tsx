@@ -118,6 +118,7 @@ export default function Dashboard() {
 
         {/* Alerts Section */}
         <div className="space-y-4">
+          <InactivityAlertsPanel />
           <UnresponsiveAthletesAlert />
           <PendingMealPlansAlert />
           <PeriodizationPhaseAlert />
@@ -125,7 +126,8 @@ export default function Dashboard() {
           <DietAdjustmentAlert />
         </div>
 
-        {/* Periodization Control Panel */}
+        {/* Weekly Report + Periodization */}
+        <WeeklyReportPanel />
         <PeriodizationOverview />
       </div>
     </Layout>
