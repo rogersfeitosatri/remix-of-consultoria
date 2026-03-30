@@ -70,7 +70,7 @@ export function calculateHealthScore(
 
   // 3. Meal plan pending
   if (hasPendingMealPlan) {
-    if (worstStatus !== 'critical') worstStatus = 'attention';
+    escalate('attention');
     reasons.push('Plano alimentar pendente');
   }
 
