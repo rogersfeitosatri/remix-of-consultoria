@@ -450,6 +450,9 @@ export default function Settings() {
         last_consultation_at: null,
         last_consultation_index: null,
         athlete_user_id: null,
+        is_frozen: false,
+        frozen_at: null,
+        total_frozen_days: 0,
       },
       errors: [],
     };

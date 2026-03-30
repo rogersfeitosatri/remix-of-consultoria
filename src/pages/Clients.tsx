@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { ClientsList } from '@/components/clients/ClientsList';
+import { FrozenClientsList } from '@/components/clients/FrozenClientsList';
 import { ClientForm } from '@/components/clients/ClientForm';
 import { ExportClientsButton } from '@/components/clients/ExportClientsButton';
 import { useClients, useAddClient, useUpdateClient, useDeleteClient, Client } from '@/hooks/useClients';
@@ -15,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Loader2, Users, UserX, Filter, Flag } from 'lucide-react';
+import { Plus, Search, Loader2, Users, UserX, Filter, Flag, Snowflake } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -56,11 +57,15 @@ export default function Clients() {
   const { toast } = useToast();
 
   const activeClients = useMemo(() => {
-    return clients.filter(c => c.is_active);
+    return clients.filter(c => c.is_active && !(c as any).is_frozen);
+  }, [clients]);
+
+  const frozenClients = useMemo(() => {
+    return clients.filter(c => (c as any).is_frozen);
   }, [clients]);
 
   const inactiveClients = useMemo(() => {
-    return clients.filter(c => !c.is_active);
+    return clients.filter(c => !c.is_active && !(c as any).is_frozen);
   }, [clients]);
 
   const applyFilters = (clientList: Client[]) => {
@@ -104,6 +109,14 @@ export default function Clients() {
       new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
     );
   }, [searchQuery, activeClients, serviceFilter, planFilter, targetRaceFilter, targetRaceAlerts]);
+
+  const filteredFrozenClients = useMemo(() => {
+    return applyFilters(frozenClients).sort((a, b) => {
+      const frozenA = (a as any).frozen_at ? new Date((a as any).frozen_at).getTime() : 0;
+      const frozenB = (b as any).frozen_at ? new Date((b as any).frozen_at).getTime() : 0;
+      return frozenB - frozenA;
+    });
+  }, [searchQuery, frozenClients, serviceFilter, planFilter, targetRaceFilter, targetRaceAlerts]);
 
   const filteredInactiveClients = useMemo(() => {
     return applyFilters(inactiveClients).sort((a, b) => 
@@ -354,10 +367,14 @@ export default function Clients() {
 
         {/* Tabs */}
         <Tabs defaultValue="active" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="active" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <Users className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">Ativos</span> ({activeClients.length})
+            </TabsTrigger>
+            <TabsTrigger value="frozen" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Snowflake className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Congelados</span> ({frozenClients.length})
             </TabsTrigger>
             <TabsTrigger value="inactive" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <UserX className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -381,6 +398,31 @@ export default function Clients() {
               onEdit={handleEdit}
               onDelete={handleDelete}
             />
+          </TabsContent>
+
+          <TabsContent value="frozen" className="mt-6">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {filteredFrozenClients.length} atletas congelados
+              </span>
+              <ExportClientsButton 
+                clients={filteredFrozenClients} 
+                targetRaceAlerts={targetRaceAlerts}
+                filename="atletas_congelados"
+              />
+            </div>
+            {filteredFrozenClients.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Snowflake className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum atleta congelado</p>
+              </div>
+            ) : (
+              <FrozenClientsList
+                clients={filteredFrozenClients}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            )}
           </TabsContent>
           
           <TabsContent value="inactive" className="mt-6">
