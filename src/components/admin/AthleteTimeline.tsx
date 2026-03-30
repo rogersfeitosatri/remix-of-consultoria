@@ -37,12 +37,11 @@ export function AthleteTimeline({ clientId }: { clientId: string }) {
       const timeline: TimelineEvent[] = [];
 
       // Fetch in parallel
-      const [anamneseRes, appointmentsRes, checkinsRes, mealPlanRes, whatsappRes] = await Promise.all([
+      const [anamneseRes, appointmentsRes, checkinsRes, mealPlanRes] = await Promise.all([
         supabase.from('anamnese_responses').select('id, submitted_at').eq('client_id', clientId).order('submitted_at', { ascending: false }),
         supabase.from('appointments').select('id, appointment_date, appointment_time, status, google_meet_link').eq('client_id', clientId).in('status', ['confirmed', 'scheduled', 'completed']).order('appointment_date', { ascending: false }),
         supabase.from('checkin_responses').select('id, submitted_at').eq('client_id', clientId).order('submitted_at', { ascending: false }),
         supabase.from('meal_plan_status').select('id, status, sent_at, created_at').eq('client_id', clientId).order('created_at', { ascending: false }),
-        supabase.from('whatsapp_logs').select('id, created_at, template_key, status').eq('client_id', clientId).order('created_at', { ascending: false }).limit(20),
       ]);
 
       // Anamnese
