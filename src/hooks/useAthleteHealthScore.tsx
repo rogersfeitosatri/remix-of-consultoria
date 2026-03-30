@@ -32,13 +32,18 @@ export function calculateHealthScore(
 
   const today = new Date();
 
+  const escalate = (level: HealthStatus) => {
+    const priority: Record<HealthStatus, number> = { healthy: 0, attention: 1, critical: 2 };
+    if (priority[level] > priority[worstStatus]) worstStatus = level;
+  };
+
   // 1. Plan validity
   const daysToEnd = differenceInDays(parseISO(client.end_date), today);
   if (daysToEnd < 0) {
-    worstStatus = 'critical';
+    escalate('critical');
     reasons.push('Plano vencido');
   } else if (daysToEnd <= 7) {
-    if (worstStatus !== 'critical') worstStatus = 'attention';
+    escalate('attention');
     reasons.push(`Plano vence em ${daysToEnd}d`);
   }
 
