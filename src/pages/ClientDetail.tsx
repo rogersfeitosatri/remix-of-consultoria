@@ -417,11 +417,7 @@ export default function ClientDetail() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  if (confirm(`Deseja congelar o plano de ${client.name}? Check-ins e contagem do plano serão pausados.`)) {
-                    freezeMutation.mutate(client.id);
-                  }
-                }}
+                onClick={() => setShowFreezeDialog(true)}
                 disabled={freezeMutation.isPending}
                 className="gap-1 text-blue-600 border-blue-300 hover:bg-blue-50"
               >
