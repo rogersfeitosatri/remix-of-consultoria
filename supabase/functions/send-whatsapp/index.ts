@@ -109,12 +109,21 @@ Deno.serve(async (req) => {
     // Get client info
     const { data: client, error: clientError } = await supabase
       .from('clients')
-      .select('phone, name, user_id')
+      .select('phone, name, user_id, is_frozen')
       .eq('id', clientId)
       .single();
 
     if (clientError || !client) {
       throw new Error('Client not found');
+    }
+
+    // Block all automated messages for frozen clients
+    if ((client as any).is_frozen) {
+      console.log('[send-whatsapp] Skipping: client is frozen', clientId);
+      return new Response(
+        JSON.stringify({ success: false, skipped: true, reason: 'client_frozen' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (!client.phone) {

@@ -17,6 +17,7 @@ interface ScheduledCheckin {
     name: string;
     phone: string;
     athlete_user_id: string | null;
+    is_frozen: boolean;
   };
 }
 
@@ -53,7 +54,7 @@ Deno.serve(async (req) => {
         scheduled_send_date,
         scheduled_send_time,
         status,
-        clients!inner(name, phone, athlete_user_id)
+        clients!inner(name, phone, athlete_user_id, is_frozen)
       `)
       .eq('scheduled_send_date', todayStr)
       .eq('status', 'pending')
@@ -93,7 +94,14 @@ Deno.serve(async (req) => {
           }
         }
 
-        const client = checkin.clients;
+        const client = checkin.clients as any;
+
+        // Skip frozen clients
+        if (client?.is_frozen) {
+          console.log('[send-checkin-reminders] Skipping frozen client:', checkin.client_id);
+          results.push({ checkinId: checkin.id, status: 'skipped', error: 'Client frozen' });
+          continue;
+        }
 
         if (!client?.phone) {
           console.log('[send-checkin-reminders] Skipping checkin without phone:', checkin.id);

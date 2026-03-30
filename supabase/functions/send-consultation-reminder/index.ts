@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
         appointment_time,
         google_meet_link,
         client_id,
-        clients!inner(name, phone)
+        clients!inner(name, phone, is_frozen)
       `)
       .eq('status', 'confirmed')
       .is('reminder_sent_at', null)
@@ -68,8 +68,15 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const client = appointment.clients as unknown as { name: string; phone: string };
+        const client = appointment.clients as unknown as { name: string; phone: string; is_frozen: boolean };
         
+        // Skip frozen clients
+        if (client?.is_frozen) {
+          console.log('Skipping reminder for frozen client, appointment:', appointment.id);
+          results.push({ appointmentId: appointment.id, success: false, error: 'Client frozen' });
+          continue;
+        }
+
         if (!client?.phone) {
           console.log('Skipping appointment without phone:', appointment.id);
           results.push({ appointmentId: appointment.id, success: false, error: 'No phone number' });

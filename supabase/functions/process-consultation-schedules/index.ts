@@ -159,13 +159,20 @@ Deno.serve(async (req) => {
       // Fetch client data separately
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
-        .select('id, name, phone, email, user_id')
+        .select('id, name, phone, email, user_id, is_frozen')
         .eq('id', schedule.client_id)
         .maybeSingle();
       
       if (clientError || !clientData) {
         console.log(`No client data for schedule ${schedule.id}:`, clientError);
         results.push({ scheduleId: schedule.id, clientName: 'Unknown', status: 'failed', error: 'No client data' });
+        continue;
+      }
+
+      // Skip frozen clients
+      if ((clientData as any).is_frozen) {
+        console.log(`Skipping frozen client ${clientData.name} for schedule ${schedule.id}`);
+        results.push({ scheduleId: schedule.id, clientName: clientData.name, status: 'skipped', error: 'Client frozen' });
         continue;
       }
 
