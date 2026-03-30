@@ -573,6 +573,22 @@ export default function ClientDetail() {
           client={client}
         />
       )}
+
+      {/* Freeze Plan Dialog */}
+      {showFreezeDialog && (
+        <FreezePlanDialog
+          client={client}
+          open={showFreezeDialog}
+          onOpenChange={setShowFreezeDialog}
+          isPending={freezeMutation.isPending}
+          onConfirm={(freezeDate, reason) => {
+            freezeMutation.mutate(
+              { clientId: client.id, freezeDate, reason },
+              { onSuccess: () => setShowFreezeDialog(false) }
+            );
+          }}
+        />
+      )}
     </Layout>
   );
 }
