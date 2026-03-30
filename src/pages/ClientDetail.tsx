@@ -478,8 +478,12 @@ export default function ClientDetail() {
         <PlanHistorySection clientId={client.id} />
         
         {/* Tabs */}
-        <Tabs defaultValue="anamnese" className="space-y-4">
+        <Tabs defaultValue="timeline" className="space-y-4">
           <TabsList className="flex-wrap h-auto">
+            <TabsTrigger value="timeline" className="gap-2">
+              <History className="h-4 w-4" />
+              Timeline
+            </TabsTrigger>
             <TabsTrigger value="anamnese" className="gap-2">
               <ClipboardCheck className="h-4 w-4" />
               Anamnese
@@ -489,10 +493,17 @@ export default function ClientDetail() {
               Evolução
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2">
-              <History className="h-4 w-4" />
-              Histórico Check-ins
+              <MessageCircle className="h-4 w-4" />
+              Check-ins
             </TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="timeline">
+            <div className="glass-card rounded-xl p-4">
+              <h3 className="text-sm font-semibold mb-3 text-foreground">Histórico de Interações</h3>
+              <AthleteTimeline clientId={client.id} />
+            </div>
+          </TabsContent>
           
           <TabsContent value="anamnese">
             <AnamneseResponseSection clientId={client.id} clientName={client.name} />
