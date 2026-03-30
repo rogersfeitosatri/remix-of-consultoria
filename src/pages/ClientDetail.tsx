@@ -33,6 +33,7 @@ import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AthleteSummarySection } from '@/components/admin/AthleteSummarySection';
+import { AthleteTimeline } from '@/components/admin/AthleteTimeline';
 import { TargetRaceAlert } from '@/components/admin/TargetRaceAlert';
 import { PremiumClientDetails } from '@/components/admin/PremiumClientDetails';
 import { AnamneseResponseSection } from '@/components/admin/AnamneseResponseSection';
