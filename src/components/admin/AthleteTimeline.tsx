@@ -94,25 +94,6 @@ export function AthleteTimeline({ clientId }: { clientId: string }) {
         });
       }
 
-      // WhatsApp
-      for (const w of whatsappRes.data || []) {
-        const templateLabels: Record<string, string> = {
-          checkin_reminder: 'Lembrete de check-in',
-          booking_link: 'Link de agendamento',
-          consultation_reminder: 'Lembrete de consulta',
-          credentials: 'Credenciais enviadas',
-        };
-        timeline.push({
-          id: `wa-${w.id}`,
-          date: w.created_at,
-          type: 'whatsapp',
-          title: templateLabels[w.template_key || ''] || 'Mensagem WhatsApp',
-          description: w.status === 'sent' ? 'Enviado' : w.status === 'failed' ? 'Falhou' : w.status,
-          icon: typeConfig.whatsapp.icon,
-          color: typeConfig.whatsapp.color,
-        });
-      }
-
       // Sort by date descending
       timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       return timeline;
