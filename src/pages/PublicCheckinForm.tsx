@@ -366,8 +366,10 @@ export default function PublicCheckinForm() {
 
       if (submitError) throw submitError;
 
-      // AI analysis will be triggered by admin when reviewing the response
-      // since public users can't read back the response ID
+      // Notify admin via WhatsApp (fire-and-forget)
+      supabase.functions.invoke('notify-checkin-response', {
+        body: { clientId, formId, responses: responsesWithComments },
+      }).catch(err => console.warn('Admin notification failed:', err));
 
       setSubmitted(true);
       toast.success('Checkin enviado com sucesso!');
