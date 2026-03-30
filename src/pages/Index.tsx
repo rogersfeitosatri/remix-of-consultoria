@@ -8,6 +8,7 @@ import { PendingMealPlansAlert } from '@/components/dashboard/PendingMealPlansAl
 import { PeriodizationPhaseAlert } from '@/components/dashboard/PeriodizationPhaseAlert';
 import { PeriodizationOverview } from '@/components/dashboard/PeriodizationOverview';
 import { UnresponsiveAthletesAlert } from '@/components/checkin/UnresponsiveAthletesAlert';
+import { MyDayTodayPanel } from '@/components/dashboard/MyDayTodayPanel';
 import { useClients, usePayments, getExpiringThisMonth } from '@/hooks/useClients';
 import { getMonthlyIncomeByPaidAt, getDueAmountInPeriod } from '@/hooks/useFinancialData';
 import { Users, DollarSign, AlertTriangle, Loader2, CreditCard } from 'lucide-react';
