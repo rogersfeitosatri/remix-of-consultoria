@@ -78,7 +78,7 @@ export function calculateHealthScore(
   if (client.has_consultations && !hasScheduledConsultation && client.consultation_count > 0) {
     const daysSinceStart = differenceInDays(today, parseISO(client.start_date));
     if (daysSinceStart > 14 && !client.first_consultation_date) {
-      if (worstStatus !== 'critical') worstStatus = 'attention';
+      escalate('attention');
       reasons.push('Sem consulta realizada');
     }
   }
