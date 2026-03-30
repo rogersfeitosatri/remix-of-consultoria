@@ -248,7 +248,6 @@ export default function AssessoriaLanding() {
                   "Planilha de treino 100% personalizada",
                   "Plano alimentar individualizado",
                   "Estratégias de suplementação pré, intra e pós-treino",
-                  "Consulta inicial por videochamada",
                   "Check-in mensal com ajustes de treino e dieta",
                   "Bônus: acesso à Zona Nutri",
                   "Suporte direto no WhatsApp",
