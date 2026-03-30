@@ -7,12 +7,13 @@ export function useFreezePlan() {
   const queryClient = useQueryClient();
 
   const freezeMutation = useMutation({
-    mutationFn: async (clientId: string) => {
+    mutationFn: async ({ clientId, freezeDate, reason }: { clientId: string; freezeDate: string; reason: string }) => {
       const { error } = await supabase
         .from('clients')
         .update({
           is_frozen: true,
-          frozen_at: new Date().toISOString(),
+          frozen_at: freezeDate,
+          freeze_reason: reason || null,
         } as any)
         .eq('id', clientId);
       if (error) throw error;

@@ -1,0 +1,1 @@
+ALTER TABLE public.clients ADD COLUMN freeze_reason text DEFAULT null;

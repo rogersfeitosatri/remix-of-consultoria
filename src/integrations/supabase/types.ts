@@ -1738,6 +1738,7 @@ export type Database = {
           email: string | null
           end_date: string
           first_consultation_date: string | null
+          freeze_reason: string | null
           frozen_at: string | null
           has_agenda_access: boolean | null
           has_checkin: boolean
@@ -1780,6 +1781,7 @@ export type Database = {
           email?: string | null
           end_date: string
           first_consultation_date?: string | null
+          freeze_reason?: string | null
           frozen_at?: string | null
           has_agenda_access?: boolean | null
           has_checkin?: boolean
@@ -1822,6 +1824,7 @@ export type Database = {
           email?: string | null
           end_date?: string
           first_consultation_date?: string | null
+          freeze_reason?: string | null
           frozen_at?: string | null
           has_agenda_access?: boolean | null
           has_checkin?: boolean

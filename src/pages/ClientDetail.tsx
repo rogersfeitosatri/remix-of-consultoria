@@ -41,6 +41,7 @@ import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCha
 import { ClientForm } from '@/components/clients/ClientForm';
 import { ChangeAthletePasswordDialog } from '@/components/clients/ChangeAthletePasswordDialog';
 import { RenewPlanDialog } from '@/components/clients/RenewPlanDialog';
+import { FreezePlanDialog } from '@/components/clients/FreezePlanDialog';
 import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
 import { AthleteCheckinSchedules } from '@/components/admin/AthleteCheckinSchedules';
 import { useQuery } from '@tanstack/react-query';
@@ -77,6 +78,7 @@ export default function ClientDetail() {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showRenewDialog, setShowRenewDialog] = useState(false);
+  const [showFreezeDialog, setShowFreezeDialog] = useState(false);
   const [sendingCheckin, setSendingCheckin] = useState(false);
   const [sendingBooking, setSendingBooking] = useState(false);
   const [sendingCredentials, setSendingCredentials] = useState(false);
@@ -416,11 +418,7 @@ export default function ClientDetail() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  if (confirm(`Deseja congelar o plano de ${client.name}? Check-ins e contagem do plano serão pausados.`)) {
-                    freezeMutation.mutate(client.id);
-                  }
-                }}
+                onClick={() => setShowFreezeDialog(true)}
                 disabled={freezeMutation.isPending}
                 className="gap-1 text-blue-600 border-blue-300 hover:bg-blue-50"
               >
@@ -573,6 +571,22 @@ export default function ClientDetail() {
           open={showRenewDialog}
           onOpenChange={setShowRenewDialog}
           client={client}
+        />
+      )}
+
+      {/* Freeze Plan Dialog */}
+      {showFreezeDialog && (
+        <FreezePlanDialog
+          client={client}
+          open={showFreezeDialog}
+          onOpenChange={setShowFreezeDialog}
+          isPending={freezeMutation.isPending}
+          onConfirm={(freezeDate, reason) => {
+            freezeMutation.mutate(
+              { clientId: client.id, freezeDate, reason },
+              { onSuccess: () => setShowFreezeDialog(false) }
+            );
+          }}
         />
       )}
     </Layout>
