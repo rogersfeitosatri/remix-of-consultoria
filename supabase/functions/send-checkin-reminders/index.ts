@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
         scheduled_send_date,
         scheduled_send_time,
         status,
-        clients!inner(name, phone, athlete_user_id)
+        clients!inner(name, phone, athlete_user_id, is_frozen)
       `)
       .eq('scheduled_send_date', todayStr)
       .eq('status', 'pending')
