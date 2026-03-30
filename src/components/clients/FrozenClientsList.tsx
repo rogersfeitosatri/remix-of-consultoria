@@ -143,6 +143,12 @@ export function FrozenClientsList({ clients, onEdit, onDelete }: FrozenClientsLi
                 </div>
               </div>
 
+              {/* Freeze reason */}
+              {(client as any).freeze_reason && (
+                <div className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2 mt-1">
+                  <span className="font-medium text-card-foreground">Motivo:</span> {(client as any).freeze_reason}
+                </div>
+              )}
               {/* Unfreeze action */}
               <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
                 <Button
