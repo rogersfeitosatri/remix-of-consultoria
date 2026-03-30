@@ -77,6 +77,7 @@ export default function ClientDetail() {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [showRenewDialog, setShowRenewDialog] = useState(false);
+  const [showFreezeDialog, setShowFreezeDialog] = useState(false);
   const [sendingCheckin, setSendingCheckin] = useState(false);
   const [sendingBooking, setSendingBooking] = useState(false);
   const [sendingCredentials, setSendingCredentials] = useState(false);
