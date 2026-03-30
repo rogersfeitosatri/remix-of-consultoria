@@ -279,6 +279,10 @@ Qualquer dúvida, estou à disposição! 💪`;
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-lg font-semibold text-card-foreground">{client.name}</h3>
+                  {client.is_active && (() => {
+                    const score = calculateHealthScore(client);
+                    return <HealthScoreBadge status={score.status} label={score.label} reasons={score.reasons} />;
+                  })()}
                   {!client.is_active && (
                     <span className="alert-badge bg-muted text-muted-foreground">Inativo</span>
                   )}
