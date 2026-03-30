@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { ClientsList } from '@/components/clients/ClientsList';
+import { FrozenClientsList } from '@/components/clients/FrozenClientsList';
 import { ClientForm } from '@/components/clients/ClientForm';
 import { ExportClientsButton } from '@/components/clients/ExportClientsButton';
 import { useClients, useAddClient, useUpdateClient, useDeleteClient, Client } from '@/hooks/useClients';
