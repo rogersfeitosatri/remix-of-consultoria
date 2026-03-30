@@ -167,9 +167,8 @@ export default function AssessoriaLanding() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-5xl mx-auto">
             {[
               { step: "01", title: "Inscrição", desc: "Garanta sua vaga e preencha o formulário de diagnóstico.", icon: ClipboardCheck },
-              { step: "02", title: "Consulta Inicial", desc: "Videochamada para ajustar treino e dieta ao seu perfil.", icon: Video },
-              { step: "03", title: "Receba seus planos", desc: "Planilha de treino + plano alimentar sincronizados no app.", icon: Calendar },
-              { step: "04", title: "Evolua", desc: "Check-in mensal, ajustes contínuos e suporte direto.", icon: Trophy },
+              { step: "02", title: "Receba seus planos", desc: "Planilha de treino + plano alimentar sincronizados no app.", icon: Calendar },
+              { step: "03", title: "Evolua", desc: "Check-in mensal, ajustes contínuos e suporte direto.", icon: Trophy },
             ].map((item, index) => (
               <div key={index} className="text-center">
                 <div className="w-14 h-14 md:w-16 md:h-16 bg-[hsl(43,74%,49%)] text-primary-foreground rounded-2xl flex items-center justify-center text-xl md:text-2xl font-bold mx-auto mb-4 shadow-lg shadow-[hsl(43,74%,49%)]/20">
@@ -198,7 +197,6 @@ export default function AssessoriaLanding() {
             {[
               { icon: Dumbbell, title: "Planilha de treino personalizada", desc: "Periodização individual criada pelo treinador Rogers Feitosa, adaptada ao seu nível e objetivos." },
               { icon: Apple, title: "Plano alimentar completo", desc: "Dieta desenhada para a sua rotina de treinos com estratégias suplementares pré, intra e pós." },
-              { icon: Video, title: "Consulta inicial por videochamada", desc: "Encontro online para conhecer você, alinhar expectativas e ajustar treino e dieta juntos." },
               { icon: Calendar, title: "Check-in mensal", desc: "A cada mês, avaliamos sua evolução, ajustamos treino e dieta conforme necessário." },
               { icon: Zap, title: "Bônus: Zona Nutri", desc: "Sistema inteligente que monta sua suplementação ideal para cada tipo de treino automaticamente." },
               { icon: MessageCircle, title: "Suporte direto no WhatsApp", desc: "Dúvidas sobre treino ou dieta? Fale diretamente com o Rogers pelo WhatsApp." },
@@ -239,7 +237,7 @@ export default function AssessoriaLanding() {
                 <p className="text-gray-400 text-sm mb-6">Nutrição + Treinamento sincronizados</p>
 
                 <div className="flex items-end justify-center gap-1 mb-2">
-                  <span className="text-4xl md:text-5xl font-extrabold text-[hsl(43,74%,49%)]">R$157</span>
+                  <span className="text-4xl md:text-5xl font-extrabold text-[hsl(43,74%,49%)]">R$179,90</span>
                   <span className="text-gray-400 text-lg mb-1">/mês</span>
                 </div>
                 <p className="text-gray-500 text-sm">no 1º ano de acompanhamento</p>
@@ -250,7 +248,6 @@ export default function AssessoriaLanding() {
                   "Planilha de treino 100% personalizada",
                   "Plano alimentar individualizado",
                   "Estratégias de suplementação pré, intra e pós-treino",
-                  "Consulta inicial por videochamada",
                   "Check-in mensal com ajustes de treino e dieta",
                   "Bônus: acesso à Zona Nutri",
                   "Suporte direto no WhatsApp",
