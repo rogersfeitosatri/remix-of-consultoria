@@ -197,7 +197,6 @@ export default function AssessoriaLanding() {
             {[
               { icon: Dumbbell, title: "Planilha de treino personalizada", desc: "Periodização individual criada pelo treinador Rogers Feitosa, adaptada ao seu nível e objetivos." },
               { icon: Apple, title: "Plano alimentar completo", desc: "Dieta desenhada para a sua rotina de treinos com estratégias suplementares pré, intra e pós." },
-              { icon: Video, title: "Consulta inicial por videochamada", desc: "Encontro online para conhecer você, alinhar expectativas e ajustar treino e dieta juntos." },
               { icon: Calendar, title: "Check-in mensal", desc: "A cada mês, avaliamos sua evolução, ajustamos treino e dieta conforme necessário." },
               { icon: Zap, title: "Bônus: Zona Nutri", desc: "Sistema inteligente que monta sua suplementação ideal para cada tipo de treino automaticamente." },
               { icon: MessageCircle, title: "Suporte direto no WhatsApp", desc: "Dúvidas sobre treino ou dieta? Fale diretamente com o Rogers pelo WhatsApp." },
