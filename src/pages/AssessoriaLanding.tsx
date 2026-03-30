@@ -6,10 +6,13 @@ import heroImg from "@/assets/hero-runners.jpg";
 import appMealPlan from "@/assets/app-meal-plan.png";
 import appHome from "@/assets/app-home.png";
 import appTraining from "@/assets/app-training.png";
+import { usePublicLandingPageSettings } from "@/hooks/useLandingPageSettings";
 
-const WHATSAPP_LINK = "https://wa.me/5500000000000?text=Quero%20saber%20mais%20sobre%20a%20RF%20Assessoria%20Esportiva";
+const DEFAULT_WHATSAPP_LINK = "https://wa.me/5500000000000?text=Quero%20saber%20mais%20sobre%20a%20RF%20Assessoria%20Esportiva";
 
 export default function AssessoriaLanding() {
+  const { data: settings } = usePublicLandingPageSettings();
+  const WHATSAPP_LINK = settings?.assessoria_whatsapp_url || DEFAULT_WHATSAPP_LINK;
   return (
     <div className="min-h-screen bg-black text-white font-sans">
       {/* Header */}
