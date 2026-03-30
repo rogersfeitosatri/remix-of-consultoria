@@ -53,17 +53,16 @@ export function calculateHealthScore(
     if (lastCheckinDate) {
       const daysSinceCheckin = differenceInDays(today, parseISO(lastCheckinDate));
       if (daysSinceCheckin > grace * 1.5) {
-        worstStatus = 'critical';
+        escalate('critical');
         reasons.push(`Check-in atrasado ${daysSinceCheckin}d`);
       } else if (daysSinceCheckin > grace) {
-        if (worstStatus !== 'critical') worstStatus = 'attention';
+        escalate('attention');
         reasons.push(`Check-in pendente`);
       }
     } else {
-      // Never responded
       const daysSinceStart = differenceInDays(today, parseISO(client.start_date));
       if (daysSinceStart > grace) {
-        if (worstStatus !== 'critical') worstStatus = 'attention';
+        escalate('attention');
         reasons.push('Sem check-in registrado');
       }
     }
