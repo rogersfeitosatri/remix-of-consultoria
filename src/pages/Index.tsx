@@ -8,6 +8,9 @@ import { PendingMealPlansAlert } from '@/components/dashboard/PendingMealPlansAl
 import { PeriodizationPhaseAlert } from '@/components/dashboard/PeriodizationPhaseAlert';
 import { PeriodizationOverview } from '@/components/dashboard/PeriodizationOverview';
 import { UnresponsiveAthletesAlert } from '@/components/checkin/UnresponsiveAthletesAlert';
+import { MyDayTodayPanel } from '@/components/dashboard/MyDayTodayPanel';
+import { InactivityAlertsPanel } from '@/components/dashboard/InactivityAlertsPanel';
+import { WeeklyReportPanel } from '@/components/dashboard/WeeklyReportPanel';
 import { useClients, usePayments, getExpiringThisMonth } from '@/hooks/useClients';
 import { getMonthlyIncomeByPaidAt, getDueAmountInPeriod } from '@/hooks/useFinancialData';
 import { Users, DollarSign, AlertTriangle, Loader2, CreditCard } from 'lucide-react';
@@ -110,8 +113,12 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* My Day Today */}
+        <MyDayTodayPanel />
+
         {/* Alerts Section */}
         <div className="space-y-4">
+          <InactivityAlertsPanel />
           <UnresponsiveAthletesAlert />
           <PendingMealPlansAlert />
           <PeriodizationPhaseAlert />
@@ -119,7 +126,8 @@ export default function Dashboard() {
           <DietAdjustmentAlert />
         </div>
 
-        {/* Periodization Control Panel */}
+        {/* Weekly Report + Periodization */}
+        <WeeklyReportPanel />
         <PeriodizationOverview />
       </div>
     </Layout>
