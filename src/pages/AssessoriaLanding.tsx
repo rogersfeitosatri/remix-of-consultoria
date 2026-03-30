@@ -160,25 +160,60 @@ export default function AssessoriaLanding() {
       </section>
 
       {/* Como Funciona */}
-      <section className="py-16 md:py-20 bg-black">
-        <div className="container mx-auto px-4">
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-center mb-3 text-white">
-            Simples e funciona.
+      <section className="py-20 md:py-28 bg-black relative overflow-hidden">
+        {/* Subtle background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[hsl(43,74%,49%)]/5 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <p className="text-[hsl(43,74%,49%)] text-center mb-3 text-sm font-bold tracking-widest uppercase">Como funciona</p>
+          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-center mb-4 text-white">
+            Do zero à sua melhor versão em{" "}
+            <span className="text-[hsl(43,74%,49%)]">3 passos</span>
           </h2>
-          <p className="text-[hsl(43,74%,49%)] text-center mb-12 text-lg">Como funciona</p>
+          <p className="text-gray-400 text-center mb-14 max-w-lg mx-auto">
+            Um processo simples, direto e sem complicação pra você começar a evoluir.
+          </p>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 max-w-5xl mx-auto">
+          <div className="max-w-4xl mx-auto space-y-0">
             {[
-              { step: "01", title: "Inscrição", desc: "Garanta sua vaga e preencha o formulário de diagnóstico.", icon: ClipboardCheck },
-              { step: "02", title: "Receba seus planos", desc: "Planilha de treino + plano alimentar sincronizados no app.", icon: Calendar },
-              { step: "03", title: "Evolua", desc: "Check-in mensal, ajustes contínuos e suporte direto.", icon: Trophy },
-            ].map((item, index) => (
-              <div key={index} className="text-center">
-                <div className="w-14 h-14 md:w-16 md:h-16 bg-[hsl(43,74%,49%)] text-primary-foreground rounded-2xl flex items-center justify-center text-xl md:text-2xl font-bold mx-auto mb-4 shadow-lg shadow-[hsl(43,74%,49%)]/20">
-                  {item.step}
+              {
+                step: "01",
+                title: "Inscreva-se e preencha o diagnóstico",
+                desc: "Após a adesão, você preenche um formulário completo sobre sua rotina, objetivos, histórico de treinos e alimentação. É a base para montar tudo de forma personalizada.",
+                icon: ClipboardCheck,
+              },
+              {
+                step: "02",
+                title: "Receba treino + dieta sincronizados",
+                desc: "Em até 72h úteis, sua planilha de treino e plano alimentar estarão disponíveis no app — tudo pensado em conjunto pelo nutricionista e treinador para que um potencialize o outro.",
+                icon: Calendar,
+              },
+              {
+                step: "03",
+                title: "Evolua com acompanhamento contínuo",
+                desc: "A cada mês, você faz um check-in completo. Avaliamos peso, medidas, treinos e sensações para ajustar tudo. Dúvidas no meio do caminho? Suporte direto pelo WhatsApp.",
+                icon: Trophy,
+              },
+            ].map((item, index, arr) => (
+              <div key={index} className="relative flex items-stretch gap-6 md:gap-8">
+                {/* Vertical connector line */}
+                <div className="flex flex-col items-center">
+                  <div className="w-14 h-14 md:w-16 md:h-16 bg-[hsl(43,74%,49%)] text-primary-foreground rounded-2xl flex items-center justify-center text-lg md:text-xl font-bold shadow-lg shadow-[hsl(43,74%,49%)]/25 flex-shrink-0 relative z-10">
+                    <item.icon className="w-6 h-6 md:w-7 md:h-7" />
+                  </div>
+                  {index < arr.length - 1 && (
+                    <div className="w-px flex-1 bg-gradient-to-b from-[hsl(43,74%,49%)]/40 to-transparent min-h-[40px]" />
+                  )}
                 </div>
-                <h3 className="font-bold text-base md:text-lg mb-2 text-white">{item.title}</h3>
-                <p className="text-gray-400 text-xs md:text-sm">{item.desc}</p>
+
+                {/* Content card */}
+                <div className={`flex-1 pb-10 ${index === arr.length - 1 ? 'pb-0' : ''}`}>
+                  <div className="bg-gray-950/80 border border-gray-800 rounded-2xl p-5 md:p-6 hover:border-[hsl(43,74%,49%)]/30 transition-all duration-300">
+                    <span className="text-[hsl(43,74%,49%)] text-xs font-bold tracking-widest mb-2 block">PASSO {item.step}</span>
+                    <h3 className="font-bold text-lg md:text-xl text-white mb-2">{item.title}</h3>
+                    <p className="text-gray-400 text-sm md:text-base leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
