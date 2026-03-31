@@ -224,6 +224,111 @@ export default function AnamneseResponseDetail() {
     });
   };
 
+  // Meal-related section keywords
+  const MEAL_KEYWORDS = ['refeição', 'refeições', 'refeicao', 'alimentação', 'alimentar', 'rotina alimentar', 'café', 'cafe', 'almoço', 'almoco', 'jantar', 'lanche', 'ceia', 'meal', 'breakfast', 'lunch', 'dinner', 'snack', 'supper'];
+
+  const isMealSection = (section: string) => {
+    const lower = section.toLowerCase();
+    return MEAL_KEYWORDS.some(kw => lower.includes(kw));
+  };
+
+  const isMealQuestion = (questionText: string) => {
+    const lower = questionText.toLowerCase();
+    const mealQWords = ['café da manhã', 'cafe da manha', 'almoço', 'almoco', 'jantar', 'lanche da manhã', 'lanche da tarde', 'ceia', 'pré-treino', 'pós-treino', 'refeição', 'o que come', 'o que costuma comer', 'rotina alimentar', 'descreva suas refeições', 'horário das refeições'];
+    return mealQWords.some(kw => lower.includes(kw));
+  };
+
+  const generatePDF = (mode: 'complete' | 'meals') => {
+    if (!responseData || !questions.length) {
+      toast.error('Nenhuma resposta para exportar');
+      return;
+    }
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const maxWidth = pageWidth - margin * 2;
+    let y = 20;
+
+    const addText = (text: string, size: number, bold = false, color: [number, number, number] = [33, 33, 33]) => {
+      doc.setFontSize(size);
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.setTextColor(...color);
+      const lines = doc.splitTextToSize(text, maxWidth);
+      for (const line of lines) {
+        if (y > 275) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, margin, y);
+        y += size * 0.45;
+      }
+    };
+
+    const addSpace = (px: number) => { y += px; };
+
+    // Header
+    const clientName = (responseData.clients as any)?.name || (responseData as any).respondent_name || 'Atleta';
+    const submittedAt = format(parseISO(responseData.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+
+    addText(mode === 'complete' ? 'ANAMNESE COMPLETA' : 'ROTINA ALIMENTAR', 18, true, [30, 80, 60]);
+    addSpace(4);
+    addText(`Atleta: ${clientName}`, 12, true);
+    addText(`Data: ${submittedAt}`, 10, false, [100, 100, 100]);
+    addSpace(2);
+
+    // Separator line
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, pageWidth - margin, y);
+    addSpace(8);
+
+    const sections = Object.keys(groupedQuestions);
+
+    sections.forEach(section => {
+      const sectionQuestions = groupedQuestions[section];
+
+      if (mode === 'meals') {
+        const sectionIsMeal = isMealSection(section);
+        const mealQs = sectionQuestions.filter(q => sectionIsMeal || isMealQuestion(q.question_text));
+        if (mealQs.length === 0) return;
+
+        addText(section, 13, true, [30, 80, 60]);
+        addSpace(4);
+
+        mealQs.forEach(question => {
+          const answer = formatAnswer(question.id, question.question_type);
+          addText(question.question_text, 10, true);
+          addText(answer, 10, false, answer === '(não respondeu)' ? [160, 160, 160] : [33, 33, 33]);
+          addSpace(5);
+        });
+        addSpace(4);
+      } else {
+        addText(section, 13, true, [30, 80, 60]);
+        addSpace(4);
+
+        sectionQuestions.forEach(question => {
+          const answer = formatAnswer(question.id, question.question_type);
+          addText(question.question_text, 10, true);
+          addText(answer, 10, false, answer === '(não respondeu)' ? [160, 160, 160] : [33, 33, 33]);
+          addSpace(5);
+        });
+        addSpace(4);
+      }
+    });
+
+    // Footer
+    addSpace(6);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, pageWidth - margin, y);
+    addSpace(6);
+    addText('Rogers Feitosa - Nutrição & Treinamento', 8, false, [150, 150, 150]);
+
+    const suffix = mode === 'complete' ? 'completa' : 'refeicoes';
+    const safeName = clientName.replace(/[^a-zA-Z0-9À-ÿ ]/g, '').replace(/\s+/g, '_');
+    doc.save(`anamnese_${suffix}_${safeName}.pdf`);
+    toast.success(`PDF ${mode === 'complete' ? 'completo' : 'de refeições'} baixado!`);
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -275,10 +380,30 @@ export default function AnamneseResponseDetail() {
               </p>
             </div>
           </div>
-          <Button onClick={copyAllResponses} className="gap-2">
-            <Copy className="h-4 w-4" />
-            Copiar Anamnese Completa
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button onClick={copyAllResponses} variant="outline" className="gap-2">
+              <Copy className="h-4 w-4" />
+              Copiar
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Baixar PDF
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => generatePDF('complete')} className="gap-2 cursor-pointer">
+                  <FileText className="h-4 w-4 text-primary" />
+                  Anamnese Completa
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => generatePDF('meals')} className="gap-2 cursor-pointer">
+                  <UtensilsCrossed className="h-4 w-4 text-primary" />
+                  Apenas Refeições
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {/* Client Info Card */}
