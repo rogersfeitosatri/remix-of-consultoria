@@ -16,9 +16,12 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { Download, FileSpreadsheet, FileText, Loader2, Search, CheckSquare, Square } from 'lucide-react';
 import { Client } from '@/hooks/useClients';
 import { AthleteWithTargetRaceAlert } from '@/hooks/useTargetRaceAlert';
+import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -50,10 +53,13 @@ const CHECKIN_LABELS: Record<string, string> = {
   quarterly: 'Trimestral',
 };
 
+type ExportMode = 'complete' | 'simplified';
+
 export function ExportClientsButton({ clients, targetRaceAlerts = [], filename = 'atletas' }: ExportClientsButtonProps) {
   const [exporting, setExporting] = useState(false);
   const [showSelector, setShowSelector] = useState(false);
   const [exportFormat, setExportFormat] = useState<'excel' | 'pdf'>('excel');
+  const [exportMode, setExportMode] = useState<ExportMode>('complete');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectorSearch, setSelectorSearch] = useState('');
 
@@ -81,10 +87,25 @@ export function ExportClientsButton({ clients, targetRaceAlerts = [], filename =
     setExportFormat(fmt);
     setSelectedIds(new Set(clients.map(c => c.id)));
     setSelectorSearch('');
+    setExportMode('complete');
     setShowSelector(true);
   };
 
-  const prepareData = (list: Client[]) => {
+  const fetchBirthDates = async (clientIds: string[]) => {
+    const { data } = await supabase
+      .from('athlete_profiles')
+      .select('client_id, birth_date')
+      .in('client_id', clientIds);
+    const map: Record<string, string> = {};
+    (data || []).forEach(p => {
+      if (p.birth_date) {
+        map[p.client_id] = format(new Date(p.birth_date), 'dd/MM/yyyy', { locale: ptBR });
+      }
+    });
+    return map;
+  };
+
+  const prepareCompleteData = (list: Client[]) => {
     return list.map(client => {
       const raceAlert = targetRaceAlerts.find(a => a.clientId === client.id);
       return {
@@ -105,6 +126,15 @@ export function ExportClientsButton({ clients, targetRaceAlerts = [], filename =
     });
   };
 
+  const prepareSimplifiedData = (list: Client[], birthDates: Record<string, string>) => {
+    return list.map(client => ({
+      'Nome': client.name,
+      'Data de Nascimento': birthDates[client.id] || '',
+      'Email': client.email || '',
+      'Telefone': client.phone || '',
+    }));
+  };
+
   const handleExport = async () => {
     const selected = clients.filter(c => selectedIds.has(c.id));
     if (selected.length === 0) {
@@ -114,24 +144,30 @@ export function ExportClientsButton({ clients, targetRaceAlerts = [], filename =
     setShowSelector(false);
     setExporting(true);
     try {
+      let birthDates: Record<string, string> = {};
+      if (exportMode === 'simplified') {
+        birthDates = await fetchBirthDates(selected.map(c => c.id));
+      }
       if (exportFormat === 'excel') {
-        await doExportExcel(selected);
+        await doExportExcel(selected, birthDates);
       } else {
-        await doExportPDF(selected);
+        await doExportPDF(selected, birthDates);
       }
     } finally {
       setExporting(false);
     }
   };
 
-  const doExportExcel = async (list: Client[]) => {
+  const doExportExcel = async (list: Client[], birthDates: Record<string, string>) => {
     try {
-      const data = prepareData(list);
+      const data = exportMode === 'complete'
+        ? prepareCompleteData(list)
+        : prepareSimplifiedData(list, birthDates);
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Atletas');
       const colWidths = Object.keys(data[0] || {}).map(key => ({
-        wch: Math.max(key.length, ...data.map(row => String(row[key as keyof typeof row] || '').length)) + 2
+        wch: Math.max(key.length, ...data.map(row => String((row as any)[key] || '').length)) + 2
       }));
       worksheet['!cols'] = colWidths;
       const dateStr = format(new Date(), 'yyyy-MM-dd_HH-mm');
@@ -143,55 +179,54 @@ export function ExportClientsButton({ clients, targetRaceAlerts = [], filename =
     }
   };
 
-  const doExportPDF = async (list: Client[]) => {
+  const doExportPDF = async (list: Client[], birthDates: Record<string, string>) => {
     try {
-      const data = prepareData(list);
-      const tableRows = data.map(row => `
-        <tr>
-          <td>${row['Nome']}</td>
-          <td>${row['Telefone']}</td>
-          <td>${row['Plano']}</td>
-          <td>${row['Serviço']}</td>
-          <td>${row['Valor Mensal']}</td>
-          <td>${row['Término']}</td>
-          <td>${row['Status']}</td>
-          <td>${row['Prova Alvo']}</td>
-          <td>${row['Dias até Prova']}</td>
-        </tr>
-      `).join('');
+      const isSimplified = exportMode === 'simplified';
 
-      const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Lista de Atletas</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { color: #333; margin-bottom: 5px; }
-            .subtitle { color: #666; margin-bottom: 20px; font-size: 14px; }
-            table { width: 100%; border-collapse: collapse; font-size: 11px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f4f4f4; font-weight: bold; }
-            tr:nth-child(even) { background-color: #fafafa; }
-            .footer { margin-top: 20px; font-size: 12px; color: #666; }
-          </style>
-        </head>
-        <body>
+      const headers = isSimplified
+        ? '<th>Nome</th><th>Data de Nascimento</th><th>Email</th><th>Telefone</th>'
+        : '<th>Nome</th><th>Telefone</th><th>Plano</th><th>Serviço</th><th>Valor</th><th>Término</th><th>Status</th><th>Prova Alvo</th><th>Dias</th>';
+
+      const tableRows = list.map(client => {
+        if (isSimplified) {
+          return `<tr>
+            <td>${client.name}</td>
+            <td>${birthDates[client.id] || ''}</td>
+            <td>${client.email || ''}</td>
+            <td>${client.phone || ''}</td>
+          </tr>`;
+        }
+        const raceAlert = targetRaceAlerts.find(a => a.clientId === client.id);
+        return `<tr>
+          <td>${client.name}</td>
+          <td>${client.phone || ''}</td>
+          <td>${PLAN_LABELS[client.plan_type] || client.plan_type}</td>
+          <td>${SERVICE_LABELS[client.service_type] || client.service_type}</td>
+          <td>R$ ${client.monthly_value.toFixed(2)}</td>
+          <td>${format(new Date(client.end_date), 'dd/MM/yyyy', { locale: ptBR })}</td>
+          <td>${client.is_active ? 'Ativo' : 'Inativo'}</td>
+          <td>${raceAlert?.targetRace || ''}</td>
+          <td>${raceAlert?.daysToRace ?? ''}</td>
+        </tr>`;
+      }).join('');
+
+      const html = `<!DOCTYPE html><html><head><title>Lista de Atletas</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #333; margin-bottom: 5px; }
+          .subtitle { color: #666; margin-bottom: 20px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f4f4f4; font-weight: bold; }
+          tr:nth-child(even) { background-color: #fafafa; }
+          .footer { margin-top: 20px; font-size: 12px; color: #666; }
+        </style></head><body>
           <h1>Lista de Atletas</h1>
-          <p class="subtitle">Exportado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })} • ${data.length} atleta(s)</p>
-          <table>
-            <thead>
-              <tr>
-                <th>Nome</th><th>Telefone</th><th>Plano</th><th>Serviço</th>
-                <th>Valor</th><th>Término</th><th>Status</th><th>Prova Alvo</th><th>Dias</th>
-              </tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-          </table>
+          <p class="subtitle">Exportado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })} • ${list.length} atleta(s)</p>
+          <table><thead><tr>${headers}</tr></thead><tbody>${tableRows}</tbody></table>
           <p class="footer">Rogers Feitosa - Nutrição & Treinamento</p>
-        </body>
-        </html>
-      `;
+        </body></html>`;
+
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(html);
@@ -241,6 +276,26 @@ export function ExportClientsButton({ clients, targetRaceAlerts = [], filename =
           </DialogHeader>
 
           <div className="space-y-3">
+            {/* Export mode */}
+            <div className="rounded-lg border p-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tipo de exportação</p>
+              <RadioGroup value={exportMode} onValueChange={(v) => setExportMode(v as ExportMode)} className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="complete" id="mode-complete" />
+                  <Label htmlFor="mode-complete" className="text-sm cursor-pointer">Dados completos</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="simplified" id="mode-simplified" />
+                  <Label htmlFor="mode-simplified" className="text-sm cursor-pointer">Resumido</Label>
+                </div>
+              </RadioGroup>
+              <p className="text-[11px] text-muted-foreground">
+                {exportMode === 'complete'
+                  ? 'Plano, serviço, valor, datas, check-in, prova alvo...'
+                  : 'Nome, data de nascimento, e-mail e telefone'}
+              </p>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -264,7 +319,7 @@ export function ExportClientsButton({ clients, targetRaceAlerts = [], filename =
               </span>
             </div>
 
-            <ScrollArea className="h-[280px] rounded-md border">
+            <ScrollArea className="h-[240px] rounded-md border">
               <div className="p-2 space-y-0.5">
                 {filteredSelectorClients.map(c => (
                   <label
