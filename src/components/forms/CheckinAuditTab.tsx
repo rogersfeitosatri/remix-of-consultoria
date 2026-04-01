@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClients } from '@/hooks/useClients';
@@ -13,9 +14,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
+import {
   Loader2, Search, CheckCircle, Clock, AlertCircle,
-  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send, TrendingUp, Phone
+  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send, TrendingUp, Phone, ChevronDown
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -53,7 +54,6 @@ export function CheckinAuditTab() {
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
 
-  // Fetch checkin responses filtered by month
   const { data: responses = [], isLoading: responsesLoading } = useQuery({
     queryKey: ['checkin-audit-responses', monthStart.toISOString()],
     queryFn: async () => {
@@ -71,7 +71,6 @@ export function CheckinAuditTab() {
     staleTime: 60_000,
   });
 
-  // Fetch feedbacks for these responses
   const responseIds = responses.map(r => r.id);
   const { data: feedbacks = [], isLoading: feedbacksLoading } = useQuery({
     queryKey: ['checkin-audit-feedbacks', responseIds.join(',')],
@@ -88,7 +87,6 @@ export function CheckinAuditTab() {
     staleTime: 60_000,
   });
 
-  // Fetch whatsapp sends for the month
   const { data: checkinSends = [], isLoading: sendsLoading } = useQuery({
     queryKey: ['checkin-audit-sends', user?.id, monthStart.toISOString()],
     queryFn: async () => {
@@ -108,7 +106,6 @@ export function CheckinAuditTab() {
     staleTime: 60_000,
   });
 
-  // Fetch all responses for selected athlete evolution
   const { data: evoResponses = [] } = useQuery({
     queryKey: ['checkin-audit-evo-responses', evolutionClientId],
     queryFn: async () => {
@@ -169,7 +166,6 @@ export function CheckinAuditTab() {
 
   const auditItems = useMemo((): AuditItem[] => {
     const items: AuditItem[] = [];
-
     responses.forEach(r => {
       const fb = feedbackMap.get(r.id);
       let feedback_status: AuditItem['feedback_status'] = 'no_feedback';
@@ -188,7 +184,6 @@ export function CheckinAuditTab() {
         response_id: r.id,
       });
     });
-
     checkinSends.forEach(send => {
       if (!respondedSendIds.has(send.id)) {
         items.push({
@@ -201,7 +196,6 @@ export function CheckinAuditTab() {
         });
       }
     });
-
     return items;
   }, [responses, feedbackMap, checkinSends, respondedSendIds]);
 
@@ -209,7 +203,7 @@ export function CheckinAuditTab() {
     return auditItems
       .filter(item => {
         if (specificDate) return isSameDay(parseISO(item.date), specificDate);
-        return true; // already filtered by month in query
+        return true;
       })
       .filter(item => {
         if (statusFilter === 'all') return true;
@@ -229,11 +223,9 @@ export function CheckinAuditTab() {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [auditItems, specificDate, statusFilter, frequencyFilter, searchQuery, clientsMap]);
 
-  // Pagination
   const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
   const paginatedItems = filteredItems.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  // Reset page when filters change
   useEffect(() => { setPage(0); }, [statusFilter, frequencyFilter, searchQuery, specificDate, currentMonth]);
 
   const stats = useMemo(() => {
@@ -247,40 +239,15 @@ export function CheckinAuditTab() {
   const getStatusBadge = (status: AuditItem['feedback_status']) => {
     switch (status) {
       case 'sent':
-        return (
-          <Badge className="bg-green-500/20 text-green-700 border-green-500/30">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Enviado
-          </Badge>
-        );
+        return <Badge className="bg-green-500/20 text-green-700 border-green-500/30"><CheckCircle className="h-3 w-3 mr-1" />Enviado</Badge>;
       case 'reviewed':
-        return (
-          <Badge className="bg-blue-500/20 text-blue-700 border-blue-500/30">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Conferido
-          </Badge>
-        );
+        return <Badge className="bg-blue-500/20 text-blue-700 border-blue-500/30"><CheckCircle className="h-3 w-3 mr-1" />Conferido</Badge>;
       case 'pending':
-        return (
-          <Badge variant="outline" className="text-amber-600 border-amber-500/30">
-            <Clock className="h-3 w-3 mr-1" />
-            Pendente
-          </Badge>
-        );
+        return <Badge variant="outline" className="text-amber-600 border-amber-500/30"><Clock className="h-3 w-3 mr-1" />Pendente</Badge>;
       case 'no_feedback':
-        return (
-          <Badge variant="outline" className="text-muted-foreground">
-            <MessageSquare className="h-3 w-3 mr-1" />
-            Sem Feedback
-          </Badge>
-        );
+        return <Badge variant="outline" className="text-muted-foreground"><MessageSquare className="h-3 w-3 mr-1" />Sem Feedback</Badge>;
       case 'unanswered':
-        return (
-          <Badge className="bg-red-500/20 text-red-700 border-red-500/30">
-            <Send className="h-3 w-3 mr-1" />
-            Sem Resposta
-          </Badge>
-        );
+        return <Badge className="bg-red-500/20 text-red-700 border-red-500/30"><Send className="h-3 w-3 mr-1" />Sem Resposta</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -480,10 +447,10 @@ export function CheckinAuditTab() {
       <Sheet open={!!evolutionClientId} onOpenChange={(open) => { if (!open) { setEvolutionClientId(null); setEvolutionClientName(''); } }}>
         <SheetContent side="bottom" className="h-[95vh] p-0 rounded-t-2xl flex flex-col sm:max-w-full">
           <SheetHeader className="px-4 pt-4 pb-2 shrink-0 border-b border-border">
-            <div className="flex items-center justify-between gap-2">
-              <SheetTitle className="text-base font-bold flex items-center gap-2 truncate">
-                <TrendingUp className="h-4 w-4 text-primary shrink-0" />
-                <span className="truncate">{evolutionClientName}</span>
+            <div className="flex items-center gap-2 pr-10">
+              <TrendingUp className="h-4 w-4 text-primary shrink-0" />
+              <SheetTitle className="text-base font-bold truncate flex-1">
+                {evolutionClientName}
               </SheetTitle>
               {(() => {
                 const client = evolutionClientId ? clientsMap[evolutionClientId] : null;
@@ -538,16 +505,23 @@ export function CheckinAuditTab() {
   );
 }
 
-/* ---------- Inline sub-component: list of check-in responses ---------- */
+/* ---------- Collapsible check-in responses list ---------- */
 function CheckinResponsesList({
   responses,
   questions,
-  clientName,
 }: {
   responses: any[];
   questions: any[];
   clientName: string;
 }) {
+  const [openId, setOpenId] = useState<string | null>(responses[0]?.id ?? null);
+
+  const questionMap = useMemo(() => {
+    const m = new Map<string, string>();
+    questions.forEach((q: any) => m.set(q.id, q.question_text));
+    return m;
+  }, [questions]);
+
   if (responses.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -557,48 +531,51 @@ function CheckinResponsesList({
     );
   }
 
-  const questionMap = useMemo(() => {
-    const m = new Map<string, string>();
-    questions.forEach((q: any) => m.set(q.id, q.question_text));
-    return m;
-  }, [questions]);
-
   return (
-    <div className="space-y-4">
-      {responses.map((resp: any, idx: number) => {
+    <div className="space-y-2">
+      {responses.map((resp: any) => {
         const answers = resp.responses as Record<string, any>;
+        const isOpen = openId === resp.id;
         return (
-          <Card key={resp.id} className="overflow-hidden">
-            <CardHeader className="py-3 px-4 bg-muted/30">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-sm font-medium">
-                  {format(parseISO(resp.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                </CardTitle>
-                <Badge variant="outline" className="text-[10px] shrink-0">
-                  {(resp as any).checkin_forms?.title || 'Check-in'}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 space-y-3">
-              {Object.entries(answers).map(([questionId, value]: [string, any]) => {
-                const questionText = questionMap.get(questionId) || questionId;
-                const answer = typeof value === 'object' && value !== null
-                  ? (value.answer ?? value.comment ?? JSON.stringify(value))
-                  : String(value ?? '');
-                const comment = typeof value === 'object' && value?.comment ? value.comment : null;
+          <Collapsible key={resp.id} open={isOpen} onOpenChange={(o) => setOpenId(o ? resp.id : null)}>
+            <CollapsibleTrigger asChild>
+              <button className="w-full flex items-center justify-between gap-2 p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium truncate">
+                    {format(parseISO(resp.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant="outline" className="text-[10px]">
+                    {(resp as any).checkin_forms?.title || 'Check-in'}
+                  </Badge>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="px-3 py-3 space-y-3 border border-t-0 border-border rounded-b-lg bg-card">
+                {Object.entries(answers).map(([questionId, value]: [string, any]) => {
+                  const questionText = questionMap.get(questionId) || questionId;
+                  const answer = typeof value === 'object' && value !== null
+                    ? (value.answer ?? value.comment ?? JSON.stringify(value))
+                    : String(value ?? '');
+                  const comment = typeof value === 'object' && value?.comment ? value.comment : null;
 
-                return (
-                  <div key={questionId} className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground leading-snug">{questionText}</p>
-                    <p className="text-sm text-foreground leading-relaxed">{answer}</p>
-                    {comment && answer !== comment && (
-                      <p className="text-xs text-muted-foreground italic pl-2 border-l-2 border-border">{comment}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
+                  return (
+                    <div key={questionId} className="space-y-0.5">
+                      <p className="text-xs font-medium text-muted-foreground leading-snug">{questionText}</p>
+                      <p className="text-sm text-foreground leading-relaxed">{answer}</p>
+                      {comment && answer !== comment && (
+                        <p className="text-xs text-muted-foreground italic pl-2 border-l-2 border-border">{comment}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         );
       })}
     </div>
