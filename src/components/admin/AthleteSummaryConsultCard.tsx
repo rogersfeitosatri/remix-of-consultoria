@@ -123,7 +123,85 @@ export function AthleteSummaryConsultCard({
     },
   });
 
-  const today = new Date();
+  // Mutations for pipeline management
+  const updateScheduleDateMutation = useMutation({
+    mutationFn: async ({ id, newDate }: { id: string; newDate: string }) => {
+      const { error } = await supabase
+        .from('consultation_schedules')
+        .update({ send_link_date: newDate, scheduled_date: newDate, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      setEditingScheduleId(null);
+      toast.success('Data atualizada');
+    },
+    onError: () => toast.error('Erro ao atualizar data'),
+  });
+
+  const addConsultationMutation = useMutation({
+    mutationFn: async (sendLinkDate: string) => {
+      if (!user) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('consultation_schedules')
+        .insert({
+          client_id: client.id,
+          user_id: user.id,
+          scheduled_date: sendLinkDate,
+          send_link_date: sendLinkDate,
+          status: 'pending',
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      setShowAddConsult(false);
+      setNewConsultDate('');
+      toast.success('Consulta adicionada à pipeline');
+    },
+    onError: () => toast.error('Erro ao adicionar consulta'),
+  });
+
+  const removeConsultationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('consultation_schedules')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      toast.success('Consulta removida');
+    },
+    onError: () => toast.error('Erro ao remover consulta'),
+  });
+
+  const handleResendLink = async (scheduleId: string) => {
+    try {
+      setIsSendingLink(scheduleId);
+      toast.loading('Enviando link...');
+      const { error } = await supabase.functions.invoke('send-booking-link', {
+        body: { consultationScheduleId: scheduleId },
+      });
+      toast.dismiss();
+      if (error) throw error;
+      toast.success('Link de agendamento enviado!');
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+    } catch (err: any) {
+      toast.dismiss();
+      toast.error(err.message || 'Erro ao enviar link');
+    } finally {
+      setIsSendingLink(null);
+    }
+  };
+
+
   const completedAppointments = appointments.filter(a => a.status === 'completed');
   const upcomingAppointments = appointments.filter(a => 
     ['scheduled', 'confirmed'].includes(a.status) && !isPast(parseISO(a.appointment_date))
