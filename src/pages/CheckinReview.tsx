@@ -466,7 +466,7 @@ export default function CheckinReview() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <Button 
@@ -488,7 +488,95 @@ export default function CheckinReview() {
             )}
           </div>
 
-          {getStatusBadge(feedback?.status)}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openWhatsApp}
+              className="gap-2 text-green-600 border-green-600/30 hover:bg-green-600/10"
+            >
+              <Phone className="h-4 w-4" />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </Button>
+            {getStatusBadge(feedback?.status)}
+          </div>
+        </div>
+
+        {/* Target Race Card */}
+        {athleteProfile?.target_race ? (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="py-3 px-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Target className="h-5 w-5 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{athleteProfile.target_race}</p>
+                  {athleteProfile.target_deadline && (
+                    <p className="text-xs text-muted-foreground">
+                      {format(parseISO(athleteProfile.target_deadline), "dd/MM/yyyy")}
+                    </p>
+                  )}
+                </div>
+                {targetRaceDays !== null && (
+                  <Badge variant={targetRaceDays <= 30 ? 'destructive' : targetRaceDays <= 60 ? 'default' : 'secondary'} className="text-sm font-bold">
+                    {targetRaceDays > 0 ? `${targetRaceDays} dias` : targetRaceDays === 0 ? 'Hoje!' : 'Encerrada'}
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-dashed border-muted-foreground/30">
+            <CardContent className="py-3 px-4">
+              {!showTargetRaceForm ? (
+                <div className="flex items-center gap-3">
+                  <Target className="h-5 w-5 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground flex-1">Sem prova alvo cadastrada</p>
+                  <Button variant="outline" size="sm" onClick={() => setShowTargetRaceForm(true)} className="gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Cadastrar
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    <p className="text-sm font-medium">Cadastrar Prova Alvo</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Nome da prova</Label>
+                      <Input
+                        placeholder="Ex: Maratona de São Paulo"
+                        value={newTargetRace}
+                        onChange={e => setNewTargetRace(e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Data da prova</Label>
+                      <Input
+                        type="date"
+                        value={newTargetDeadline}
+                        onChange={e => setNewTargetDeadline(e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => setShowTargetRaceForm(false)}>Cancelar</Button>
+                    <Button
+                      size="sm"
+                      onClick={() => saveTargetRaceMutation.mutate()}
+                      disabled={!newTargetRace || saveTargetRaceMutation.isPending}
+                    >
+                      Salvar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
         </div>
 
         {/* Main Content */}
