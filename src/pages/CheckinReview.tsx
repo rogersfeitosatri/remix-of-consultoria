@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -20,11 +22,14 @@ import {
   RefreshCw,
   Clock,
   FileText,
-  History
+  History,
+  Target,
+  Calendar,
+  Phone
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { EvolutionAnalysisTab } from '@/components/checkin/EvolutionAnalysisTab';
@@ -84,6 +89,9 @@ export default function CheckinReview() {
   const [editedFeedback, setEditedFeedback] = useState('');
   const [feedbackInitialized, setFeedbackInitialized] = useState(false);
   const [activeTab, setActiveTab] = useState('responses');
+  const [showTargetRaceForm, setShowTargetRaceForm] = useState(false);
+  const [newTargetRace, setNewTargetRace] = useState('');
+  const [newTargetDeadline, setNewTargetDeadline] = useState('');
 
   // Fetch check-in response
   const { data: checkinResponse, isLoading: loadingResponse } = useQuery({
@@ -204,7 +212,72 @@ export default function CheckinReview() {
     enabled: !!evolutionFormId,
   });
 
-  // Initialize feedback text
+  // Fetch athlete profile (target race)
+  const { data: athleteProfile } = useQuery({
+    queryKey: ['athlete-profile-target-race', checkinResponse?.client_id],
+    queryFn: async () => {
+      if (!checkinResponse?.client_id) return null;
+      const { data, error } = await supabase
+        .from('athlete_profiles')
+        .select('id, target_race, target_deadline')
+        .eq('client_id', checkinResponse.client_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!checkinResponse?.client_id,
+  });
+
+  const targetRaceDays = athleteProfile?.target_deadline
+    ? differenceInDays(parseISO(athleteProfile.target_deadline), new Date())
+    : null;
+
+  // Save target race mutation
+  const saveTargetRaceMutation = useMutation({
+    mutationFn: async () => {
+      if (!checkinResponse?.client_id || !newTargetRace) return;
+      const { data: existing } = await supabase
+        .from('athlete_profiles')
+        .select('id')
+        .eq('client_id', checkinResponse.client_id)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('athlete_profiles')
+          .update({ target_race: newTargetRace, target_deadline: newTargetDeadline || null })
+          .eq('client_id', checkinResponse.client_id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('athlete_profiles')
+          .insert({ client_id: checkinResponse.client_id, target_race: newTargetRace, target_deadline: newTargetDeadline || null });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-profile-target-race', checkinResponse?.client_id] });
+      queryClient.invalidateQueries({ queryKey: ['target-race-alert', checkinResponse?.client_id] });
+      setShowTargetRaceForm(false);
+      setNewTargetRace('');
+      setNewTargetDeadline('');
+      toast.success('Prova alvo salva com sucesso!');
+    },
+    onError: () => toast.error('Erro ao salvar prova alvo'),
+  });
+
+  const openWhatsApp = () => {
+    const phone = checkinResponse?.clients?.phone;
+    if (!phone) {
+      toast.error('Telefone do atleta não cadastrado');
+      return;
+    }
+    const cleanPhone = phone.replace(/\D/g, '');
+    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    window.open(`https://wa.me/${formattedPhone}`, '_blank');
+  };
+
+
   if (!feedbackInitialized && (feedback?.final_feedback || feedback?.suggested_feedback || aiAnalysis?.suggested_feedback)) {
     setEditedFeedback(feedback?.final_feedback || feedback?.suggested_feedback || aiAnalysis?.suggested_feedback || '');
     setFeedbackInitialized(true);
@@ -393,7 +466,7 @@ export default function CheckinReview() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <Button 
@@ -415,8 +488,95 @@ export default function CheckinReview() {
             )}
           </div>
 
-          {getStatusBadge(feedback?.status)}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openWhatsApp}
+              className="gap-2 text-green-600 border-green-600/30 hover:bg-green-600/10"
+            >
+              <Phone className="h-4 w-4" />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </Button>
+            {getStatusBadge(feedback?.status)}
+          </div>
         </div>
+
+        {/* Target Race Card */}
+        {athleteProfile?.target_race ? (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="py-3 px-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Target className="h-5 w-5 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{athleteProfile.target_race}</p>
+                  {athleteProfile.target_deadline && (
+                    <p className="text-xs text-muted-foreground">
+                      {format(parseISO(athleteProfile.target_deadline), "dd/MM/yyyy")}
+                    </p>
+                  )}
+                </div>
+                {targetRaceDays !== null && (
+                  <Badge variant={targetRaceDays <= 30 ? 'destructive' : targetRaceDays <= 60 ? 'default' : 'secondary'} className="text-sm font-bold">
+                    {targetRaceDays > 0 ? `${targetRaceDays} dias` : targetRaceDays === 0 ? 'Hoje!' : 'Encerrada'}
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-dashed border-muted-foreground/30">
+            <CardContent className="py-3 px-4">
+              {!showTargetRaceForm ? (
+                <div className="flex items-center gap-3">
+                  <Target className="h-5 w-5 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground flex-1">Sem prova alvo cadastrada</p>
+                  <Button variant="outline" size="sm" onClick={() => setShowTargetRaceForm(true)} className="gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Cadastrar
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    <p className="text-sm font-medium">Cadastrar Prova Alvo</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Nome da prova</Label>
+                      <Input
+                        placeholder="Ex: Maratona de São Paulo"
+                        value={newTargetRace}
+                        onChange={e => setNewTargetRace(e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Data da prova</Label>
+                      <Input
+                        type="date"
+                        value={newTargetDeadline}
+                        onChange={e => setNewTargetDeadline(e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => setShowTargetRaceForm(false)}>Cancelar</Button>
+                    <Button
+                      size="sm"
+                      onClick={() => saveTargetRaceMutation.mutate()}
+                      disabled={!newTargetRace || saveTargetRaceMutation.isPending}
+                    >
+                      Salvar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} key={responseId} className="space-y-4">
