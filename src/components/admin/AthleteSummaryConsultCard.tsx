@@ -201,7 +201,7 @@ export function AthleteSummaryConsultCard({
     }
   };
 
-
+  const today = new Date();
   const completedAppointments = appointments.filter(a => a.status === 'completed');
   const upcomingAppointments = appointments.filter(a => 
     ['scheduled', 'confirmed'].includes(a.status) && !isPast(parseISO(a.appointment_date))
