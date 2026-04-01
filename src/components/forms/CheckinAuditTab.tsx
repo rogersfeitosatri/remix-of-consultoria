@@ -473,6 +473,26 @@ export function CheckinAuditTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* Evolution Dialog */}
+      <Dialog open={!!evolutionClientId} onOpenChange={(open) => { if (!open) { setEvolutionClientId(null); setEvolutionClientName(''); } }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Evolução — {evolutionClientName}
+            </DialogTitle>
+          </DialogHeader>
+          {evolutionClientId && (
+            <EvolutionAnalysisTab
+              clientId={evolutionClientId}
+              clientName={evolutionClientName}
+              responses={evoResponses}
+              questions={evoQuestions}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
