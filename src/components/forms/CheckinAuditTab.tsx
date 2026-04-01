@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClients } from '@/hooks/useClients';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,13 +15,14 @@ import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isSam
 import { ptBR } from 'date-fns/locale';
 import { 
   Loader2, Search, CheckCircle, Clock, AlertCircle,
-  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send, TrendingUp
+  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send, TrendingUp, Phone
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useNavigate } from 'react-router-dom';
 import { EvolutionAnalysisTab } from '@/components/checkin/EvolutionAnalysisTab';
+import { Separator } from '@/components/ui/separator';
 
 type AuditItem = {
   id: string;
@@ -474,25 +476,131 @@ export function CheckinAuditTab() {
         </CardContent>
       </Card>
 
-      {/* Evolution Dialog */}
-      <Dialog open={!!evolutionClientId} onOpenChange={(open) => { if (!open) { setEvolutionClientId(null); setEvolutionClientName(''); } }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              Evolução — {evolutionClientName}
-            </DialogTitle>
-          </DialogHeader>
-          {evolutionClientId && (
-            <EvolutionAnalysisTab
-              clientId={evolutionClientId}
-              clientName={evolutionClientName}
-              responses={evoResponses}
-              questions={evoQuestions}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Athlete Detail Sheet - Mobile Friendly */}
+      <Sheet open={!!evolutionClientId} onOpenChange={(open) => { if (!open) { setEvolutionClientId(null); setEvolutionClientName(''); } }}>
+        <SheetContent side="bottom" className="h-[95vh] p-0 rounded-t-2xl flex flex-col sm:max-w-full">
+          <SheetHeader className="px-4 pt-4 pb-2 shrink-0 border-b border-border">
+            <div className="flex items-center justify-between gap-2">
+              <SheetTitle className="text-base font-bold flex items-center gap-2 truncate">
+                <TrendingUp className="h-4 w-4 text-primary shrink-0" />
+                <span className="truncate">{evolutionClientName}</span>
+              </SheetTitle>
+              {(() => {
+                const client = evolutionClientId ? clientsMap[evolutionClientId] : null;
+                const phone = client?.phone;
+                if (!phone) return null;
+                const cleanPhone = phone.replace(/\D/g, '');
+                return (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="gap-1.5 shrink-0 bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => window.open(`https://wa.me/${cleanPhone}`, '_blank')}
+                  >
+                    <Phone className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">WhatsApp</span>
+                  </Button>
+                );
+              })()}
+            </div>
+          </SheetHeader>
+
+          <Tabs defaultValue="respostas" className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="grid grid-cols-2 mx-4 mt-3 shrink-0">
+              <TabsTrigger value="respostas" className="gap-1.5 text-xs sm:text-sm">
+                <MessageSquare className="h-3.5 w-3.5" />
+                Respostas
+              </TabsTrigger>
+              <TabsTrigger value="evolucao" className="gap-1.5 text-xs sm:text-sm">
+                <TrendingUp className="h-3.5 w-3.5" />
+                Evolução
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="respostas" className="flex-1 overflow-y-auto px-4 pb-4 mt-3">
+              <CheckinResponsesList responses={evoResponses} questions={evoQuestions} clientName={evolutionClientName} />
+            </TabsContent>
+
+            <TabsContent value="evolucao" className="flex-1 overflow-y-auto px-4 pb-4 mt-3">
+              {evolutionClientId && (
+                <EvolutionAnalysisTab
+                  clientId={evolutionClientId}
+                  clientName={evolutionClientName}
+                  responses={evoResponses}
+                  questions={evoQuestions}
+                />
+              )}
+            </TabsContent>
+          </Tabs>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+/* ---------- Inline sub-component: list of check-in responses ---------- */
+function CheckinResponsesList({
+  responses,
+  questions,
+  clientName,
+}: {
+  responses: any[];
+  questions: any[];
+  clientName: string;
+}) {
+  if (responses.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <MessageSquare className="h-10 w-10 mb-3 opacity-40" />
+        <p className="text-sm">Nenhuma resposta de check-in encontrada.</p>
+      </div>
+    );
+  }
+
+  const questionMap = useMemo(() => {
+    const m = new Map<string, string>();
+    questions.forEach((q: any) => m.set(q.id, q.question_text));
+    return m;
+  }, [questions]);
+
+  return (
+    <div className="space-y-4">
+      {responses.map((resp: any, idx: number) => {
+        const answers = resp.responses as Record<string, any>;
+        return (
+          <Card key={resp.id} className="overflow-hidden">
+            <CardHeader className="py-3 px-4 bg-muted/30">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-sm font-medium">
+                  {format(parseISO(resp.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                </CardTitle>
+                <Badge variant="outline" className="text-[10px] shrink-0">
+                  {(resp as any).checkin_forms?.title || 'Check-in'}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3">
+              {Object.entries(answers).map(([questionId, value]: [string, any]) => {
+                const questionText = questionMap.get(questionId) || questionId;
+                const answer = typeof value === 'object' && value !== null
+                  ? (value.answer ?? value.comment ?? JSON.stringify(value))
+                  : String(value ?? '');
+                const comment = typeof value === 'object' && value?.comment ? value.comment : null;
+
+                return (
+                  <div key={questionId} className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground leading-snug">{questionText}</p>
+                    <p className="text-sm text-foreground leading-relaxed">{answer}</p>
+                    {comment && answer !== comment && (
+                      <p className="text-xs text-muted-foreground italic pl-2 border-l-2 border-border">{comment}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
