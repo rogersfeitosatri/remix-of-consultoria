@@ -540,30 +540,6 @@ export function CheckinAuditTab() {
 
 /* ---------- Inline sub-component: list of check-in responses ---------- */
 function CheckinResponsesList({
-  responses,
-  questions,
-}: {
-  responses: any[];
-  questions: any[];
-  clientName: string;
-}) {
-  const [openId, setOpenId] = useState<string | null>(responses[0]?.id ?? null);
-
-  const questionMap = useMemo(() => {
-    const m = new Map<string, string>();
-    questions.forEach((q: any) => m.set(q.id, q.question_text));
-    return m;
-  }, [questions]);
-
-  if (responses.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-        <MessageSquare className="h-10 w-10 mb-3 opacity-40" />
-        <p className="text-sm">Nenhuma resposta de check-in encontrada.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-2">
       {responses.map((resp: any) => {
