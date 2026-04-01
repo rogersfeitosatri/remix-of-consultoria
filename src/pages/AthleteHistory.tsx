@@ -287,7 +287,9 @@ export default function AthleteHistory() {
           <TabsContent value="evolution" className="space-y-4">
             <CheckinEvolutionCharts 
               responses={checkinResponses} 
-              questions={checkinQuestions} 
+              questions={checkinQuestions}
+              clientName={client?.name}
+              clientId={clientId}
             />
           </TabsContent>
 

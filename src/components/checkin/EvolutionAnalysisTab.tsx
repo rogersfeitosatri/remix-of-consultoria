@@ -89,7 +89,7 @@ export function EvolutionAnalysisTab({ clientId, clientName, responses, question
   return (
     <div className="space-y-6">
       {/* Evolution Charts */}
-      <CheckinEvolutionCharts responses={responses} questions={questions} />
+      <CheckinEvolutionCharts responses={responses} questions={questions} clientName={clientName} clientId={clientId} />
 
       {/* AI Evolution Analysis */}
       <Card>

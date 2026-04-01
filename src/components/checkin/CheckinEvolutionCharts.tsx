@@ -2,9 +2,12 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TrendingUp, Scale, Moon, Dumbbell, Utensils, Heart } from 'lucide-react';
+import { TrendingUp, Scale, Moon, Dumbbell, Utensils, Heart, Target } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
 
 interface CheckinResponse {
   id: string;
@@ -22,6 +25,8 @@ interface CheckinQuestion {
 interface Props {
   responses: CheckinResponse[];
   questions: CheckinQuestion[];
+  clientName?: string;
+  clientId?: string;
 }
 
 // Map options to numeric values for charting
@@ -84,7 +89,27 @@ const questionPatterns = {
   weeklyScore: /nota.*daria.*semana/i,
 };
 
-export function CheckinEvolutionCharts({ responses, questions }: Props) {
+export function CheckinEvolutionCharts({ responses, questions, clientName, clientId }: Props) {
+  // Fetch target race if clientId provided
+  const { data: targetRace } = useQuery({
+    queryKey: ['target-race-chart', clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('target_race, target_deadline')
+        .eq('client_id', clientId!)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!clientId,
+  });
+
+  const raceCountdown = useMemo(() => {
+    if (!targetRace?.target_deadline) return null;
+    const days = differenceInCalendarDays(new Date(targetRace.target_deadline), new Date());
+    return days;
+  }, [targetRace]);
+
   // Process data for charts
   const chartData = useMemo(() => {
     if (!responses.length || !questions.length) return [];
@@ -170,11 +195,29 @@ export function CheckinEvolutionCharts({ responses, questions }: Props) {
       {hasWeight && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Scale className="h-4 w-4 text-primary" />
-              Evolução do Peso
-            </CardTitle>
-            <CardDescription>Peso em jejum ao longo dos check-ins</CardDescription>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Scale className="h-4 w-4 text-primary" />
+                  Evolução do Peso
+                  {clientName && <span className="text-muted-foreground font-normal">— {clientName}</span>}
+                </CardTitle>
+                <CardDescription>Peso em jejum ao longo dos check-ins</CardDescription>
+              </div>
+              {targetRace?.target_race && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Target className="h-3 w-3" />
+                    {targetRace.target_race}
+                  </Badge>
+                  {raceCountdown !== null && (
+                    <Badge variant={raceCountdown <= 30 ? 'destructive' : 'secondary'} className="text-xs">
+                      {raceCountdown > 0 ? `${raceCountdown} dias` : 'Hoje!'}
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[200px] w-full">

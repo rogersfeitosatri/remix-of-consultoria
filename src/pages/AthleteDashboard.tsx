@@ -319,7 +319,7 @@ export default function AthleteDashboard() {
             </CardContent></Card>
             {checkinResponses.length > 0 && (
               <div className="mt-4">
-                <CheckinEvolutionCharts responses={checkinResponses} questions={checkinQuestions} />
+                <CheckinEvolutionCharts responses={checkinResponses} questions={checkinQuestions} clientName={client?.name} clientId={client?.id} />
               </div>
             )}
           </TabsContent>

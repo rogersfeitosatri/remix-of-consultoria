@@ -510,7 +510,9 @@ export default function ClientDetail() {
           <TabsContent value="evolution">
             <CheckinEvolutionCharts 
               responses={checkinResponses} 
-              questions={checkinQuestions} 
+              questions={checkinQuestions}
+              clientName={client?.name}
+              clientId={clientId}
             />
           </TabsContent>
           
