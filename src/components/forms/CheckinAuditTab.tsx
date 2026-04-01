@@ -542,12 +542,19 @@ export function CheckinAuditTab() {
 function CheckinResponsesList({
   responses,
   questions,
-  clientName,
 }: {
   responses: any[];
   questions: any[];
   clientName: string;
 }) {
+  const [openId, setOpenId] = useState<string | null>(responses[0]?.id ?? null);
+
+  const questionMap = useMemo(() => {
+    const m = new Map<string, string>();
+    questions.forEach((q: any) => m.set(q.id, q.question_text));
+    return m;
+  }, [questions]);
+
   if (responses.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -557,6 +564,56 @@ function CheckinResponsesList({
     );
   }
 
+  return (
+    <div className="space-y-2">
+      {responses.map((resp: any) => {
+        const answers = resp.responses as Record<string, any>;
+        const isOpen = openId === resp.id;
+        return (
+          <Collapsible key={resp.id} open={isOpen} onOpenChange={(o) => setOpenId(o ? resp.id : null)}>
+            <CollapsibleTrigger asChild>
+              <button className="w-full flex items-center justify-between gap-2 p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium truncate">
+                    {format(parseISO(resp.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant="outline" className="text-[10px]">
+                    {(resp as any).checkin_forms?.title || 'Check-in'}
+                  </Badge>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="px-3 py-3 space-y-3 border border-t-0 border-border rounded-b-lg bg-card">
+                {Object.entries(answers).map(([questionId, value]: [string, any]) => {
+                  const questionText = questionMap.get(questionId) || questionId;
+                  const answer = typeof value === 'object' && value !== null
+                    ? (value.answer ?? value.comment ?? JSON.stringify(value))
+                    : String(value ?? '');
+                  const comment = typeof value === 'object' && value?.comment ? value.comment : null;
+
+                  return (
+                    <div key={questionId} className="space-y-0.5">
+                      <p className="text-xs font-medium text-muted-foreground leading-snug">{questionText}</p>
+                      <p className="text-sm text-foreground leading-relaxed">{answer}</p>
+                      {comment && answer !== comment && (
+                        <p className="text-xs text-muted-foreground italic pl-2 border-l-2 border-border">{comment}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      })}
+    </div>
+  );
+}
   const questionMap = useMemo(() => {
     const m = new Map<string, string>();
     questions.forEach((q: any) => m.set(q.id, q.question_text));
