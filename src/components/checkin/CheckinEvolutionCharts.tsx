@@ -22,6 +22,8 @@ interface CheckinQuestion {
 interface Props {
   responses: CheckinResponse[];
   questions: CheckinQuestion[];
+  clientName?: string;
+  clientId?: string;
 }
 
 // Map options to numeric values for charting
