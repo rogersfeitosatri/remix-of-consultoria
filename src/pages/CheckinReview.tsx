@@ -92,6 +92,8 @@ export default function CheckinReview() {
   const [showTargetRaceForm, setShowTargetRaceForm] = useState(false);
   const [newTargetRace, setNewTargetRace] = useState('');
   const [newTargetDeadline, setNewTargetDeadline] = useState('');
+  const [editingWeightQuestionId, setEditingWeightQuestionId] = useState<string | null>(null);
+  const [editedWeightValue, setEditedWeightValue] = useState('');
 
   // Fetch check-in response
   const { data: checkinResponse, isLoading: loadingResponse } = useQuery({
@@ -265,6 +267,38 @@ export default function CheckinReview() {
     },
     onError: () => toast.error('Erro ao salvar prova alvo'),
   });
+
+  // Mutation to update weight response
+  const updateWeightMutation = useMutation({
+    mutationFn: async ({ questionId, newValue }: { questionId: string; newValue: string }) => {
+      if (!checkinResponse || !responseId) return;
+      const updatedResponses = { ...checkinResponse.responses };
+      const existing = updatedResponses[questionId];
+      if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+        updatedResponses[questionId] = { ...existing, answer: newValue };
+      } else {
+        updatedResponses[questionId] = newValue;
+      }
+      const { error } = await supabase
+        .from('checkin_responses')
+        .update({ responses: updatedResponses })
+        .eq('id', responseId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checkin_response', responseId] });
+      queryClient.invalidateQueries({ queryKey: ['checkin_responses', 'all', checkinResponse?.client_id] });
+      setEditingWeightQuestionId(null);
+      setEditedWeightValue('');
+      toast.success('Peso atualizado com sucesso!');
+    },
+    onError: () => toast.error('Erro ao atualizar peso'),
+  });
+
+  const isWeightQuestion = (text: string) => {
+    const lower = text.toLowerCase();
+    return lower.includes('peso') || lower.includes('weight') || lower.includes('kg');
+  };
 
   const openWhatsApp = () => {
     const phone = checkinResponse?.clients?.phone;
@@ -635,14 +669,63 @@ export default function CheckinReview() {
                     ? answer.join(', ') 
                     : (typeof answer === 'string' || typeof answer === 'number' ? String(answer) : 'Não respondido');
 
+                  const isWeight = isWeightQuestion(question.question_text);
+                  const isEditing = editingWeightQuestionId === question.id;
+
                   return (
                     <div key={question.id} className="border-b border-border/50 pb-4 last:border-0">
                       <p className="font-medium text-sm text-muted-foreground mb-1">
                         {index + 1}. {question.question_text}
                       </p>
-                      <p className="text-foreground">
-                        {displayAnswer || 'Não respondido'}
-                      </p>
+                      {isEditing ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            value={editedWeightValue}
+                            onChange={(e) => setEditedWeightValue(e.target.value)}
+                            className="h-8 w-32"
+                            placeholder="Ex: 72.5"
+                          />
+                          <span className="text-sm text-muted-foreground">kg</span>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="h-8 px-3"
+                            onClick={() => updateWeightMutation.mutate({ questionId: question.id, newValue: editedWeightValue })}
+                            disabled={updateWeightMutation.isPending || !editedWeightValue}
+                          >
+                            Salvar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 px-3"
+                            onClick={() => { setEditingWeightQuestionId(null); setEditedWeightValue(''); }}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <p className="text-foreground">
+                            {displayAnswer || 'Não respondido'}
+                          </p>
+                          {isWeight && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                              onClick={() => {
+                                setEditingWeightQuestionId(question.id);
+                                setEditedWeightValue(String(displayAnswer).replace(/[^\d.,]/g, '').replace(',', '.'));
+                              }}
+                            >
+                              ✏️ Editar
+                            </Button>
+                          )}
+                        </div>
+                      )}
                       {comment && (
                         <p className="text-sm text-muted-foreground mt-1 italic">
                           "{comment}"
