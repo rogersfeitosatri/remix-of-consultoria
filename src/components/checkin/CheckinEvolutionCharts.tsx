@@ -195,11 +195,29 @@ export function CheckinEvolutionCharts({ responses, questions, clientName, clien
       {hasWeight && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Scale className="h-4 w-4 text-primary" />
-              Evolução do Peso
-            </CardTitle>
-            <CardDescription>Peso em jejum ao longo dos check-ins</CardDescription>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Scale className="h-4 w-4 text-primary" />
+                  Evolução do Peso
+                  {clientName && <span className="text-muted-foreground font-normal">— {clientName}</span>}
+                </CardTitle>
+                <CardDescription>Peso em jejum ao longo dos check-ins</CardDescription>
+              </div>
+              {targetRace?.target_race && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Target className="h-3 w-3" />
+                    {targetRace.target_race}
+                  </Badge>
+                  {raceCountdown !== null && (
+                    <Badge variant={raceCountdown <= 30 ? 'destructive' : 'secondary'} className="text-xs">
+                      {raceCountdown > 0 ? `${raceCountdown} dias` : 'Hoje!'}
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[200px] w-full">
