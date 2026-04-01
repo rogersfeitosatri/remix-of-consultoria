@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useClients } from '@/hooks/useClients';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,12 +14,13 @@ import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isSam
 import { ptBR } from 'date-fns/locale';
 import { 
   Loader2, Search, CheckCircle, Clock, AlertCircle,
-  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send
+  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send, TrendingUp
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useNavigate } from 'react-router-dom';
+import { EvolutionAnalysisTab } from '@/components/checkin/EvolutionAnalysisTab';
 
 type AuditItem = {
   id: string;
@@ -43,6 +45,8 @@ export function CheckinAuditTab() {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [specificDate, setSpecificDate] = useState<Date | undefined>(undefined);
   const [page, setPage] = useState(0);
+  const [evolutionClientId, setEvolutionClientId] = useState<string | null>(null);
+  const [evolutionClientName, setEvolutionClientName] = useState('');
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -100,6 +104,38 @@ export function CheckinAuditTab() {
     },
     enabled: !!user,
     staleTime: 60_000,
+  });
+
+  // Fetch all responses for selected athlete evolution
+  const { data: evoResponses = [] } = useQuery({
+    queryKey: ['checkin-audit-evo-responses', evolutionClientId],
+    queryFn: async () => {
+      if (!evolutionClientId) return [];
+      const { data, error } = await supabase
+        .from('checkin_responses')
+        .select('*, checkin_forms (title)')
+        .eq('client_id', evolutionClientId)
+        .order('submitted_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!evolutionClientId,
+  });
+
+  const evoFormId = evoResponses[0]?.form_id;
+  const { data: evoQuestions = [] } = useQuery({
+    queryKey: ['checkin-audit-evo-questions', evoFormId],
+    queryFn: async () => {
+      if (!evoFormId) return [];
+      const { data, error } = await supabase
+        .from('checkin_questions')
+        .select('*')
+        .eq('form_id', evoFormId)
+        .order('order_index', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!evoFormId,
   });
 
   const isLoading = responsesLoading || clientsLoading || feedbacksLoading || sendsLoading;
@@ -379,7 +415,20 @@ export function CheckinAuditTab() {
                     const client = clientsMap[item.client_id];
                     return (
                       <TableRow key={item.id}>
-                        <TableCell className="font-medium text-sm">{client?.name || '—'}</TableCell>
+                        <TableCell className="font-medium text-sm">
+                          <button
+                            className="text-left hover:text-primary hover:underline transition-colors flex items-center gap-1"
+                            onClick={() => {
+                              if (client) {
+                                setEvolutionClientId(client.id);
+                                setEvolutionClientName(client.name);
+                              }
+                            }}
+                          >
+                            {client?.name || '—'}
+                            <TrendingUp className="h-3 w-3 opacity-0 group-hover:opacity-100" />
+                          </button>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[10px]">
                             {client?.checkin_frequency === 'weekly' ? 'Sem' : client?.checkin_frequency === 'biweekly' ? 'Quin' : client?.checkin_frequency === 'monthly' ? 'Men' : '-'}
@@ -424,6 +473,26 @@ export function CheckinAuditTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* Evolution Dialog */}
+      <Dialog open={!!evolutionClientId} onOpenChange={(open) => { if (!open) { setEvolutionClientId(null); setEvolutionClientName(''); } }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Evolução — {evolutionClientName}
+            </DialogTitle>
+          </DialogHeader>
+          {evolutionClientId && (
+            <EvolutionAnalysisTab
+              clientId={evolutionClientId}
+              clientName={evolutionClientName}
+              responses={evoResponses}
+              questions={evoQuestions}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
