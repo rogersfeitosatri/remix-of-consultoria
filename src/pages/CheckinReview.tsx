@@ -212,7 +212,72 @@ export default function CheckinReview() {
     enabled: !!evolutionFormId,
   });
 
-  // Initialize feedback text
+  // Fetch athlete profile (target race)
+  const { data: athleteProfile } = useQuery({
+    queryKey: ['athlete-profile-target-race', checkinResponse?.client_id],
+    queryFn: async () => {
+      if (!checkinResponse?.client_id) return null;
+      const { data, error } = await supabase
+        .from('athlete_profiles')
+        .select('id, target_race, target_deadline')
+        .eq('client_id', checkinResponse.client_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!checkinResponse?.client_id,
+  });
+
+  const targetRaceDays = athleteProfile?.target_deadline
+    ? differenceInDays(parseISO(athleteProfile.target_deadline), new Date())
+    : null;
+
+  // Save target race mutation
+  const saveTargetRaceMutation = useMutation({
+    mutationFn: async () => {
+      if (!checkinResponse?.client_id || !newTargetRace) return;
+      const { data: existing } = await supabase
+        .from('athlete_profiles')
+        .select('id')
+        .eq('client_id', checkinResponse.client_id)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('athlete_profiles')
+          .update({ target_race: newTargetRace, target_deadline: newTargetDeadline || null })
+          .eq('client_id', checkinResponse.client_id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('athlete_profiles')
+          .insert({ client_id: checkinResponse.client_id, target_race: newTargetRace, target_deadline: newTargetDeadline || null });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-profile-target-race', checkinResponse?.client_id] });
+      queryClient.invalidateQueries({ queryKey: ['target-race-alert', checkinResponse?.client_id] });
+      setShowTargetRaceForm(false);
+      setNewTargetRace('');
+      setNewTargetDeadline('');
+      toast.success('Prova alvo salva com sucesso!');
+    },
+    onError: () => toast.error('Erro ao salvar prova alvo'),
+  });
+
+  const openWhatsApp = () => {
+    const phone = checkinResponse?.clients?.phone;
+    if (!phone) {
+      toast.error('Telefone do atleta não cadastrado');
+      return;
+    }
+    const cleanPhone = phone.replace(/\D/g, '');
+    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    window.open(`https://wa.me/${formattedPhone}`, '_blank');
+  };
+
+
   if (!feedbackInitialized && (feedback?.final_feedback || feedback?.suggested_feedback || aiAnalysis?.suggested_feedback)) {
     setEditedFeedback(feedback?.final_feedback || feedback?.suggested_feedback || aiAnalysis?.suggested_feedback || '');
     setFeedbackInitialized(true);
