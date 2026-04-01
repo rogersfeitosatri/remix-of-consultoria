@@ -54,11 +54,18 @@ export function AthleteSummaryConsultCard({
   isSaving 
 }: AthleteSummaryConsultCardProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: stats, isLoading } = useConsultationStats(client.id);
   const [isEditing, setIsEditing] = useState(false);
   const [notes, setNotes] = useState(adminNotesShort || '');
   const [showHistory, setShowHistory] = useState(false);
   const [showPipeline, setShowPipeline] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState('');
+  const [showAddConsult, setShowAddConsult] = useState(false);
+  const [newConsultDate, setNewConsultDate] = useState('');
+  const [isSendingLink, setIsSendingLink] = useState<string | null>(null);
 
   // All appointments for this athlete
   const { data: appointments = [] } = useQuery({
