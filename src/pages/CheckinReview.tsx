@@ -577,7 +577,6 @@ export default function CheckinReview() {
             </CardContent>
           </Card>
         )}
-        </div>
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} key={responseId} className="space-y-4">
