@@ -480,10 +480,10 @@ export function CheckinAuditTab() {
       <Sheet open={!!evolutionClientId} onOpenChange={(open) => { if (!open) { setEvolutionClientId(null); setEvolutionClientName(''); } }}>
         <SheetContent side="bottom" className="h-[95vh] p-0 rounded-t-2xl flex flex-col sm:max-w-full">
           <SheetHeader className="px-4 pt-4 pb-2 shrink-0 border-b border-border">
-            <div className="flex items-center justify-between gap-2">
-              <SheetTitle className="text-base font-bold flex items-center gap-2 truncate">
-                <TrendingUp className="h-4 w-4 text-primary shrink-0" />
-                <span className="truncate">{evolutionClientName}</span>
+            <div className="flex items-center gap-2 pr-8">
+              <TrendingUp className="h-4 w-4 text-primary shrink-0" />
+              <SheetTitle className="text-base font-bold truncate flex-1">
+                {evolutionClientName}
               </SheetTitle>
               {(() => {
                 const client = evolutionClientId ? clientsMap[evolutionClientId] : null;
@@ -494,7 +494,7 @@ export function CheckinAuditTab() {
                   <Button
                     size="sm"
                     variant="default"
-                    className="gap-1.5 shrink-0 bg-green-600 hover:bg-green-700 text-white"
+                    className="gap-1.5 shrink-0 bg-green-600 hover:bg-green-700 text-white mr-2"
                     onClick={() => window.open(`https://wa.me/${cleanPhone}`, '_blank')}
                   >
                     <Phone className="h-3.5 w-3.5" />
