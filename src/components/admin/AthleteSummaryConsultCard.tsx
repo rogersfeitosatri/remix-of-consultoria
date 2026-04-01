@@ -383,44 +383,163 @@ export function AthleteSummaryConsultCard({
                   <p className="text-[10px] mt-0.5">Edite o cadastro do atleta para gerar o pipeline.</p>
                 </div>
               ) : (
-                <div className="space-y-1 max-h-[200px] overflow-y-auto">
-                  {schedules.map((schedule, index) => (
-                    <div 
-                      key={schedule.id}
-                      className={cn(
-                        "flex items-center justify-between p-2 rounded-md text-xs border",
-                        schedule.status === 'completed' && "bg-emerald-500/5 border-emerald-500/20",
-                        schedule.status === 'scheduled' && "bg-blue-500/5 border-blue-500/20",
-                        ['sent', 'link_sent'].includes(schedule.status) && "bg-amber-500/5 border-amber-500/20",
-                        schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date))
-                          ? "bg-red-500/5 border-red-500/20"
-                          : schedule.status === 'pending' && "bg-muted/30 border-border",
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground font-mono w-4 text-center">{index + 1}</span>
-                        <div>
-                          <p className="font-medium">
-                            {schedule.status === 'completed' 
-                              ? format(parseISO(schedule.scheduled_date), "dd/MM/yy")
-                              : `Envio: ${format(parseISO(schedule.send_link_date), "dd/MM/yy")}`
-                            }
-                          </p>
-                          {schedule.scheduled_time && (
-                            <p className="text-muted-foreground text-[10px]">
-                              {schedule.scheduled_time.slice(0, 5)}
-                            </p>
-                          )}
-                          {schedule.status === 'pending' && !isPast(parseISO(schedule.send_link_date)) && (
-                            <p className="text-muted-foreground text-[10px]">
-                              em {differenceInDays(parseISO(schedule.send_link_date), today)}d
-                            </p>
-                          )}
+                <div className="space-y-1 max-h-[260px] overflow-y-auto">
+                  {schedules.map((schedule, index) => {
+                    const isEditingThis = editingScheduleId === schedule.id;
+                    const canManage = ['pending', 'sent', 'link_sent'].includes(schedule.status);
+                    const canResend = ['pending', 'sent', 'link_sent'].includes(schedule.status);
+
+                    return (
+                      <div 
+                        key={schedule.id}
+                        className={cn(
+                          "p-2 rounded-md text-xs border",
+                          schedule.status === 'completed' && "bg-emerald-500/5 border-emerald-500/20",
+                          schedule.status === 'scheduled' && "bg-blue-500/5 border-blue-500/20",
+                          ['sent', 'link_sent'].includes(schedule.status) && "bg-amber-500/5 border-amber-500/20",
+                          schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date))
+                            ? "bg-red-500/5 border-red-500/20"
+                            : schedule.status === 'pending' && "bg-muted/30 border-border",
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className="text-muted-foreground font-mono w-4 text-center shrink-0">{index + 1}</span>
+                            {isEditingThis ? (
+                              <div className="flex items-center gap-1 flex-1">
+                                <Input
+                                  type="date"
+                                  value={editDate}
+                                  onChange={e => setEditDate(e.target.value)}
+                                  className="h-6 text-xs w-[120px]"
+                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 w-5 p-0"
+                                  onClick={() => {
+                                    if (editDate) updateScheduleDateMutation.mutate({ id: schedule.id, newDate: editDate });
+                                  }}
+                                  disabled={updateScheduleDateMutation.isPending}
+                                >
+                                  <Save className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 w-5 p-0"
+                                  onClick={() => setEditingScheduleId(null)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="min-w-0">
+                                <p className="font-medium truncate">
+                                  {schedule.status === 'completed' 
+                                    ? format(parseISO(schedule.scheduled_date), "dd/MM/yy")
+                                    : `Envio: ${format(parseISO(schedule.send_link_date), "dd/MM/yy")}`
+                                  }
+                                </p>
+                                {schedule.scheduled_time && (
+                                  <p className="text-muted-foreground text-[10px]">{schedule.scheduled_time.slice(0, 5)}</p>
+                                )}
+                                {schedule.status === 'pending' && !isPast(parseISO(schedule.send_link_date)) && (
+                                  <p className="text-muted-foreground text-[10px]">em {differenceInDays(parseISO(schedule.send_link_date), today)}d</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {getScheduleStatusBadge(schedule.status, schedule.send_link_date)}
+                          </div>
                         </div>
+                        {/* Action buttons for manageable schedules */}
+                        {canManage && !isEditingThis && (
+                          <div className="flex items-center gap-1 mt-1.5 pl-6">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                              onClick={() => {
+                                setEditingScheduleId(schedule.id);
+                                setEditDate(schedule.send_link_date);
+                              }}
+                            >
+                              <Pencil className="h-2.5 w-2.5" />
+                              Editar
+                            </Button>
+                            {canResend && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                onClick={() => handleResendLink(schedule.id)}
+                                disabled={isSendingLink === schedule.id}
+                              >
+                                <Send className="h-2.5 w-2.5" />
+                                {schedule.status === 'pending' ? 'Enviar' : 'Reenviar'}
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px] gap-1 text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (confirm('Remover esta consulta da pipeline?')) {
+                                  removeConsultationMutation.mutate(schedule.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      {getScheduleStatusBadge(schedule.status, schedule.send_link_date)}
-                    </div>
-                  ))}
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Add consultation button */}
+              {!showAddConsult ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full h-7 text-[10px] gap-1 mt-1 text-muted-foreground"
+                  onClick={() => setShowAddConsult(true)}
+                >
+                  <Plus className="h-3 w-3" />
+                  Adicionar consulta
+                </Button>
+              ) : (
+                <div className="flex items-center gap-1 mt-1">
+                  <Input
+                    type="date"
+                    value={newConsultDate}
+                    onChange={e => setNewConsultDate(e.target.value)}
+                    className="h-7 text-xs flex-1"
+                    placeholder="Data de envio"
+                  />
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-7 text-[10px] px-2"
+                    onClick={() => {
+                      if (newConsultDate) addConsultationMutation.mutate(newConsultDate);
+                    }}
+                    disabled={!newConsultDate || addConsultationMutation.isPending}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-1.5"
+                    onClick={() => { setShowAddConsult(false); setNewConsultDate(''); }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
                 </div>
               )}
             </CollapsibleContent>
