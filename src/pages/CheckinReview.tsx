@@ -89,6 +89,9 @@ export default function CheckinReview() {
   const [editedFeedback, setEditedFeedback] = useState('');
   const [feedbackInitialized, setFeedbackInitialized] = useState(false);
   const [activeTab, setActiveTab] = useState('responses');
+  const [showTargetRaceForm, setShowTargetRaceForm] = useState(false);
+  const [newTargetRace, setNewTargetRace] = useState('');
+  const [newTargetDeadline, setNewTargetDeadline] = useState('');
 
   // Fetch check-in response
   const { data: checkinResponse, isLoading: loadingResponse } = useQuery({
