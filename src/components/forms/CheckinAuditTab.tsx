@@ -45,6 +45,8 @@ export function CheckinAuditTab() {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [specificDate, setSpecificDate] = useState<Date | undefined>(undefined);
   const [page, setPage] = useState(0);
+  const [evolutionClientId, setEvolutionClientId] = useState<string | null>(null);
+  const [evolutionClientName, setEvolutionClientName] = useState('');
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
