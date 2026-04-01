@@ -13,12 +13,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
 import { useConsultationStats } from '@/hooks/useAthleteSummary';
 import { Client } from '@/hooks/useClients';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 interface AthleteSummaryConsultCardProps {
   client: Client;
