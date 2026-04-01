@@ -89,7 +89,27 @@ const questionPatterns = {
   weeklyScore: /nota.*daria.*semana/i,
 };
 
-export function CheckinEvolutionCharts({ responses, questions }: Props) {
+export function CheckinEvolutionCharts({ responses, questions, clientName, clientId }: Props) {
+  // Fetch target race if clientId provided
+  const { data: targetRace } = useQuery({
+    queryKey: ['target-race-chart', clientId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('athlete_profiles')
+        .select('target_race, target_deadline')
+        .eq('client_id', clientId!)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!clientId,
+  });
+
+  const raceCountdown = useMemo(() => {
+    if (!targetRace?.target_deadline) return null;
+    const days = differenceInCalendarDays(new Date(targetRace.target_deadline), new Date());
+    return days;
+  }, [targetRace]);
+
   // Process data for charts
   const chartData = useMemo(() => {
     if (!responses.length || !questions.length) return [];
