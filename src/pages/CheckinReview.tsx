@@ -268,6 +268,38 @@ export default function CheckinReview() {
     onError: () => toast.error('Erro ao salvar prova alvo'),
   });
 
+  // Mutation to update weight response
+  const updateWeightMutation = useMutation({
+    mutationFn: async ({ questionId, newValue }: { questionId: string; newValue: string }) => {
+      if (!checkinResponse || !responseId) return;
+      const updatedResponses = { ...checkinResponse.responses };
+      const existing = updatedResponses[questionId];
+      if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+        updatedResponses[questionId] = { ...existing, answer: newValue };
+      } else {
+        updatedResponses[questionId] = newValue;
+      }
+      const { error } = await supabase
+        .from('checkin_responses')
+        .update({ responses: updatedResponses })
+        .eq('id', responseId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checkin_response', responseId] });
+      queryClient.invalidateQueries({ queryKey: ['checkin_responses', 'all', checkinResponse?.client_id] });
+      setEditingWeightQuestionId(null);
+      setEditedWeightValue('');
+      toast.success('Peso atualizado com sucesso!');
+    },
+    onError: () => toast.error('Erro ao atualizar peso'),
+  });
+
+  const isWeightQuestion = (text: string) => {
+    const lower = text.toLowerCase();
+    return lower.includes('peso') || lower.includes('weight') || lower.includes('kg');
+  };
+
   const openWhatsApp = () => {
     const phone = checkinResponse?.clients?.phone;
     if (!phone) {
