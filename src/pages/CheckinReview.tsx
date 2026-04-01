@@ -92,6 +92,8 @@ export default function CheckinReview() {
   const [showTargetRaceForm, setShowTargetRaceForm] = useState(false);
   const [newTargetRace, setNewTargetRace] = useState('');
   const [newTargetDeadline, setNewTargetDeadline] = useState('');
+  const [editingWeightQuestionId, setEditingWeightQuestionId] = useState<string | null>(null);
+  const [editedWeightValue, setEditedWeightValue] = useState('');
 
   // Fetch check-in response
   const { data: checkinResponse, isLoading: loadingResponse } = useQuery({
