@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClients } from '@/hooks/useClients';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,13 +15,14 @@ import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isSam
 import { ptBR } from 'date-fns/locale';
 import { 
   Loader2, Search, CheckCircle, Clock, AlertCircle,
-  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send, TrendingUp
+  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send, TrendingUp, Phone
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useNavigate } from 'react-router-dom';
 import { EvolutionAnalysisTab } from '@/components/checkin/EvolutionAnalysisTab';
+import { Separator } from '@/components/ui/separator';
 
 type AuditItem = {
   id: string;
