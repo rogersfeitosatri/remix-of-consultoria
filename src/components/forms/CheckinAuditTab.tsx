@@ -106,6 +106,38 @@ export function CheckinAuditTab() {
     staleTime: 60_000,
   });
 
+  // Fetch all responses for selected athlete evolution
+  const { data: evoResponses = [] } = useQuery({
+    queryKey: ['checkin-audit-evo-responses', evolutionClientId],
+    queryFn: async () => {
+      if (!evolutionClientId) return [];
+      const { data, error } = await supabase
+        .from('checkin_responses')
+        .select('*, checkin_forms (title)')
+        .eq('client_id', evolutionClientId)
+        .order('submitted_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!evolutionClientId,
+  });
+
+  const evoFormId = evoResponses[0]?.form_id;
+  const { data: evoQuestions = [] } = useQuery({
+    queryKey: ['checkin-audit-evo-questions', evoFormId],
+    queryFn: async () => {
+      if (!evoFormId) return [];
+      const { data, error } = await supabase
+        .from('checkin_questions')
+        .select('*')
+        .eq('form_id', evoFormId)
+        .order('order_index', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!evoFormId,
+  });
+
   const isLoading = responsesLoading || clientsLoading || feedbacksLoading || sendsLoading;
 
   const clientsMap = useMemo(() => {
