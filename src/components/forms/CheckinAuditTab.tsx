@@ -415,7 +415,20 @@ export function CheckinAuditTab() {
                     const client = clientsMap[item.client_id];
                     return (
                       <TableRow key={item.id}>
-                        <TableCell className="font-medium text-sm">{client?.name || '—'}</TableCell>
+                        <TableCell className="font-medium text-sm">
+                          <button
+                            className="text-left hover:text-primary hover:underline transition-colors flex items-center gap-1"
+                            onClick={() => {
+                              if (client) {
+                                setEvolutionClientId(client.id);
+                                setEvolutionClientName(client.name);
+                              }
+                            }}
+                          >
+                            {client?.name || '—'}
+                            <TrendingUp className="h-3 w-3 opacity-0 group-hover:opacity-100" />
+                          </button>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[10px]">
                             {client?.checkin_frequency === 'weekly' ? 'Sem' : client?.checkin_frequency === 'biweekly' ? 'Quin' : client?.checkin_frequency === 'monthly' ? 'Men' : '-'}
