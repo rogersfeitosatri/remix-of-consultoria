@@ -207,6 +207,8 @@ export function CheckinAuditTab() {
       })
       .filter(item => {
         if (statusFilter === 'all') return true;
+        if (statusFilter === 'responded') return item.type === 'response';
+        if (statusFilter === 'pending_review') return item.feedback_status === 'pending' || item.feedback_status === 'no_feedback';
         if (statusFilter === 'unanswered') return item.feedback_status === 'unanswered';
         return item.feedback_status === statusFilter;
       })
