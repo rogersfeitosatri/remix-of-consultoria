@@ -276,22 +276,24 @@ export function CheckinAuditTab() {
         <CardContent className="space-y-4">
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-muted/50 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <div className="text-xs text-muted-foreground">Respondidos</div>
-            </div>
-            <div className="bg-amber-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-amber-600">{stats.pendingReview}</div>
-              <div className="text-xs text-muted-foreground">Pendente Revisão</div>
-            </div>
-            <div className="bg-green-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.feedbackSent}</div>
-              <div className="text-xs text-muted-foreground">Feedback Enviado</div>
-            </div>
-            <div className="bg-red-500/10 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.unanswered}</div>
-              <div className="text-xs text-muted-foreground">Sem Resposta</div>
-            </div>
+            {([
+              { key: 'responded', label: 'Respondidos', value: stats.total, filterValue: 'responded', bg: 'bg-muted/50', text: '', ring: 'ring-foreground/20' },
+              { key: 'pending', label: 'Pendente Revisão', value: stats.pendingReview, filterValue: 'pending_review', bg: 'bg-amber-500/10', text: 'text-amber-600', ring: 'ring-amber-500' },
+              { key: 'sent', label: 'Feedback Enviado', value: stats.feedbackSent, filterValue: 'sent', bg: 'bg-green-500/10', text: 'text-green-600', ring: 'ring-green-500' },
+              { key: 'unanswered', label: 'Sem Resposta', value: stats.unanswered, filterValue: 'unanswered', bg: 'bg-red-500/10', text: 'text-red-600', ring: 'ring-red-500' },
+            ] as const).map(stat => {
+              const isActive = statusFilter === stat.filterValue;
+              return (
+                <button
+                  key={stat.key}
+                  onClick={() => setStatusFilter(isActive ? 'all' : stat.filterValue)}
+                  className={`${stat.bg} rounded-lg p-3 text-center cursor-pointer transition-all hover:scale-[1.03] ${isActive ? `ring-2 ${stat.ring} shadow-md` : ''}`}
+                >
+                  <div className={`text-2xl font-bold ${stat.text}`}>{stat.value}</div>
+                  <div className="text-xs text-muted-foreground">{stat.label}</div>
+                </button>
+              );
+            })}
           </div>
 
           {/* Filters */}
