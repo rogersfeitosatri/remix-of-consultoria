@@ -230,13 +230,31 @@ export function CheckinAuditTab() {
 
   useEffect(() => { setPage(0); }, [statusFilter, frequencyFilter, searchQuery, specificDate, currentMonth]);
 
+  const baseItemsForStats = useMemo(() => {
+    return auditItems
+      .filter(item => {
+        if (specificDate) return isSameDay(parseISO(item.date), specificDate);
+        return true;
+      })
+      .filter(item => {
+        if (frequencyFilter === 'all') return true;
+        const client = clientsMap[item.client_id];
+        return client?.checkin_frequency === frequencyFilter;
+      })
+      .filter(item => {
+        if (!searchQuery) return true;
+        const client = clientsMap[item.client_id];
+        return client?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      });
+  }, [auditItems, specificDate, frequencyFilter, searchQuery, clientsMap]);
+
   const stats = useMemo(() => {
-    const total = filteredItems.filter(i => i.type === 'response').length;
-    const pendingReview = filteredItems.filter(i => i.feedback_status === 'pending' || i.feedback_status === 'no_feedback').length;
-    const feedbackSent = filteredItems.filter(i => i.feedback_status === 'sent').length;
-    const unanswered = filteredItems.filter(i => i.feedback_status === 'unanswered').length;
+    const total = baseItemsForStats.filter(i => i.type === 'response').length;
+    const pendingReview = baseItemsForStats.filter(i => i.feedback_status === 'pending' || i.feedback_status === 'no_feedback').length;
+    const feedbackSent = baseItemsForStats.filter(i => i.feedback_status === 'sent').length;
+    const unanswered = baseItemsForStats.filter(i => i.feedback_status === 'unanswered').length;
     return { total, pendingReview, feedbackSent, unanswered };
-  }, [filteredItems]);
+  }, [baseItemsForStats]);
 
   const getStatusBadge = (status: AuditItem['feedback_status']) => {
     switch (status) {
