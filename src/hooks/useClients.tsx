@@ -598,6 +598,7 @@ export function useAddClient() {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
       queryClient.invalidateQueries({ queryKey: ['scheduled_checkins'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-checkin-schedules'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['meal-plan-status'] });
       queryClient.invalidateQueries({ queryKey: ['pending-meal-plans'] });
