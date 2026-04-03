@@ -186,7 +186,10 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
                   <SelectContent>
                     <SelectItem value="weekly">Semanal</SelectItem>
                     <SelectItem value="biweekly">Quinzenal</SelectItem>
+                    <SelectItem value="three_weeks">A cada 3 semanas</SelectItem>
                     <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="bimonthly">Bimestral</SelectItem>
+                    <SelectItem value="quarterly">Trimestral</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
