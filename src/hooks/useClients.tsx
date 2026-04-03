@@ -639,6 +639,7 @@ export function useUpdateClient() {
         dbUpdates.end_date !== undefined ||
         dbUpdates.first_consultation_date !== undefined ||
         dbUpdates.consultation_frequency !== undefined ||
+        dbUpdates.consultation_count !== undefined ||
         dbUpdates.has_consultations !== undefined ||
         dbUpdates.plan_duration !== undefined;
 
