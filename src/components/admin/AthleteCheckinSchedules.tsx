@@ -15,9 +15,13 @@ import { format } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 
 const FREQ_LABELS: Record<string, string> = {
+  daily: 'Diário (envio semanal)',
   weekly: 'Semanal',
   biweekly: 'Quinzenal',
+  three_weeks: 'A cada 3 semanas',
   monthly: 'Mensal',
+  bimonthly: 'Bimestral',
+  quarterly: 'Trimestral',
   custom: 'Personalizado',
 };
 
@@ -182,13 +186,16 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
                   <SelectContent>
                     <SelectItem value="weekly">Semanal</SelectItem>
                     <SelectItem value="biweekly">Quinzenal</SelectItem>
+                    <SelectItem value="three_weeks">A cada 3 semanas</SelectItem>
                     <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="bimonthly">Bimestral</SelectItem>
+                    <SelectItem value="quarterly">Trimestral</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            {(freqType === 'weekly' || freqType === 'biweekly') && (
+            {['weekly', 'biweekly', 'three_weeks'].includes(freqType) && (
               <div>
                 <Label>Dias da semana</Label>
                 <div className="flex gap-2 mt-1">

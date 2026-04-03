@@ -500,6 +500,47 @@ export function useAddClient() {
             console.error('Error creating checkin schedules:', checkinError);
           }
         }
+
+        // Auto-create dispatch schedule (athlete_checkin_schedules)
+        // Find the first active checkin form to use
+        const { data: activeForms } = await supabase
+          .from('checkin_forms')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .limit(1);
+
+        if (activeForms && activeForms.length > 0) {
+          // Map client frequency to dispatch frequency
+          const freqMap: Record<string, string> = {
+            daily: 'weekly',
+            weekly: 'weekly',
+            biweekly: 'biweekly',
+            three_weeks: 'three_weeks',
+            monthly: 'monthly',
+            bimonthly: 'bimonthly',
+            quarterly: 'quarterly',
+          };
+          const dispatchFreq = freqMap[client.checkin_frequency] || 'weekly';
+
+          const { error: dispatchError } = await supabase
+            .from('athlete_checkin_schedules')
+            .insert({
+              user_id: user.id,
+              client_id: client.id,
+              checkin_form_id: activeForms[0].id,
+              start_date: client.start_date,
+              frequency_type: dispatchFreq,
+              weekly_days: [1], // Monday
+              send_time: '07:00:00',
+              due_in_hours: 48,
+              is_active: true,
+            });
+
+          if (dispatchError) {
+            console.error('Error creating dispatch schedule:', dispatchError);
+          }
+        }
       }
 
       // CRITICAL: Create athlete_profile for the new client
@@ -682,6 +723,69 @@ export function useUpdateClient() {
               .insert(checkinSchedules);
           }
         }
+
+        // Sync dispatch schedule (athlete_checkin_schedules) frequency
+        const freqMap: Record<string, string> = {
+          daily: 'weekly',
+          weekly: 'weekly',
+          biweekly: 'biweekly',
+          three_weeks: 'three_weeks',
+          monthly: 'monthly',
+          bimonthly: 'bimonthly',
+          quarterly: 'quarterly',
+        };
+
+        if (updatedClient.has_checkin && updatedClient.checkin_frequency) {
+          const dispatchFreq = freqMap[updatedClient.checkin_frequency] || 'weekly';
+
+          // Check if dispatch schedule exists
+          const { data: existingSchedules } = await supabase
+            .from('athlete_checkin_schedules')
+            .select('id')
+            .eq('client_id', id);
+
+          if (existingSchedules && existingSchedules.length > 0) {
+            // Update existing schedule frequency
+            await supabase
+              .from('athlete_checkin_schedules')
+              .update({ 
+                frequency_type: dispatchFreq,
+                start_date: updatedClient.start_date,
+                is_active: true,
+              })
+              .eq('client_id', id);
+          } else {
+            // Create new dispatch schedule
+            const { data: activeForms } = await supabase
+              .from('checkin_forms')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('is_active', true)
+              .limit(1);
+
+            if (activeForms && activeForms.length > 0) {
+              await supabase
+                .from('athlete_checkin_schedules')
+                .insert({
+                  user_id: user.id,
+                  client_id: id,
+                  checkin_form_id: activeForms[0].id,
+                  start_date: updatedClient.start_date,
+                  frequency_type: dispatchFreq,
+                  weekly_days: [1],
+                  send_time: '07:00:00',
+                  due_in_hours: 48,
+                  is_active: true,
+                });
+            }
+          }
+        } else {
+          // Deactivate dispatch schedules if checkin disabled
+          await supabase
+            .from('athlete_checkin_schedules')
+            .update({ is_active: false })
+            .eq('client_id', id);
+        }
       }
 
       return data;
@@ -691,6 +795,7 @@ export function useUpdateClient() {
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
       queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules'] });
       queryClient.invalidateQueries({ queryKey: ['scheduled_checkins'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-checkin-schedules'] });
     },
   });
 }

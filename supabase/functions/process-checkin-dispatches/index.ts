@@ -16,6 +16,45 @@ function formatPhoneAsAccessCode(phone: string): string {
   return `+55 ${phone}`;
 }
 
+// Map frequency_type to interval in weeks
+function getFrequencyWeeks(frequencyType: string): number {
+  switch (frequencyType) {
+    case 'daily': return 1; // daily still sends weekly on Mondays
+    case 'weekly': return 1;
+    case 'biweekly': return 2;
+    case 'three_weeks': return 3;
+    case 'monthly': return 4;
+    case 'bimonthly': return 8;
+    case 'quarterly': return 12;
+    default: return 1;
+  }
+}
+
+function shouldSendForFrequency(
+  frequencyType: string,
+  currentDay: number,
+  weeklyDays: number[],
+  startDate: string,
+  now: Date
+): boolean {
+  const freqWeeks = getFrequencyWeeks(frequencyType);
+  
+  // Check if today is a valid send day
+  if (!weeklyDays.includes(currentDay)) return false;
+
+  if (freqWeeks === 1) {
+    // Weekly: send every week on the specified days
+    return true;
+  }
+
+  // For multi-week frequencies, calculate weeks since start
+  const start = new Date(startDate);
+  const weeksSinceStart = Math.floor(
+    (now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)
+  );
+  return weeksSinceStart % freqWeeks === 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -27,12 +66,11 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const now = new Date();
-    const currentDay = now.getDay(); // 0=Sun, 1=Mon...
+    const currentDay = now.getDay();
     const currentTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'America/Fortaleza' });
 
     console.log(`[process-checkin-dispatches] Running at ${now.toISOString()}, day=${currentDay}, time=${currentTime}`);
 
-    // Fetch active schedules with client end_date for plan expiry check
     const { data: schedules, error: sErr } = await supabase
       .from('athlete_checkin_schedules')
       .select(`
@@ -61,19 +99,16 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // ── PLAN EXPIRY / FREEZE GUARD ──
         const todayDate = now.toISOString().split('T')[0];
-        
-        // Skip frozen clients
+
         if (client.is_frozen) {
           console.log(`[process-checkin-dispatches] Skipping ${client.name}: plan is frozen`);
           skipped++;
           continue;
         }
-        
-        // Skip if client is inactive or plan has ended
+
         if (!client.is_active || (client.end_date && client.end_date < todayDate)) {
-          console.log(`[process-checkin-dispatches] Skipping ${client.name}: plan expired (end_date=${client.end_date}, is_active=${client.is_active})`);
+          console.log(`[process-checkin-dispatches] Skipping ${client.name}: plan expired`);
           await supabase
             .from('athlete_checkin_schedules')
             .update({ is_active: false })
@@ -82,37 +117,29 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Check if it's a valid send day
-        const weeklyDays = schedule.weekly_days || [1]; // default Monday
-        
-        let shouldSendToday = false;
-        
-        if (schedule.frequency_type === 'weekly') {
-          shouldSendToday = weeklyDays.includes(currentDay);
-        } else if (schedule.frequency_type === 'biweekly') {
-          // Send every 2 weeks on the specified days
-          const startDate = new Date(schedule.start_date);
-          const weeksSinceStart = Math.floor((now.getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
-          shouldSendToday = weeksSinceStart % 2 === 0 && weeklyDays.includes(currentDay);
-        } else if (schedule.frequency_type === 'monthly') {
-          // Send on the same day of month as start_date
-          const startDay = new Date(schedule.start_date).getDate();
-          shouldSendToday = now.getDate() === startDay;
-        }
+        // Use the unified frequency check
+        const weeklyDays = schedule.weekly_days || [1];
+        const shouldSendToday = shouldSendForFrequency(
+          schedule.frequency_type,
+          currentDay,
+          weeklyDays,
+          schedule.start_date,
+          now
+        );
 
         if (!shouldSendToday) {
           skipped++;
           continue;
         }
 
-        // Check send_time (allow 10min window)
+        // Check send_time
         const scheduleTime = schedule.send_time?.substring(0, 5) || '09:00';
         if (currentTime < scheduleTime) {
           skipped++;
           continue;
         }
 
-        // Idempotency: check if already dispatched today for this schedule
+        // Idempotency check
         const todayStr = now.toISOString().split('T')[0];
         const { data: existing } = await supabase
           .from('checkin_dispatches')
@@ -127,12 +154,10 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Calculate due_at
         const dueAt = schedule.due_in_hours
           ? new Date(now.getTime() + schedule.due_in_hours * 60 * 60 * 1000).toISOString()
           : schedule.due_at || null;
 
-        // Create dispatch record
         const { data: dispatch, error: dErr } = await supabase
           .from('checkin_dispatches')
           .insert({
@@ -152,7 +177,6 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Send via WhatsApp
         const codigoAcesso = formatPhoneAsAccessCode(client.phone);
         const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
 
@@ -176,7 +200,6 @@ Deno.serve(async (req) => {
             .update({ status: 'failed', error_message: whatsappError.message })
             .eq('id', dispatch.id);
         } else {
-          // Update schedule last_dispatched_at
           await supabase
             .from('athlete_checkin_schedules')
             .update({ last_dispatched_at: now.toISOString() })
@@ -184,8 +207,6 @@ Deno.serve(async (req) => {
         }
 
         dispatched++;
-
-        // Small delay
         await new Promise(r => setTimeout(r, 1000));
       } catch (err: any) {
         console.error(`[process-checkin-dispatches] Error processing schedule ${schedule.id}:`, err);
