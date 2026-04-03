@@ -652,6 +652,28 @@ export function useUpdateClient() {
       if (consultationFieldsChanged && user) {
         const updatedClient = data as Client;
 
+        // Recalculate consultation_count dynamically if frequency or duration changed
+        if (
+          (dbUpdates.consultation_frequency !== undefined || dbUpdates.plan_duration !== undefined) &&
+          updatedClient.has_consultations &&
+          updatedClient.consultation_frequency &&
+          updatedClient.consultation_frequency !== 'once'
+        ) {
+          const recalculatedCount = calculateConsultationCount(
+            updatedClient.plan_duration as any,
+            updatedClient.consultation_frequency as any
+          );
+
+          // Update consultation_count in DB if different
+          if (recalculatedCount !== updatedClient.consultation_count) {
+            await supabase
+              .from('clients')
+              .update({ consultation_count: recalculatedCount })
+              .eq('id', id);
+            updatedClient.consultation_count = recalculatedCount;
+          }
+        }
+
         // Delete only pending/future schedules — preserve completed history
         await supabase
           .from('consultation_schedules')
@@ -693,6 +715,30 @@ export function useUpdateClient() {
               .from('consultation_schedules')
               .insert(schedules);
           }
+
+          // Sync consultation_schedule_rules with updated cadence
+          const cadenceWeeks = updatedClient.consultation_frequency === 'six_weeks' ? 6 : 4;
+          const { data: existingRule } = await supabase
+            .from('consultation_schedule_rules')
+            .select('id')
+            .eq('client_id', id)
+            .maybeSingle();
+
+          if (existingRule) {
+            await supabase
+              .from('consultation_schedule_rules')
+              .update({
+                cadence_weeks: cadenceWeeks,
+                is_enabled: true,
+              })
+              .eq('client_id', id);
+          }
+        } else if (!updatedClient.has_consultations) {
+          // Disable consultation rules if consultations disabled
+          await supabase
+            .from('consultation_schedule_rules')
+            .update({ is_enabled: false })
+            .eq('client_id', id);
         }
       }
 
