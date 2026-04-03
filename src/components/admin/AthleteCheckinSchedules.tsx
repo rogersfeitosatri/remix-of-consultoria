@@ -195,7 +195,7 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
               </div>
             </div>
 
-            {(freqType === 'weekly' || freqType === 'biweekly') && (
+            {['weekly', 'biweekly', 'three_weeks'].includes(freqType) && (
               <div>
                 <Label>Dias da semana</Label>
                 <div className="flex gap-2 mt-1">
