@@ -15,9 +15,13 @@ import { format } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 
 const FREQ_LABELS: Record<string, string> = {
+  daily: 'Diário (envio semanal)',
   weekly: 'Semanal',
   biweekly: 'Quinzenal',
+  three_weeks: 'A cada 3 semanas',
   monthly: 'Mensal',
+  bimonthly: 'Bimestral',
+  quarterly: 'Trimestral',
   custom: 'Personalizado',
 };
 
