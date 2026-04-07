@@ -215,6 +215,13 @@ export function AthleteSummaryConsultCard({
   const scheduledSchedules = schedules.filter(s => s.status === 'scheduled');
   const completedSchedules = schedules.filter(s => s.status === 'completed');
 
+  // Last completed consultation date (from appointments)
+  const lastCompletedAppointment = completedAppointments.length > 0 ? completedAppointments[0] : null;
+  const lastConsultDate = lastCompletedAppointment?.appointment_date || stats?.lastCompletedAt || null;
+
+  // Next send link date from pipeline
+  const nextPendingSchedule = pendingSchedules.length > 0 ? pendingSchedules[0] : null;
+
   // Determine consultation frequency label
   const frequencyLabel = client.consultation_frequency === 'six_weeks' 
     ? 'a cada 6 semanas' 
@@ -222,11 +229,11 @@ export function AthleteSummaryConsultCard({
       ? 'mensal' 
       : 'única';
   
-  const daysSinceLastConsult = stats?.lastCompletedAt 
-    ? differenceInDays(today, parseISO(stats.lastCompletedAt))
+  const daysSinceLastConsult = lastConsultDate
+    ? differenceInDays(today, parseISO(lastConsultDate))
     : null;
-  const daysUntilNextConsult = nextAppointment
-    ? differenceInDays(parseISO(nextAppointment.appointment_date), today)
+  const daysUntilNextSend = nextPendingSchedule
+    ? differenceInDays(parseISO(nextPendingSchedule.send_link_date), today)
     : null;
 
   const handleSave = () => {
