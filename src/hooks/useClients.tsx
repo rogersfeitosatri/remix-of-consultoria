@@ -699,17 +699,72 @@ export function useUpdateClient() {
               updatedClient.last_consultation_index
             );
           }
-          // New clients (standard flow)
+          // New clients (standard flow) — use last completed consultation as anchor if available
           else if (updatedClient.first_consultation_date) {
-            schedules = generateConsultationSchedules(
-              user.id,
-              id,
-              updatedClient.first_consultation_date,
-              updatedClient.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
-              updatedClient.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
-              updatedClient.end_date,
-              updatedClient.consultation_count || 1
-            );
+            // Check for completed/confirmed consultations to use as anchor
+            const { data: completedSchedules } = await supabase
+              .from('consultation_schedules')
+              .select('scheduled_date, status')
+              .eq('client_id', id)
+              .in('status', ['completed', 'confirmed', 'scheduled'])
+              .order('scheduled_date', { ascending: false })
+              .limit(1);
+
+            const completedCount = await supabase
+              .from('consultation_schedules')
+              .select('id', { count: 'exact', head: true })
+              .eq('client_id', id)
+              .in('status', ['completed', 'confirmed', 'scheduled']);
+
+            const alreadyDone = completedCount.count || 0;
+            const remaining = (updatedClient.consultation_count || 1) - alreadyDone;
+
+            if (alreadyDone > 0 && completedSchedules && completedSchedules.length > 0 && remaining > 0) {
+              // Use last completed consultation as anchor for future schedules
+              const lastCompletedDate = completedSchedules[0].scheduled_date;
+              const anchorDate = parseISO(lastCompletedDate);
+              
+              const futureSchedules: typeof schedules = [];
+              let currentDate = anchorDate;
+              let generated = 0;
+              const planEnd = parseISO(updatedClient.end_date);
+
+              while (generated < remaining) {
+                let intervalEnd: Date;
+                if (updatedClient.consultation_frequency === 'monthly') {
+                  intervalEnd = addMonths(currentDate, 1);
+                } else {
+                  intervalEnd = addWeeks(currentDate, 6);
+                }
+
+                const sendDate = getFirstMondayAfter(intervalEnd);
+                if (sendDate > planEnd) break;
+
+                futureSchedules.push({
+                  client_id: id,
+                  user_id: user.id,
+                  scheduled_date: format(intervalEnd, 'yyyy-MM-dd'),
+                  send_link_date: format(sendDate, 'yyyy-MM-dd'),
+                  status: 'pending',
+                });
+
+                generated++;
+                currentDate = intervalEnd;
+              }
+
+              schedules = futureSchedules;
+            } else {
+              // No completed consultations — generate from first_consultation_date
+              schedules = generateConsultationSchedules(
+                user.id,
+                id,
+                updatedClient.first_consultation_date,
+                updatedClient.consultation_frequency as 'once' | 'monthly' | 'six_weeks',
+                updatedClient.plan_duration as 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks',
+                updatedClient.end_date,
+                updatedClient.consultation_count || 1
+              );
+            }
           }
 
           if (schedules.length > 0) {
