@@ -215,6 +215,13 @@ export function AthleteSummaryConsultCard({
   const scheduledSchedules = schedules.filter(s => s.status === 'scheduled');
   const completedSchedules = schedules.filter(s => s.status === 'completed');
 
+  // Last completed consultation date (from appointments)
+  const lastCompletedAppointment = completedAppointments.length > 0 ? completedAppointments[0] : null;
+  const lastConsultDate = lastCompletedAppointment?.appointment_date || stats?.lastCompletedAt || null;
+
+  // Next send link date from pipeline
+  const nextPendingSchedule = pendingSchedules.length > 0 ? pendingSchedules[0] : null;
+
   // Determine consultation frequency label
   const frequencyLabel = client.consultation_frequency === 'six_weeks' 
     ? 'a cada 6 semanas' 
@@ -222,11 +229,11 @@ export function AthleteSummaryConsultCard({
       ? 'mensal' 
       : 'única';
   
-  const daysSinceLastConsult = stats?.lastCompletedAt 
-    ? differenceInDays(today, parseISO(stats.lastCompletedAt))
+  const daysSinceLastConsult = lastConsultDate
+    ? differenceInDays(today, parseISO(lastConsultDate))
     : null;
-  const daysUntilNextConsult = nextAppointment
-    ? differenceInDays(parseISO(nextAppointment.appointment_date), today)
+  const daysUntilNextSend = nextPendingSchedule
+    ? differenceInDays(parseISO(nextPendingSchedule.send_link_date), today)
     : null;
 
   const handleSave = () => {
@@ -309,8 +316,8 @@ export function AthleteSummaryConsultCard({
               <Clock className="h-3 w-3" /> Última
             </p>
             <p className="text-sm font-medium">
-              {stats?.lastCompletedAt 
-                ? format(parseISO(stats.lastCompletedAt), "dd/MM/yy", { locale: ptBR })
+              {lastConsultDate
+                ? format(parseISO(lastConsultDate), "dd/MM/yy", { locale: ptBR })
                 : '—'}
             </p>
             {daysSinceLastConsult !== null && (
@@ -320,15 +327,18 @@ export function AthleteSummaryConsultCard({
           
           <div className="p-2.5 rounded-lg bg-muted/50">
             <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
-              <Calendar className="h-3 w-3" /> Próxima
+              <Send className="h-3 w-3" /> Próx. envio
             </p>
             <p className="text-sm font-medium">
-              {nextAppointment 
-                ? format(parseISO(nextAppointment.appointment_date), "dd/MM/yy", { locale: ptBR })
+              {nextPendingSchedule
+                ? format(parseISO(nextPendingSchedule.send_link_date), "dd/MM/yy", { locale: ptBR })
                 : '—'}
             </p>
-            {daysUntilNextConsult !== null && daysUntilNextConsult >= 0 && (
-              <p className="text-xs text-muted-foreground">em {daysUntilNextConsult}d</p>
+            {daysUntilNextSend !== null && daysUntilNextSend >= 0 && (
+              <p className="text-xs text-muted-foreground">em {daysUntilNextSend}d</p>
+            )}
+            {daysUntilNextSend !== null && daysUntilNextSend < 0 && (
+              <p className="text-xs text-destructive">atrasado {Math.abs(daysUntilNextSend)}d</p>
             )}
           </div>
         </div>
