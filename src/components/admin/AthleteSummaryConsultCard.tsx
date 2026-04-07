@@ -316,8 +316,8 @@ export function AthleteSummaryConsultCard({
               <Clock className="h-3 w-3" /> Última
             </p>
             <p className="text-sm font-medium">
-              {stats?.lastCompletedAt 
-                ? format(parseISO(stats.lastCompletedAt), "dd/MM/yy", { locale: ptBR })
+              {lastConsultDate
+                ? format(parseISO(lastConsultDate), "dd/MM/yy", { locale: ptBR })
                 : '—'}
             </p>
             {daysSinceLastConsult !== null && (
@@ -327,15 +327,18 @@ export function AthleteSummaryConsultCard({
           
           <div className="p-2.5 rounded-lg bg-muted/50">
             <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
-              <Calendar className="h-3 w-3" /> Próxima
+              <Send className="h-3 w-3" /> Próx. envio
             </p>
             <p className="text-sm font-medium">
-              {nextAppointment 
-                ? format(parseISO(nextAppointment.appointment_date), "dd/MM/yy", { locale: ptBR })
+              {nextPendingSchedule
+                ? format(parseISO(nextPendingSchedule.send_link_date), "dd/MM/yy", { locale: ptBR })
                 : '—'}
             </p>
-            {daysUntilNextConsult !== null && daysUntilNextConsult >= 0 && (
-              <p className="text-xs text-muted-foreground">em {daysUntilNextConsult}d</p>
+            {daysUntilNextSend !== null && daysUntilNextSend >= 0 && (
+              <p className="text-xs text-muted-foreground">em {daysUntilNextSend}d</p>
+            )}
+            {daysUntilNextSend !== null && daysUntilNextSend < 0 && (
+              <p className="text-xs text-destructive">atrasado {Math.abs(daysUntilNextSend)}d</p>
             )}
           </div>
         </div>
