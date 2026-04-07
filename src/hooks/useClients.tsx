@@ -642,7 +642,8 @@ export function useUpdateClient() {
         dbUpdates.consultation_frequency !== undefined ||
         dbUpdates.consultation_count !== undefined ||
         dbUpdates.has_consultations !== undefined ||
-        dbUpdates.plan_duration !== undefined;
+        dbUpdates.plan_duration !== undefined ||
+        dbUpdates.onboarding_type !== undefined;
 
       // Check if we need to regenerate checkin schedules
       const checkinFieldsChanged =
