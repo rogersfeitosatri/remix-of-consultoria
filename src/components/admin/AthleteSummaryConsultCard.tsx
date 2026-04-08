@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { differenceInDays, parseISO, format, isPast, isToday } from 'date-fns';
+import { differenceInDays, parseISO, format, isPast, isToday, addMonths, addWeeks, nextMonday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   CalendarCheck, Clock, Video, Calendar, Edit2, Save, X, 
   ListTodo, CheckCircle2, Send, Link2, AlertTriangle, ChevronDown, ChevronUp,
-  Plus, Trash2, RefreshCw, Pencil
+  Plus, Trash2, RefreshCw, Pencil, Zap
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +66,8 @@ export function AthleteSummaryConsultCard({
   const [showAddConsult, setShowAddConsult] = useState(false);
   const [newConsultDate, setNewConsultDate] = useState('');
   const [isSendingLink, setIsSendingLink] = useState<string | null>(null);
+  const [showConfirmConsult1, setShowConfirmConsult1] = useState(false);
+  const [confirmConsult1Date, setConfirmConsult1Date] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   // All appointments for this athlete
   const { data: appointments = [] } = useQuery({
@@ -179,6 +181,93 @@ export function AthleteSummaryConsultCard({
       toast.success('Consulta removida');
     },
     onError: () => toast.error('Erro ao remover consulta'),
+  });
+
+  // Confirm consultation 1 and generate remaining pipeline
+  const confirmAndGeneratePipelineMutation = useMutation({
+    mutationFn: async (anchorDate: string) => {
+      if (!user) throw new Error('Not authenticated');
+      const totalConsultations = client.consultation_count || 1;
+      const frequency = client.consultation_frequency as 'once' | 'monthly' | 'six_weeks';
+      const planEndDate = parseISO(client.end_date);
+      const anchor = parseISO(anchorDate);
+
+      // 1. Mark existing first schedule as completed, or create one
+      const existingFirst = schedules.find(s => s.status === 'pending');
+      if (existingFirst) {
+        await supabase
+          .from('consultation_schedules')
+          .update({ status: 'completed', scheduled_date: anchorDate, send_link_date: anchorDate, updated_at: new Date().toISOString() })
+          .eq('id', existingFirst.id);
+      } else {
+        await supabase
+          .from('consultation_schedules')
+          .insert({
+            client_id: client.id,
+            user_id: user.id,
+            scheduled_date: anchorDate,
+            send_link_date: anchorDate,
+            status: 'completed',
+          });
+      }
+
+      // 2. Generate remaining schedules
+      const existingCompleted = schedules.filter(s => s.status === 'completed').length;
+      const alreadyCompletedCount = existingCompleted + (existingFirst ? 0 : 1); // +1 for the one we just created/updated
+      const remaining = totalConsultations - alreadyCompletedCount;
+      
+      if (remaining <= 0 || frequency === 'once') return;
+
+      const newSchedules: Array<{ client_id: string; user_id: string; scheduled_date: string; send_link_date: string; status: string }> = [];
+      let currentBase = anchor;
+
+      for (let i = 0; i < remaining; i++) {
+        const intervalEnd = frequency === 'six_weeks'
+          ? addWeeks(currentBase, 6)
+          : addMonths(currentBase, 1);
+        
+        const sendDate = nextMonday(intervalEnd);
+        
+        if (sendDate > planEndDate) break;
+
+        newSchedules.push({
+          client_id: client.id,
+          user_id: user.id,
+          scheduled_date: format(sendDate, 'yyyy-MM-dd'),
+          send_link_date: format(sendDate, 'yyyy-MM-dd'),
+          status: 'pending',
+        });
+
+        currentBase = intervalEnd;
+      }
+
+      // Delete any remaining pending schedules that aren't the first one
+      const pendingIds = schedules
+        .filter(s => ['pending', 'sent', 'link_sent'].includes(s.status) && s.id !== existingFirst?.id)
+        .map(s => s.id);
+      
+      if (pendingIds.length > 0) {
+        await supabase
+          .from('consultation_schedules')
+          .delete()
+          .in('id', pendingIds);
+      }
+
+      if (newSchedules.length > 0) {
+        const { error } = await supabase
+          .from('consultation_schedules')
+          .insert(newSchedules);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
+      toast.success('Consulta 1 confirmada e pipeline gerado!');
+      setShowConfirmConsult1(false);
+    },
+    onError: (e: any) => toast.error('Erro: ' + e.message),
   });
 
   const handleResendLink = async (scheduleId: string) => {
@@ -386,7 +475,68 @@ export function AthleteSummaryConsultCard({
                 )}
               </div>
 
-              {schedules.length === 0 ? (
+              {/* Show confirm + generate button when pipeline is incomplete */}
+              {completedSchedules.length === 0 && schedules.length < (client.consultation_count || 1) && client.consultation_frequency !== 'once' && (
+                <div className="p-3 rounded-md border border-amber-500/30 bg-amber-500/5 space-y-2">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Zap className="h-4 w-4 text-amber-500 shrink-0" />
+                    <div>
+                      <p className="font-medium text-foreground">Pipeline incompleto</p>
+                      <p className="text-muted-foreground">
+                        {schedules.length}/{client.consultation_count} consultas no cronograma. Confirme a consulta 1 para gerar as demais automaticamente.
+                      </p>
+                    </div>
+                  </div>
+                  {!showConfirmConsult1 ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full h-7 text-xs gap-1.5 border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+                      onClick={() => setShowConfirmConsult1(true)}
+                    >
+                      <CheckCircle2 className="h-3 w-3" />
+                      Confirmar Consulta 1 e Gerar Pipeline
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] text-muted-foreground shrink-0">Data da consulta 1:</label>
+                        <Input
+                          type="date"
+                          value={confirmConsult1Date}
+                          onChange={e => setConfirmConsult1Date(e.target.value)}
+                          className="h-7 text-xs flex-1"
+                        />
+                      </div>
+                      <div className="flex gap-1.5">
+                        <Button 
+                          size="sm" 
+                          className="flex-1 h-7 text-xs gap-1"
+                          onClick={() => confirmAndGeneratePipelineMutation.mutate(confirmConsult1Date)}
+                          disabled={confirmAndGeneratePipelineMutation.isPending || !confirmConsult1Date}
+                        >
+                          {confirmAndGeneratePipelineMutation.isPending ? (
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3" />
+                          )}
+                          Confirmar e Gerar
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs"
+                          onClick={() => setShowConfirmConsult1(false)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {schedules.length === 0 && completedSchedules.length === 0 && (client.consultation_frequency === 'once' || (client.consultation_count || 0) <= 1) ? (
                 <div className="p-3 text-center text-xs text-muted-foreground border border-dashed rounded-md">
                   <AlertTriangle className="h-4 w-4 mx-auto mb-1 text-amber-500" />
                   <p>Nenhum cronograma gerado.</p>
