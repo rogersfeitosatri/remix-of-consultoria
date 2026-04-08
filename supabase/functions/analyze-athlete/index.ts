@@ -260,7 +260,6 @@ const ANALYSIS_SCHEMA = {
             required: ["meal_name", "food_groups"],
           },
         },
-      },
         daily_totals: {
           type: "object",
           description: "Totais diários aproximados do plano",
