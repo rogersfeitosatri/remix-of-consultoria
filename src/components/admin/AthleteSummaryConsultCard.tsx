@@ -66,6 +66,8 @@ export function AthleteSummaryConsultCard({
   const [showAddConsult, setShowAddConsult] = useState(false);
   const [newConsultDate, setNewConsultDate] = useState('');
   const [isSendingLink, setIsSendingLink] = useState<string | null>(null);
+  const [showConfirmConsult1, setShowConfirmConsult1] = useState(false);
+  const [confirmConsult1Date, setConfirmConsult1Date] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   // All appointments for this athlete
   const { data: appointments = [] } = useQuery({
