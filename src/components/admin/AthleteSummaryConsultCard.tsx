@@ -270,7 +270,7 @@ export function AthleteSummaryConsultCard({
     onError: (e: any) => toast.error('Erro: ' + e.message),
   });
 
-
+  const handleResendLink = async (scheduleId: string) => {
     try {
       setIsSendingLink(scheduleId);
       toast.loading('Enviando link...');
