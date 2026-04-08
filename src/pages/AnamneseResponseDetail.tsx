@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, Copy, FileText, Brain, CheckCircle, User, Mail, Calendar, RefreshCw, Download, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, Copy, FileText, Brain, CheckCircle, User, Mail, Calendar, RefreshCw, Download, UtensilsCrossed, TrendingUp, Apple, Target, AlertTriangle, Utensils, Pill, Activity } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
@@ -35,37 +36,19 @@ export default function AnamneseResponseDetail() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('respostas');
 
-  // Fetch the anamnese response with all related data
   const { data: responseData, isLoading, isError } = useQuery({
     queryKey: ['anamnese_response_detail', responseId],
     queryFn: async () => {
-      // First try to fetch with client data (for linked responses)
       const { data: response, error } = await supabase
         .from('anamnese_responses')
         .select(`
-          id,
-          client_id,
-          form_id,
-          responses,
-          submitted_at,
-          ai_analysis,
-          ai_analyzed_at,
-          respondent_name,
-          respondent_email,
-          clients (
-            id,
-            name,
-            email,
-            phone
-          ),
-          anamnese_forms (
-            id,
-            title
-          )
+          id, client_id, form_id, responses, submitted_at, ai_analysis, ai_analyzed_at,
+          respondent_name, respondent_email,
+          clients (id, name, email, phone),
+          anamnese_forms (id, title)
         `)
         .eq('id', responseId)
         .maybeSingle();
-
       if (error) throw error;
       return response;
     },
@@ -74,7 +57,6 @@ export default function AnamneseResponseDetail() {
     staleTime: 30000,
   });
 
-  // Fetch AI analysis from ai_analyses table
   const { data: aiAnalysisFromTable, isLoading: loadingAiAnalysis } = useQuery({
     queryKey: ['ai_analysis', responseData?.client_id],
     queryFn: async () => {
@@ -83,14 +65,12 @@ export default function AnamneseResponseDetail() {
         .select('*')
         .eq('client_id', responseData?.client_id)
         .maybeSingle();
-      
       if (error) throw error;
       return data;
     },
     enabled: !!responseData?.client_id,
   });
 
-  // Mutation to trigger AI analysis
   const analyzeAthleteMutation = useMutation({
     mutationFn: async () => {
       if (!responseData?.client_id) throw new Error('Client ID not found');
@@ -98,6 +78,7 @@ export default function AnamneseResponseDetail() {
         body: { clientId: responseData.client_id },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       return data;
     },
     onSuccess: () => {
@@ -118,131 +99,95 @@ export default function AnamneseResponseDetail() {
         .select('*')
         .eq('form_id', responseData?.form_id)
         .order('order_index', { ascending: true });
-
       if (error) throw error;
       return data as AnamneseQuestion[];
     },
     enabled: !!responseData?.form_id,
   });
 
-  // Group questions by section
   const groupedQuestions = questions.reduce((acc, q) => {
-    if (!acc[q.section]) {
-      acc[q.section] = [];
-    }
+    if (!acc[q.section]) acc[q.section] = [];
     acc[q.section].push(q);
     return acc;
   }, {} as Record<string, AnamneseQuestion[]>);
 
-  // Format answer for display
   const formatAnswer = (questionId: string, questionType: string): string => {
     const responses = responseData?.responses as Record<string, any> | null;
     if (!responses) return '(não respondeu)';
-
     let answer = responses[questionId];
-    
-    if (answer === undefined || answer === null || answer === '') {
-      return '(não respondeu)';
-    }
+    if (answer === undefined || answer === null || answer === '') return '(não respondeu)';
 
-    // Handle object with "answer" property (common format)
     if (typeof answer === 'object' && !Array.isArray(answer)) {
-      // Extract the actual answer value from { answer: "...", comment: "..." } structure
       if ('answer' in answer) {
         const mainAnswer = answer.answer;
         const comment = answer.comment;
-        
-        if (mainAnswer === undefined || mainAnswer === null || mainAnswer === '') {
-          return '(não respondeu)';
-        }
-        
-        let result = '';
-        
-        if (Array.isArray(mainAnswer)) {
-          result = mainAnswer.length > 0 ? mainAnswer.join(', ') : '(não respondeu)';
-        } else {
-          result = String(mainAnswer);
-        }
-        
-        // Append comment if exists
-        if (comment && String(comment).trim()) {
-          result += `\nObservação: ${comment}`;
-        }
-        
+        if (mainAnswer === undefined || mainAnswer === null || mainAnswer === '') return '(não respondeu)';
+        let result = Array.isArray(mainAnswer) ? (mainAnswer.length > 0 ? mainAnswer.join(', ') : '(não respondeu)') : String(mainAnswer);
+        if (comment && String(comment).trim()) result += `\nObservação: ${comment}`;
         return result;
       }
-      
-      // For other complex objects (like meal data), try to format nicely
       const entries = Object.entries(answer);
       if (entries.length === 0) return '(não respondeu)';
-      
-      return entries
-        .filter(([_, v]) => v !== null && v !== undefined && v !== '')
-        .map(([k, v]) => `${k}: ${v}`)
-        .join('\n') || '(não respondeu)';
+      return entries.filter(([_, v]) => v !== null && v !== undefined && v !== '').map(([k, v]) => `${k}: ${v}`).join('\n') || '(não respondeu)';
     }
-
-    if (Array.isArray(answer)) {
-      if (answer.length === 0) return '(não respondeu)';
-      return answer.join(', ');
-    }
-
+    if (Array.isArray(answer)) return answer.length === 0 ? '(não respondeu)' : answer.join(', ');
     return String(answer);
   };
 
-  // Copy all responses to clipboard
   const copyAllResponses = () => {
-    if (!responseData || !questions.length) {
-      toast.error('Nenhuma resposta para copiar');
-      return;
-    }
-
+    if (!responseData || !questions.length) { toast.error('Nenhuma resposta para copiar'); return; }
     const clientName = (responseData.clients as any)?.name || 'Atleta';
     const clientEmail = (responseData.clients as any)?.email || '';
     const submittedAt = format(parseISO(responseData.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-
     let textToCopy = `ANAMNESE - ${clientName}\n`;
     if (clientEmail) textToCopy += `Email: ${clientEmail}\n`;
-    textToCopy += `Data: ${submittedAt}\n`;
-    textToCopy += `${'='.repeat(50)}\n\n`;
-
-    const sections = Object.keys(groupedQuestions);
-    
-    sections.forEach((section, sectionIndex) => {
+    textToCopy += `Data: ${submittedAt}\n${'='.repeat(50)}\n\n`;
+    Object.entries(groupedQuestions).forEach(([section, sqs], si) => {
       textToCopy += `--- ${section} ---\n\n`;
-      
-      groupedQuestions[section].forEach((question, qIndex) => {
-        const answer = formatAnswer(question.id, question.question_type);
-        textToCopy += `Pergunta ${sectionIndex + 1}.${qIndex + 1}: ${question.question_text}\n`;
-        textToCopy += `Resposta: ${answer}\n\n`;
+      sqs.forEach((q, qi) => {
+        textToCopy += `Pergunta ${si + 1}.${qi + 1}: ${q.question_text}\nResposta: ${formatAnswer(q.id, q.question_type)}\n\n`;
       });
     });
-
     navigator.clipboard.writeText(textToCopy);
-    toast.success('Copiado ✅', {
-      description: 'Anamnese completa copiada para a área de transferência',
-    });
+    toast.success('Copiado ✅');
   };
 
-  // Meal-related section keywords
   const MEAL_KEYWORDS = ['refeição', 'refeições', 'refeicao', 'alimentação', 'alimentar', 'rotina alimentar', 'café', 'cafe', 'almoço', 'almoco', 'jantar', 'lanche', 'ceia', 'meal', 'breakfast', 'lunch', 'dinner', 'snack', 'supper'];
-
-  const isMealSection = (section: string) => {
-    const lower = section.toLowerCase();
-    return MEAL_KEYWORDS.some(kw => lower.includes(kw));
+  const isMealSection = (section: string) => MEAL_KEYWORDS.some(kw => section.toLowerCase().includes(kw));
+  const isMealQuestion = (text: string) => {
+    const kws = ['café da manhã', 'cafe da manha', 'almoço', 'almoco', 'jantar', 'lanche da manhã', 'lanche da tarde', 'ceia', 'pré-treino', 'pós-treino', 'refeição', 'o que come', 'o que costuma comer', 'rotina alimentar', 'descreva suas refeições', 'horário das refeições'];
+    return kws.some(kw => text.toLowerCase().includes(kw));
   };
 
-  const isMealQuestion = (questionText: string) => {
-    const lower = questionText.toLowerCase();
-    const mealQWords = ['café da manhã', 'cafe da manha', 'almoço', 'almoco', 'jantar', 'lanche da manhã', 'lanche da tarde', 'ceia', 'pré-treino', 'pós-treino', 'refeição', 'o que come', 'o que costuma comer', 'rotina alimentar', 'descreva suas refeições', 'horário das refeições'];
-    return mealQWords.some(kw => lower.includes(kw));
+  // Parse the structured AI analysis from raw_response
+  const getStructuredAnalysis = () => {
+    const analysis = aiAnalysisFromTable || (responseData?.ai_analysis as any);
+    if (!analysis) return null;
+
+    try {
+      // Try to parse raw_response first (new format)
+      if (analysis.raw_response) {
+        const parsed = typeof analysis.raw_response === 'string' ? JSON.parse(analysis.raw_response) : analysis.raw_response;
+        if (parsed.athlete_summary && parsed.carb_estimation && parsed.meal_plan) {
+          return { ...parsed, _isNewFormat: true, updated_at: analysis.updated_at };
+        }
+      }
+    } catch {}
+
+    // Fall back to old format
+    return {
+      _isNewFormat: false,
+      athlete_summary: analysis.diagnosis || '',
+      alerts: analysis.alerts || [],
+      energy_expenditure: analysis.energy_expenditure,
+      macronutrients: analysis.macronutrients,
+      caloric_deficit: analysis.caloric_deficit,
+      updated_at: analysis.updated_at,
+    };
   };
 
-  const generatePDF = (mode: 'complete' | 'meals') => {
-    if (!responseData || !questions.length) {
-      toast.error('Nenhuma resposta para exportar');
-      return;
-    }
+  const generatePDF = (mode: 'complete' | 'meals' | 'analysis') => {
+    if (!responseData) { toast.error('Nenhum dado para exportar'); return; }
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -256,48 +201,137 @@ export default function AnamneseResponseDetail() {
       doc.setTextColor(...color);
       const lines = doc.splitTextToSize(text, maxWidth);
       for (const line of lines) {
-        if (y > 275) {
-          doc.addPage();
-          y = 20;
-        }
+        if (y > 275) { doc.addPage(); y = 20; }
         doc.text(line, margin, y);
         y += size * 0.45;
       }
     };
-
     const addSpace = (px: number) => { y += px; };
+    const addSeparator = () => {
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, y, pageWidth - margin, y);
+      addSpace(8);
+    };
 
-    // Header
     const clientName = (responseData.clients as any)?.name || (responseData as any).respondent_name || 'Atleta';
     const submittedAt = format(parseISO(responseData.submitted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
 
+    if (mode === 'analysis') {
+      const sa = getStructuredAnalysis();
+      if (!sa) { toast.error('Análise não disponível'); return; }
+
+      addText('ANÁLISE NUTRICIONAL INTELIGENTE', 16, true, [30, 80, 60]);
+      addSpace(2);
+      addText(`Atleta: ${clientName} • ${submittedAt}`, 10, false, [100, 100, 100]);
+      addSpace(4);
+      addSeparator();
+
+      // 1. Summary
+      addText('1. RESUMO DO ATLETA', 13, true, [30, 80, 60]);
+      addSpace(3);
+      addText(sa.athlete_summary || '', 10);
+      addSpace(6);
+
+      // 2. Carb estimation
+      if (sa.carb_estimation) {
+        addText('2. ESTIMATIVA NUTRICIONAL ATUAL', 13, true, [30, 80, 60]);
+        addSpace(3);
+        addText(`CHO atual estimado: ~${sa.carb_estimation.current_cho_gkg} g/kg (${sa.carb_estimation.classification})`, 10, true);
+        if (sa.carb_estimation.current_protein_gkg) addText(`Proteína: ~${sa.carb_estimation.current_protein_gkg} g/kg`, 10);
+        if (sa.carb_estimation.current_fat_gkg) addText(`Gordura: ~${sa.carb_estimation.current_fat_gkg} g/kg`, 10);
+        if (sa.carb_estimation.estimated_kcal) addText(`Kcal estimada: ~${sa.carb_estimation.estimated_kcal} kcal/dia`, 10);
+        addSpace(2);
+        addText(sa.carb_estimation.reasoning, 9, false, [80, 80, 80]);
+        addSpace(6);
+      }
+
+      // 3. Progression
+      if (sa.carb_progression) {
+        addText('3. PROGRESSÃO DE CARBOIDRATOS', 13, true, [30, 80, 60]);
+        addSpace(3);
+        addText(`Atual: ${sa.carb_progression.current} g/kg → Próximo: ${sa.carb_progression.next_target} → Meta: ${sa.carb_progression.final_goal} g/kg`, 10, true);
+        addText(`Incremento: ${sa.carb_progression.increment}`, 10);
+        addText(sa.carb_progression.rationale, 9, false, [80, 80, 80]);
+        addSpace(6);
+      }
+
+      // 4. Meal plan
+      if (sa.meal_plan?.meals) {
+        addText('4. PLANO ALIMENTAR', 13, true, [30, 80, 60]);
+        addSpace(3);
+        for (const meal of sa.meal_plan.meals) {
+          addText(meal.meal_name, 11, true);
+          for (const fg of meal.food_groups || []) {
+            addText(`  ${fg.group}: ${fg.options}`, 10);
+          }
+          if (meal.timing_note) addText(`  ⏰ ${meal.timing_note}`, 9, false, [100, 100, 100]);
+          addSpace(3);
+        }
+        addSpace(4);
+      }
+
+      // 5. Orientations
+      if (sa.strategic_orientations) {
+        addText('5. ORIENTAÇÕES ESTRATÉGICAS', 13, true, [30, 80, 60]);
+        addSpace(3);
+        if (sa.strategic_orientations.meal_routine?.length) {
+          addText('Rotina Alimentar:', 10, true);
+          sa.strategic_orientations.meal_routine.forEach((o: string) => addText(`• ${o}`, 9));
+          addSpace(3);
+        }
+        if (sa.strategic_orientations.training_strategy?.length) {
+          addText('Estratégia para Treino:', 10, true);
+          sa.strategic_orientations.training_strategy.forEach((o: string) => addText(`• ${o}`, 9));
+          addSpace(3);
+        }
+        if (sa.strategic_orientations.supplementation?.length) {
+          addText('Suplementação:', 10, true);
+          sa.strategic_orientations.supplementation.forEach((s: any) => addText(`• ${s.supplement}: ${s.recommendation}`, 9));
+          addSpace(3);
+        }
+        if (sa.strategic_orientations.race_context) {
+          addText('Contexto da Prova:', 10, true);
+          addText(sa.strategic_orientations.race_context, 9);
+        }
+        addSpace(4);
+      }
+
+      // 6. Alerts
+      if (sa.alerts?.length) {
+        addText('6. ALERTAS IMPORTANTES', 13, true, [180, 80, 30]);
+        addSpace(3);
+        sa.alerts.forEach((a: string) => addText(`⚠ ${a}`, 10));
+      }
+
+      addSpace(8);
+      addSeparator();
+      addText('Rogers Feitosa - Nutrição & Treinamento', 8, false, [150, 150, 150]);
+
+      const safeName = clientName.replace(/[^a-zA-Z0-9À-ÿ ]/g, '').replace(/\s+/g, '_');
+      doc.save(`analise_nutricional_${safeName}.pdf`);
+      toast.success('PDF da análise baixado!');
+      return;
+    }
+
+    // Original PDF modes (complete / meals)
+    if (!questions.length) { toast.error('Nenhuma resposta para exportar'); return; }
     addText(mode === 'complete' ? 'ANAMNESE COMPLETA' : 'ROTINA ALIMENTAR', 18, true, [30, 80, 60]);
     addSpace(4);
     addText(`Atleta: ${clientName}`, 12, true);
     addText(`Data: ${submittedAt}`, 10, false, [100, 100, 100]);
     addSpace(2);
+    addSeparator();
 
-    // Separator line
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, y, pageWidth - margin, y);
-    addSpace(8);
-
-    const sections = Object.keys(groupedQuestions);
-
-    sections.forEach(section => {
-      const sectionQuestions = groupedQuestions[section];
-
+    Object.entries(groupedQuestions).forEach(([section, sqs]) => {
       if (mode === 'meals') {
         const sectionIsMeal = isMealSection(section);
-        const mealQs = sectionQuestions.filter(q => sectionIsMeal || isMealQuestion(q.question_text));
+        const mealQs = sqs.filter(q => sectionIsMeal || isMealQuestion(q.question_text));
         if (mealQs.length === 0) return;
-
         addText(section, 13, true, [30, 80, 60]);
         addSpace(4);
-
-        mealQs.forEach(question => {
-          const answer = formatAnswer(question.id, question.question_type);
-          addText(question.question_text, 10, true);
+        mealQs.forEach(q => {
+          const answer = formatAnswer(q.id, q.question_type);
+          addText(q.question_text, 10, true);
           addText(answer, 10, false, answer === '(não respondeu)' ? [160, 160, 160] : [33, 33, 33]);
           addSpace(5);
         });
@@ -305,10 +339,9 @@ export default function AnamneseResponseDetail() {
       } else {
         addText(section, 13, true, [30, 80, 60]);
         addSpace(4);
-
-        sectionQuestions.forEach(question => {
-          const answer = formatAnswer(question.id, question.question_type);
-          addText(question.question_text, 10, true);
+        sqs.forEach(q => {
+          const answer = formatAnswer(q.id, q.question_type);
+          addText(q.question_text, 10, true);
           addText(answer, 10, false, answer === '(não respondeu)' ? [160, 160, 160] : [33, 33, 33]);
           addSpace(5);
         });
@@ -316,11 +349,8 @@ export default function AnamneseResponseDetail() {
       }
     });
 
-    // Footer
     addSpace(6);
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, y, pageWidth - margin, y);
-    addSpace(6);
+    addSeparator();
     addText('Rogers Feitosa - Nutrição & Treinamento', 8, false, [150, 150, 150]);
 
     const suffix = mode === 'complete' ? 'completa' : 'refeicoes';
@@ -354,15 +384,23 @@ export default function AnamneseResponseDetail() {
     );
   }
 
-  // Handle both linked (with client) and unlinked (with respondent_name) responses
   const client = responseData.clients as any;
   const respondentName = (responseData as any).respondent_name;
   const respondentEmail = (responseData as any).respondent_email;
   const displayName = client?.name || respondentName || 'Anônimo';
   const displayEmail = client?.email || respondentEmail || null;
   const form = responseData.anamnese_forms as any;
-  // Use AI analysis from dedicated table (priority) or from response field
-  const aiAnalysis = aiAnalysisFromTable || (responseData.ai_analysis as any);
+  const structuredAnalysis = getStructuredAnalysis();
+
+  const choClassColor = (c: string) => {
+    switch (c) {
+      case 'Baixa': return 'text-red-600 bg-red-500/10 border-red-500/20';
+      case 'Moderada': return 'text-yellow-600 bg-yellow-500/10 border-yellow-500/20';
+      case 'Adequada': return 'text-green-600 bg-green-500/10 border-green-500/20';
+      case 'Alta': return 'text-blue-600 bg-blue-500/10 border-blue-500/20';
+      default: return 'text-muted-foreground bg-muted border-border';
+    }
+  };
 
   return (
     <Layout>
@@ -401,12 +439,18 @@ export default function AnamneseResponseDetail() {
                   <UtensilsCrossed className="h-4 w-4 text-primary" />
                   Apenas Refeições
                 </DropdownMenuItem>
+                {structuredAnalysis && (
+                  <DropdownMenuItem onClick={() => generatePDF('analysis')} className="gap-2 cursor-pointer">
+                    <Brain className="h-4 w-4 text-primary" />
+                    Análise + Plano Alimentar
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
 
-        {/* Client Info Card */}
+        {/* Client Info */}
         <Card>
           <CardContent className="pt-6">
             <div className="flex flex-wrap gap-6">
@@ -414,9 +458,7 @@ export default function AnamneseResponseDetail() {
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span className="font-medium">{displayName}</span>
                 {!client && respondentName && (
-                  <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-xs">
-                    Não vinculado
-                  </Badge>
+                  <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-xs">Não vinculado</Badge>
                 )}
               </div>
               {displayEmail && (
@@ -427,15 +469,13 @@ export default function AnamneseResponseDetail() {
               )}
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">
-                  {format(parseISO(responseData.submitted_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                </span>
+                <span className="text-muted-foreground">{format(parseISO(responseData.submitted_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
               </div>
               <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Concluída
               </Badge>
-              {aiAnalysis && (
+              {structuredAnalysis && (
                 <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20">
                   <Brain className="h-3 w-3 mr-1" />
                   Análise IA disponível
@@ -455,7 +495,7 @@ export default function AnamneseResponseDetail() {
             <TabsTrigger value="ia" className="gap-2">
               <Brain className="h-4 w-4" />
               Análise da IA
-              {!aiAnalysis && !loadingAiAnalysis && <span className="text-xs ml-1">(gerar)</span>}
+              {!structuredAnalysis && !loadingAiAnalysis && <span className="text-xs ml-1">(gerar)</span>}
             </TabsTrigger>
           </TabsList>
 
@@ -466,9 +506,7 @@ export default function AnamneseResponseDetail() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle>Respostas Originais</CardTitle>
-                    <CardDescription>
-                      Todas as perguntas e respostas exatamente como o atleta respondeu
-                    </CardDescription>
+                    <CardDescription>Todas as perguntas e respostas exatamente como o atleta respondeu</CardDescription>
                   </div>
                   <Button variant="outline" size="sm" onClick={copyAllResponses} className="gap-2">
                     <Copy className="h-4 w-4" />
@@ -486,16 +524,11 @@ export default function AnamneseResponseDetail() {
                           {sectionQuestions.map((question, index) => {
                             const answer = formatAnswer(question.id, question.question_type);
                             const isEmpty = answer === '(não respondeu)';
-                            
                             return (
                               <div key={question.id} className="space-y-2">
-                                <p className="font-medium text-foreground">
-                                  {index + 1}. {question.question_text}
-                                </p>
+                                <p className="font-medium text-foreground">{index + 1}. {question.question_text}</p>
                                 <div className={`p-3 rounded-lg ${isEmpty ? 'bg-muted/50' : 'bg-primary/5 border border-primary/10'}`}>
-                                  <p className={`${isEmpty ? 'text-muted-foreground italic' : 'text-foreground'} whitespace-pre-wrap`}>
-                                    {answer}
-                                  </p>
+                                  <p className={`${isEmpty ? 'text-muted-foreground italic' : 'text-foreground'} whitespace-pre-wrap`}>{answer}</p>
                                 </div>
                               </div>
                             );
@@ -503,7 +536,6 @@ export default function AnamneseResponseDetail() {
                         </div>
                       </div>
                     ))}
-
                     {Object.keys(groupedQuestions).length === 0 && (
                       <div className="text-center py-8 text-muted-foreground">
                         <p>Nenhuma pergunta encontrada para este formulário</p>
@@ -517,130 +549,307 @@ export default function AnamneseResponseDetail() {
 
           {/* AI Analysis Tab */}
           <TabsContent value="ia" className="mt-6">
-            {aiAnalysis ? (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Brain className="h-5 w-5 text-blue-500" />
-                        Análise da Inteligência Artificial
-                      </CardTitle>
-                      <CardDescription>
-                        Análise gerada automaticamente baseada nas respostas do atleta
-                        {aiAnalysis.updated_at && (
-                          <span className="block mt-1">
-                            Analisada em {format(parseISO(aiAnalysis.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                          </span>
-                        )}
-                      </CardDescription>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => analyzeAthleteMutation.mutate()}
-                      disabled={analyzeAthleteMutation.isPending}
-                      className="gap-2"
-                    >
-                      {analyzeAthleteMutation.isPending ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                          Analisando...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4" />
-                          Reanalisar
-                        </>
-                      )}
-                    </Button>
+            {structuredAnalysis ? (
+              <div className="space-y-6">
+                {/* Header with reanalyze */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-blue-500" />
+                      Análise Nutricional Inteligente
+                    </h2>
+                    {structuredAnalysis.updated_at && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Gerada em {format(parseISO(structuredAnalysis.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                    )}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[500px] pr-4">
-                    <div className="space-y-6">
-                      {aiAnalysis.diagnosis && (
-                        <div>
-                          <h4 className="font-semibold mb-2">Diagnóstico</h4>
-                          <p className="text-muted-foreground whitespace-pre-wrap">{aiAnalysis.diagnosis}</p>
-                        </div>
-                      )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => analyzeAthleteMutation.mutate()}
+                    disabled={analyzeAthleteMutation.isPending}
+                    className="gap-2"
+                  >
+                    {analyzeAthleteMutation.isPending ? (
+                      <><RefreshCw className="h-4 w-4 animate-spin" />Analisando...</>
+                    ) : (
+                      <><RefreshCw className="h-4 w-4" />Reanalisar</>
+                    )}
+                  </Button>
+                </div>
 
-                      {aiAnalysis.alerts && aiAnalysis.alerts.length > 0 && (
+                {/* 1. RESUMO */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <User className="h-4 w-4 text-primary" />
+                      1. Resumo Inteligente do Atleta
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{structuredAnalysis.athlete_summary}</p>
+                  </CardContent>
+                </Card>
+
+                {/* 2. ESTIMATIVA NUTRICIONAL */}
+                {structuredAnalysis.carb_estimation && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Apple className="h-4 w-4 text-primary" />
+                        2. Estimativa Nutricional Atual
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <p className="text-2xl font-bold text-primary">~{structuredAnalysis.carb_estimation.current_cho_gkg}</p>
+                          <p className="text-xs text-muted-foreground">CHO (g/kg)</p>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-muted/50">
+                          <Badge className={`${choClassColor(structuredAnalysis.carb_estimation.classification)} text-sm`}>
+                            {structuredAnalysis.carb_estimation.classification}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground mt-1">Classificação</p>
+                        </div>
+                        {structuredAnalysis.carb_estimation.current_protein_gkg && (
+                          <div className="text-center p-3 rounded-lg bg-muted/50">
+                            <p className="text-2xl font-bold">~{structuredAnalysis.carb_estimation.current_protein_gkg}</p>
+                            <p className="text-xs text-muted-foreground">PTN (g/kg)</p>
+                          </div>
+                        )}
+                        {structuredAnalysis.carb_estimation.estimated_kcal && (
+                          <div className="text-center p-3 rounded-lg bg-muted/50">
+                            <p className="text-2xl font-bold">~{structuredAnalysis.carb_estimation.estimated_kcal}</p>
+                            <p className="text-xs text-muted-foreground">kcal/dia</p>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground italic">{structuredAnalysis.carb_estimation.reasoning}</p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* 3. PROGRESSÃO DE CHO */}
+                {structuredAnalysis.carb_progression && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                        3. Estratégia de Progressão de Carboidratos
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-3 mb-4 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <div className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-center">
+                            <p className="text-lg font-bold text-red-600">{structuredAnalysis.carb_progression.current}</p>
+                            <p className="text-[10px] text-red-600">g/kg atual</p>
+                          </div>
+                          <span className="text-muted-foreground">→</span>
+                          <div className="px-4 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-center">
+                            <p className="text-lg font-bold text-yellow-600">{structuredAnalysis.carb_progression.next_target}</p>
+                            <p className="text-[10px] text-yellow-600">g/kg próximo</p>
+                          </div>
+                          <span className="text-muted-foreground">→</span>
+                          <div className="px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-center">
+                            <p className="text-lg font-bold text-green-600">{structuredAnalysis.carb_progression.final_goal}</p>
+                            <p className="text-[10px] text-green-600">g/kg meta</p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          Incremento: {structuredAnalysis.carb_progression.increment}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground italic">{structuredAnalysis.carb_progression.rationale}</p>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* 4. PLANO ALIMENTAR */}
+                {structuredAnalysis.meal_plan?.meals && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Utensils className="h-4 w-4 text-primary" />
+                        4. Plano Alimentar Estruturado
+                      </CardTitle>
+                      <CardDescription>Baseado nos alimentos que o atleta já consome</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {structuredAnalysis.meal_plan.meals.map((meal: any, i: number) => (
+                          <div key={i} className="p-4 rounded-lg border bg-card">
+                            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                              <UtensilsCrossed className="h-3.5 w-3.5 text-primary" />
+                              {meal.meal_name}
+                            </h4>
+                            <div className="space-y-1.5">
+                              {(meal.food_groups || []).map((fg: any, j: number) => (
+                                <div key={j} className="flex gap-2 text-sm">
+                                  <span className="font-medium text-primary min-w-[90px]">{fg.group}:</span>
+                                  <span className="text-muted-foreground">{fg.options}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {meal.timing_note && (
+                              <p className="text-xs text-muted-foreground mt-2 italic">⏰ {meal.timing_note}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* 5. ORIENTAÇÕES ESTRATÉGICAS */}
+                {structuredAnalysis.strategic_orientations && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Target className="h-4 w-4 text-primary" />
+                        5. Orientações Estratégicas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      {structuredAnalysis.strategic_orientations.meal_routine?.length > 0 && (
                         <div>
-                          <h4 className="font-semibold mb-2">Alertas</h4>
-                          <ul className="space-y-2">
-                            {aiAnalysis.alerts.map((alert: string, i: number) => (
-                              <li key={i} className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                                <span className="text-yellow-500">⚠️</span>
-                                <span>{alert}</span>
+                          <h5 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                            <Activity className="h-3.5 w-3.5" />
+                            Rotina Alimentar
+                          </h5>
+                          <ul className="space-y-1.5">
+                            {structuredAnalysis.strategic_orientations.meal_routine.map((o: string, i: number) => (
+                              <li key={i} className="text-sm text-muted-foreground flex gap-2">
+                                <span className="text-primary mt-0.5">•</span>
+                                <span>{o}</span>
                               </li>
                             ))}
                           </ul>
                         </div>
                       )}
 
-                      {aiAnalysis.energy_expenditure && (
+                      {structuredAnalysis.strategic_orientations.training_strategy?.length > 0 && (
                         <div>
-                          <h4 className="font-semibold mb-2">Gasto Energético</h4>
-                          <div className="p-4 rounded-lg bg-muted/50">
-                            <pre className="text-sm whitespace-pre-wrap">
-                              {JSON.stringify(aiAnalysis.energy_expenditure, null, 2)}
-                            </pre>
+                          <Separator className="mb-4" />
+                          <h5 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                            <TrendingUp className="h-3.5 w-3.5" />
+                            Estratégia para Treino
+                          </h5>
+                          <ul className="space-y-1.5">
+                            {structuredAnalysis.strategic_orientations.training_strategy.map((o: string, i: number) => (
+                              <li key={i} className="text-sm text-muted-foreground flex gap-2">
+                                <span className="text-primary mt-0.5">•</span>
+                                <span>{o}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {structuredAnalysis.strategic_orientations.supplementation?.length > 0 && (
+                        <div>
+                          <Separator className="mb-4" />
+                          <h5 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                            <Pill className="h-3.5 w-3.5" />
+                            Suplementação
+                          </h5>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {structuredAnalysis.strategic_orientations.supplementation.map((s: any, i: number) => (
+                              <div key={i} className="p-3 rounded-lg bg-muted/50 border">
+                                <p className="text-sm font-medium">{s.supplement}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">{s.recommendation}</p>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
 
-                      {aiAnalysis.macronutrients && (
+                      {structuredAnalysis.strategic_orientations.race_context && (
                         <div>
-                          <h4 className="font-semibold mb-2">Macronutrientes</h4>
-                          <div className="p-4 rounded-lg bg-muted/50">
-                            <pre className="text-sm whitespace-pre-wrap">
-                              {JSON.stringify(aiAnalysis.macronutrients, null, 2)}
-                            </pre>
-                          </div>
+                          <Separator className="mb-4" />
+                          <h5 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                            <Target className="h-3.5 w-3.5" />
+                            Contexto da Prova
+                          </h5>
+                          <p className="text-sm text-muted-foreground">{structuredAnalysis.strategic_orientations.race_context}</p>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                )}
 
-                      {aiAnalysis.caloric_deficit && (
-                        <div>
-                          <h4 className="font-semibold mb-2">Déficit Calórico</h4>
+                {/* 6. ALERTAS */}
+                {structuredAnalysis.alerts?.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                        6. Alertas Importantes
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-2">
+                        {structuredAnalysis.alerts.map((alert: string, i: number) => (
+                          <li key={i} className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                            <span className="text-yellow-500 mt-0.5">⚠️</span>
+                            <span className="text-sm">{alert}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Old format fallback display */}
+                {!structuredAnalysis._isNewFormat && (
+                  <>
+                    {structuredAnalysis.energy_expenditure && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Gasto Energético</CardTitle>
+                        </CardHeader>
+                        <CardContent>
                           <div className="p-4 rounded-lg bg-muted/50">
-                            <pre className="text-sm whitespace-pre-wrap">
-                              {JSON.stringify(aiAnalysis.caloric_deficit, null, 2)}
-                            </pre>
+                            <pre className="text-sm whitespace-pre-wrap">{JSON.stringify(structuredAnalysis.energy_expenditure, null, 2)}</pre>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {structuredAnalysis.macronutrients && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Macronutrientes</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="p-4 rounded-lg bg-muted/50">
+                            <pre className="text-sm whitespace-pre-wrap">{JSON.stringify(structuredAnalysis.macronutrients, null, 2)}</pre>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                )}
+              </div>
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Brain className="h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Análise não disponível</h3>
                   <p className="text-muted-foreground text-center mb-4">
-                    Esta anamnese ainda não foi analisada pela IA.
-                    <br />
+                    Esta anamnese ainda não foi analisada pela IA.<br />
                     Clique no botão abaixo para gerar a análise automaticamente.
                   </p>
-                  <Button 
+                  <Button
                     onClick={() => analyzeAthleteMutation.mutate()}
                     disabled={analyzeAthleteMutation.isPending}
                     className="gap-2"
                   >
                     {analyzeAthleteMutation.isPending ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        Analisando...
-                      </>
+                      <><RefreshCw className="h-4 w-4 animate-spin" />Analisando...</>
                     ) : (
-                      <>
-                        <Brain className="h-4 w-4" />
-                        Gerar Análise com IA
-                      </>
+                      <><Brain className="h-4 w-4" />Gerar Análise com IA</>
                     )}
                   </Button>
                 </CardContent>
