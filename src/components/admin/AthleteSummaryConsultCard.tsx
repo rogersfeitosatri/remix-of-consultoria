@@ -475,7 +475,68 @@ export function AthleteSummaryConsultCard({
                 )}
               </div>
 
-              {schedules.length === 0 ? (
+              {/* Show confirm + generate button when pipeline is incomplete */}
+              {completedSchedules.length === 0 && schedules.length < (client.consultation_count || 1) && client.consultation_frequency !== 'once' && (
+                <div className="p-3 rounded-md border border-amber-500/30 bg-amber-500/5 space-y-2">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Zap className="h-4 w-4 text-amber-500 shrink-0" />
+                    <div>
+                      <p className="font-medium text-foreground">Pipeline incompleto</p>
+                      <p className="text-muted-foreground">
+                        {schedules.length}/{client.consultation_count} consultas no cronograma. Confirme a consulta 1 para gerar as demais automaticamente.
+                      </p>
+                    </div>
+                  </div>
+                  {!showConfirmConsult1 ? (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full h-7 text-xs gap-1.5 border-amber-500/30 text-amber-600 hover:bg-amber-500/10"
+                      onClick={() => setShowConfirmConsult1(true)}
+                    >
+                      <CheckCircle2 className="h-3 w-3" />
+                      Confirmar Consulta 1 e Gerar Pipeline
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] text-muted-foreground shrink-0">Data da consulta 1:</label>
+                        <Input
+                          type="date"
+                          value={confirmConsult1Date}
+                          onChange={e => setConfirmConsult1Date(e.target.value)}
+                          className="h-7 text-xs flex-1"
+                        />
+                      </div>
+                      <div className="flex gap-1.5">
+                        <Button 
+                          size="sm" 
+                          className="flex-1 h-7 text-xs gap-1"
+                          onClick={() => confirmAndGeneratePipelineMutation.mutate(confirmConsult1Date)}
+                          disabled={confirmAndGeneratePipelineMutation.isPending || !confirmConsult1Date}
+                        >
+                          {confirmAndGeneratePipelineMutation.isPending ? (
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="h-3 w-3" />
+                          )}
+                          Confirmar e Gerar
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs"
+                          onClick={() => setShowConfirmConsult1(false)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {schedules.length === 0 && completedSchedules.length === 0 && (client.consultation_frequency === 'once' || (client.consultation_count || 0) <= 1) ? (
                 <div className="p-3 text-center text-xs text-muted-foreground border border-dashed rounded-md">
                   <AlertTriangle className="h-4 w-4 mx-auto mb-1 text-amber-500" />
                   <p>Nenhum cronograma gerado.</p>
