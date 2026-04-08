@@ -264,8 +264,21 @@ export default function AnamneseResponseDetail() {
           for (const fg of meal.food_groups || []) {
             addText(`  ${fg.group}: ${fg.options}`, 10);
           }
+          if (meal.meal_macros) addText(`  📊 ${meal.meal_macros}`, 9, false, [80, 120, 80]);
           if (meal.timing_note) addText(`  ⏰ ${meal.timing_note}`, 9, false, [100, 100, 100]);
           addSpace(3);
+        }
+        if (sa.meal_plan.daily_totals) {
+          addSpace(3);
+          addSeparator();
+          addText('TOTAIS DIÁRIOS APROXIMADOS', 11, true, [30, 80, 60]);
+          addSpace(2);
+          const dt = sa.meal_plan.daily_totals;
+          addText(`Calorias: ~${dt.kcal} kcal`, 10, true);
+          addText(`Carboidratos: ~${dt.cho_g}g (${dt.cho_gkg} g/kg)`, 10);
+          addText(`Proteínas: ~${dt.protein_g}g${dt.protein_gkg ? ` (${dt.protein_gkg} g/kg)` : ''}`, 10);
+          addText(`Gorduras: ~${dt.fat_g}g`, 10);
+          addSeparator();
         }
         addSpace(4);
       }
@@ -442,7 +455,7 @@ export default function AnamneseResponseDetail() {
                 {structuredAnalysis && (
                   <DropdownMenuItem onClick={() => generatePDF('analysis')} className="gap-2 cursor-pointer">
                     <Brain className="h-4 w-4 text-primary" />
-                    Análise + Plano Alimentar
+                    Plano Alimentar IA
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
