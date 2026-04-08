@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { differenceInDays, parseISO, format, isPast, isToday } from 'date-fns';
+import { differenceInDays, parseISO, format, isPast, isToday, addMonths, addWeeks, nextMonday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   CalendarCheck, Clock, Video, Calendar, Edit2, Save, X, 
   ListTodo, CheckCircle2, Send, Link2, AlertTriangle, ChevronDown, ChevronUp,
-  Plus, Trash2, RefreshCw, Pencil
+  Plus, Trash2, RefreshCw, Pencil, Zap
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
