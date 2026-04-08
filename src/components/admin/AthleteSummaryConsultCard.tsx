@@ -181,7 +181,94 @@ export function AthleteSummaryConsultCard({
     onError: () => toast.error('Erro ao remover consulta'),
   });
 
-  const handleResendLink = async (scheduleId: string) => {
+  // Confirm consultation 1 and generate remaining pipeline
+  const confirmAndGeneratePipelineMutation = useMutation({
+    mutationFn: async (anchorDate: string) => {
+      if (!user) throw new Error('Not authenticated');
+      const totalConsultations = client.consultation_count || 1;
+      const frequency = client.consultation_frequency as 'once' | 'monthly' | 'six_weeks';
+      const planEndDate = parseISO(client.end_date);
+      const anchor = parseISO(anchorDate);
+
+      // 1. Mark existing first schedule as completed, or create one
+      const existingFirst = schedules.find(s => s.status === 'pending');
+      if (existingFirst) {
+        await supabase
+          .from('consultation_schedules')
+          .update({ status: 'completed', scheduled_date: anchorDate, send_link_date: anchorDate, updated_at: new Date().toISOString() })
+          .eq('id', existingFirst.id);
+      } else {
+        await supabase
+          .from('consultation_schedules')
+          .insert({
+            client_id: client.id,
+            user_id: user.id,
+            scheduled_date: anchorDate,
+            send_link_date: anchorDate,
+            status: 'completed',
+          });
+      }
+
+      // 2. Generate remaining schedules
+      const existingCompleted = schedules.filter(s => s.status === 'completed').length;
+      const alreadyCompletedCount = existingCompleted + (existingFirst ? 0 : 1); // +1 for the one we just created/updated
+      const remaining = totalConsultations - alreadyCompletedCount;
+      
+      if (remaining <= 0 || frequency === 'once') return;
+
+      const newSchedules: Array<{ client_id: string; user_id: string; scheduled_date: string; send_link_date: string; status: string }> = [];
+      let currentBase = anchor;
+
+      for (let i = 0; i < remaining; i++) {
+        const intervalEnd = frequency === 'six_weeks'
+          ? addWeeks(currentBase, 6)
+          : addMonths(currentBase, 1);
+        
+        const sendDate = nextMonday(intervalEnd);
+        
+        if (sendDate > planEndDate) break;
+
+        newSchedules.push({
+          client_id: client.id,
+          user_id: user.id,
+          scheduled_date: format(sendDate, 'yyyy-MM-dd'),
+          send_link_date: format(sendDate, 'yyyy-MM-dd'),
+          status: 'pending',
+        });
+
+        currentBase = intervalEnd;
+      }
+
+      // Delete any remaining pending schedules that aren't the first one
+      const pendingIds = schedules
+        .filter(s => ['pending', 'sent', 'link_sent'].includes(s.status) && s.id !== existingFirst?.id)
+        .map(s => s.id);
+      
+      if (pendingIds.length > 0) {
+        await supabase
+          .from('consultation_schedules')
+          .delete()
+          .in('id', pendingIds);
+      }
+
+      if (newSchedules.length > 0) {
+        const { error } = await supabase
+          .from('consultation_schedules')
+          .insert(newSchedules);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
+      toast.success('Consulta 1 confirmada e pipeline gerado!');
+      setShowConfirmConsult1(false);
+    },
+    onError: (e: any) => toast.error('Erro: ' + e.message),
+  });
+
+
     try {
       setIsSendingLink(scheduleId);
       toast.loading('Enviando link...');
