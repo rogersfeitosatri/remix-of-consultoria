@@ -6,7 +6,6 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -14,74 +13,43 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase configuration is missing');
-    }
-
-    if (!openaiApiKey) {
-      throw new Error('OPENAI_API_KEY is not configured');
-    }
+    if (!supabaseUrl || !supabaseServiceKey) throw new Error('Supabase configuration is missing');
+    if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     const { clientId } = await req.json();
-
-    if (!clientId) {
-      throw new Error('clientId is required');
-    }
+    if (!clientId) throw new Error('clientId is required');
 
     console.log('Analyzing athlete for client:', clientId);
 
-    // Fetch client data first (required)
     const { data: client, error: clientError } = await supabase
       .from('clients')
       .select('*')
       .eq('id', clientId)
       .single();
 
-    if (clientError || !client) {
-      console.error('Error fetching client:', clientError);
-      throw new Error('Failed to fetch client data');
-    }
+    if (clientError || !client) throw new Error('Failed to fetch client data');
 
-    // Fetch athlete profile (optional - some athletes only have anamnese)
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from('athlete_profiles')
       .select('*')
       .eq('client_id', clientId)
       .maybeSingle();
 
-    if (profileError) {
-      console.error('Error fetching profile (non-critical):', profileError);
-    }
-
-    // Fetch anamnese responses (dynamic form) - this is the main source of data
-    const { data: anamneseResponses, error: anamneseError } = await supabase
+    const { data: anamneseResponses } = await supabase
       .from('anamnese_responses')
-      .select(`
-        *,
-        anamnese_forms!inner (
-          title,
-          user_id
-        )
-      `)
+      .select(`*, anamnese_forms!inner (title, user_id)`)
       .eq('client_id', clientId)
       .order('submitted_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (anamneseError) {
-      console.error('Error fetching anamnese:', anamneseError);
-    }
-
-    // Must have either profile or anamnese responses
     if (!profile && !anamneseResponses) {
       throw new Error('Nenhum dado encontrado para análise. O atleta precisa ter preenchido a anamnese ou ter um perfil cadastrado.');
     }
 
-    // Fetch anamnese questions if we have responses
     let anamneseQuestions: any[] = [];
     if (anamneseResponses?.form_id) {
       const { data: questions } = await supabase
@@ -89,82 +57,66 @@ Deno.serve(async (req) => {
         .select('id, question_text, section')
         .eq('form_id', anamneseResponses.form_id)
         .order('order_index', { ascending: true });
-      
       anamneseQuestions = questions || [];
     }
 
-    console.log('Client:', client.name);
-    console.log('Profile found:', !!profile);
-    console.log('Anamnese responses found:', !!anamneseResponses);
-
-    // Build the prompt for ChatGPT
     const prompt = buildAnalysisPrompt(profile, client, anamneseResponses, anamneseQuestions);
 
-    console.log('Sending request to Lovable AI...');
+    console.log('Sending request to Lovable AI Gateway...');
 
-    // Call Lovable AI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
+        'Authorization': `Bearer ${lovableApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'google/gemini-2.5-pro',
         messages: [
           {
             role: 'system',
-            content: `Você é um nutricionista esportivo funcional especializado em corredores, baseando suas análises no Tratado de Nutrição Esportiva Funcional (Paschoal & Naves).
-
-Princípios: Individualidade bioquímica, Teia de Interconexões Metabólicas (Assimilação, Defesa/Reparo, Energia, Biotransformação, Transporte, Comunicação, Integridade Estrutural, Mental/Emocional), Sistema ATMS.
-Considere hipersensibilidades alimentares (IgG), modulação do NFκ-B, suporte intestinal, energia mitocondrial, biotransformação hepática.
-Suplementação: ômega-3, vitamina D3, zinco, magnésio, CoQ10, glutamina, colágeno, BCAA conforme necessidade individual.
-
-Analise os dados do atleta e forneça uma análise estruturada em JSON com os seguintes campos:
-- diagnosis: string com diagnóstico detalhado da situação atual do atleta (considere aspectos funcionais)
-- energy_expenditure: objeto com { bmr: number (TMB), tdee: number (GET), training_expenditure: number (gasto treino), formula_used: string }
-- caloric_deficit: objeto com { recommended_deficit: number (kcal), target_calories: number, deficit_percentage: number, timeline_weeks: number }
-- macronutrients: objeto com { protein_g_kg: number, carbs_g_kg: number, fat_g_kg: number, protein_total: number, carbs_total: number, fat_total: number }
-- alerts: array de strings com alertas importantes e recomendações baseadas em nutrição funcional
-
-Responda APENAS com o JSON válido, sem markdown ou texto adicional.`
+            content: SYSTEM_PROMPT,
           },
+          { role: 'user', content: prompt }
+        ],
+        tools: [
           {
-            role: 'user',
-            content: prompt
+            type: "function",
+            function: {
+              name: "submit_athlete_analysis",
+              description: "Submit the complete structured nutritional analysis for the athlete",
+              parameters: ANALYSIS_SCHEMA,
+            }
           }
         ],
-        max_completion_tokens: 2000,
+        tool_choice: { type: "function", function: { name: "submit_athlete_analysis" } },
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Lovable AI API error:', response.status, errorText);
-      throw new Error(`Lovable AI API error: ${response.status}`);
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns minutos." }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Créditos insuficientes. Adicione créditos ao workspace." }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const errText = await response.text();
+      console.error('AI gateway error:', response.status, errText);
+      throw new Error(`AI error: ${response.status}`);
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall) throw new Error("AI did not return structured data");
 
-    console.log('Lovable AI response received');
+    const analysisData = JSON.parse(toolCall.function.arguments);
+    console.log('AI analysis received with sections:', Object.keys(analysisData));
 
-    let analysisData;
-    try {
-      // Remove markdown code blocks if present
-      let cleanResponse = aiResponse.trim();
-      if (cleanResponse.startsWith('```json')) {
-        cleanResponse = cleanResponse.replace(/^```json\n?/, '').replace(/\n?```$/, '');
-      } else if (cleanResponse.startsWith('```')) {
-        cleanResponse = cleanResponse.replace(/^```\n?/, '').replace(/\n?```$/, '');
-      }
-      analysisData = JSON.parse(cleanResponse);
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', aiResponse);
-      throw new Error('Failed to parse AI analysis response');
-    }
-
-    // Check if analysis already exists for this client
+    // Map to DB columns - store the new structured analysis in diagnosis (text) + raw_response (full JSON)
     const { data: existingAnalysis } = await supabase
       .from('ai_analyses')
       .select('id')
@@ -174,46 +126,42 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`
     const analysisRecord = {
       client_id: clientId,
       athlete_profile_id: profile?.id || null,
-      diagnosis: analysisData.diagnosis,
-      energy_expenditure: analysisData.energy_expenditure,
-      caloric_deficit: analysisData.caloric_deficit,
-      macronutrients: analysisData.macronutrients,
+      diagnosis: analysisData.athlete_summary || '',
+      energy_expenditure: {
+        carb_estimation: analysisData.carb_estimation,
+        carb_progression: analysisData.carb_progression,
+      },
+      caloric_deficit: {
+        meal_plan: analysisData.meal_plan,
+      },
+      macronutrients: {
+        strategic_orientations: analysisData.strategic_orientations,
+      },
       alerts: analysisData.alerts || [],
-      raw_response: aiResponse,
-      model_used: 'google/gemini-3-flash-preview',
+      raw_response: JSON.stringify(analysisData),
+      model_used: 'google/gemini-2.5-pro',
     };
 
     let result;
     if (existingAnalysis) {
-      // Update existing analysis
       const { data: updated, error: updateError } = await supabase
         .from('ai_analyses')
         .update(analysisRecord)
         .eq('id', existingAnalysis.id)
         .select()
         .single();
-
-      if (updateError) {
-        console.error('Error updating analysis:', updateError);
-        throw new Error('Failed to update analysis');
-      }
+      if (updateError) throw new Error('Failed to update analysis');
       result = updated;
     } else {
-      // Insert new analysis
       const { data: inserted, error: insertError } = await supabase
         .from('ai_analyses')
         .insert(analysisRecord)
         .select()
         .single();
-
-      if (insertError) {
-        console.error('Error inserting analysis:', insertError);
-        throw new Error('Failed to save analysis');
-      }
+      if (insertError) throw new Error('Failed to save analysis');
       result = inserted;
     }
 
-    // Update client status
     await supabase
       .from('clients')
       .update({ athlete_status: 'analysis_complete' })
@@ -235,18 +183,130 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`
   }
 });
 
+const SYSTEM_PROMPT = `Você é um nutricionista esportivo funcional especializado em atletas de endurance (corrida, triathlon, ciclismo), baseando suas análises no Tratado de Nutrição Esportiva Funcional (Paschoal & Naves) e evidências científicas atuais.
+
+Sua tarefa é analisar a anamnese do atleta e gerar uma análise estruturada completa com foco em APLICAÇÃO PRÁTICA.
+
+REGRAS:
+- Linguagem simples, clara e direta
+- Foco em aplicação prática
+- Evitar blocos longos de texto
+- Priorizar leitura rápida
+- Usar os alimentos que o atleta JÁ consome para montar o plano
+- Sempre manter substituições na MESMA LINHA (ex: "pão francês ou tapioca ou cuscuz")
+- Considerar a prova alvo e tempo até ela para contextualizar estratégias
+- Basear estimativas de CHO nos alimentos relatados na anamnese`;
+
+const ANALYSIS_SCHEMA = {
+  type: "object",
+  properties: {
+    athlete_summary: {
+      type: "string",
+      description: "Resumo inteligente objetivo: modalidade, nível, objetivo principal, rotina de treinos, pontos de atenção comportamentais e alimentares. Máximo 6 linhas."
+    },
+    carb_estimation: {
+      type: "object",
+      description: "Estimativa nutricional atual baseada nos alimentos relatados",
+      properties: {
+        current_cho_gkg: { type: "number", description: "Estimativa atual de CHO em g/kg" },
+        classification: { type: "string", enum: ["Baixa", "Moderada", "Adequada", "Alta"], description: "Classificação da ingestão" },
+        current_protein_gkg: { type: "number", description: "Estimativa atual de proteína em g/kg" },
+        current_fat_gkg: { type: "number", description: "Estimativa atual de gordura em g/kg" },
+        estimated_kcal: { type: "number", description: "Estimativa de kcal total diária atual" },
+        reasoning: { type: "string", description: "Breve justificativa da estimativa baseada nos alimentos citados" },
+      },
+      required: ["current_cho_gkg", "classification", "reasoning"],
+    },
+    carb_progression: {
+      type: "object",
+      description: "Estratégia de progressão de carboidratos",
+      properties: {
+        current: { type: "number", description: "CHO atual estimado g/kg" },
+        next_target: { type: "string", description: "Próximo alvo (ex: 4.2–4.7 g/kg)" },
+        final_goal: { type: "number", description: "Meta final de CHO g/kg" },
+        increment: { type: "string", description: "Incremento sugerido (ex: +1 a +1.5 g/kg)" },
+        rationale: { type: "string", description: "Justificativa da progressão considerando objetivo e fase" },
+      },
+      required: ["current", "next_target", "final_goal", "increment", "rationale"],
+    },
+    meal_plan: {
+      type: "object",
+      description: "Plano alimentar baseado nos hábitos do atleta",
+      properties: {
+        meals: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              meal_name: { type: "string", description: "Nome da refeição (Café da manhã, Lanche da manhã, Almoço, Lanche da tarde, Jantar, Ceia)" },
+              food_groups: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    group: { type: "string", description: "Grupo alimentar (Carboidrato, Proteína, Gordura, Fruta, Vegetal, Fibra)" },
+                    options: { type: "string", description: "Opções separadas por 'ou' na mesma linha (ex: pão francês ou tapioca ou cuscuz)" },
+                  },
+                  required: ["group", "options"],
+                },
+              },
+              timing_note: { type: "string", description: "Nota sobre timing se relevante (pré-treino, pós-treino)" },
+            },
+            required: ["meal_name", "food_groups"],
+          },
+        },
+      },
+      required: ["meals"],
+    },
+    strategic_orientations: {
+      type: "object",
+      description: "Orientações estratégicas personalizadas",
+      properties: {
+        meal_routine: {
+          type: "array",
+          items: { type: "string" },
+          description: "Orientações sobre rotina alimentar (distribuição, ajustes pré/pós-treino, organização)"
+        },
+        training_strategy: {
+          type: "array",
+          items: { type: "string" },
+          description: "Estratégias para treino (CHO antes/durante/depois, ajuste por volume)"
+        },
+        supplementation: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              supplement: { type: "string", description: "Nome do suplemento" },
+              recommendation: { type: "string", description: "Recomendação contextualizada" },
+            },
+            required: ["supplement", "recommendation"],
+          },
+          description: "Sugestões de suplementação contextualizada"
+        },
+        race_context: { type: "string", description: "Contexto em relação à prova alvo (construção vs refinamento)" },
+      },
+      required: ["meal_routine", "training_strategy", "supplementation"],
+    },
+    alerts: {
+      type: "array",
+      items: { type: "string" },
+      description: "Alertas importantes e objetivos: baixa ingestão de CHO, proteína insuficiente, falta de estratégia em treinos longos, risco de baixa disponibilidade energética, etc."
+    },
+  },
+  required: ["athlete_summary", "carb_estimation", "carb_progression", "meal_plan", "strategic_orientations", "alerts"],
+  additionalProperties: false,
+};
+
 function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, anamneseQuestions: any[]): string {
   const mealDescription = (meal: any) => {
     if (!meal) return 'Não informado';
     return `Horário: ${meal.time || 'N/I'}, Local: ${meal.location || 'N/I'}, Alimentos: ${meal.foods || 'N/I'}`;
   };
 
-  // Build anamnese section from dynamic form responses
   let anamneseSection = '';
   if (anamneseResponses?.responses && anamneseQuestions.length > 0) {
-    anamneseSection = `
-### Respostas da Anamnese Dinâmica
-`;
+    anamneseSection = `\n### Respostas da Anamnese Dinâmica\n`;
     const responses = anamneseResponses.responses;
     const groupedBySection: Record<string, string[]> = {};
     
@@ -254,17 +314,13 @@ function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, 
       const response = responses[question.id];
       if (response) {
         const section = question.section || 'Geral';
-        if (!groupedBySection[section]) {
-          groupedBySection[section] = [];
-        }
+        if (!groupedBySection[section]) groupedBySection[section] = [];
         
         let answerText = '';
         if (typeof response === 'object' && response.answer !== undefined) {
           const answer = response.answer;
           answerText = Array.isArray(answer) ? answer.join(', ') : String(answer);
-          if (response.comment) {
-            answerText += ` (Comentário: ${response.comment})`;
-          }
+          if (response.comment) answerText += ` (Comentário: ${response.comment})`;
         } else {
           answerText = Array.isArray(response) ? response.join(', ') : String(response);
         }
@@ -278,114 +334,77 @@ function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, 
     }
   }
 
-  // If no profile exists, use only anamnese data
   if (!profile) {
-    return `
-## DADOS DO ATLETA CORREDOR
-### Dados Pessoais
-- Nome: ${client.name}
-- Email: ${client.email || 'Não informado'}
-- Telefone: ${client.phone || 'Não informado'}
-
-${anamneseSection}
-
-Por favor, analise esses dados da anamnese e forneça:
-1. Diagnóstico completo da situação atual do atleta (pontos de atenção, objetivos, possíveis riscos ou limitações)
-2. Estimativa de gasto energético (TMB, GET, gasto com treinos) - use valores estimados baseados nas informações disponíveis
-3. Déficit calórico adequado para corredor (considerando performance e recuperação)
-4. Sugestão de macronutrientes em g/kg de peso corporal
-5. Alertas importantes e recomendações específicas
-
-IMPORTANTE: Se alguma informação essencial (peso, altura, idade) não estiver disponível nas respostas, use valores médios para estimativas mas sinalize claramente nos alertas que são estimativas.
-`;
+    return `## DADOS DO ATLETA\n### Dados Pessoais\n- Nome: ${client.name}\n- Email: ${client.email || 'N/I'}\n- Telefone: ${client.phone || 'N/I'}\n- Prova Alvo: ${client.target_race || 'N/I'}\n${anamneseSection}\n\nIMPORTANTE: Se peso/altura não disponíveis, use estimativas e sinalize nos alertas.`;
   }
 
-  return `
-## DADOS DO ATLETA CORREDOR
-
+  return `## DADOS DO ATLETA
 ### Dados Pessoais
 - Nome: ${profile.full_name || client.name}
-- Gênero: ${profile.gender || 'Não informado'}
-- Data de Nascimento: ${profile.birth_date || 'Não informada'}
-- Cidade/Estado: ${profile.city_state || 'Não informado'}
-- Profissão: ${profile.profession || 'Não informada'}
+- Gênero: ${profile.gender || 'N/I'}
+- Data de Nascimento: ${profile.birth_date || 'N/I'}
+- Cidade/Estado: ${profile.city_state || 'N/I'}
+- Profissão: ${profile.profession || 'N/I'}
 
 ### Medidas Corporais
 - Peso Atual: ${profile.current_weight || 'N/I'} kg
 - Altura: ${profile.height || 'N/I'} cm
-- Peso Ideal (desejado): ${profile.ideal_weight || 'N/I'} kg
+- Peso Ideal: ${profile.ideal_weight || 'N/I'} kg
 - Maior Peso: ${profile.max_weight || 'N/I'} kg
 - Menor Peso Adulto: ${profile.min_adult_weight || 'N/I'} kg
-- Circunferência Cintura: ${profile.waist_circumference || 'N/I'} cm
-- Circunferência Quadril: ${profile.hip_circumference || 'N/I'} cm
+- Cintura: ${profile.waist_circumference || 'N/I'} cm
+- Quadril: ${profile.hip_circumference || 'N/I'} cm
 
-### Histórico de Corrida
+### Histórico Esportivo
 - Pratica Corrida: ${profile.practices_running || 'N/I'}
 - Tempo de Prática: ${profile.running_time || 'N/I'}
 - Frequência Semanal: ${profile.weekly_frequency || 'N/I'}
 - Volume Semanal: ${profile.weekly_volume_km || 'N/I'} km
-- Provas Participadas: ${profile.races_participated || 'N/I'}
-- Histórico de Lesões: ${profile.injury_history || 'N/I'}
+- Provas: ${profile.races_participated || 'N/I'}
+- Prova Alvo: ${profile.target_race || client.target_race || 'N/I'}
+- Lesões: ${profile.injury_history || 'N/I'}
 
 ### Objetivos
-- Objetivo Principal: ${profile.main_goal || 'N/I'}
-- Objetivo Secundário: ${profile.secondary_goal || 'N/I'}
+- Principal: ${profile.main_goal || 'N/I'}
+- Secundário: ${profile.secondary_goal || 'N/I'}
 - Meta Específica: ${profile.specific_target || 'N/I'}
 - Prazo: ${profile.target_deadline || 'N/I'}
 
-### Rotina e Trabalho
-- Horário de Trabalho: ${profile.work_schedule || 'N/I'}
-- Trabalho Sedentário: ${profile.sedentary_work || 'N/I'}
-- Horas Sentado por Dia: ${profile.hours_sitting || 'N/I'}
+### Rotina
+- Trabalho: ${profile.work_schedule || 'N/I'}
+- Sedentário: ${profile.sedentary_work || 'N/I'}
+- Horas sentado: ${profile.hours_sitting || 'N/I'}
 
 ### Sono e Estresse
-- Horas de Sono: ${profile.sleep_hours || 'N/I'}
-- Qualidade do Sono: ${profile.sleep_quality || 'N/I'}
-- Horário de Dormir: ${profile.bedtime || 'N/I'}
-- Horário de Acordar: ${profile.wake_time || 'N/I'}
-- Nível de Estresse: ${profile.stress_level || 'N/I'}
-- Causa do Estresse: ${profile.stress_cause || 'N/I'}
+- Sono: ${profile.sleep_hours || 'N/I'}h | Qualidade: ${profile.sleep_quality || 'N/I'}
+- Dormir: ${profile.bedtime || 'N/I'} | Acordar: ${profile.wake_time || 'N/I'}
+- Estresse: ${profile.stress_level || 'N/I'} - ${profile.stress_cause || 'N/I'}
 
-### Histórico de Dietas
-- Fez Dieta Antes: ${profile.previous_diets || 'N/I'}
-- Tipos de Dieta: ${profile.diet_types || 'N/I'}
-- Motivo de Parar: ${profile.diet_stop_reason || 'N/I'}
-- Acompanhamento Nutricional Atual: ${profile.nutritional_followup || 'N/I'}
+### Dietas Anteriores
+- Fez dieta: ${profile.previous_diets || 'N/I'} | Tipos: ${profile.diet_types || 'N/I'}
+- Motivo de parar: ${profile.diet_stop_reason || 'N/I'}
 
 ### Suplementação
-- Usa Suplementos: ${profile.uses_supplements || 'N/I'}
-- Suplementos Atuais: ${profile.current_supplements || 'N/I'}
-- Já Usou Suplementos: ${profile.used_supplements_before || 'N/I'}
-- Suplementos Passados: ${profile.past_supplements || 'N/I'}
+- Usa: ${profile.uses_supplements || 'N/I'} | Atuais: ${profile.current_supplements || 'N/I'}
+- Já usou: ${profile.used_supplements_before || 'N/I'} | Passados: ${profile.past_supplements || 'N/I'}
 
-### Função Intestinal
-- Funcionamento Intestinal: ${profile.intestinal_function || 'N/I'}
-- Frequência de Evacuação: ${profile.evacuation_frequency || 'N/I'}
-- Problemas Intestinais: ${JSON.stringify(profile.intestinal_problems) || 'N/I'}
+### Intestino
+- Função: ${profile.intestinal_function || 'N/I'} | Evacuação: ${profile.evacuation_frequency || 'N/I'}
 
-### Restrições Alimentares
-- Alergias Alimentares: ${profile.food_allergies || 'N/I'}
-- Intolerância à Lactose: ${profile.lactose_intolerance || 'N/I'}
-- Intolerância ao Glúten: ${profile.gluten_intolerance || 'N/I'}
-- Restrições Religiosas: ${profile.religious_restrictions || 'N/I'}
-- Alimentos que Não Gosta: ${profile.disliked_foods || 'N/I'}
-- Alimentos Favoritos: ${profile.favorite_foods || 'N/I'}
+### Restrições
+- Alergias: ${profile.food_allergies || 'N/I'}
+- Lactose: ${profile.lactose_intolerance || 'N/I'} | Glúten: ${profile.gluten_intolerance || 'N/I'}
+- Religiosas: ${profile.religious_restrictions || 'N/I'}
+- Não gosta: ${profile.disliked_foods || 'N/I'}
+- Favoritos: ${profile.favorite_foods || 'N/I'}
 
 ### Rotina Alimentar Atual
 - Café da Manhã: ${mealDescription(profile.meal_breakfast)}
-- Lanche da Manhã: ${profile.meal_morning_snack_enabled ? mealDescription(profile.meal_morning_snack) : 'Não faz'}
+- Lanche Manhã: ${profile.meal_morning_snack_enabled ? mealDescription(profile.meal_morning_snack) : 'Não faz'}
 - Almoço: ${mealDescription(profile.meal_lunch)}
-- Lanche da Tarde: ${profile.meal_afternoon_snack_enabled ? mealDescription(profile.meal_afternoon_snack) : 'Não faz'}
+- Lanche Tarde: ${profile.meal_afternoon_snack_enabled ? mealDescription(profile.meal_afternoon_snack) : 'Não faz'}
 - Jantar: ${mealDescription(profile.meal_dinner)}
 - Ceia: ${profile.meal_supper_enabled ? mealDescription(profile.meal_supper) : 'Não faz'}
-- Muda nos Finais de Semana: ${profile.weekend_changes || 'N/I'}
-- Descrição Fim de Semana: ${profile.weekend_description || 'N/I'}
-${anamneseSection}
-Por favor, analise esses dados e forneça:
-1. Diagnóstico completo da situação atual do atleta (pontos de atenção, objetivos, possíveis riscos ou limitações)
-2. Estimativa de gasto energético (TMB, GET, gasto com treinos)
-3. Déficit calórico adequado para corredor (considerando performance e recuperação)
-4. Sugestão de macronutrientes em g/kg de peso corporal
-5. Alertas importantes e recomendações específicas
-`;
+- Fim de semana: ${profile.weekend_changes || 'N/I'} - ${profile.weekend_description || 'N/I'}
+${anamneseSection}`;
 }
