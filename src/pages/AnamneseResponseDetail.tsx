@@ -264,8 +264,21 @@ export default function AnamneseResponseDetail() {
           for (const fg of meal.food_groups || []) {
             addText(`  ${fg.group}: ${fg.options}`, 10);
           }
+          if (meal.meal_macros) addText(`  📊 ${meal.meal_macros}`, 9, false, [80, 120, 80]);
           if (meal.timing_note) addText(`  ⏰ ${meal.timing_note}`, 9, false, [100, 100, 100]);
           addSpace(3);
+        }
+        if (sa.meal_plan.daily_totals) {
+          addSpace(3);
+          addSeparator();
+          addText('TOTAIS DIÁRIOS APROXIMADOS', 11, true, [30, 80, 60]);
+          addSpace(2);
+          const dt = sa.meal_plan.daily_totals;
+          addText(`Calorias: ~${dt.kcal} kcal`, 10, true);
+          addText(`Carboidratos: ~${dt.cho_g}g (${dt.cho_gkg} g/kg)`, 10);
+          addText(`Proteínas: ~${dt.protein_g}g${dt.protein_gkg ? ` (${dt.protein_gkg} g/kg)` : ''}`, 10);
+          addText(`Gorduras: ~${dt.fat_g}g`, 10);
+          addSeparator();
         }
         addSpace(4);
       }
@@ -442,7 +455,7 @@ export default function AnamneseResponseDetail() {
                 {structuredAnalysis && (
                   <DropdownMenuItem onClick={() => generatePDF('analysis')} className="gap-2 cursor-pointer">
                     <Brain className="h-4 w-4 text-primary" />
-                    Análise + Plano Alimentar
+                    Plano Alimentar IA
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -693,12 +706,29 @@ export default function AnamneseResponseDetail() {
                                 </div>
                               ))}
                             </div>
+                            {meal.meal_macros && (
+                              <p className="text-xs text-green-600 mt-2 font-medium">📊 {meal.meal_macros}</p>
+                            )}
                             {meal.timing_note && (
-                              <p className="text-xs text-muted-foreground mt-2 italic">⏰ {meal.timing_note}</p>
+                              <p className="text-xs text-muted-foreground mt-1 italic">⏰ {meal.timing_note}</p>
                             )}
                           </div>
                         ))}
                       </div>
+                      {structuredAnalysis.meal_plan.daily_totals && (
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                          <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                            <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                            Totais Diários Aproximados
+                          </h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div><span className="text-muted-foreground">Calorias:</span> <span className="font-semibold">~{structuredAnalysis.meal_plan.daily_totals.kcal} kcal</span></div>
+                            <div><span className="text-muted-foreground">CHO:</span> <span className="font-semibold">~{structuredAnalysis.meal_plan.daily_totals.cho_g}g ({structuredAnalysis.meal_plan.daily_totals.cho_gkg} g/kg)</span></div>
+                            <div><span className="text-muted-foreground">PTN:</span> <span className="font-semibold">~{structuredAnalysis.meal_plan.daily_totals.protein_g}g</span></div>
+                            <div><span className="text-muted-foreground">LIP:</span> <span className="font-semibold">~{structuredAnalysis.meal_plan.daily_totals.fat_g}g</span></div>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}

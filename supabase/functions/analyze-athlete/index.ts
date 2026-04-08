@@ -195,7 +195,11 @@ REGRAS:
 - Usar os alimentos que o atleta JÁ consome para montar o plano
 - Sempre manter substituições na MESMA LINHA (ex: "pão francês ou tapioca ou cuscuz")
 - Considerar a prova alvo e tempo até ela para contextualizar estratégias
-- Basear estimativas de CHO nos alimentos relatados na anamnese`;
+- Basear estimativas de CHO nos alimentos relatados na anamnese
+- O PLANO ALIMENTAR DEVE TER PORÇÕES E QUANTIDADES REAIS (gramas, ml, unidades) condizentes com os alvos de macros e calorias
+- Cada opção de alimento deve incluir a quantidade (ex: "2 fatias de pão francês (100g) ou 1 tapioca grande (80g) ou 1 cuscuz médio (120g)")
+- A soma das refeições deve fechar com o alvo calórico e de macronutrientes definido na progressão
+- Incluir ao final do plano um resumo dos totais aproximados de macros e calorias do dia`;
 
 const ANALYSIS_SCHEMA = {
   type: "object",
@@ -245,18 +249,32 @@ const ANALYSIS_SCHEMA = {
                   type: "object",
                   properties: {
                     group: { type: "string", description: "Grupo alimentar (Carboidrato, Proteína, Gordura, Fruta, Vegetal, Fibra)" },
-                    options: { type: "string", description: "Opções separadas por 'ou' na mesma linha (ex: pão francês ou tapioca ou cuscuz)" },
+                    options: { type: "string", description: "Opções COM PORÇÕES E QUANTIDADES separadas por 'ou' (ex: 2 fatias de pão francês (100g) ou 1 tapioca grande (80g) ou 1 cuscuz médio (120g))" },
                   },
                   required: ["group", "options"],
                 },
               },
+              meal_macros: { type: "string", description: "Resumo aproximado de macros da refeição (ex: ~45g CHO, ~25g PTN, ~10g LIP, ~370 kcal)" },
               timing_note: { type: "string", description: "Nota sobre timing se relevante (pré-treino, pós-treino)" },
             },
             required: ["meal_name", "food_groups"],
           },
         },
+        daily_totals: {
+          type: "object",
+          description: "Totais diários aproximados do plano",
+          properties: {
+            kcal: { type: "number", description: "Total de kcal" },
+            cho_g: { type: "number", description: "Total de CHO em gramas" },
+            cho_gkg: { type: "number", description: "CHO em g/kg" },
+            protein_g: { type: "number", description: "Total de proteína em gramas" },
+            protein_gkg: { type: "number", description: "Proteína em g/kg" },
+            fat_g: { type: "number", description: "Total de gordura em gramas" },
+          },
+          required: ["kcal", "cho_g", "cho_gkg", "protein_g", "fat_g"],
+        },
       },
-      required: ["meals"],
+      required: ["meals", "daily_totals"],
     },
     strategic_orientations: {
       type: "object",
