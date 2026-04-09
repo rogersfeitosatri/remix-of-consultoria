@@ -1,15 +1,9 @@
 import { Layout } from '@/components/layout/Layout';
 import { StatCard } from '@/components/dashboard/StatCard';
-
-import { PendingCheckinsAlert } from '@/components/dashboard/PendingCheckinsAlert';
-import { DietAdjustmentAlert } from '@/components/dashboard/DietAdjustmentAlert';
 import { GoogleOAuthAlert } from '@/components/dashboard/GoogleOAuthAlert';
-import { PendingMealPlansAlert } from '@/components/dashboard/PendingMealPlansAlert';
-import { PeriodizationPhaseAlert } from '@/components/dashboard/PeriodizationPhaseAlert';
+import { ActionCenterPanel } from '@/components/dashboard/ActionCenterPanel';
+import { DietAdjustmentAlert } from '@/components/dashboard/DietAdjustmentAlert';
 import { PeriodizationOverview } from '@/components/dashboard/PeriodizationOverview';
-import { UnresponsiveAthletesAlert } from '@/components/checkin/UnresponsiveAthletesAlert';
-import { MyDayTodayPanel } from '@/components/dashboard/MyDayTodayPanel';
-import { InactivityAlertsPanel } from '@/components/dashboard/InactivityAlertsPanel';
 import { WeeklyReportPanel } from '@/components/dashboard/WeeklyReportPanel';
 import { useClients, usePayments, getExpiringThisMonth } from '@/hooks/useClients';
 import { getMonthlyIncomeByPaidAt, getDueAmountInPeriod } from '@/hooks/useFinancialData';
@@ -22,26 +16,21 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
-  
 
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonth = today.getMonth();
-  
-  // Período do mês atual
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
 
   const activeClients = clients.filter(c => c.is_active);
   const expiringThisMonth = getExpiringThisMonth(clients, currentYear, currentMonth);
   
-  // Entradas do mês: apenas pagamentos com paid_at no mês atual
   const monthlyIncome = useMemo(() => 
     getMonthlyIncomeByPaidAt(payments, monthStart, monthEnd),
     [payments, monthStart, monthEnd]
   );
   
-  // Vencimentos do mês: pagamentos com due_date no mês atual (não pagos)
   const monthlyDue = useMemo(() =>
     getDueAmountInPeriod(payments, monthStart, monthEnd),
     [payments, monthStart, monthEnd]
@@ -61,18 +50,18 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+      <div className="space-y-4 sm:space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="mt-1 text-sm sm:text-base text-muted-foreground">Rogers Feitosa - Nutrição & Treinamento</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Visão geral e ações do dia</p>
           </div>
           <GoogleOAuthAlert />
         </div>
 
-        {/* Stats - Mobile: 2 columns (stacked look), Desktop: 4 columns */}
-        <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Stats */}
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Atletas Ativos"
             value={activeClients.length}
@@ -97,7 +86,7 @@ export default function Dashboard() {
             className="text-left transition-transform hover:scale-[1.02]"
           >
             <StatCard
-              title="Vencimentos do Mês"
+              title="Vencimentos"
               value={`R$ ${monthlyDue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
               subtitle="pendentes"
               icon={<CreditCard className="h-5 w-5 sm:h-6 sm:w-6" />}
@@ -113,22 +102,17 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* My Day Today */}
-        <MyDayTodayPanel />
+        {/* Action Center — replaces all scattered alerts */}
+        <ActionCenterPanel />
 
-        {/* Alerts Section */}
-        <div className="space-y-4">
-          <InactivityAlertsPanel />
-          <UnresponsiveAthletesAlert />
-          <PendingMealPlansAlert />
-          <PeriodizationPhaseAlert />
-          <PendingCheckinsAlert />
-          <DietAdjustmentAlert />
-        </div>
+        {/* Diet Adjustments — stays separate (has its own complex grouping) */}
+        <DietAdjustmentAlert />
 
         {/* Weekly Report + Periodization */}
-        <WeeklyReportPanel />
-        <PeriodizationOverview />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <WeeklyReportPanel />
+          <PeriodizationOverview />
+        </div>
       </div>
     </Layout>
   );

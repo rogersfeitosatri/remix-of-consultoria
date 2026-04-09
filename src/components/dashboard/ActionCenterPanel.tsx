@@ -1,0 +1,487 @@
+import { useState, useMemo } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+  AlertTriangle, Clock, CheckCircle, ChevronRight, Video, ExternalLink,
+  ListTodo, MessageSquare, UtensilsCrossed, UserX, Zap, CalendarCheck,
+  Target
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useMyDayToday } from '@/hooks/useMyDayToday';
+import { useInactivityAlerts } from '@/hooks/useInactivityAlerts';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { usePendingMealPlans, useUnlinkedAnamneseForMealPlan, useMarkMealPlanSent } from '@/hooks/useMealPlanStatus';
+import { formatDistanceToNow, parseISO, addDays, isWeekend, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
+
+function businessDaysSince(fromDate: Date): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(fromDate);
+  start.setHours(0, 0, 0, 0);
+  let count = 0;
+  let current = new Date(start);
+  while (current < today) {
+    current = addDays(current, 1);
+    if (!isWeekend(current)) count++;
+  }
+  return count;
+}
+
+export function ActionCenterPanel() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { data: dayData, isLoading: dayLoading } = useMyDayToday();
+  const { data: inactiveAthletes = [] } = useInactivityAlerts(14);
+  const { data: pendingPlans = [] } = usePendingMealPlans();
+  const { data: unlinkedAnamnese = [] } = useUnlinkedAnamneseForMealPlan();
+  const markAsSent = useMarkMealPlanSent();
+
+  // Unresponsive athletes
+  const { data: unresponsiveAthletes = [] } = useQuery({
+    queryKey: ['unresponsive-athletes-checkin', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data: dispatches } = await supabase
+        .from('checkin_dispatches')
+        .select('client_id, sent_at, status')
+        .eq('user_id', user.id)
+        .in('status', ['sent', 'pending'])
+        .order('sent_at', { ascending: false })
+        .limit(500);
+
+      if (!dispatches?.length) return [];
+
+      const byClient: Record<string, { count: number; lastSentAt: string }> = {};
+      for (const d of dispatches) {
+        if (!byClient[d.client_id]) byClient[d.client_id] = { count: 0, lastSentAt: d.sent_at };
+        byClient[d.client_id].count++;
+      }
+
+      const problematic = Object.entries(byClient)
+        .filter(([_, v]) => v.count >= 2)
+        .map(([clientId, v]) => ({ clientId, ...v }));
+
+      if (!problematic.length) return [];
+
+      const { data: clients } = await supabase
+        .from('clients')
+        .select('id, name, phone')
+        .in('id', problematic.map(p => p.clientId))
+        .eq('is_active', true);
+
+      const clientMap = new Map((clients || []).map(c => [c.id, { name: c.name, phone: c.phone }]));
+
+      return problematic
+        .filter(p => clientMap.has(p.clientId))
+        .map(p => ({
+          clientId: p.clientId,
+          clientName: clientMap.get(p.clientId)!.name,
+          phone: clientMap.get(p.clientId)!.phone,
+          missedCount: p.count,
+          lastSentAt: p.lastSentAt,
+        }))
+        .sort((a, b) => b.missedCount - a.missedCount);
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
+
+  // Pending checkin feedbacks
+  const { data: pendingCheckinFeedbacks = [] } = useQuery({
+    queryKey: ['pending_checkins_dashboard'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('checkin_feedbacks')
+        .select('id, checkin_response_id, status, created_at, clients(id, name), checkin_responses(submitted_at, checkin_forms(title))')
+        .in('status', ['pending', 'approved'])
+        .order('created_at', { ascending: false })
+        .limit(10);
+      return (data || []) as any[];
+    },
+    refetchInterval: 30000,
+  });
+
+  const appointments = dayData?.appointments || [];
+  const overdueTasks = dayData?.tasks.filter(t => t.is_overdue) || [];
+  const todayTasks = dayData?.tasks.filter(t => !t.is_overdue) || [];
+  const pendingCheckins = dayData?.pendingCheckins || [];
+  const urgentAthletes = dayData?.urgentAthletes || [];
+
+  // Count items per tab
+  const urgentCount = overdueTasks.length + unresponsiveAthletes.length + urgentAthletes.length;
+  const todayCount = appointments.length + todayTasks.length + pendingCheckins.length;
+  const pendingCount = pendingPlans.length + unlinkedAnamnese.length + pendingCheckinFeedbacks.length + inactiveAthletes.length;
+
+  const totalCount = urgentCount + todayCount + pendingCount;
+
+  const [activeTab, setActiveTab] = useState(() => {
+    if (urgentCount > 0) return 'urgent';
+    if (todayCount > 0) return 'today';
+    return 'pending';
+  });
+
+  if (dayLoading) {
+    return <Skeleton className="h-48 w-full rounded-xl" />;
+  }
+
+  if (totalCount === 0) {
+    return (
+      <Card className="border-success/30 bg-success/5">
+        <CardContent className="flex items-center gap-3 py-5 px-5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/10">
+            <CheckCircle className="h-5 w-5 text-success" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">Tudo em dia! 🎉</p>
+            <p className="text-sm text-muted-foreground">Nenhuma pendência ou tarefa urgente no momento.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const openWhatsApp = (phone: string, message?: string) => {
+    const digits = phone.replace(/\D/g, '');
+    const withDDI = digits.startsWith('55') ? digits : `55${digits}`;
+    const msg = message || 'Olá! Tudo bem? 💪';
+    window.open(`https://wa.me/${withDDI}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  return (
+    <Card className="border-primary/20">
+      <CardContent className="p-0">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div className="border-b border-border px-4 pt-3">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarCheck className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-sm text-foreground">Centro de Ações</h3>
+            </div>
+            <TabsList className="w-full justify-start bg-transparent h-auto p-0 gap-1">
+              <TabsTrigger
+                value="urgent"
+                className="relative data-[state=active]:bg-destructive/10 data-[state=active]:text-destructive data-[state=active]:shadow-none rounded-t-lg rounded-b-none border-b-2 border-transparent data-[state=active]:border-destructive px-3 py-1.5 text-xs"
+              >
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Urgente
+                {urgentCount > 0 && (
+                  <Badge variant="destructive" className="ml-1.5 h-4 min-w-4 text-[10px] px-1">
+                    {urgentCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="today"
+                className="relative data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none rounded-t-lg rounded-b-none border-b-2 border-transparent data-[state=active]:border-primary px-3 py-1.5 text-xs"
+              >
+                <Clock className="h-3 w-3 mr-1" />
+                Hoje
+                {todayCount > 0 && (
+                  <Badge className="ml-1.5 h-4 min-w-4 text-[10px] px-1 bg-primary text-primary-foreground">
+                    {todayCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="pending"
+                className="relative data-[state=active]:bg-warning/10 data-[state=active]:text-warning data-[state=active]:shadow-none rounded-t-lg rounded-b-none border-b-2 border-transparent data-[state=active]:border-warning px-3 py-1.5 text-xs"
+              >
+                <UtensilsCrossed className="h-3 w-3 mr-1" />
+                Pendente
+                {pendingCount > 0 && (
+                  <Badge className="ml-1.5 h-4 min-w-4 text-[10px] px-1 bg-warning text-warning-foreground">
+                    {pendingCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* URGENT TAB */}
+          <TabsContent value="urgent" className="m-0 p-4 space-y-3">
+            {urgentCount === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma urgência no momento ✓</p>
+            ) : (
+              <>
+                {/* Overdue tasks */}
+                {overdueTasks.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-destructive flex items-center gap-1">
+                      <ListTodo className="h-3 w-3" /> Tarefas atrasadas ({overdueTasks.length})
+                    </p>
+                    {overdueTasks.slice(0, 5).map(t => (
+                      <ActionRow
+                        key={t.id}
+                        icon={<ListTodo className="h-3.5 w-3.5 text-destructive" />}
+                        title={t.title}
+                        subtitle={t.client_name || undefined}
+                        variant="destructive"
+                        onClick={() => navigate('/tasks')}
+                      />
+                    ))}
+                    {overdueTasks.length > 5 && (
+                      <Button variant="link" size="sm" className="h-6 text-xs p-0" onClick={() => navigate('/tasks')}>
+                        +{overdueTasks.length - 5} mais
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* Unresponsive athletes */}
+                {unresponsiveAthletes.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-destructive flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" /> Sem resposta ({unresponsiveAthletes.length})
+                    </p>
+                    {unresponsiveAthletes.slice(0, 5).map(a => (
+                      <ActionRow
+                        key={a.clientId}
+                        icon={<MessageSquare className="h-3.5 w-3.5 text-destructive" />}
+                        title={a.clientName}
+                        subtitle={`${a.missedCount}x sem resposta`}
+                        variant="destructive"
+                        onClick={() => navigate(`/clients/${a.clientId}`)}
+                        whatsApp={a.phone ? () => openWhatsApp(a.phone!, `Olá! Percebi que faz um tempo que não nos falamos. Como está indo? 💪`) : undefined}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Expiring plans */}
+                {urgentAthletes.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-destructive flex items-center gap-1">
+                      <Target className="h-3 w-3" /> Planos vencendo ({urgentAthletes.length})
+                    </p>
+                    {urgentAthletes.map(a => (
+                      <ActionRow
+                        key={a.id}
+                        icon={<Target className="h-3.5 w-3.5 text-destructive" />}
+                        title={a.name}
+                        badge={<Badge variant="destructive" className="text-[10px] px-1 py-0">{a.days_left}d</Badge>}
+                        variant="destructive"
+                        onClick={() => navigate(`/clients/${a.id}`)}
+                        whatsApp={a.phone ? () => openWhatsApp(a.phone!) : undefined}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          {/* TODAY TAB */}
+          <TabsContent value="today" className="m-0 p-4 space-y-3">
+            {todayCount === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Agenda livre hoje ✓</p>
+            ) : (
+              <>
+                {/* Appointments */}
+                {appointments.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-primary flex items-center gap-1">
+                      <Video className="h-3 w-3" /> Consultas ({appointments.length})
+                    </p>
+                    {appointments.map(a => (
+                      <div key={a.id} className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-sm border border-primary/20">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Video className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span className="truncate font-medium text-xs">{a.client_name}</span>
+                          <span className="text-muted-foreground text-xs shrink-0">
+                            {a.appointment_time?.substring(0, 5)}
+                          </span>
+                        </div>
+                        <div className="flex gap-1 shrink-0">
+                          {a.google_meet_link && (
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" asChild>
+                              <a href={a.google_meet_link} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="h-3 w-3 mr-1" /> Meet
+                              </a>
+                            </Button>
+                          )}
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => navigate(`/clients/${a.client_id}`)}>
+                            Ver
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Today tasks */}
+                {todayTasks.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <ListTodo className="h-3 w-3" /> Tarefas para hoje ({todayTasks.length})
+                    </p>
+                    {todayTasks.slice(0, 5).map(t => (
+                      <ActionRow
+                        key={t.id}
+                        icon={<ListTodo className="h-3.5 w-3.5 text-muted-foreground" />}
+                        title={t.title}
+                        subtitle={t.client_name || undefined}
+                        onClick={() => navigate('/tasks')}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Pending checkins waiting */}
+                {pendingCheckins.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-warning flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" /> Aguardando resposta ({pendingCheckins.length})
+                    </p>
+                    {pendingCheckins.map(c => (
+                      <ActionRow
+                        key={c.client_id}
+                        icon={<MessageSquare className="h-3.5 w-3.5 text-warning" />}
+                        title={c.client_name}
+                        subtitle={`há ${c.days_waiting}d`}
+                        variant="warning"
+                        onClick={() => navigate(`/clients/${c.client_id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          {/* PENDING TAB */}
+          <TabsContent value="pending" className="m-0 p-4 space-y-3">
+            {pendingCount === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma pendência ✓</p>
+            ) : (
+              <>
+                {/* Pending meal plans */}
+                {(pendingPlans.length > 0 || unlinkedAnamnese.length > 0) && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-orange-500 flex items-center gap-1">
+                      <UtensilsCrossed className="h-3 w-3" /> Planos alimentares ({pendingPlans.length + unlinkedAnamnese.length})
+                    </p>
+                    {pendingPlans.slice(0, 5).map(plan => {
+                      const refDate = plan.anamnese_submitted_at ? parseISO(plan.anamnese_submitted_at) : parseISO(plan.created_at);
+                      const elapsed = businessDaysSince(refDate);
+                      const remaining = 4 - elapsed;
+                      return (
+                        <div key={plan.id} className="flex items-center justify-between rounded-lg bg-background/80 px-3 py-2 text-sm border border-border/50">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Checkbox
+                              checked={false}
+                              onClick={(e) => { e.stopPropagation(); markAsSent.mutate(plan.client_id); }}
+                              disabled={markAsSent.isPending}
+                              className="border-orange-400 h-3.5 w-3.5"
+                            />
+                            <span className="truncate text-xs font-medium">{plan.client_name}</span>
+                            {remaining < 0 ? (
+                              <Badge variant="destructive" className="text-[10px] px-1 py-0">{Math.abs(remaining)}d atrasado</Badge>
+                            ) : remaining === 0 ? (
+                              <Badge className="text-[10px] px-1 py-0 bg-yellow-500 text-white">Último dia</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-[10px] px-1 py-0">{remaining}d</Badge>
+                            )}
+                          </div>
+                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => {
+                            if (plan.anamnese_response_id) navigate(`/anamnese-response/${plan.anamnese_response_id}`);
+                            else navigate(`/clients/${plan.client_id}`);
+                          }}>
+                            <ChevronRight className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Pending checkin reviews */}
+                {pendingCheckinFeedbacks.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-orange-500 flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" /> Check-ins p/ revisar ({pendingCheckinFeedbacks.length})
+                    </p>
+                    {pendingCheckinFeedbacks.slice(0, 5).map((f: any) => (
+                      <ActionRow
+                        key={f.id}
+                        icon={<MessageSquare className="h-3.5 w-3.5 text-orange-500" />}
+                        title={f.clients?.name || 'N/A'}
+                        subtitle={f.status === 'approved' ? 'Pronto p/ envio' : 'Pendente'}
+                        onClick={() => navigate(`/checkin-review/${f.checkin_response_id}`)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Inactive athletes */}
+                {inactiveAthletes.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <UserX className="h-3 w-3" /> Sem interação +14d ({inactiveAthletes.length})
+                    </p>
+                    {inactiveAthletes.slice(0, 5).map(a => (
+                      <ActionRow
+                        key={a.id}
+                        icon={<UserX className="h-3.5 w-3.5 text-muted-foreground" />}
+                        title={a.name}
+                        subtitle={`${a.daysSinceLastInteraction}d`}
+                        onClick={() => navigate(`/clients/${a.id}`)}
+                        whatsApp={a.phone ? () => openWhatsApp(a.phone!) : undefined}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Reusable action row
+function ActionRow({
+  icon, title, subtitle, badge, variant, onClick, whatsApp,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  badge?: React.ReactNode;
+  variant?: 'destructive' | 'warning';
+  onClick: () => void;
+  whatsApp?: () => void;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm border cursor-pointer transition-colors ${
+        variant === 'destructive'
+          ? 'bg-destructive/5 border-destructive/20 hover:bg-destructive/10'
+          : variant === 'warning'
+          ? 'bg-warning/5 border-warning/20 hover:bg-warning/10'
+          : 'bg-background/80 border-border/50 hover:bg-muted/50'
+      }`}
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        {icon}
+        <span className="truncate text-xs font-medium">{title}</span>
+        {subtitle && <span className="text-[10px] text-muted-foreground shrink-0">{subtitle}</span>}
+        {badge}
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {whatsApp && (
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-success" onClick={(e) => { e.stopPropagation(); whatsApp(); }}>
+            <Zap className="h-3 w-3" />
+          </Button>
+        )}
+        <ChevronRight className="h-3 w-3 text-muted-foreground" />
+      </div>
+    </div>
+  );
+}
