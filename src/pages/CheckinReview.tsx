@@ -337,11 +337,35 @@ export default function CheckinReview() {
     },
   });
 
+  // Auto-complete the checkin_response task for this athlete
+  const autoCompleteCheckinTask = async (clientId: string) => {
+    try {
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('task_type', 'checkin_response')
+        .in('status', ['pending', 'in_progress'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (tasks && tasks.length > 0) {
+        await supabase
+          .from('tasks')
+          .update({ status: 'done', completed_at: new Date().toISOString(), is_archived: true })
+          .eq('id', tasks[0].id);
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        queryClient.invalidateQueries({ queryKey: ['my-day-today'] });
+      }
+    } catch (err) {
+      console.error('Error auto-completing task:', err);
+    }
+  };
+
   // Mutation to approve feedback (with optional WhatsApp send)
   const approveMutation = useMutation({
     mutationFn: async ({ sendWhatsApp = false }: { sendWhatsApp?: boolean } = {}) => {
       if (!feedback?.id) {
-        // Create feedback if doesn't exist
         const { error } = await supabase
           .from('checkin_feedbacks')
           .insert({
@@ -355,7 +379,6 @@ export default function CheckinReview() {
           });
         if (error) throw error;
       } else {
-        // Update existing feedback
         const { error } = await supabase
           .from('checkin_feedbacks')
           .update({
@@ -368,10 +391,13 @@ export default function CheckinReview() {
       }
       return { sendWhatsApp };
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
       queryClient.invalidateQueries({ queryKey: ['pending_checkin_reviews'] });
       queryClient.invalidateQueries({ queryKey: ['pending_checkins_dashboard'] });
+      if (checkinResponse?.client_id) {
+        await autoCompleteCheckinTask(checkinResponse.client_id);
+      }
       if (data?.sendWhatsApp) {
         toast.success('Feedback aprovado! Pronto para envio.');
       } else {
