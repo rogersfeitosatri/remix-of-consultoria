@@ -192,10 +192,12 @@ export function ActionCenterPanel() {
   const todayCount = appointments.length + todayTasks.length + pendingCheckins.length;
   const pendingCount = pendingPlans.length + unlinkedAnamnese.length + pendingCheckinFeedbacks.length + inactiveAthletes.length;
   const retentionCount = retentionAthletes.length;
+  const registrationCount = pendingRegistrations.length;
 
-  const totalCount = urgentCount + todayCount + pendingCount + retentionCount;
+  const totalCount = urgentCount + todayCount + pendingCount + retentionCount + registrationCount;
 
   const [activeTab, setActiveTab] = useState(() => {
+    if (registrationCount > 0) return 'registrations';
     if (urgentCount > 0) return 'urgent';
     if (todayCount > 0) return 'today';
     if (retentionCount > 0) return 'retention';
