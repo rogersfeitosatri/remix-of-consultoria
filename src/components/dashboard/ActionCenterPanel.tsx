@@ -130,6 +130,29 @@ export function ActionCenterPanel() {
     refetchInterval: 30000,
   });
 
+  // Pending registrations: athletes auto-created from anamnese with incomplete setup
+  const { data: pendingRegistrations = [] } = useQuery({
+    queryKey: ['pending-registrations', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data: clients } = await supabase
+        .from('clients')
+        .select('id, name, email, phone, created_at, athlete_status, plan_type')
+        .eq('user_id', user.id)
+        .eq('registration_source', 'anamnese_auto')
+        .eq('monthly_value', 0)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      return (clients || []).map((c: any) => ({
+        ...c,
+        days_since: differenceInCalendarDays(new Date(), new Date(c.created_at)),
+      }));
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
+
   // Retention panel: athletes with <30 days to plan expiration
   const { data: retentionAthletes = [] } = useQuery({
     queryKey: ['retention-athletes', user?.id],
