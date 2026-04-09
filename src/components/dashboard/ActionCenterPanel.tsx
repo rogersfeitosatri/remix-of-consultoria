@@ -270,7 +270,19 @@ export function ActionCenterPanel() {
               <CalendarCheck className="h-4 w-4 text-primary" />
               <h3 className="font-semibold text-sm text-foreground">Centro de Ações</h3>
             </div>
-            <TabsList className="w-full justify-start bg-transparent h-auto p-0 gap-1 flex-wrap">
+             <TabsList className="w-full justify-start bg-transparent h-auto p-0 gap-1 flex-wrap">
+              {registrationCount > 0 && (
+                <TabsTrigger
+                  value="registrations"
+                  className="relative data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-600 data-[state=active]:shadow-none rounded-t-lg rounded-b-none border-b-2 border-transparent data-[state=active]:border-emerald-500 px-3 py-1.5 text-xs"
+                >
+                  <UserPlus className="h-3 w-3 mr-1" />
+                  Cadastros
+                  <Badge className="ml-1.5 h-4 min-w-4 text-[10px] px-1 bg-emerald-500 text-white">
+                    {registrationCount}
+                  </Badge>
+                </TabsTrigger>
+              )}
               <TabsTrigger
                 value="urgent"
                 className="relative data-[state=active]:bg-destructive/10 data-[state=active]:text-destructive data-[state=active]:shadow-none rounded-t-lg rounded-b-none border-b-2 border-transparent data-[state=active]:border-destructive px-3 py-1.5 text-xs"
