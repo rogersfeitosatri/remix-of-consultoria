@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   AlertTriangle, Clock, CheckCircle, ChevronRight, Video, ExternalLink,
   ListTodo, MessageSquare, UtensilsCrossed, UserX, Zap, CalendarCheck,
-  Target, Users, Phone
+  Target, Users, Phone, UserPlus
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useMyDayToday } from '@/hooks/useMyDayToday';
