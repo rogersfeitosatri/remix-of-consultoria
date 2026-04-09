@@ -334,6 +334,75 @@ export function ActionCenterPanel() {
             </TabsList>
           </div>
 
+          {/* REGISTRATIONS TAB */}
+          <TabsContent value="registrations" className="m-0 p-4 space-y-3">
+            {registrationCount === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum cadastro pendente ✓</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-emerald-600 flex items-center gap-1">
+                    <UserPlus className="h-3 w-3" /> Cadastros pendentes ({registrationCount})
+                  </p>
+                  <Button variant="link" size="sm" className="h-6 text-xs p-0" onClick={() => navigate('/clients')}>
+                    Ver todos
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground mb-2">
+                  Atletas que enviaram a anamnese e precisam ter o cadastro finalizado (plano, financeiro, etc.)
+                </p>
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                  {pendingRegistrations.map((a: any) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm border bg-background/80 border-border/50 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <UserPlus className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="truncate text-xs font-medium block">{a.name}</span>
+                          <span className="text-[10px] text-muted-foreground block">{a.email}</span>
+                        </div>
+                        {a.days_since > 3 ? (
+                          <Badge variant="destructive" className="text-[10px] px-1 py-0 shrink-0">
+                            {a.days_since}d atrás
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] px-1 py-0 shrink-0">
+                            {a.days_since === 0 ? 'Hoje' : `${a.days_since}d atrás`}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {a.phone && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-success"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openWhatsApp(a.phone, `Olá ${a.name.split(' ')[0]}! Recebi sua anamnese. Vou finalizar seu cadastro e já te informo os próximos passos! 💪`);
+                            }}
+                          >
+                            <Phone className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 px-2.5 text-xs"
+                          onClick={() => navigate(`/clients/${a.id}`)}
+                        >
+                          Concluir cadastro
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </TabsContent>
+
           {/* URGENT TAB */}
           <TabsContent value="urgent" className="m-0 p-4 space-y-3">
             {urgentCount === 0 ? (
