@@ -445,10 +445,13 @@ export default function CheckinReview() {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
       queryClient.invalidateQueries({ queryKey: ['pending_checkin_reviews'] });
       queryClient.invalidateQueries({ queryKey: ['pending_checkins_dashboard'] });
+      if (checkinResponse?.client_id) {
+        await autoCompleteCheckinTask(checkinResponse.client_id);
+      }
       toast.success('Check-in finalizado sem envio de WhatsApp');
       setActiveTab('evolution');
     },
