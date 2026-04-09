@@ -6,19 +6,20 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   AlertTriangle, Clock, CheckCircle, ChevronRight, Video, ExternalLink,
   ListTodo, MessageSquare, UtensilsCrossed, UserX, Zap, CalendarCheck,
-  Target
+  Target, Users, Phone
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useMyDayToday } from '@/hooks/useMyDayToday';
 import { useInactivityAlerts } from '@/hooks/useInactivityAlerts';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { usePendingMealPlans, useUnlinkedAnamneseForMealPlan, useMarkMealPlanSent } from '@/hooks/useMealPlanStatus';
-import { formatDistanceToNow, parseISO, addDays, isWeekend, format } from 'date-fns';
+import { formatDistanceToNow, parseISO, addDays, isWeekend, format, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { toast } from 'sonner';
 
 function businessDaysSince(fromDate: Date): number {
   const today = new Date();
@@ -37,11 +38,32 @@ function businessDaysSince(fromDate: Date): number {
 export function ActionCenterPanel() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: dayData, isLoading: dayLoading } = useMyDayToday();
   const { data: inactiveAthletes = [] } = useInactivityAlerts(14);
   const { data: pendingPlans = [] } = usePendingMealPlans();
   const { data: unlinkedAnamnese = [] } = useUnlinkedAnamneseForMealPlan();
   const markAsSent = useMarkMealPlanSent();
+
+  // Complete task mutation
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const completeTask = async (taskId: string) => {
+    setCompletingTaskId(taskId);
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'done', completed_at: new Date().toISOString(), is_archived: true })
+        .eq('id', taskId);
+      if (error) throw error;
+      toast.success('Tarefa concluída!');
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-day-today'] });
+    } catch {
+      toast.error('Erro ao concluir tarefa');
+    } finally {
+      setCompletingTaskId(null);
+    }
+  };
 
   // Unresponsive athletes
   const { data: unresponsiveAthletes = [] } = useQuery({
@@ -108,6 +130,34 @@ export function ActionCenterPanel() {
     refetchInterval: 30000,
   });
 
+  // Retention panel: athletes with <30 days to plan expiration
+  const { data: retentionAthletes = [] } = useQuery({
+    queryKey: ['retention-athletes', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const today = new Date();
+      const thirtyDaysLater = format(addDays(today, 30), 'yyyy-MM-dd');
+      const todayStr = format(today, 'yyyy-MM-dd');
+
+      const { data: clients } = await supabase
+        .from('clients')
+        .select('id, name, phone, end_date, plan_type, service_type')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .eq('is_frozen', false)
+        .lte('end_date', thirtyDaysLater)
+        .gte('end_date', todayStr)
+        .order('end_date');
+
+      return (clients || []).map((c: any) => ({
+        ...c,
+        days_left: differenceInCalendarDays(new Date(c.end_date), today),
+      }));
+    },
+    enabled: !!user?.id,
+    refetchInterval: 300000,
+  });
+
   const appointments = dayData?.appointments || [];
   const overdueTasks = dayData?.tasks.filter(t => t.is_overdue) || [];
   const todayTasks = dayData?.tasks.filter(t => !t.is_overdue) || [];
@@ -118,12 +168,14 @@ export function ActionCenterPanel() {
   const urgentCount = overdueTasks.length + unresponsiveAthletes.length + urgentAthletes.length;
   const todayCount = appointments.length + todayTasks.length + pendingCheckins.length;
   const pendingCount = pendingPlans.length + unlinkedAnamnese.length + pendingCheckinFeedbacks.length + inactiveAthletes.length;
+  const retentionCount = retentionAthletes.length;
 
-  const totalCount = urgentCount + todayCount + pendingCount;
+  const totalCount = urgentCount + todayCount + pendingCount + retentionCount;
 
   const [activeTab, setActiveTab] = useState(() => {
     if (urgentCount > 0) return 'urgent';
     if (todayCount > 0) return 'today';
+    if (retentionCount > 0) return 'retention';
     return 'pending';
   });
 
@@ -154,6 +206,36 @@ export function ActionCenterPanel() {
     window.open(`https://wa.me/${withDDI}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
+  const TaskCheckRow = ({ task }: { task: any }) => (
+    <div
+      className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm border ${
+        task.is_overdue
+          ? 'bg-destructive/5 border-destructive/20'
+          : 'bg-background/80 border-border/50'
+      }`}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <Checkbox
+          checked={false}
+          disabled={completingTaskId === task.id}
+          onClick={(e) => { e.stopPropagation(); completeTask(task.id); }}
+          className={`h-3.5 w-3.5 shrink-0 ${task.is_overdue ? 'border-destructive' : 'border-muted-foreground'}`}
+        />
+        <span className="truncate text-xs font-medium">{task.title}</span>
+        {task.client_name && <span className="text-[10px] text-muted-foreground shrink-0">{task.client_name}</span>}
+      </div>
+      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs shrink-0" onClick={() => navigate('/tasks')}>
+        <ChevronRight className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+
+  const getRetentionBadgeColor = (daysLeft: number) => {
+    if (daysLeft <= 7) return 'destructive';
+    if (daysLeft <= 14) return 'default';
+    return 'secondary';
+  };
+
   return (
     <Card className="border-primary/20">
       <CardContent className="p-0">
@@ -163,7 +245,7 @@ export function ActionCenterPanel() {
               <CalendarCheck className="h-4 w-4 text-primary" />
               <h3 className="font-semibold text-sm text-foreground">Centro de Ações</h3>
             </div>
-            <TabsList className="w-full justify-start bg-transparent h-auto p-0 gap-1">
+            <TabsList className="w-full justify-start bg-transparent h-auto p-0 gap-1 flex-wrap">
               <TabsTrigger
                 value="urgent"
                 className="relative data-[state=active]:bg-destructive/10 data-[state=active]:text-destructive data-[state=active]:shadow-none rounded-t-lg rounded-b-none border-b-2 border-transparent data-[state=active]:border-destructive px-3 py-1.5 text-xs"
@@ -200,6 +282,18 @@ export function ActionCenterPanel() {
                   </Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger
+                value="retention"
+                className="relative data-[state=active]:bg-orange-500/10 data-[state=active]:text-orange-600 data-[state=active]:shadow-none rounded-t-lg rounded-b-none border-b-2 border-transparent data-[state=active]:border-orange-500 px-3 py-1.5 text-xs"
+              >
+                <Users className="h-3 w-3 mr-1" />
+                Retenção
+                {retentionCount > 0 && (
+                  <Badge className="ml-1.5 h-4 min-w-4 text-[10px] px-1 bg-orange-500 text-white">
+                    {retentionCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -209,21 +303,13 @@ export function ActionCenterPanel() {
               <p className="text-sm text-muted-foreground text-center py-4">Nenhuma urgência no momento ✓</p>
             ) : (
               <>
-                {/* Overdue tasks */}
                 {overdueTasks.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-destructive flex items-center gap-1">
                       <ListTodo className="h-3 w-3" /> Tarefas atrasadas ({overdueTasks.length})
                     </p>
                     {overdueTasks.slice(0, 5).map(t => (
-                      <ActionRow
-                        key={t.id}
-                        icon={<ListTodo className="h-3.5 w-3.5 text-destructive" />}
-                        title={t.title}
-                        subtitle={t.client_name || undefined}
-                        variant="destructive"
-                        onClick={() => navigate('/tasks')}
-                      />
+                      <TaskCheckRow key={t.id} task={t} />
                     ))}
                     {overdueTasks.length > 5 && (
                       <Button variant="link" size="sm" className="h-6 text-xs p-0" onClick={() => navigate('/tasks')}>
@@ -233,7 +319,6 @@ export function ActionCenterPanel() {
                   </div>
                 )}
 
-                {/* Unresponsive athletes */}
                 {unresponsiveAthletes.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-destructive flex items-center gap-1">
@@ -253,7 +338,6 @@ export function ActionCenterPanel() {
                   </div>
                 )}
 
-                {/* Expiring plans */}
                 {urgentAthletes.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-destructive flex items-center gap-1">
@@ -282,7 +366,6 @@ export function ActionCenterPanel() {
               <p className="text-sm text-muted-foreground text-center py-4">Agenda livre hoje ✓</p>
             ) : (
               <>
-                {/* Appointments */}
                 {appointments.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-primary flex items-center gap-1">
@@ -314,25 +397,17 @@ export function ActionCenterPanel() {
                   </div>
                 )}
 
-                {/* Today tasks */}
                 {todayTasks.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                       <ListTodo className="h-3 w-3" /> Tarefas para hoje ({todayTasks.length})
                     </p>
                     {todayTasks.slice(0, 5).map(t => (
-                      <ActionRow
-                        key={t.id}
-                        icon={<ListTodo className="h-3.5 w-3.5 text-muted-foreground" />}
-                        title={t.title}
-                        subtitle={t.client_name || undefined}
-                        onClick={() => navigate('/tasks')}
-                      />
+                      <TaskCheckRow key={t.id} task={t} />
                     ))}
                   </div>
                 )}
 
-                {/* Pending checkins waiting */}
                 {pendingCheckins.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-warning flex items-center gap-1">
@@ -360,7 +435,6 @@ export function ActionCenterPanel() {
               <p className="text-sm text-muted-foreground text-center py-4">Nenhuma pendência ✓</p>
             ) : (
               <>
-                {/* Pending meal plans */}
                 {(pendingPlans.length > 0 || unlinkedAnamnese.length > 0) && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-orange-500 flex items-center gap-1">
@@ -400,7 +474,6 @@ export function ActionCenterPanel() {
                   </div>
                 )}
 
-                {/* Pending checkin reviews */}
                 {pendingCheckinFeedbacks.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-orange-500 flex items-center gap-1">
@@ -418,7 +491,6 @@ export function ActionCenterPanel() {
                   </div>
                 )}
 
-                {/* Inactive athletes */}
                 {inactiveAthletes.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -436,6 +508,63 @@ export function ActionCenterPanel() {
                     ))}
                   </div>
                 )}
+              </>
+            )}
+          </TabsContent>
+
+          {/* RETENTION TAB */}
+          <TabsContent value="retention" className="m-0 p-4 space-y-3">
+            {retentionCount === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum plano vencendo nos próximos 30 dias ✓</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-orange-600 flex items-center gap-1">
+                    <Users className="h-3 w-3" /> Atletas com plano vencendo em até 30 dias ({retentionCount})
+                  </p>
+                </div>
+                <p className="text-[10px] text-muted-foreground mb-2">
+                  Foque em contato diário para aumentar as chances de renovação
+                </p>
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                  {retentionAthletes.map((a: any) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm border bg-background/80 border-border/50 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate text-xs font-medium">{a.name}</span>
+                        <Badge
+                          variant={getRetentionBadgeColor(a.days_left) as any}
+                          className="text-[10px] px-1.5 py-0 shrink-0"
+                        >
+                          {a.days_left}d
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {a.plan_type === 'premium' ? 'Premium' : 'Consultoria'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {a.phone && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-success"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openWhatsApp(a.phone, `Olá ${a.name.split(' ')[0]}! Como está indo o acompanhamento? Quero saber como posso te ajudar ainda mais! 💪`);
+                            }}
+                          >
+                            <Phone className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => navigate(`/clients/${a.id}`)}>
+                          <ChevronRight className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </>
             )}
           </TabsContent>
