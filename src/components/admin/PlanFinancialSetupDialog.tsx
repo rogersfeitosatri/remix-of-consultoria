@@ -44,13 +44,13 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [planType, setPlanType] = useState(client.plan_type || 'consultoria');
-  const [serviceType, setServiceType] = useState(client.service_type || 'nutrition');
-  const [planDuration, setPlanDuration] = useState(client.plan_duration || 'monthly');
+  const [planType, setPlanType] = useState<string>(client.plan_type || 'consultoria');
+  const [serviceType, setServiceType] = useState<string>(client.service_type || 'nutrition');
+  const [planDuration, setPlanDuration] = useState<string>(client.plan_duration || 'monthly');
   const [monthlyValue, setMonthlyValue] = useState(client.monthly_value > 0 ? String(client.monthly_value) : '');
   const [startDate, setStartDate] = useState(client.start_date || format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(client.end_date || '');
-  const [paymentType, setPaymentType] = useState(client.payment_type || 'pix');
+  const [paymentType, setPaymentType] = useState<string>(client.payment_type || 'pix');
   const [paymentDate, setPaymentDate] = useState(client.payment_date || format(new Date(), 'yyyy-MM-dd'));
 
   const handleDurationChange = (val: string) => {
