@@ -130,6 +130,17 @@ export function ActionCenterPanel() {
     refetchInterval: 30000,
   });
 
+  // Helper to detect missing fields for pending registrations
+  const getMissingFields = (c: any): string[] => {
+    const missing: string[] = [];
+    if (!c.monthly_value || Number(c.monthly_value) <= 0) missing.push('Valor mensal');
+    if (!c.phone) missing.push('Telefone');
+    if (!c.plan_type) missing.push('Tipo de plano');
+    if (!c.service_type) missing.push('Tipo de serviço');
+    if (!c.plan_duration || c.plan_duration === 'monthly') missing.push('Duração do plano');
+    return missing;
+  };
+
   // Pending registrations: athletes auto-created from anamnese with incomplete setup
   const { data: pendingRegistrations = [] } = useQuery({
     queryKey: ['pending-registrations', user?.id],
@@ -137,17 +148,20 @@ export function ActionCenterPanel() {
       if (!user?.id) return [];
       const { data: clients } = await supabase
         .from('clients')
-        .select('id, name, email, phone, created_at, athlete_status, plan_type')
+        .select('id, name, email, phone, created_at, athlete_status, plan_type, service_type, monthly_value, has_checkin, has_consultations, plan_duration, payment_type')
         .eq('user_id', user.id)
         .eq('registration_source', 'anamnese_auto')
-        .eq('monthly_value', 0)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
-      return (clients || []).map((c: any) => ({
-        ...c,
-        days_since: differenceInCalendarDays(new Date(), new Date(c.created_at)),
-      }));
+      // Only show clients that still have missing fields
+      return (clients || [])
+        .map((c: any) => ({
+          ...c,
+          days_since: differenceInCalendarDays(new Date(), new Date(c.created_at)),
+          missing_fields: getMissingFields(c),
+        }))
+        .filter((c: any) => c.missing_fields.length > 0);
     },
     enabled: !!user?.id,
     refetchInterval: 60000,
