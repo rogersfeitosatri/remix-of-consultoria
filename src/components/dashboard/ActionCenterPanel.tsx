@@ -376,6 +376,13 @@ export function ActionCenterPanel() {
                         <div className="min-w-0">
                           <span className="truncate text-xs font-medium block">{a.name}</span>
                           <span className="text-[10px] text-muted-foreground block">{a.email}</span>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {a.missing_fields?.map((field: string) => (
+                              <Badge key={field} variant="outline" className="text-[9px] px-1 py-0 text-destructive border-destructive/30">
+                                ⚠ {field}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
                         {a.days_since > 3 ? (
                           <Badge variant="destructive" className="text-[10px] px-1 py-0 shrink-0">
