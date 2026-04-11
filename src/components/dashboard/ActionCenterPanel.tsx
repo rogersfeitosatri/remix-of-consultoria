@@ -137,7 +137,7 @@ export function ActionCenterPanel() {
     if (!c.phone) missing.push('Telefone');
     if (!c.plan_type) missing.push('Tipo de plano');
     if (!c.service_type) missing.push('Tipo de serviço');
-    if (!c.plan_duration || c.plan_duration === 'monthly') missing.push('Duração do plano');
+    if (!c.plan_duration) missing.push('Duração do plano');
     return missing;
   };
 
