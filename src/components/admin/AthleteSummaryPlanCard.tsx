@@ -1,6 +1,6 @@
 import { differenceInDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calendar, DollarSign, RefreshCw, Archive, Utensils, Dumbbell, UtensilsCrossed } from 'lucide-react';
+import { Calendar, DollarSign, RefreshCw, Archive, Utensils, Dumbbell, UtensilsCrossed, Settings2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { useNavigate } from 'react-router-dom';
 import { Client } from '@/hooks/useClients';
 import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
+import { PlanFinancialSetupDialog } from '@/components/admin/PlanFinancialSetupDialog';
 
 const PLAN_LABELS: Record<string, string> = {
   consultoria: 'Consultoria',
@@ -121,6 +122,7 @@ export function AthleteSummaryPlanCard({ client, onRenewPlan }: AthleteSummaryPl
         
         {/* Ações */}
         <div className="flex gap-2 pt-1">
+          <PlanFinancialSetupDialog client={client} />
           {onRenewPlan && (
             <Button variant="outline" size="sm" className="flex-1 gap-1 text-xs h-8" onClick={onRenewPlan}>
               <RefreshCw className="h-3 w-3" />
