@@ -53,6 +53,7 @@ export default function CalendarPage() {
   const { data: appointments = [] } = useConsultationAppointments();
   const [activeTab, setActiveTab] = useState('pipeline');
   const [selectedAgendaDay, setSelectedAgendaDay] = useState<Date>(new Date());
+  const [linkDialogDay, setLinkDialogDay] = useState<Date | null>(null);
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
