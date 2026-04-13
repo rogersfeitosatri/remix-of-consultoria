@@ -389,7 +389,15 @@ export default function CalendarPage() {
                         return (
                           <div
                             key={day.toISOString()}
-                            onClick={() => setSelectedAgendaDay(day)}
+                            onClick={() => {
+                              setSelectedAgendaDay(day);
+                              // Check if this day has send link events
+                              const dayEvents = getEventsForDate(day);
+                              const hasLinks = dayEvents.some(e => e.type === 'sendLink');
+                              if (hasLinks) {
+                                setLinkDialogDay(day);
+                              }
+                            }}
                             className={cn(
                               "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative cursor-pointer hover:bg-muted/50 transition-colors",
                               !isCurrentMonth && "bg-muted/30",
