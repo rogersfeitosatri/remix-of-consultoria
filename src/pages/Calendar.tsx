@@ -496,6 +496,14 @@ export default function CalendarPage() {
                   <DayAgendaPanel
                     date={selectedAgendaDay}
                     appointments={appointments}
+                    scheduledLinks={consultations}
+                    onOpenLinkDialog={() => {
+                      const dayEvents = getEventsForDate(selectedAgendaDay);
+                      const hasLinks = dayEvents.some(e => e.type === 'sendLink');
+                      if (hasLinks) {
+                        setLinkDialogDay(selectedAgendaDay);
+                      }
+                    }}
                   />
                 </div>
               )}
