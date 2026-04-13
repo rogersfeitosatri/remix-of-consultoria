@@ -124,52 +124,7 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
     return events;
   };
 
-  // Get athletes with scheduled link sends for a specific week (Monday-based)
-  const getAthletesForWeek = useMemo(() => {
-    if (!selectedDayForList) return [];
-    
-    const weekStart = startOfISOWeek(selectedDayForList);
-    const weekEnd = endOfISOWeek(selectedDayForList);
-    
-    const athletesInWeek: { client: Client; sendDate: Date; consultNumber: number; total: number }[] = [];
-    
-    // Get all clients with consultations
-    const clientsWithPlans = (allClients || []).filter(c => 
-      c.has_consultations && 
-      c.is_active && 
-      c.consultation_count && 
-      c.first_consultation_date
-    );
-    
-    clientsWithPlans.forEach(client => {
-      const firstConsultDate = parseISO(client.first_consultation_date!);
-      const weeksInterval = client.consultation_frequency === 'six_weeks' ? 6 : 4;
-      const lastCompletedConsult = client.last_consultation_index || 0;
-      const totalConsults = client.consultation_count || 0;
-      
-      // Start from the next consultation after the last completed one
-      for (let consultNum = lastCompletedConsult + 1; consultNum <= totalConsults; consultNum++) {
-        // Skip the first consultation (no link send needed for it)
-        if (consultNum === 1) continue;
-        
-        // Calculate weeks from first consultation
-        const weeksFromFirst = weeksInterval * (consultNum - 1);
-        const sendDate = addWeeks(firstConsultDate, weeksFromFirst);
-        const mondayDate = getDay(sendDate) === 1 ? sendDate : nextMonday(sendDate);
-        
-        if (isWithinInterval(mondayDate, { start: weekStart, end: weekEnd })) {
-          athletesInWeek.push({
-            client,
-            sendDate: mondayDate,
-            consultNumber: consultNum,
-            total: totalConsults
-          });
-        }
-      }
-    });
-    
-    return athletesInWeek.sort((a, b) => a.client.name.localeCompare(b.client.name));
-  }, [selectedDayForList, allClients]);
+
 
   const handleMarkAsSent = async (id: string) => {
     try {
