@@ -58,7 +58,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: 'bg-destructive/10 text-destructive',
 };
 
-export function DayAgendaPanel({ date, appointments = [] }: DayAgendaPanelProps) {
+export function DayAgendaPanel({ date, appointments = [], scheduledLinks = [], onOpenLinkDialog }: DayAgendaPanelProps) {
   const dateStr = format(date, 'yyyy-MM-dd');
   const { data: tasks = [] } = useTasksByDate(dateStr);
   const completeTask = useCompleteTask();
@@ -69,10 +69,13 @@ export function DayAgendaPanel({ date, appointments = [] }: DayAgendaPanelProps)
       .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
   }, [appointments, dateStr]);
 
+  const dayLinks = useMemo(() => {
+    return scheduledLinks.filter(l => l.send_link_date === dateStr && l.status === 'pending');
+  }, [scheduledLinks, dateStr]);
+
   const sortedTasks = useMemo(() => {
     const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
     return [...tasks].sort((a, b) => {
-      // Overdue first
       const aOverdue = a.status === 'overdue' ? 0 : 1;
       const bOverdue = b.status === 'overdue' ? 0 : 1;
       if (aOverdue !== bOverdue) return aOverdue - bOverdue;
@@ -81,7 +84,7 @@ export function DayAgendaPanel({ date, appointments = [] }: DayAgendaPanelProps)
   }, [tasks]);
 
   const overdueCount = tasks.filter(t => t.status === 'overdue').length;
-  const totalItems = dayAppointments.length + tasks.length;
+  const totalItems = dayAppointments.length + tasks.length + dayLinks.length;
 
   if (totalItems === 0) {
     return (
