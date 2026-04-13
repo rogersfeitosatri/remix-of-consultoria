@@ -499,6 +499,16 @@ export default function CalendarPage() {
                   />
                 </div>
               )}
+
+              {/* Link Schedule Edit Dialog */}
+              <LinkScheduleEditDialog
+                open={!!linkDialogDay}
+                onOpenChange={(open) => !open && setLinkDialogDay(null)}
+                selectedDate={linkDialogDay}
+                schedules={consultations}
+                allSchedules={consultations}
+                clients={allClients}
+              />
             </TabsContent>
 
             {/* Tab: History */}
