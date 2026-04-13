@@ -2324,6 +2324,7 @@ export type Database = {
           area: string
           created_at: string
           id: string
+          monthly_cost_goal: number | null
           notes: string | null
           reference_date: string
           updated_at: string
@@ -2334,6 +2335,7 @@ export type Database = {
           area?: string
           created_at?: string
           id?: string
+          monthly_cost_goal?: number | null
           notes?: string | null
           reference_date?: string
           updated_at?: string
@@ -2344,6 +2346,7 @@ export type Database = {
           area?: string
           created_at?: string
           id?: string
+          monthly_cost_goal?: number | null
           notes?: string | null
           reference_date?: string
           updated_at?: string
