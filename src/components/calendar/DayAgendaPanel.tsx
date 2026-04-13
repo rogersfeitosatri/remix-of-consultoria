@@ -149,6 +149,35 @@ export function DayAgendaPanel({ date, appointments = [], scheduledLinks = [], o
               </div>
             )}
 
+            {/* Scheduled Links */}
+            {dayLinks.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between mt-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Envio de Links ({dayLinks.length})
+                  </p>
+                  {onOpenLinkDialog && (
+                    <Button size="sm" variant="ghost" className="h-6 text-xs text-primary" onClick={onOpenLinkDialog}>
+                      Gerenciar
+                    </Button>
+                  )}
+                </div>
+                {dayLinks.map(link => (
+                  <div
+                    key={link.id}
+                    className="flex items-center gap-3 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-colors"
+                    onClick={onOpenLinkDialog}
+                  >
+                    <Send className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{link.client_name}</p>
+                      <p className="text-xs text-muted-foreground">Enviar link de agendamento</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Tasks */}
             {sortedTasks.length > 0 && (
               <div className="space-y-1.5">
