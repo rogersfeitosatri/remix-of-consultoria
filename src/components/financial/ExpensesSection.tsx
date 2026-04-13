@@ -100,7 +100,7 @@ export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, on
       });
       
       toast.success(formData.expense_type === 'subscription' ? 'Assinatura registrada!' : 'Despesa registrada!');
-      setIsOpen(false);
+      handleDialogClose(false);
       setFormData({ description: '', amount: '', due_date: '', due_day: '', category: 'geral', notes: '', expense_type: 'single' });
     } catch (error) {
       toast.error('Erro ao registrar despesa');
