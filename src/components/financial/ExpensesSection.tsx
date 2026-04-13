@@ -30,9 +30,11 @@ const DUE_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 interface ExpensesSectionProps {
   filterStartDate?: Date;
   filterEndDate?: Date;
+  dialogOnly?: boolean;
+  onCloseDialog?: () => void;
 }
 
-export function ExpensesSection({ filterStartDate, filterEndDate }: ExpensesSectionProps) {
+export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, onCloseDialog }: ExpensesSectionProps) {
   const { data: expenses = [], isLoading } = useExpenses();
   const addExpense = useAddExpense();
   const updateExpense = useUpdateExpense();
