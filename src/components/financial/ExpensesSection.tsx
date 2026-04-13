@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,17 @@ export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, on
   const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
   
-  const [isOpen, setIsOpen] = useState(dialogOnly || false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Sync dialog open state when used in dialogOnly mode
+  useEffect(() => {
+    if (dialogOnly) setIsOpen(true);
+  }, [dialogOnly]);
+
+  const handleDialogClose = (open: boolean) => {
+    setIsOpen(open);
+    if (!open && onCloseDialog) onCloseDialog();
+  };
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
