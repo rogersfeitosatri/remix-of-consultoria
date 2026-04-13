@@ -43,6 +43,14 @@ interface DayAgendaPanelProps {
   onOpenLinkDialog?: () => void;
 }
 
+const TYPE_ICONS: Record<string, typeof UtensilsCrossed> = {
+  meal_plan: UtensilsCrossed,
+  checkin_response: MessageSquare,
+  consultation_prep: CalendarCheck2,
+  diet_adjustment: Zap,
+  custom: CheckCircle2,
+};
+
 const PRIORITY_COLORS: Record<string, string> = {
   low: 'bg-muted text-muted-foreground',
   medium: 'bg-primary/10 text-primary',
