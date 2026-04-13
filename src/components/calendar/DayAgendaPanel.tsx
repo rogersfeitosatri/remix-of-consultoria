@@ -14,6 +14,12 @@ import {
   User,
   Clock,
   ExternalLink,
+  Send,
+  CheckCircle2,
+  AlertTriangle,
+  User,
+  Clock,
+  ExternalLink,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
