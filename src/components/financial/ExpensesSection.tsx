@@ -229,6 +229,77 @@ export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, on
   const pendingExpenses = displayExpenses.filter(e => e.status !== 'paid');
   const totalPending = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
 
+  // In dialogOnly mode, just render the add dialog
+  if (dialogOnly) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleDialogClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Nova Despesa</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label className="text-foreground mb-3 block">Tipo de conta</Label>
+              <RadioGroup 
+                value={formData.expense_type} 
+                onValueChange={(value: 'single' | 'subscription') => setFormData({ ...formData, expense_type: value })}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="do-single" />
+                  <Label htmlFor="do-single" className="text-foreground cursor-pointer">Variável</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="subscription" id="do-subscription" />
+                  <Label htmlFor="do-subscription" className="text-foreground cursor-pointer">Fixo (recorrente)</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            <div>
+              <Label className="text-foreground">Descrição</Label>
+              <Input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-foreground">Valor (R$)</Label>
+                <Input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} required />
+              </div>
+              {formData.expense_type === 'single' ? (
+                <div>
+                  <Label className="text-foreground">Vencimento</Label>
+                  <Input type="date" value={formData.due_date} onChange={(e) => setFormData({ ...formData, due_date: e.target.value })} required />
+                </div>
+              ) : (
+                <div>
+                  <Label className="text-foreground">Dia do mês</Label>
+                  <Select value={formData.due_day} onValueChange={(value) => setFormData({ ...formData, due_day: value })}>
+                    <SelectTrigger><SelectValue placeholder="Dia..." /></SelectTrigger>
+                    <SelectContent>
+                      {DUE_DAYS.map((day) => (<SelectItem key={day} value={day.toString()}>Dia {day}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            <div>
+              <Label className="text-foreground">Categoria</Label>
+              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EXPENSE_CATEGORIES.map((cat) => (<SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => handleDialogClose(false)}>Cancelar</Button>
+              <Button type="submit" disabled={addExpense.isPending}>{addExpense.isPending ? 'Salvando...' : 'Salvar'}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   if (isLoading) {
     return (
       <Card>
