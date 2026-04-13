@@ -14,12 +14,20 @@ import {
   User,
   Clock,
   ExternalLink,
+  Send,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useTasksByDate, useCompleteTask, Task, TaskStatus, TASK_STATUS_LABELS, TASK_TYPE_LABELS } from '@/hooks/useTasks';
 import { Link } from 'react-router-dom';
+
+interface ScheduledLinkItem {
+  id: string;
+  client_name: string;
+  send_link_date: string;
+  status: string;
+}
 
 interface DayAgendaPanelProps {
   date: Date;
@@ -31,6 +39,8 @@ interface DayAgendaPanelProps {
     status: string;
     client?: { name: string; phone?: string };
   }>;
+  scheduledLinks?: ScheduledLinkItem[];
+  onOpenLinkDialog?: () => void;
 }
 
 const TYPE_ICONS: Record<string, typeof UtensilsCrossed> = {
@@ -48,7 +58,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: 'bg-destructive/10 text-destructive',
 };
 
-export function DayAgendaPanel({ date, appointments = [] }: DayAgendaPanelProps) {
+export function DayAgendaPanel({ date, appointments = [], scheduledLinks = [], onOpenLinkDialog }: DayAgendaPanelProps) {
   const dateStr = format(date, 'yyyy-MM-dd');
   const { data: tasks = [] } = useTasksByDate(dateStr);
   const completeTask = useCompleteTask();
@@ -59,10 +69,13 @@ export function DayAgendaPanel({ date, appointments = [] }: DayAgendaPanelProps)
       .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
   }, [appointments, dateStr]);
 
+  const dayLinks = useMemo(() => {
+    return scheduledLinks.filter(l => l.send_link_date === dateStr && l.status === 'pending');
+  }, [scheduledLinks, dateStr]);
+
   const sortedTasks = useMemo(() => {
     const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
     return [...tasks].sort((a, b) => {
-      // Overdue first
       const aOverdue = a.status === 'overdue' ? 0 : 1;
       const bOverdue = b.status === 'overdue' ? 0 : 1;
       if (aOverdue !== bOverdue) return aOverdue - bOverdue;
@@ -71,7 +84,7 @@ export function DayAgendaPanel({ date, appointments = [] }: DayAgendaPanelProps)
   }, [tasks]);
 
   const overdueCount = tasks.filter(t => t.status === 'overdue').length;
-  const totalItems = dayAppointments.length + tasks.length;
+  const totalItems = dayAppointments.length + tasks.length + dayLinks.length;
 
   if (totalItems === 0) {
     return (
@@ -133,6 +146,35 @@ export function DayAgendaPanel({ date, appointments = [] }: DayAgendaPanelProps)
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Scheduled Links */}
+            {dayLinks.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between mt-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Envio de Links ({dayLinks.length})
+                  </p>
+                  {onOpenLinkDialog && (
+                    <Button size="sm" variant="ghost" className="h-6 text-xs text-primary" onClick={onOpenLinkDialog}>
+                      Gerenciar
+                    </Button>
+                  )}
+                </div>
+                {dayLinks.map(link => (
+                  <div
+                    key={link.id}
+                    className="flex items-center gap-3 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-colors"
+                    onClick={onOpenLinkDialog}
+                  >
+                    <Send className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{link.client_name}</p>
+                      <p className="text-xs text-muted-foreground">Enviar link de agendamento</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 

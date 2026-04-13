@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { DayAgendaPanel } from '@/components/calendar/DayAgendaPanel';
+import { LinkScheduleEditDialog } from '@/components/calendar/LinkScheduleEditDialog';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -52,6 +53,7 @@ export default function CalendarPage() {
   const { data: appointments = [] } = useConsultationAppointments();
   const [activeTab, setActiveTab] = useState('pipeline');
   const [selectedAgendaDay, setSelectedAgendaDay] = useState<Date>(new Date());
+  const [linkDialogDay, setLinkDialogDay] = useState<Date | null>(null);
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -387,7 +389,15 @@ export default function CalendarPage() {
                         return (
                           <div
                             key={day.toISOString()}
-                            onClick={() => setSelectedAgendaDay(day)}
+                            onClick={() => {
+                              setSelectedAgendaDay(day);
+                              // Check if this day has send link events
+                              const dayEvents = getEventsForDate(day);
+                              const hasLinks = dayEvents.some(e => e.type === 'sendLink');
+                              if (hasLinks) {
+                                setLinkDialogDay(day);
+                              }
+                            }}
                             className={cn(
                               "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative cursor-pointer hover:bg-muted/50 transition-colors",
                               !isCurrentMonth && "bg-muted/30",
@@ -486,9 +496,27 @@ export default function CalendarPage() {
                   <DayAgendaPanel
                     date={selectedAgendaDay}
                     appointments={appointments}
+                    scheduledLinks={consultations}
+                    onOpenLinkDialog={() => {
+                      const dayEvents = getEventsForDate(selectedAgendaDay);
+                      const hasLinks = dayEvents.some(e => e.type === 'sendLink');
+                      if (hasLinks) {
+                        setLinkDialogDay(selectedAgendaDay);
+                      }
+                    }}
                   />
                 </div>
               )}
+
+              {/* Link Schedule Edit Dialog */}
+              <LinkScheduleEditDialog
+                open={!!linkDialogDay}
+                onOpenChange={(open) => !open && setLinkDialogDay(null)}
+                selectedDate={linkDialogDay}
+                schedules={consultations}
+                allSchedules={consultations}
+                clients={allClients}
+              />
             </TabsContent>
 
             {/* Tab: History */}
