@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { LinkScheduleEditDialog } from '@/components/calendar/LinkScheduleEditDialog';
 import {
   ConsultationSchedule,
   Client,
