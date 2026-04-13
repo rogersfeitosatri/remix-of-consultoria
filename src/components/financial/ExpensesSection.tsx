@@ -40,7 +40,7 @@ export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, on
   const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
   
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(dialogOnly || false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
