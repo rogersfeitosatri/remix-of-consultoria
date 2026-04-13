@@ -16,6 +16,7 @@ import { ReceiptScanDialog } from '@/components/financial/ReceiptScanDialog';
 import { FinancialInsightsPanel } from '@/components/financial/FinancialInsightsPanel';
 import { TransactionsList } from '@/components/financial/TransactionsList';
 import { DebtsList } from '@/components/financial/DebtsList';
+import { MonthlyCostsPanel } from '@/components/financial/MonthlyCostsPanel';
 import { Button } from '@/components/ui/button';
 import { useClients, usePayments, getOverduePayments, useAddPayment } from '@/hooks/useClients';
 import { 
@@ -45,13 +46,13 @@ export default function Financial() {
   const [filter, setFilter] = useState<'all' | 'overdue' | 'upcoming'>(initialFilter as any);
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [showReceiptScan, setShowReceiptScan] = useState(false);
+  const [showAddExpense, setShowAddExpense] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab);
   
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
   const addPaymentMutation = useAddPayment();
 
-  // Cálculos de entradas baseados no período filtrado (data de pagamento - paid_at)
   const incomeTotal = useMemo(() => 
     getMonthlyIncomeByPaidAt(payments, filterStartDate, filterEndDate),
     [payments, filterStartDate, filterEndDate]
@@ -170,13 +171,20 @@ export default function Financial() {
           <TabsContent value="gestao" className="space-y-6 mt-4">
             <FinancialOverview filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
 
-            {/* Quick action: scan receipt */}
-            <div className="flex justify-end">
+            {/* Quick actions */}
+            <div className="flex justify-end gap-2">
               <Button onClick={() => setShowReceiptScan(true)} variant="outline" className="gap-2">
                 <Camera className="h-4 w-4" />
-                Escanear Comprovante com IA
+                Escanear Comprovante
               </Button>
             </div>
+
+            {/* Custos do Mês (Fixed vs Variable) */}
+            <MonthlyCostsPanel 
+              filterStartDate={filterStartDate} 
+              filterEndDate={filterEndDate}
+              onAddNew={() => setShowAddExpense(true)}
+            />
 
             <ManagementCharts filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
 
@@ -188,9 +196,8 @@ export default function Financial() {
             </div>
           </TabsContent>
 
-          {/* Atletas Tab (existing) */}
+          {/* Atletas Tab */}
           <TabsContent value="atletas" className="space-y-6 mt-4">
-            {/* Stats */}
             <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
               <StatCard
                 title="Entradas do Período"
@@ -240,8 +247,6 @@ export default function Financial() {
               <IncomeList payments={incomePayments} title="Entradas Confirmadas" />
               <ExpiringPlansList clients={expiringPlans} title="Planos Expirando" />
             </div>
-
-            <ExpensesSection filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
           </TabsContent>
         </Tabs>
       </div>
@@ -257,6 +262,14 @@ export default function Financial() {
         clients={clients}
         onSubmit={handleAddPayment}
         isSubmitting={addPaymentMutation.isPending}
+      />
+
+      {/* Reuse ExpensesSection dialog for adding expenses */}
+      <ExpensesSection 
+        filterStartDate={filterStartDate} 
+        filterEndDate={filterEndDate}
+        dialogOnly={showAddExpense}
+        onCloseDialog={() => setShowAddExpense(false)}
       />
     </Layout>
   );

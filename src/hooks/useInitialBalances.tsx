@@ -37,7 +37,7 @@ export function useUpsertInitialBalance() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { area: string; amount: number; notes?: string }) => {
+    mutationFn: async (input: { area: string; amount: number; notes?: string; monthly_cost_goal?: number }) => {
       if (!user) throw new Error('Not authenticated');
 
       // Check if exists
@@ -48,18 +48,22 @@ export function useUpsertInitialBalance() {
         .maybeSingle();
 
       if (existing) {
+        const updateData: any = { amount: input.amount, notes: input.notes || null };
+        if (input.monthly_cost_goal !== undefined) updateData.monthly_cost_goal = input.monthly_cost_goal;
         const { data, error } = await supabase
           .from('financial_initial_balances')
-          .update({ amount: input.amount, notes: input.notes || null })
+          .update(updateData)
           .eq('id', existing.id)
           .select()
           .single();
         if (error) throw error;
         return data;
       } else {
+        const insertData: any = { user_id: user.id, area: input.area, amount: input.amount, notes: input.notes || null };
+        if (input.monthly_cost_goal !== undefined) insertData.monthly_cost_goal = input.monthly_cost_goal;
         const { data, error } = await supabase
           .from('financial_initial_balances')
-          .insert({ user_id: user.id, area: input.area, amount: input.amount, notes: input.notes || null })
+          .insert(insertData)
           .select()
           .single();
         if (error) throw error;

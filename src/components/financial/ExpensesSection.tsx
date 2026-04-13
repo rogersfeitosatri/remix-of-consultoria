@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,15 +30,27 @@ const DUE_DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 interface ExpensesSectionProps {
   filterStartDate?: Date;
   filterEndDate?: Date;
+  dialogOnly?: boolean;
+  onCloseDialog?: () => void;
 }
 
-export function ExpensesSection({ filterStartDate, filterEndDate }: ExpensesSectionProps) {
+export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, onCloseDialog }: ExpensesSectionProps) {
   const { data: expenses = [], isLoading } = useExpenses();
   const addExpense = useAddExpense();
   const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
   
   const [isOpen, setIsOpen] = useState(false);
+
+  // Sync dialog open state when used in dialogOnly mode
+  useEffect(() => {
+    if (dialogOnly) setIsOpen(true);
+  }, [dialogOnly]);
+
+  const handleDialogClose = (open: boolean) => {
+    setIsOpen(open);
+    if (!open && onCloseDialog) onCloseDialog();
+  };
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -88,7 +100,7 @@ export function ExpensesSection({ filterStartDate, filterEndDate }: ExpensesSect
       });
       
       toast.success(formData.expense_type === 'subscription' ? 'Assinatura registrada!' : 'Despesa registrada!');
-      setIsOpen(false);
+      handleDialogClose(false);
       setFormData({ description: '', amount: '', due_date: '', due_day: '', category: 'geral', notes: '', expense_type: 'single' });
     } catch (error) {
       toast.error('Erro ao registrar despesa');
@@ -216,6 +228,77 @@ export function ExpensesSection({ filterStartDate, filterEndDate }: ExpensesSect
   
   const pendingExpenses = displayExpenses.filter(e => e.status !== 'paid');
   const totalPending = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+  // In dialogOnly mode, just render the add dialog
+  if (dialogOnly) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleDialogClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Nova Despesa</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label className="text-foreground mb-3 block">Tipo de conta</Label>
+              <RadioGroup 
+                value={formData.expense_type} 
+                onValueChange={(value: 'single' | 'subscription') => setFormData({ ...formData, expense_type: value })}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="do-single" />
+                  <Label htmlFor="do-single" className="text-foreground cursor-pointer">Variável</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="subscription" id="do-subscription" />
+                  <Label htmlFor="do-subscription" className="text-foreground cursor-pointer">Fixo (recorrente)</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            <div>
+              <Label className="text-foreground">Descrição</Label>
+              <Input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-foreground">Valor (R$)</Label>
+                <Input type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} required />
+              </div>
+              {formData.expense_type === 'single' ? (
+                <div>
+                  <Label className="text-foreground">Vencimento</Label>
+                  <Input type="date" value={formData.due_date} onChange={(e) => setFormData({ ...formData, due_date: e.target.value })} required />
+                </div>
+              ) : (
+                <div>
+                  <Label className="text-foreground">Dia do mês</Label>
+                  <Select value={formData.due_day} onValueChange={(value) => setFormData({ ...formData, due_day: value })}>
+                    <SelectTrigger><SelectValue placeholder="Dia..." /></SelectTrigger>
+                    <SelectContent>
+                      {DUE_DAYS.map((day) => (<SelectItem key={day} value={day.toString()}>Dia {day}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            <div>
+              <Label className="text-foreground">Categoria</Label>
+              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EXPENSE_CATEGORIES.map((cat) => (<SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => handleDialogClose(false)}>Cancelar</Button>
+              <Button type="submit" disabled={addExpense.isPending}>{addExpense.isPending ? 'Salvando...' : 'Salvar'}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   if (isLoading) {
     return (
