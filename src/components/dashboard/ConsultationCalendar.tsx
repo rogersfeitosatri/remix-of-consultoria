@@ -512,62 +512,15 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
           </div>
         </div>
 
-        {/* Selected Day Athletes List Dialog */}
-        <Dialog open={!!selectedDayForList} onOpenChange={(open) => !open && setSelectedDayForList(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Send className="h-4 w-4 text-amber-500" />
-                Atletas da Semana
-              </DialogTitle>
-              <DialogDescription>
-                {selectedDayForList && (
-                  <>Semana de {format(startOfISOWeek(selectedDayForList), "dd/MM", { locale: ptBR })} a {format(endOfISOWeek(selectedDayForList), "dd/MM/yyyy", { locale: ptBR })}</>
-                )}
-              </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-[400px]">
-              {getAthletesForWeek.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Send className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Nenhum envio de link programado para esta semana</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {getAthletesForWeek.map((item, idx) => (
-                    <div
-                      key={`${item.client.id}-${idx}`}
-                      className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-amber-500/20 flex items-center justify-center">
-                          <User className="h-4 w-4 text-amber-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{item.client.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Consulta {item.consultNumber}/{item.total}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-medium text-amber-600">
-                          {format(item.sendDate, "dd/MM")}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Segunda</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSelectedDayForList(null)}>
-                Fechar
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Link Schedule Edit Dialog */}
+        <LinkScheduleEditDialog
+          open={!!selectedDayForList}
+          onOpenChange={(open) => !open && setSelectedDayForList(null)}
+          selectedDate={selectedDayForList}
+          schedules={consultations}
+          allSchedules={consultations}
+          clients={[...clients, ...(allClients || [])]}
+        />
       </CardContent>
     </Card>
   );
