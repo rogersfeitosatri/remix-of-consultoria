@@ -22,6 +22,13 @@ import { cn } from '@/lib/utils';
 import { useTasksByDate, useCompleteTask, Task, TaskStatus, TASK_STATUS_LABELS, TASK_TYPE_LABELS } from '@/hooks/useTasks';
 import { Link } from 'react-router-dom';
 
+interface ScheduledLinkItem {
+  id: string;
+  client_name: string;
+  send_link_date: string;
+  status: string;
+}
+
 interface DayAgendaPanelProps {
   date: Date;
   appointments?: Array<{
@@ -32,15 +39,9 @@ interface DayAgendaPanelProps {
     status: string;
     client?: { name: string; phone?: string };
   }>;
+  scheduledLinks?: ScheduledLinkItem[];
+  onOpenLinkDialog?: () => void;
 }
-
-const TYPE_ICONS: Record<string, typeof UtensilsCrossed> = {
-  meal_plan: UtensilsCrossed,
-  checkin_response: MessageSquare,
-  consultation_prep: CalendarCheck2,
-  diet_adjustment: Zap,
-  custom: CheckCircle2,
-};
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: 'bg-muted text-muted-foreground',
