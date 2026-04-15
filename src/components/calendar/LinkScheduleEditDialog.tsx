@@ -315,6 +315,21 @@ export function LinkScheduleEditDialog({
 
                       {!isEditing && (
                         <div className="flex items-center gap-1">
+                          {/* Show confirm button for overdue items */}
+                          {isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date)) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700"
+                              onClick={() => {
+                                setConfirmingId(schedule.id);
+                                setConfirmDate(schedule.send_link_date);
+                              }}
+                              title="Confirmar que a consulta ocorreu"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -342,6 +357,38 @@ export function LinkScheduleEditDialog({
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
+                        </div>
+                      )}
+
+                      {/* Confirm consultation inline form */}
+                      {confirmingId === schedule.id && !isEditing && (
+                        <div className="mt-2 p-2 rounded-md bg-emerald-500/5 border border-emerald-500/20">
+                          <p className="text-xs text-muted-foreground mb-1.5">Data em que a consulta ocorreu:</p>
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="date"
+                              value={confirmDate}
+                              onChange={e => setConfirmDate(e.target.value)}
+                              className="h-7 text-xs flex-1"
+                            />
+                            <Button
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              onClick={() => handleConfirmConsultation(schedule.id, confirmDate)}
+                              disabled={!confirmDate || saving}
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              Confirmar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-1.5"
+                              onClick={() => { setConfirmingId(null); setConfirmDate(''); }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
