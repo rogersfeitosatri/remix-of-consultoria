@@ -1989,11 +1989,15 @@ export type Database = {
       }
       consultation_schedules: {
         Row: {
+          appointment_id: string | null
           booking_expires_at: string | null
           booking_token: string | null
           client_id: string
+          confirmation_status: string | null
+          confirmed_at: string | null
           created_at: string
           id: string
+          link_sent_at: string | null
           scheduled_date: string
           scheduled_time: string | null
           send_link_date: string
@@ -2002,11 +2006,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          appointment_id?: string | null
           booking_expires_at?: string | null
           booking_token?: string | null
           client_id: string
+          confirmation_status?: string | null
+          confirmed_at?: string | null
           created_at?: string
           id?: string
+          link_sent_at?: string | null
           scheduled_date: string
           scheduled_time?: string | null
           send_link_date: string
@@ -2015,11 +2023,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          appointment_id?: string | null
           booking_expires_at?: string | null
           booking_token?: string | null
           client_id?: string
+          confirmation_status?: string | null
+          confirmed_at?: string | null
           created_at?: string
           id?: string
+          link_sent_at?: string | null
           scheduled_date?: string
           scheduled_time?: string | null
           send_link_date?: string
@@ -2028,6 +2040,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "consultation_schedules_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "consultation_schedules_client_id_fkey"
             columns: ["client_id"]
