@@ -677,8 +677,99 @@ export function AthleteSummaryConsultCard({
                             {getScheduleStatusBadge(schedule.status, schedule.send_link_date)}
                           </div>
                         </div>
-                        {/* Action buttons for manageable schedules */}
-                        {canManage && !isEditingThis && (
+                        {/* Overdue confirmation UI */}
+                        {schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date)) && (
+                          confirmingOverdueId === schedule.id ? (
+                            <div className="mt-1.5 pl-6 space-y-1.5">
+                              <p className="text-[10px] text-muted-foreground">Data em que a consulta ocorreu:</p>
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="date"
+                                  value={overdueConfirmDate}
+                                  onChange={e => setOverdueConfirmDate(e.target.value)}
+                                  className="h-6 text-xs w-[130px]"
+                                />
+                                <Button
+                                  size="sm"
+                                  className="h-6 text-[10px] gap-1 px-2"
+                                  onClick={() => {
+                                    if (overdueConfirmDate) {
+                                      confirmOverdueConsultationMutation.mutate({ 
+                                        scheduleId: schedule.id, 
+                                        consultDate: overdueConfirmDate 
+                                      });
+                                    }
+                                  }}
+                                  disabled={!overdueConfirmDate || confirmOverdueConsultationMutation.isPending}
+                                >
+                                  <CheckCircle2 className="h-2.5 w-2.5" />
+                                  Confirmar
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-1.5"
+                                  onClick={() => { setConfirmingOverdueId(null); setOverdueConfirmDate(''); }}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 mt-1.5 pl-6">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-5 px-1.5 text-[10px] gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                                onClick={() => {
+                                  setConfirmingOverdueId(schedule.id);
+                                  setOverdueConfirmDate(schedule.send_link_date);
+                                }}
+                              >
+                                <CheckCircle2 className="h-2.5 w-2.5" />
+                                Confirmar Consulta
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setEditingScheduleId(schedule.id);
+                                  setEditDate(schedule.send_link_date);
+                                }}
+                              >
+                                <Pencil className="h-2.5 w-2.5" />
+                                Editar
+                              </Button>
+                              {canResend && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                  onClick={() => handleResendLink(schedule.id)}
+                                  disabled={isSendingLink === schedule.id}
+                                >
+                                  <Send className="h-2.5 w-2.5" />
+                                  Enviar
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-1.5 text-[10px] gap-1 text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  if (confirm('Remover esta consulta da pipeline?')) {
+                                    removeConsultationMutation.mutate(schedule.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-2.5 w-2.5" />
+                              </Button>
+                            </div>
+                          )
+                        )}
+                        {/* Action buttons for non-overdue manageable schedules */}
+                        {canManage && !isEditingThis && !(schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date))) && (
                           <div className="flex items-center gap-1 mt-1.5 pl-6">
                             <Button
                               variant="ghost"
