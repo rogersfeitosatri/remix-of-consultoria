@@ -744,7 +744,7 @@ export function useUpdateClient() {
                 futureSchedules.push({
                   client_id: id,
                   user_id: user.id,
-                  scheduled_date: format(intervalEnd, 'yyyy-MM-dd'),
+                  scheduled_date: format(sendDate, 'yyyy-MM-dd'),
                   send_link_date: format(sendDate, 'yyyy-MM-dd'),
                   status: 'pending',
                 });
