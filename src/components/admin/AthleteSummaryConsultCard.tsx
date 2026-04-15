@@ -125,6 +125,10 @@ export function AthleteSummaryConsultCard({
     },
   });
 
+  // State for confirming overdue consultations
+  const [confirmingOverdueId, setConfirmingOverdueId] = useState<string | null>(null);
+  const [overdueConfirmDate, setOverdueConfirmDate] = useState('');
+
   // Mutations for pipeline management
   const updateScheduleDateMutation = useMutation({
     mutationFn: async ({ id, newDate }: { id: string; newDate: string }) => {
@@ -165,6 +169,65 @@ export function AthleteSummaryConsultCard({
       toast.success('Consulta adicionada à pipeline');
     },
     onError: () => toast.error('Erro ao adicionar consulta'),
+  });
+
+  // Confirm overdue consultation - marks schedule as completed and creates appointment record
+  const confirmOverdueConsultationMutation = useMutation({
+    mutationFn: async ({ scheduleId, consultDate }: { scheduleId: string; consultDate: string }) => {
+      if (!user) throw new Error('Not authenticated');
+      
+      // 1. Mark schedule as completed
+      const { error: schedError } = await supabase
+        .from('consultation_schedules')
+        .update({ 
+          status: 'completed', 
+          scheduled_date: consultDate,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', scheduleId);
+      if (schedError) throw schedError;
+
+      // 2. Check if appointment already exists for this date
+      const { data: existingApt } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('client_id', client.id)
+        .eq('appointment_date', consultDate)
+        .in('status', ['completed', 'confirmed', 'scheduled'])
+        .maybeSingle();
+
+      // 3. Create completed appointment if none exists
+      if (!existingApt) {
+        const { error: aptError } = await supabase
+          .from('appointments')
+          .insert({
+            client_id: client.id,
+            user_id: user.id,
+            appointment_date: consultDate,
+            appointment_time: '09:00',
+            duration_minutes: 60,
+            status: 'completed',
+            notes_admin: 'Consulta confirmada manualmente (retroativa)',
+            timezone: 'America/Fortaleza',
+          });
+        if (aptError) throw aptError;
+      } else {
+        // Mark existing appointment as completed if not already
+        await supabase
+          .from('appointments')
+          .update({ status: 'completed' })
+          .eq('id', existingApt.id);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
+      setConfirmingOverdueId(null);
+      setOverdueConfirmDate('');
+      toast.success('Consulta confirmada com sucesso!');
+    },
+    onError: () => toast.error('Erro ao confirmar consulta'),
   });
 
   const removeConsultationMutation = useMutation({
