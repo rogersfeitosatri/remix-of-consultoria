@@ -713,7 +713,7 @@ export function AthleteSummaryConsultCard({
                         {schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date)) && (
                           confirmingOverdueId === schedule.id ? (
                             <div className="mt-1.5 pl-6 space-y-1.5">
-                              <p className="text-[10px] text-muted-foreground">Data em que a consulta ocorreu:</p>
+                              <p className="text-[10px] text-muted-foreground">Essa consulta foi realizada?</p>
                               <div className="flex items-center gap-1">
                                 <Input
                                   type="date"
@@ -723,19 +723,36 @@ export function AthleteSummaryConsultCard({
                                 />
                                 <Button
                                   size="sm"
-                                  className="h-6 text-[10px] gap-1 px-2"
+                                  className="h-6 text-[10px] gap-1 px-2 bg-emerald-600 hover:bg-emerald-700"
                                   onClick={() => {
                                     if (overdueConfirmDate) {
                                       confirmOverdueConsultationMutation.mutate({ 
                                         scheduleId: schedule.id, 
-                                        consultDate: overdueConfirmDate 
+                                        consultDate: overdueConfirmDate,
+                                        wasRealized: true,
                                       });
                                     }
                                   }}
                                   disabled={!overdueConfirmDate || confirmOverdueConsultationMutation.isPending}
                                 >
                                   <CheckCircle2 className="h-2.5 w-2.5" />
-                                  Confirmar
+                                  Realizada
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  className="h-6 text-[10px] gap-1 px-2"
+                                  onClick={() => {
+                                    confirmOverdueConsultationMutation.mutate({ 
+                                      scheduleId: schedule.id, 
+                                      consultDate: schedule.send_link_date,
+                                      wasRealized: false,
+                                    });
+                                  }}
+                                  disabled={confirmOverdueConsultationMutation.isPending}
+                                >
+                                  <X className="h-2.5 w-2.5" />
+                                  Não realizada
                                 </Button>
                                 <Button
                                   variant="ghost"
