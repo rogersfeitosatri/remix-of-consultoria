@@ -246,8 +246,7 @@ function generateConsultationSchedules(
     schedules.push({
       client_id: clientId,
       user_id: userId,
-      // Mantemos a data "prevista" da consulta como fim do intervalo (sem mudar arquitetura)
-      scheduled_date: format(intervalEndDate, 'yyyy-MM-dd'),
+      scheduled_date: format(sendLinkDate, 'yyyy-MM-dd'),
       send_link_date: format(sendLinkDate, 'yyyy-MM-dd'),
       status: 'pending',
     });
@@ -744,7 +743,7 @@ export function useUpdateClient() {
                 futureSchedules.push({
                   client_id: id,
                   user_id: user.id,
-                  scheduled_date: format(intervalEnd, 'yyyy-MM-dd'),
+                  scheduled_date: format(sendDate, 'yyyy-MM-dd'),
                   send_link_date: format(sendDate, 'yyyy-MM-dd'),
                   status: 'pending',
                 });
@@ -1020,9 +1019,17 @@ export function useUpdateConsultationSchedule() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ConsultationSchedule> & { id: string }) => {
+      // Always keep send_link_date and scheduled_date in sync
+      const finalUpdates = { ...updates };
+      if (finalUpdates.send_link_date && !finalUpdates.scheduled_date) {
+        finalUpdates.scheduled_date = finalUpdates.send_link_date;
+      } else if (finalUpdates.scheduled_date && !finalUpdates.send_link_date) {
+        finalUpdates.send_link_date = finalUpdates.scheduled_date;
+      }
+      
       const { data, error } = await supabase
         .from('consultation_schedules')
-        .update(updates)
+        .update(finalUpdates)
         .eq('id', id)
         .select()
         .single();
@@ -1030,8 +1037,9 @@ export function useUpdateConsultationSchedule() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules'] });
     },
   });
 }
@@ -1051,6 +1059,7 @@ export function useDeleteConsultationSchedule() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules'] });
     },
   });
 }
@@ -1079,6 +1088,7 @@ export function useAddConsultationSchedule() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules'] });
     },
   });
 }
