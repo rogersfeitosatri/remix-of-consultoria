@@ -192,6 +192,64 @@ export function LinkScheduleEditDialog({
     }
   };
 
+  const handleConfirmConsultation = async (scheduleId: string, consultDate: string) => {
+    setSaving(true);
+    try {
+      const schedule = allSchedules.find((s) => s.id === scheduleId);
+      if (!schedule) throw new Error('Schedule not found');
+
+      // Mark schedule as completed
+      await supabase
+        .from('consultation_schedules')
+        .update({ status: 'completed', scheduled_date: consultDate, updated_at: new Date().toISOString() })
+        .eq('id', scheduleId);
+
+      // Check if appointment exists
+      const { data: existingApt } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('client_id', schedule.client_id)
+        .eq('appointment_date', consultDate)
+        .in('status', ['completed', 'confirmed', 'scheduled'])
+        .maybeSingle();
+
+      if (!existingApt) {
+        // Get admin user_id from the schedule
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('user_id')
+          .eq('id', schedule.client_id)
+          .single();
+
+        if (clientData) {
+          await supabase.from('appointments').insert({
+            client_id: schedule.client_id,
+            user_id: clientData.user_id,
+            appointment_date: consultDate,
+            appointment_time: '09:00',
+            duration_minutes: 60,
+            status: 'completed',
+            notes_admin: 'Consulta confirmada manualmente (retroativa)',
+            timezone: 'America/Fortaleza',
+          });
+        }
+      } else {
+        await supabase.from('appointments').update({ status: 'completed' }).eq('id', existingApt.id);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-appointments'] });
+      setConfirmingId(null);
+      setConfirmDate('');
+      toast.success('Consulta confirmada!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao confirmar consulta');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const editingSchedule = editing
     ? allSchedules.find((s) => s.id === editing.scheduleId)
     : null;
