@@ -14,9 +14,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
-  Send, User, Edit2, Trash2, Check, RefreshCw, ArrowRight, CalendarDays, AlertTriangle,
+  Send, User, Edit2, Trash2, Check, RefreshCw, ArrowRight, CalendarDays, AlertTriangle, CheckCircle2,
 } from 'lucide-react';
-import { format, parseISO, getDay, addWeeks, nextMonday, isBefore } from 'date-fns';
+import { format, parseISO, getDay, addWeeks, nextMonday, isBefore, isPast, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,6 +56,8 @@ export function LinkScheduleEditDialog({
 }: LinkScheduleEditDialogProps) {
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [confirmDate, setConfirmDate] = useState('');
   const updateSchedule = useUpdateConsultationSchedule();
   const deleteSchedule = useDeleteConsultationSchedule();
   const queryClient = useQueryClient();
