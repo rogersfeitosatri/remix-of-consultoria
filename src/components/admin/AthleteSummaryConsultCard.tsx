@@ -45,6 +45,10 @@ interface ScheduleRow {
   send_link_date: string;
   status: string;
   scheduled_time: string | null;
+  link_sent_at: string | null;
+  confirmed_at: string | null;
+  confirmation_status: string | null;
+  appointment_id: string | null;
 }
 
 export function AthleteSummaryConsultCard({ 
@@ -89,7 +93,7 @@ export function AthleteSummaryConsultCard({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('consultation_schedules')
-        .select('id, scheduled_date, send_link_date, status, scheduled_time')
+        .select('id, scheduled_date, send_link_date, status, scheduled_time, link_sent_at, confirmed_at, confirmation_status, appointment_id')
         .eq('client_id', client.id)
         .order('send_link_date', { ascending: true });
       if (error) throw error;
@@ -173,50 +177,77 @@ export function AthleteSummaryConsultCard({
 
   // Confirm overdue consultation - marks schedule as completed and creates appointment record
   const confirmOverdueConsultationMutation = useMutation({
-    mutationFn: async ({ scheduleId, consultDate }: { scheduleId: string; consultDate: string }) => {
+    mutationFn: async ({ scheduleId, consultDate, wasRealized }: { scheduleId: string; consultDate: string; wasRealized: boolean }) => {
       if (!user) throw new Error('Not authenticated');
       
-      // 1. Mark schedule as completed
-      const { error: schedError } = await supabase
-        .from('consultation_schedules')
-        .update({ 
-          status: 'completed', 
-          scheduled_date: consultDate,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', scheduleId);
-      if (schedError) throw schedError;
+      if (wasRealized) {
+        // 1. Mark schedule as completed
+        const { error: schedError } = await supabase
+          .from('consultation_schedules')
+          .update({ 
+            status: 'completed', 
+            scheduled_date: consultDate,
+            confirmed_at: new Date().toISOString(),
+            confirmation_status: 'realizada',
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', scheduleId);
+        if (schedError) throw schedError;
 
-      // 2. Check if appointment already exists for this date
-      const { data: existingApt } = await supabase
-        .from('appointments')
-        .select('id')
-        .eq('client_id', client.id)
-        .eq('appointment_date', consultDate)
-        .in('status', ['completed', 'confirmed', 'scheduled'])
-        .maybeSingle();
-
-      // 3. Create completed appointment if none exists
-      if (!existingApt) {
-        const { error: aptError } = await supabase
+        // 2. Check if appointment already exists for this date
+        const { data: existingApt } = await supabase
           .from('appointments')
-          .insert({
-            client_id: client.id,
-            user_id: user.id,
-            appointment_date: consultDate,
-            appointment_time: '09:00',
-            duration_minutes: 60,
-            status: 'completed',
-            notes_admin: 'Consulta confirmada manualmente (retroativa)',
-            timezone: 'America/Fortaleza',
-          });
-        if (aptError) throw aptError;
+          .select('id')
+          .eq('client_id', client.id)
+          .eq('appointment_date', consultDate)
+          .in('status', ['completed', 'confirmed', 'scheduled'])
+          .maybeSingle();
+
+        // 3. Create completed appointment if none exists
+        if (!existingApt) {
+          const { data: newApt, error: aptError } = await supabase
+            .from('appointments')
+            .insert({
+              client_id: client.id,
+              user_id: user.id,
+              appointment_date: consultDate,
+              appointment_time: '09:00',
+              duration_minutes: 60,
+              status: 'completed',
+              notes_admin: 'Consulta confirmada manualmente (retroativa)',
+              timezone: 'America/Fortaleza',
+            })
+            .select('id')
+            .single();
+          if (aptError) throw aptError;
+          
+          // Link appointment to schedule
+          await supabase
+            .from('consultation_schedules')
+            .update({ appointment_id: newApt.id })
+            .eq('id', scheduleId);
+        } else {
+          await supabase
+            .from('appointments')
+            .update({ status: 'completed' })
+            .eq('id', existingApt.id);
+          await supabase
+            .from('consultation_schedules')
+            .update({ appointment_id: existingApt.id })
+            .eq('id', scheduleId);
+        }
       } else {
-        // Mark existing appointment as completed if not already
-        await supabase
-          .from('appointments')
-          .update({ status: 'completed' })
-          .eq('id', existingApt.id);
+        // Mark as not realized
+        const { error } = await supabase
+          .from('consultation_schedules')
+          .update({ 
+            status: 'completed', 
+            confirmed_at: new Date().toISOString(),
+            confirmation_status: 'nao_realizada',
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', scheduleId);
+        if (error) throw error;
       }
     },
     onSuccess: () => {
@@ -225,9 +256,9 @@ export function AthleteSummaryConsultCard({
       queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
       setConfirmingOverdueId(null);
       setOverdueConfirmDate('');
-      toast.success('Consulta confirmada com sucesso!');
+      toast.success('Consulta atualizada com sucesso!');
     },
-    onError: () => toast.error('Erro ao confirmar consulta'),
+    onError: () => toast.error('Erro ao atualizar consulta'),
   });
 
   const removeConsultationMutation = useMutation({
@@ -365,7 +396,8 @@ export function AthleteSummaryConsultCard({
   // Pipeline: future/pending schedules
   const pendingSchedules = schedules.filter(s => ['pending', 'sent', 'link_sent'].includes(s.status));
   const scheduledSchedules = schedules.filter(s => s.status === 'scheduled');
-  const completedSchedules = schedules.filter(s => s.status === 'completed');
+  const completedSchedules = schedules.filter(s => s.status === 'completed' && s.confirmation_status !== 'nao_realizada');
+  const notRealizedSchedules = schedules.filter(s => s.confirmation_status === 'nao_realizada');
 
   // Last completed consultation date (from appointments)
   const lastCompletedAppointment = completedAppointments.length > 0 ? completedAppointments[0] : null;
@@ -398,26 +430,27 @@ export function AthleteSummaryConsultCard({
     setIsEditing(false);
   };
 
-  const getScheduleStatusBadge = (status: string, sendDate: string) => {
-    const sendDateParsed = parseISO(sendDate);
+  const getScheduleStatusBadge = (schedule: ScheduleRow) => {
+    const { status, send_link_date, confirmation_status } = schedule;
+    const sendDateParsed = parseISO(send_link_date);
     const isOverdue = isPast(sendDateParsed) && !isToday(sendDateParsed) && status === 'pending';
 
-    switch (status) {
-      case 'completed':
-        return <Badge className="text-[10px] bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Realizada</Badge>;
-      case 'scheduled':
-        return <Badge className="text-[10px] bg-blue-500/10 text-blue-500 border-blue-500/20">Agendada</Badge>;
-      case 'sent':
-      case 'link_sent':
-        return <Badge className="text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/20">Link Enviado</Badge>;
-      case 'pending':
-        if (isOverdue) {
-          return <Badge className="text-[10px] bg-red-500/10 text-red-500 border-red-500/20">Atrasado</Badge>;
-        }
-        return <Badge variant="secondary" className="text-[10px]">Pendente</Badge>;
-      default:
-        return <Badge variant="outline" className="text-[10px]">{status}</Badge>;
+    if (status === 'completed' && confirmation_status === 'nao_realizada') {
+      return <Badge className="text-[10px] bg-red-500/10 text-red-500 border-red-500/20">Não Realizada</Badge>;
     }
+    if (status === 'completed') {
+      return <Badge className="text-[10px] bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Confirmada ✓</Badge>;
+    }
+    if (status === 'scheduled') {
+      return <Badge className="text-[10px] bg-blue-500/10 text-blue-500 border-blue-500/20">Agendada</Badge>;
+    }
+    if (status === 'sent' || status === 'link_sent') {
+      return <Badge className="text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/20">Link Enviado</Badge>;
+    }
+    if (status === 'pending' && isOverdue) {
+      return <Badge className="text-[10px] bg-red-500/10 text-red-500 border-red-500/20">Atrasado</Badge>;
+    }
+    return <Badge variant="secondary" className="text-[10px]">Pendente</Badge>;
   };
   
   if (isLoading) {
@@ -528,12 +561,13 @@ export function AthleteSummaryConsultCard({
                 <p>
                   <span className="font-medium text-foreground">{client.consultation_count}</span> consulta{client.consultation_count > 1 ? 's' : ''} no plano ({frequencyLabel})
                 </p>
-                {completedSchedules.length > 0 && (
+                {(completedSchedules.length > 0 || notRealizedSchedules.length > 0) && (
                   <p className="mt-0.5">
-                    ✅ {completedSchedules.length} realizada{completedSchedules.length > 1 ? 's' : ''} · 
+                    {completedSchedules.length > 0 && `✅ ${completedSchedules.length} confirmada${completedSchedules.length > 1 ? 's' : ''}`}
+                    {notRealizedSchedules.length > 0 && ` · ❌ ${notRealizedSchedules.length} não realizada${notRealizedSchedules.length > 1 ? 's' : ''}`}
                     {pendingSchedules.length > 0 
-                      ? ` 📅 ${pendingSchedules.length} pendente${pendingSchedules.length > 1 ? 's' : ''}` 
-                      : ' Todas concluídas'}
+                      ? ` · 📅 ${pendingSchedules.length} pendente${pendingSchedules.length > 1 ? 's' : ''}` 
+                      : completedSchedules.length + notRealizedSchedules.length >= (client.consultation_count || 0) ? ' · Todas concluídas' : ''}
                   </p>
                 )}
               </div>
@@ -660,12 +694,22 @@ export function AthleteSummaryConsultCard({
                               <div className="min-w-0">
                                 <p className="font-medium truncate">
                                   {schedule.status === 'completed' 
-                                    ? format(parseISO(schedule.scheduled_date), "dd/MM/yy")
+                                    ? `${format(parseISO(schedule.scheduled_date), "dd/MM/yy")}${schedule.confirmation_status === 'nao_realizada' ? ' ✗' : ''}`
                                     : `Envio: ${format(parseISO(schedule.send_link_date), "dd/MM/yy")}`
                                   }
                                 </p>
+                                {schedule.link_sent_at && (
+                                  <p className="text-muted-foreground text-[10px]">
+                                    Link: {format(parseISO(schedule.link_sent_at), "dd/MM HH:mm")}
+                                  </p>
+                                )}
                                 {schedule.scheduled_time && (
                                   <p className="text-muted-foreground text-[10px]">{schedule.scheduled_time.slice(0, 5)}</p>
+                                )}
+                                {schedule.confirmed_at && (
+                                  <p className="text-muted-foreground text-[10px]">
+                                    Confirmado: {format(parseISO(schedule.confirmed_at), "dd/MM/yy")}
+                                  </p>
                                 )}
                                 {schedule.status === 'pending' && !isPast(parseISO(schedule.send_link_date)) && (
                                   <p className="text-muted-foreground text-[10px]">em {differenceInDays(parseISO(schedule.send_link_date), today)}d</p>
@@ -674,14 +718,14 @@ export function AthleteSummaryConsultCard({
                             )}
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
-                            {getScheduleStatusBadge(schedule.status, schedule.send_link_date)}
+                            {getScheduleStatusBadge(schedule)}
                           </div>
                         </div>
                         {/* Overdue confirmation UI */}
                         {schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date)) && (
                           confirmingOverdueId === schedule.id ? (
                             <div className="mt-1.5 pl-6 space-y-1.5">
-                              <p className="text-[10px] text-muted-foreground">Data em que a consulta ocorreu:</p>
+                              <p className="text-[10px] text-muted-foreground">Essa consulta foi realizada?</p>
                               <div className="flex items-center gap-1">
                                 <Input
                                   type="date"
@@ -691,19 +735,36 @@ export function AthleteSummaryConsultCard({
                                 />
                                 <Button
                                   size="sm"
-                                  className="h-6 text-[10px] gap-1 px-2"
+                                  className="h-6 text-[10px] gap-1 px-2 bg-emerald-600 hover:bg-emerald-700"
                                   onClick={() => {
                                     if (overdueConfirmDate) {
                                       confirmOverdueConsultationMutation.mutate({ 
                                         scheduleId: schedule.id, 
-                                        consultDate: overdueConfirmDate 
+                                        consultDate: overdueConfirmDate,
+                                        wasRealized: true,
                                       });
                                     }
                                   }}
                                   disabled={!overdueConfirmDate || confirmOverdueConsultationMutation.isPending}
                                 >
                                   <CheckCircle2 className="h-2.5 w-2.5" />
-                                  Confirmar
+                                  Realizada
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  className="h-6 text-[10px] gap-1 px-2"
+                                  onClick={() => {
+                                    confirmOverdueConsultationMutation.mutate({ 
+                                      scheduleId: schedule.id, 
+                                      consultDate: schedule.send_link_date,
+                                      wasRealized: false,
+                                    });
+                                  }}
+                                  disabled={confirmOverdueConsultationMutation.isPending}
+                                >
+                                  <X className="h-2.5 w-2.5" />
+                                  Não realizada
                                 </Button>
                                 <Button
                                   variant="ghost"
