@@ -695,7 +695,9 @@ export function AthleteSummaryConsultCard({
                                 <p className="font-medium truncate">
                                   {schedule.status === 'completed' 
                                     ? `${format(parseISO(schedule.scheduled_date), "dd/MM/yy")}${schedule.confirmation_status === 'nao_realizada' ? ' ✗' : ''}`
-                                    : `Envio: ${format(parseISO(schedule.send_link_date), "dd/MM/yy")}`
+                                    : schedule.status === 'scheduled'
+                                      ? format(parseISO(schedule.scheduled_date), "dd/MM/yy")
+                                      : `Envio: ${format(parseISO(schedule.send_link_date), "dd/MM/yy")}`
                                   }
                                 </p>
                                 {schedule.link_sent_at && (
