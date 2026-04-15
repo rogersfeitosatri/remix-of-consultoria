@@ -561,12 +561,13 @@ export function AthleteSummaryConsultCard({
                 <p>
                   <span className="font-medium text-foreground">{client.consultation_count}</span> consulta{client.consultation_count > 1 ? 's' : ''} no plano ({frequencyLabel})
                 </p>
-                {completedSchedules.length > 0 && (
+                {(completedSchedules.length > 0 || notRealizedSchedules.length > 0) && (
                   <p className="mt-0.5">
-                    ✅ {completedSchedules.length} realizada{completedSchedules.length > 1 ? 's' : ''} · 
+                    {completedSchedules.length > 0 && `✅ ${completedSchedules.length} confirmada${completedSchedules.length > 1 ? 's' : ''}`}
+                    {notRealizedSchedules.length > 0 && ` · ❌ ${notRealizedSchedules.length} não realizada${notRealizedSchedules.length > 1 ? 's' : ''}`}
                     {pendingSchedules.length > 0 
-                      ? ` 📅 ${pendingSchedules.length} pendente${pendingSchedules.length > 1 ? 's' : ''}` 
-                      : ' Todas concluídas'}
+                      ? ` · 📅 ${pendingSchedules.length} pendente${pendingSchedules.length > 1 ? 's' : ''}` 
+                      : completedSchedules.length + notRealizedSchedules.length >= (client.consultation_count || 0) ? ' · Todas concluídas' : ''}
                   </p>
                 )}
               </div>
