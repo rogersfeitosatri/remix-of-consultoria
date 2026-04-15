@@ -396,7 +396,8 @@ export function AthleteSummaryConsultCard({
   // Pipeline: future/pending schedules
   const pendingSchedules = schedules.filter(s => ['pending', 'sent', 'link_sent'].includes(s.status));
   const scheduledSchedules = schedules.filter(s => s.status === 'scheduled');
-  const completedSchedules = schedules.filter(s => s.status === 'completed');
+  const completedSchedules = schedules.filter(s => s.status === 'completed' && s.confirmation_status !== 'nao_realizada');
+  const notRealizedSchedules = schedules.filter(s => s.confirmation_status === 'nao_realizada');
 
   // Last completed consultation date (from appointments)
   const lastCompletedAppointment = completedAppointments.length > 0 ? completedAppointments[0] : null;
