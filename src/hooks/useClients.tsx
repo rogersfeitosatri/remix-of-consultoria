@@ -246,8 +246,7 @@ function generateConsultationSchedules(
     schedules.push({
       client_id: clientId,
       user_id: userId,
-      // Mantemos a data "prevista" da consulta como fim do intervalo (sem mudar arquitetura)
-      scheduled_date: format(intervalEndDate, 'yyyy-MM-dd'),
+      scheduled_date: format(sendLinkDate, 'yyyy-MM-dd'),
       send_link_date: format(sendLinkDate, 'yyyy-MM-dd'),
       status: 'pending',
     });
