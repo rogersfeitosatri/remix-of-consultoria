@@ -45,6 +45,10 @@ interface ScheduleRow {
   send_link_date: string;
   status: string;
   scheduled_time: string | null;
+  link_sent_at: string | null;
+  confirmed_at: string | null;
+  confirmation_status: string | null;
+  appointment_id: string | null;
 }
 
 export function AthleteSummaryConsultCard({ 
