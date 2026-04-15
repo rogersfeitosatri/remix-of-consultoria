@@ -1020,9 +1020,17 @@ export function useUpdateConsultationSchedule() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ConsultationSchedule> & { id: string }) => {
+      // Always keep send_link_date and scheduled_date in sync
+      const finalUpdates = { ...updates };
+      if (finalUpdates.send_link_date && !finalUpdates.scheduled_date) {
+        finalUpdates.scheduled_date = finalUpdates.send_link_date;
+      } else if (finalUpdates.scheduled_date && !finalUpdates.send_link_date) {
+        finalUpdates.send_link_date = finalUpdates.scheduled_date;
+      }
+      
       const { data, error } = await supabase
         .from('consultation_schedules')
-        .update(updates)
+        .update(finalUpdates)
         .eq('id', id)
         .select()
         .single();
