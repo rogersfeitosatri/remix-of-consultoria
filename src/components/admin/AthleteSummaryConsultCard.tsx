@@ -93,7 +93,7 @@ export function AthleteSummaryConsultCard({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('consultation_schedules')
-        .select('id, scheduled_date, send_link_date, status, scheduled_time')
+        .select('id, scheduled_date, send_link_date, status, scheduled_time, link_sent_at, confirmed_at, confirmation_status, appointment_id')
         .eq('client_id', client.id)
         .order('send_link_date', { ascending: true });
       if (error) throw error;
