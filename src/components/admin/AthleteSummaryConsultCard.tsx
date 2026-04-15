@@ -831,6 +831,35 @@ export function AthleteSummaryConsultCard({
                             </div>
                           )
                         )}
+                        {/* Confirm realized for scheduled consultations whose date has passed */}
+                        {schedule.status === 'scheduled' && schedule.appointment_id && isPast(parseISO(schedule.scheduled_date)) && !isToday(parseISO(schedule.scheduled_date)) && (
+                          <div className="flex items-center gap-1 mt-1.5 pl-6">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px] gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                              onClick={async () => {
+                                try {
+                                  // Mark appointment as completed → trigger will sync schedule
+                                  const { error } = await supabase
+                                    .from('appointments')
+                                    .update({ status: 'completed' })
+                                    .eq('id', schedule.appointment_id!);
+                                  if (error) throw error;
+                                  queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+                                  queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
+                                  queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+                                  toast.success('Consulta confirmada como realizada!');
+                                } catch {
+                                  toast.error('Erro ao confirmar consulta');
+                                }
+                              }}
+                            >
+                              <CheckCircle2 className="h-2.5 w-2.5" />
+                              Confirmar Realizada
+                            </Button>
+                          </div>
+                        )}
                         {/* Action buttons for non-overdue manageable schedules */}
                         {canManage && !isEditingThis && !(schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date))) && (
                           <div className="flex items-center gap-1 mt-1.5 pl-6">
