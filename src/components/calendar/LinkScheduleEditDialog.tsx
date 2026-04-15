@@ -9,13 +9,14 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
-  Send, User, Edit2, Trash2, Check, RefreshCw, ArrowRight, CalendarDays, AlertTriangle,
+  Send, User, Edit2, Trash2, Check, RefreshCw, ArrowRight, CalendarDays, AlertTriangle, CheckCircle2,
 } from 'lucide-react';
-import { format, parseISO, getDay, addWeeks, nextMonday, isBefore } from 'date-fns';
+import { format, parseISO, getDay, addWeeks, nextMonday, isBefore, isPast, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,6 +56,8 @@ export function LinkScheduleEditDialog({
 }: LinkScheduleEditDialogProps) {
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [confirmDate, setConfirmDate] = useState('');
   const updateSchedule = useUpdateConsultationSchedule();
   const deleteSchedule = useDeleteConsultationSchedule();
   const queryClient = useQueryClient();
@@ -189,6 +192,64 @@ export function LinkScheduleEditDialog({
     }
   };
 
+  const handleConfirmConsultation = async (scheduleId: string, consultDate: string) => {
+    setSaving(true);
+    try {
+      const schedule = allSchedules.find((s) => s.id === scheduleId);
+      if (!schedule) throw new Error('Schedule not found');
+
+      // Mark schedule as completed
+      await supabase
+        .from('consultation_schedules')
+        .update({ status: 'completed', scheduled_date: consultDate, updated_at: new Date().toISOString() })
+        .eq('id', scheduleId);
+
+      // Check if appointment exists
+      const { data: existingApt } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('client_id', schedule.client_id)
+        .eq('appointment_date', consultDate)
+        .in('status', ['completed', 'confirmed', 'scheduled'])
+        .maybeSingle();
+
+      if (!existingApt) {
+        // Get admin user_id from the schedule
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('user_id')
+          .eq('id', schedule.client_id)
+          .single();
+
+        if (clientData) {
+          await supabase.from('appointments').insert({
+            client_id: schedule.client_id,
+            user_id: clientData.user_id,
+            appointment_date: consultDate,
+            appointment_time: '09:00',
+            duration_minutes: 60,
+            status: 'completed',
+            notes_admin: 'Consulta confirmada manualmente (retroativa)',
+            timezone: 'America/Fortaleza',
+          });
+        }
+      } else {
+        await supabase.from('appointments').update({ status: 'completed' }).eq('id', existingApt.id);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-appointments'] });
+      setConfirmingId(null);
+      setConfirmDate('');
+      toast.success('Consulta confirmada!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao confirmar consulta');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const editingSchedule = editing
     ? allSchedules.find((s) => s.id === editing.scheduleId)
     : null;
@@ -254,6 +315,21 @@ export function LinkScheduleEditDialog({
 
                       {!isEditing && (
                         <div className="flex items-center gap-1">
+                          {/* Show confirm button for overdue items */}
+                          {isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date)) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700"
+                              onClick={() => {
+                                setConfirmingId(schedule.id);
+                                setConfirmDate(schedule.send_link_date);
+                              }}
+                              title="Confirmar que a consulta ocorreu"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -281,6 +357,38 @@ export function LinkScheduleEditDialog({
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
+                        </div>
+                      )}
+
+                      {/* Confirm consultation inline form */}
+                      {confirmingId === schedule.id && !isEditing && (
+                        <div className="mt-2 p-2 rounded-md bg-emerald-500/5 border border-emerald-500/20">
+                          <p className="text-xs text-muted-foreground mb-1.5">Data em que a consulta ocorreu:</p>
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="date"
+                              value={confirmDate}
+                              onChange={e => setConfirmDate(e.target.value)}
+                              className="h-7 text-xs flex-1"
+                            />
+                            <Button
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              onClick={() => handleConfirmConsultation(schedule.id, confirmDate)}
+                              disabled={!confirmDate || saving}
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              Confirmar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-1.5"
+                              onClick={() => { setConfirmingId(null); setConfirmDate(''); }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
