@@ -1060,6 +1060,7 @@ export function useDeleteConsultationSchedule() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules'] });
     },
   });
 }
@@ -1088,6 +1089,7 @@ export function useAddConsultationSchedule() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules'] });
     },
   });
 }
