@@ -1038,8 +1038,9 @@ export function useUpdateConsultationSchedule() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules'] });
     },
   });
 }
