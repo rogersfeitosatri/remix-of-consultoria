@@ -429,26 +429,27 @@ export function AthleteSummaryConsultCard({
     setIsEditing(false);
   };
 
-  const getScheduleStatusBadge = (status: string, sendDate: string) => {
-    const sendDateParsed = parseISO(sendDate);
+  const getScheduleStatusBadge = (schedule: ScheduleRow) => {
+    const { status, send_link_date, confirmation_status } = schedule;
+    const sendDateParsed = parseISO(send_link_date);
     const isOverdue = isPast(sendDateParsed) && !isToday(sendDateParsed) && status === 'pending';
 
-    switch (status) {
-      case 'completed':
-        return <Badge className="text-[10px] bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Realizada</Badge>;
-      case 'scheduled':
-        return <Badge className="text-[10px] bg-blue-500/10 text-blue-500 border-blue-500/20">Agendada</Badge>;
-      case 'sent':
-      case 'link_sent':
-        return <Badge className="text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/20">Link Enviado</Badge>;
-      case 'pending':
-        if (isOverdue) {
-          return <Badge className="text-[10px] bg-red-500/10 text-red-500 border-red-500/20">Atrasado</Badge>;
-        }
-        return <Badge variant="secondary" className="text-[10px]">Pendente</Badge>;
-      default:
-        return <Badge variant="outline" className="text-[10px]">{status}</Badge>;
+    if (status === 'completed' && confirmation_status === 'nao_realizada') {
+      return <Badge className="text-[10px] bg-red-500/10 text-red-500 border-red-500/20">Não Realizada</Badge>;
     }
+    if (status === 'completed') {
+      return <Badge className="text-[10px] bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Confirmada ✓</Badge>;
+    }
+    if (status === 'scheduled') {
+      return <Badge className="text-[10px] bg-blue-500/10 text-blue-500 border-blue-500/20">Agendada</Badge>;
+    }
+    if (status === 'sent' || status === 'link_sent') {
+      return <Badge className="text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/20">Link Enviado</Badge>;
+    }
+    if (status === 'pending' && isOverdue) {
+      return <Badge className="text-[10px] bg-red-500/10 text-red-500 border-red-500/20">Atrasado</Badge>;
+    }
+    return <Badge variant="secondary" className="text-[10px]">Pendente</Badge>;
   };
   
   if (isLoading) {
