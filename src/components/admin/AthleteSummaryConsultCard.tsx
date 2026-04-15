@@ -692,12 +692,22 @@ export function AthleteSummaryConsultCard({
                               <div className="min-w-0">
                                 <p className="font-medium truncate">
                                   {schedule.status === 'completed' 
-                                    ? format(parseISO(schedule.scheduled_date), "dd/MM/yy")
+                                    ? `${format(parseISO(schedule.scheduled_date), "dd/MM/yy")}${schedule.confirmation_status === 'nao_realizada' ? ' ✗' : ''}`
                                     : `Envio: ${format(parseISO(schedule.send_link_date), "dd/MM/yy")}`
                                   }
                                 </p>
+                                {schedule.link_sent_at && (
+                                  <p className="text-muted-foreground text-[10px]">
+                                    Link: {format(parseISO(schedule.link_sent_at), "dd/MM HH:mm")}
+                                  </p>
+                                )}
                                 {schedule.scheduled_time && (
                                   <p className="text-muted-foreground text-[10px]">{schedule.scheduled_time.slice(0, 5)}</p>
+                                )}
+                                {schedule.confirmed_at && (
+                                  <p className="text-muted-foreground text-[10px]">
+                                    Confirmado: {format(parseISO(schedule.confirmed_at), "dd/MM/yy")}
+                                  </p>
                                 )}
                                 {schedule.status === 'pending' && !isPast(parseISO(schedule.send_link_date)) && (
                                   <p className="text-muted-foreground text-[10px]">em {differenceInDays(parseISO(schedule.send_link_date), today)}d</p>
