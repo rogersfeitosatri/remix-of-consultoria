@@ -177,50 +177,77 @@ export function AthleteSummaryConsultCard({
 
   // Confirm overdue consultation - marks schedule as completed and creates appointment record
   const confirmOverdueConsultationMutation = useMutation({
-    mutationFn: async ({ scheduleId, consultDate }: { scheduleId: string; consultDate: string }) => {
+    mutationFn: async ({ scheduleId, consultDate, wasRealized }: { scheduleId: string; consultDate: string; wasRealized: boolean }) => {
       if (!user) throw new Error('Not authenticated');
       
-      // 1. Mark schedule as completed
-      const { error: schedError } = await supabase
-        .from('consultation_schedules')
-        .update({ 
-          status: 'completed', 
-          scheduled_date: consultDate,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', scheduleId);
-      if (schedError) throw schedError;
+      if (wasRealized) {
+        // 1. Mark schedule as completed
+        const { error: schedError } = await supabase
+          .from('consultation_schedules')
+          .update({ 
+            status: 'completed', 
+            scheduled_date: consultDate,
+            confirmed_at: new Date().toISOString(),
+            confirmation_status: 'realizada',
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', scheduleId);
+        if (schedError) throw schedError;
 
-      // 2. Check if appointment already exists for this date
-      const { data: existingApt } = await supabase
-        .from('appointments')
-        .select('id')
-        .eq('client_id', client.id)
-        .eq('appointment_date', consultDate)
-        .in('status', ['completed', 'confirmed', 'scheduled'])
-        .maybeSingle();
-
-      // 3. Create completed appointment if none exists
-      if (!existingApt) {
-        const { error: aptError } = await supabase
+        // 2. Check if appointment already exists for this date
+        const { data: existingApt } = await supabase
           .from('appointments')
-          .insert({
-            client_id: client.id,
-            user_id: user.id,
-            appointment_date: consultDate,
-            appointment_time: '09:00',
-            duration_minutes: 60,
-            status: 'completed',
-            notes_admin: 'Consulta confirmada manualmente (retroativa)',
-            timezone: 'America/Fortaleza',
-          });
-        if (aptError) throw aptError;
+          .select('id')
+          .eq('client_id', client.id)
+          .eq('appointment_date', consultDate)
+          .in('status', ['completed', 'confirmed', 'scheduled'])
+          .maybeSingle();
+
+        // 3. Create completed appointment if none exists
+        if (!existingApt) {
+          const { data: newApt, error: aptError } = await supabase
+            .from('appointments')
+            .insert({
+              client_id: client.id,
+              user_id: user.id,
+              appointment_date: consultDate,
+              appointment_time: '09:00',
+              duration_minutes: 60,
+              status: 'completed',
+              notes_admin: 'Consulta confirmada manualmente (retroativa)',
+              timezone: 'America/Fortaleza',
+            })
+            .select('id')
+            .single();
+          if (aptError) throw aptError;
+          
+          // Link appointment to schedule
+          await supabase
+            .from('consultation_schedules')
+            .update({ appointment_id: newApt.id })
+            .eq('id', scheduleId);
+        } else {
+          await supabase
+            .from('appointments')
+            .update({ status: 'completed' })
+            .eq('id', existingApt.id);
+          await supabase
+            .from('consultation_schedules')
+            .update({ appointment_id: existingApt.id })
+            .eq('id', scheduleId);
+        }
       } else {
-        // Mark existing appointment as completed if not already
-        await supabase
-          .from('appointments')
-          .update({ status: 'completed' })
-          .eq('id', existingApt.id);
+        // Mark as not realized
+        const { error } = await supabase
+          .from('consultation_schedules')
+          .update({ 
+            status: 'completed', 
+            confirmed_at: new Date().toISOString(),
+            confirmation_status: 'nao_realizada',
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', scheduleId);
+        if (error) throw error;
       }
     },
     onSuccess: () => {
@@ -229,9 +256,9 @@ export function AthleteSummaryConsultCard({
       queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
       setConfirmingOverdueId(null);
       setOverdueConfirmDate('');
-      toast.success('Consulta confirmada com sucesso!');
+      toast.success('Consulta atualizada com sucesso!');
     },
-    onError: () => toast.error('Erro ao confirmar consulta'),
+    onError: () => toast.error('Erro ao atualizar consulta'),
   });
 
   const removeConsultationMutation = useMutation({
