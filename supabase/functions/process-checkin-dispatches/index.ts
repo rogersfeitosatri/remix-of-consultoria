@@ -129,13 +129,14 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Use the unified frequency check
+        // Use the unified frequency check (now based on last_dispatched_at + cycle)
         const weeklyDays = schedule.weekly_days || [1];
         const shouldSendToday = shouldSendForFrequency(
           schedule.frequency_type,
           currentDay,
           weeklyDays,
           schedule.start_date,
+          schedule.last_dispatched_at,
           now
         );
 
