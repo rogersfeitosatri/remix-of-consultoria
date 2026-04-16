@@ -35,10 +35,11 @@ function shouldSendForFrequency(
   currentDay: number,
   weeklyDays: number[],
   startDate: string,
+  lastDispatchedAt: string | null,
   now: Date
 ): boolean {
   const freqWeeks = getFrequencyWeeks(frequencyType);
-  
+
   // Check if today is a valid send day
   if (!weeklyDays.includes(currentDay)) return false;
 
@@ -47,12 +48,23 @@ function shouldSendForFrequency(
     return true;
   }
 
-  // For multi-week frequencies, calculate weeks since start
-  const start = new Date(startDate);
-  const weeksSinceStart = Math.floor(
-    (now.getTime() - start.getTime()) / (7 * 24 * 60 * 60 * 1000)
-  );
-  return weeksSinceStart % freqWeeks === 0;
+  // NEW LOGIC: "last dispatch + cycle" instead of "weeks_since_start % cycle"
+  // This eliminates the alignment bug where start_date offset caused permanent skips.
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const today = new Date(now.toISOString().split('T')[0] + 'T00:00:00Z');
+
+  if (!lastDispatchedAt) {
+    // Never dispatched: send if start_date has passed
+    const start = new Date(startDate + 'T00:00:00Z');
+    return today.getTime() >= start.getTime();
+  }
+
+  // Send if at least (freqWeeks * 7 - 1) days have passed since last dispatch
+  // The "-1" provides a small tolerance to avoid edge cases on the exact target day
+  const last = new Date(lastDispatchedAt);
+  const lastDay = new Date(last.toISOString().split('T')[0] + 'T00:00:00Z');
+  const daysSinceLast = Math.floor((today.getTime() - lastDay.getTime()) / MS_PER_DAY);
+  return daysSinceLast >= (freqWeeks * 7 - 1);
 }
 
 Deno.serve(async (req) => {
@@ -117,13 +129,14 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Use the unified frequency check
+        // Use the unified frequency check (now based on last_dispatched_at + cycle)
         const weeklyDays = schedule.weekly_days || [1];
         const shouldSendToday = shouldSendForFrequency(
           schedule.frequency_type,
           currentDay,
           weeklyDays,
           schedule.start_date,
+          schedule.last_dispatched_at,
           now
         );
 
