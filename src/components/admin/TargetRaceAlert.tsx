@@ -634,6 +634,8 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
             </p>
           </div>
         )}
+
+        {renderCompletedRacesHistory()}
       </CardContent>
     </Card>
   );
