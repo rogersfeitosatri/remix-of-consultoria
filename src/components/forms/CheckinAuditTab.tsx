@@ -284,7 +284,8 @@ export function CheckinAuditTab() {
     const pendingReview = baseItemsForStats.filter(i => i.feedback_status === 'pending' || i.feedback_status === 'no_feedback').length;
     const feedbackSent = baseItemsForStats.filter(i => i.feedback_status === 'sent').length;
     const unanswered = baseItemsForStats.filter(i => i.feedback_status === 'unanswered').length;
-    return { total, pendingReview, feedbackSent, unanswered };
+    const cancelled = baseItemsForStats.filter(i => i.feedback_status === 'cancelled').length;
+    return { total, pendingReview, feedbackSent, unanswered, cancelled };
   }, [baseItemsForStats]);
 
   const getStatusBadge = (status: AuditItem['feedback_status']) => {
@@ -299,6 +300,8 @@ export function CheckinAuditTab() {
         return <Badge variant="outline" className="text-muted-foreground"><MessageSquare className="h-3 w-3 mr-1" />Sem Feedback</Badge>;
       case 'unanswered':
         return <Badge className="bg-red-500/20 text-red-700 border-red-500/30"><Send className="h-3 w-3 mr-1" />Sem Resposta</Badge>;
+      case 'cancelled':
+        return <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30"><X className="h-3 w-3 mr-1" />Cancelado pelo admin</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
