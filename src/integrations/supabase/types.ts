@@ -4382,6 +4382,9 @@ export type Database = {
           buffer_minutes: number
           created_at: string
           id: string
+          max_advance_days: number
+          min_advance_unit: string
+          min_advance_value: number
           slot_duration_minutes: number
           updated_at: string
           user_id: string
@@ -4394,6 +4397,9 @@ export type Database = {
           buffer_minutes?: number
           created_at?: string
           id?: string
+          max_advance_days?: number
+          min_advance_unit?: string
+          min_advance_value?: number
           slot_duration_minutes?: number
           updated_at?: string
           user_id: string
@@ -4406,6 +4412,9 @@ export type Database = {
           buffer_minutes?: number
           created_at?: string
           id?: string
+          max_advance_days?: number
+          min_advance_unit?: string
+          min_advance_value?: number
           slot_duration_minutes?: number
           updated_at?: string
           user_id?: string
