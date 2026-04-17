@@ -379,6 +379,30 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
   }
 
 
+  // Helper to render completed races history
+  const renderCompletedRacesHistory = () => {
+    if (completedRaces.length === 0) return null;
+    return (
+      <div className="pt-3 border-t mt-3 space-y-2">
+        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          <Trophy className="h-3 w-3" /> Provas realizadas
+        </p>
+        <div className="space-y-1">
+          {completedRaces.map((r: any) => (
+            <div key={r.id} className="flex items-center justify-between text-xs bg-muted/40 rounded px-2 py-1.5">
+              <span className="font-medium truncate">{r.race_name}</span>
+              {r.race_date && (
+                <span className="text-muted-foreground shrink-0 ml-2">
+                  {format(parseISO(r.race_date), "dd/MM/yyyy", { locale: ptBR })}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   // No target race
   if (!alertData?.hasTargetRace) {
     return (
@@ -418,6 +442,69 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
               Adicionar Prova Alvo
             </Button>
           </div>
+          {renderCompletedRacesHistory()}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Target race already passed → show "completed" state with action to add a new one
+  if (isRacePast) {
+    return (
+      <Card className="border-green-500/30 bg-green-500/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base text-foreground">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-green-600" />
+              Prova Realizada
+            </div>
+            <Badge variant="secondary" className="text-xs">Concluída</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">{alertData.targetRace}</span>
+            </div>
+            {alertData.targetDeadline && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>
+                  {format(parseISO(alertData.targetDeadline), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-muted/50 p-3 rounded-lg">
+            <p className="text-sm">
+              A data desta prova já passou. Salve como prova realizada e cadastre uma nova prova alvo para continuar o acompanhamento.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              size="sm"
+              className="flex-1"
+              onClick={handleArchiveAndAddNew}
+              disabled={isSaving}
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trophy className="h-4 w-4 mr-2" />}
+              Salvar como realizada e adicionar nova
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleStartEdit}
+              disabled={isSaving}
+            >
+              <Edit2 className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
+          </div>
+
+          {renderCompletedRacesHistory()}
         </CardContent>
       </Card>
     );
