@@ -73,6 +73,9 @@ export default function SchedulingSettings() {
   const [endTime, setEndTime] = useState('18:00');
   const [slotDuration, setSlotDuration] = useState(60);
   const [bufferMinutes, setBufferMinutes] = useState(0);
+  const [minAdvanceValue, setMinAdvanceValue] = useState(24);
+  const [minAdvanceUnit, setMinAdvanceUnit] = useState<'hours' | 'days'>('hours');
+  const [maxAdvanceDays, setMaxAdvanceDays] = useState(60);
   const [slug, setSlug] = useState('');
   const [copied, setCopied] = useState(false);
   
@@ -91,6 +94,9 @@ export default function SchedulingSettings() {
     endTime + ':00' !== settings.working_hours_end ||
     slotDuration !== settings.slot_duration_minutes ||
     bufferMinutes !== ((settings as any).buffer_minutes || 0) ||
+    minAdvanceValue !== ((settings as any).min_advance_value ?? 24) ||
+    minAdvanceUnit !== ((settings as any).min_advance_unit ?? 'hours') ||
+    maxAdvanceDays !== ((settings as any).max_advance_days ?? 60) ||
     slug !== (settings.booking_link_slug || '')
   ) : false;
 
@@ -101,6 +107,9 @@ export default function SchedulingSettings() {
       setEndTime(settings.working_hours_end?.substring(0, 5) || '18:00');
       setSlotDuration(settings.slot_duration_minutes);
       setBufferMinutes((settings as any).buffer_minutes || 0);
+      setMinAdvanceValue((settings as any).min_advance_value ?? 24);
+      setMinAdvanceUnit(((settings as any).min_advance_unit ?? 'hours') as 'hours' | 'days');
+      setMaxAdvanceDays((settings as any).max_advance_days ?? 60);
       setSlug(settings.booking_link_slug || '');
     }
   }, [settings]);
@@ -113,6 +122,9 @@ export default function SchedulingSettings() {
         working_hours_end: endTime + ':00',
         slot_duration_minutes: slotDuration,
         buffer_minutes: bufferMinutes,
+        min_advance_value: minAdvanceValue,
+        min_advance_unit: minAdvanceUnit,
+        max_advance_days: maxAdvanceDays,
         booking_link_slug: slug || null,
       } as any);
       toast.success('Configurações salvas!');
