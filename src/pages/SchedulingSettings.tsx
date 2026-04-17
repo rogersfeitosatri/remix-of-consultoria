@@ -361,6 +361,57 @@ export default function SchedulingSettings() {
               </CardContent>
             </Card>
 
+            {/* Janela de visualização (atleta) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Janela de Visualização do Atleta
+                </CardTitle>
+                <CardDescription>
+                  Controle a partir de quando e até quando o atleta consegue ver horários disponíveis no link público de agendamento
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Antecedência mínima</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={minAdvanceValue}
+                      onChange={(e) => setMinAdvanceValue(Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Unidade</Label>
+                    <Select value={minAdvanceUnit} onValueChange={(v) => setMinAdvanceUnit(v as 'hours' | 'days')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hours">Horas</SelectItem>
+                        <SelectItem value="days">Dias</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Até quantos dias à frente</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={maxAdvanceDays}
+                      onChange={(e) => setMaxAdvanceDays(Math.max(1, Number(e.target.value) || 1))}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Ex: <strong>{minAdvanceValue} {minAdvanceUnit === 'hours' ? 'horas' : 'dias'}</strong> antes • até <strong>{maxAdvanceDays} dias</strong> à frente. O atleta só verá horários dentro dessa janela.
+                </p>
+              </CardContent>
+            </Card>
+
             {/* Booking Link */}
             <Card>
               <CardHeader>

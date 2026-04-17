@@ -32,6 +32,9 @@ interface SchedulingSettings {
   slot_duration_minutes: number;
   buffer_minutes: number;
   working_days: number[];
+  min_advance_value: number;
+  min_advance_unit: 'hours' | 'days';
+  max_advance_days: number;
 }
 
 export default function PublicBookingConsult() {
@@ -66,7 +69,7 @@ export default function PublicBookingConsult() {
       
       const { data } = await supabase
         .from('scheduling_settings')
-        .select('id, user_id, slot_duration_minutes, buffer_minutes, working_days')
+        .select('id, user_id, slot_duration_minutes, buffer_minutes, working_days, min_advance_value, min_advance_unit, max_advance_days')
         .eq('user_id', adminUserId)
         .maybeSingle();
       
@@ -75,6 +78,9 @@ export default function PublicBookingConsult() {
           ...data,
           working_days: Array.isArray(data.working_days) ? data.working_days : JSON.parse(data.working_days as string),
           buffer_minutes: data.buffer_minutes || 0,
+          min_advance_value: (data as any).min_advance_value ?? 24,
+          min_advance_unit: ((data as any).min_advance_unit ?? 'hours') as 'hours' | 'days',
+          max_advance_days: (data as any).max_advance_days ?? 60,
         });
       }
     };
