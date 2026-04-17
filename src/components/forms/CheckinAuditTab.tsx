@@ -395,6 +395,7 @@ export function CheckinAuditTab() {
                 <SelectItem value="pending">Pendente Revisão</SelectItem>
                 <SelectItem value="sent">Feedback Enviado</SelectItem>
                 <SelectItem value="reviewed">Conferidos</SelectItem>
+                <SelectItem value="cancelled">Cancelado pelo admin</SelectItem>
               </SelectContent>
             </Select>
 
