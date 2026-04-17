@@ -24,7 +24,8 @@ import { useMarkDietAdjustmentDone } from '@/hooks/useDietAdjustmentAlerts';
 import { useTargetRaces, useCreateTargetRace } from '@/hooks/useTargetRaces';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, startOfToday } from 'date-fns';
+import { Trophy } from 'lucide-react';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -63,6 +64,79 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
     },
     enabled: !alertData?.hasTargetRace && !isEditing,
   });
+
+  // Fetch completed/archived races for this athlete
+  const { data: completedRaces = [] } = useQuery({
+    queryKey: ['athlete-completed-races', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('athlete_completed_races')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('race_date', { ascending: false, nullsFirst: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Detect if current target race date already passed
+  const isRacePast = !!(
+    alertData?.hasTargetRace &&
+    alertData?.targetDeadline &&
+    isBefore(parseISO(alertData.targetDeadline), startOfToday())
+  );
+
+  const archiveCurrentRace = async (): Promise<boolean> => {
+    if (!alertData?.targetRace) return true;
+    try {
+      const { data: client } = await supabase
+        .from('clients')
+        .select('user_id')
+        .eq('id', clientId)
+        .maybeSingle();
+      if (!client?.user_id) throw new Error('Cliente não encontrado');
+
+      const exists = completedRaces.some(
+        (r: any) => r.race_name === alertData.targetRace && r.race_date === alertData.targetDeadline
+      );
+      if (!exists) {
+        const { error } = await supabase.from('athlete_completed_races').insert({
+          client_id: clientId,
+          user_id: client.user_id,
+          race_name: alertData.targetRace,
+          race_date: alertData.targetDeadline || null,
+        });
+        if (error) throw error;
+      }
+      return true;
+    } catch (e: any) {
+      toast.error('Erro ao arquivar prova: ' + (e.message || 'Tente novamente'));
+      return false;
+    }
+  };
+
+  const handleArchiveAndAddNew = async () => {
+    setIsSaving(true);
+    const ok = await archiveCurrentRace();
+    if (!ok) { setIsSaving(false); return; }
+
+    const { error } = await supabase
+      .from('athlete_profiles')
+      .update({ target_race: null, target_deadline: null })
+      .eq('client_id', clientId);
+    setIsSaving(false);
+    if (error) {
+      toast.error('Erro ao limpar prova atual: ' + error.message);
+      return;
+    }
+    toast.success('Prova marcada como realizada!');
+    queryClient.invalidateQueries({ queryKey: ['target-race-alert', clientId] });
+    queryClient.invalidateQueries({ queryKey: ['athlete-completed-races', clientId] });
+    queryClient.invalidateQueries({ queryKey: ['athletes-target-race-alerts'] });
+    setTargetRace('');
+    setTargetDeadline('');
+    setIsEditing(true);
+  };
 
   const handleStartEdit = () => {
     setTargetRace(alertData?.targetRace || '');
@@ -305,6 +379,30 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
   }
 
 
+  // Helper to render completed races history
+  const renderCompletedRacesHistory = () => {
+    if (completedRaces.length === 0) return null;
+    return (
+      <div className="pt-3 border-t mt-3 space-y-2">
+        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          <Trophy className="h-3 w-3" /> Provas realizadas
+        </p>
+        <div className="space-y-1">
+          {completedRaces.map((r: any) => (
+            <div key={r.id} className="flex items-center justify-between text-xs bg-muted/40 rounded px-2 py-1.5">
+              <span className="font-medium truncate">{r.race_name}</span>
+              {r.race_date && (
+                <span className="text-muted-foreground shrink-0 ml-2">
+                  {format(parseISO(r.race_date), "dd/MM/yyyy", { locale: ptBR })}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   // No target race
   if (!alertData?.hasTargetRace) {
     return (
@@ -344,6 +442,69 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
               Adicionar Prova Alvo
             </Button>
           </div>
+          {renderCompletedRacesHistory()}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Target race already passed → show "completed" state with action to add a new one
+  if (isRacePast) {
+    return (
+      <Card className="border-green-500/30 bg-green-500/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base text-foreground">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-green-600" />
+              Prova Realizada
+            </div>
+            <Badge variant="secondary" className="text-xs">Concluída</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">{alertData.targetRace}</span>
+            </div>
+            {alertData.targetDeadline && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>
+                  {format(parseISO(alertData.targetDeadline), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-muted/50 p-3 rounded-lg">
+            <p className="text-sm">
+              A data desta prova já passou. Salve como prova realizada e cadastre uma nova prova alvo para continuar o acompanhamento.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              size="sm"
+              className="flex-1"
+              onClick={handleArchiveAndAddNew}
+              disabled={isSaving}
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trophy className="h-4 w-4 mr-2" />}
+              Salvar como realizada e adicionar nova
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleStartEdit}
+              disabled={isSaving}
+            >
+              <Edit2 className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
+          </div>
+
+          {renderCompletedRacesHistory()}
         </CardContent>
       </Card>
     );
@@ -473,6 +634,8 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
             </p>
           </div>
         )}
+
+        {renderCompletedRacesHistory()}
       </CardContent>
     </Card>
   );

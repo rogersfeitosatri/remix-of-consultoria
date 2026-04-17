@@ -515,6 +515,47 @@ export type Database = {
           },
         ]
       }
+      athlete_completed_races: {
+        Row: {
+          archived_at: string
+          client_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          race_date: string | null
+          race_name: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string
+          client_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          race_date?: string | null
+          race_name: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          race_date?: string | null
+          race_name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_completed_races_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_periodization: {
         Row: {
           client_id: string
