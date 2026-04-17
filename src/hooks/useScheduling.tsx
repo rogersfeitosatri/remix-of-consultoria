@@ -10,6 +10,9 @@ export interface SchedulingSettings {
   working_hours_end: string;
   slot_duration_minutes: number;
   booking_link_slug: string | null;
+  min_advance_value: number;
+  min_advance_unit: 'hours' | 'days';
+  max_advance_days: number;
   created_at: string;
   updated_at: string;
 }

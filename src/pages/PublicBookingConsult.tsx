@@ -32,6 +32,9 @@ interface SchedulingSettings {
   slot_duration_minutes: number;
   buffer_minutes: number;
   working_days: number[];
+  min_advance_value: number;
+  min_advance_unit: 'hours' | 'days';
+  max_advance_days: number;
 }
 
 export default function PublicBookingConsult() {
@@ -66,7 +69,7 @@ export default function PublicBookingConsult() {
       
       const { data } = await supabase
         .from('scheduling_settings')
-        .select('id, user_id, slot_duration_minutes, buffer_minutes, working_days')
+        .select('id, user_id, slot_duration_minutes, buffer_minutes, working_days, min_advance_value, min_advance_unit, max_advance_days')
         .eq('user_id', adminUserId)
         .maybeSingle();
       
@@ -75,6 +78,9 @@ export default function PublicBookingConsult() {
           ...data,
           working_days: Array.isArray(data.working_days) ? data.working_days : JSON.parse(data.working_days as string),
           buffer_minutes: data.buffer_minutes || 0,
+          min_advance_value: (data as any).min_advance_value ?? 24,
+          min_advance_unit: ((data as any).min_advance_unit ?? 'hours') as 'hours' | 'days',
+          max_advance_days: (data as any).max_advance_days ?? 60,
         });
       }
     };
@@ -155,23 +161,37 @@ export default function PublicBookingConsult() {
     }
   };
 
-  // Calculate available dates based on availability rules
+  // Compute the earliest moment a booking is allowed (min advance)
+  const minBookingMoment = useMemo(() => {
+    if (!settings) return new Date();
+    const now = new Date();
+    if (settings.min_advance_unit === 'days') {
+      return addDays(startOfDay(now), settings.min_advance_value);
+    }
+    return new Date(now.getTime() + settings.min_advance_value * 60 * 60 * 1000);
+  }, [settings]);
+
+  // Calculate available dates based on availability rules and booking window
   const availableDates = useMemo(() => {
     const dates: Date[] = [];
     const today = startOfDay(new Date());
-    
-    for (let i = 1; i <= 60; i++) {
+    const maxDays = settings?.max_advance_days ?? 60;
+    const minDay = startOfDay(minBookingMoment);
+
+    for (let i = 1; i <= maxDays; i++) {
       const date = addDays(today, i);
+      // Skip dates before min advance window
+      if (isBefore(date, minDay)) continue;
       const dayOfWeek = date.getDay();
-      
+
       const hasRule = availabilityRules.some(rule => rule.day_of_week === dayOfWeek);
       if (hasRule) {
         dates.push(date);
       }
     }
-    
+
     return dates;
-  }, [availabilityRules]);
+  }, [availabilityRules, settings, minBookingMoment]);
 
   // Calculate available time slots for selected date (with buffer support)
   const availableSlots = useMemo(() => {
@@ -209,13 +229,14 @@ export default function PublicBookingConsult() {
           return slotTime >= aptStart && slotTime < aptEnd;
         });
         
-        // Check if slot is in the past (for today)
+        // Check if slot is in the past (for today) OR before min advance window
         const slotDateTime = parse(timeStr, 'HH:mm', selectedDate);
         const isPast = isSameDay(selectedDate, new Date()) && isBefore(slotDateTime, new Date());
-        
+        const isBeforeMinAdvance = isBefore(slotDateTime, minBookingMoment);
+
         slots.push({
           time: timeStr,
-          available: !isBooked && !isPast,
+          available: !isBooked && !isPast && !isBeforeMinAdvance,
         });
         
         // Use slot step (duration + buffer) for next slot

@@ -73,6 +73,9 @@ export default function SchedulingSettings() {
   const [endTime, setEndTime] = useState('18:00');
   const [slotDuration, setSlotDuration] = useState(60);
   const [bufferMinutes, setBufferMinutes] = useState(0);
+  const [minAdvanceValue, setMinAdvanceValue] = useState(24);
+  const [minAdvanceUnit, setMinAdvanceUnit] = useState<'hours' | 'days'>('hours');
+  const [maxAdvanceDays, setMaxAdvanceDays] = useState(60);
   const [slug, setSlug] = useState('');
   const [copied, setCopied] = useState(false);
   
@@ -91,6 +94,9 @@ export default function SchedulingSettings() {
     endTime + ':00' !== settings.working_hours_end ||
     slotDuration !== settings.slot_duration_minutes ||
     bufferMinutes !== ((settings as any).buffer_minutes || 0) ||
+    minAdvanceValue !== ((settings as any).min_advance_value ?? 24) ||
+    minAdvanceUnit !== ((settings as any).min_advance_unit ?? 'hours') ||
+    maxAdvanceDays !== ((settings as any).max_advance_days ?? 60) ||
     slug !== (settings.booking_link_slug || '')
   ) : false;
 
@@ -101,6 +107,9 @@ export default function SchedulingSettings() {
       setEndTime(settings.working_hours_end?.substring(0, 5) || '18:00');
       setSlotDuration(settings.slot_duration_minutes);
       setBufferMinutes((settings as any).buffer_minutes || 0);
+      setMinAdvanceValue((settings as any).min_advance_value ?? 24);
+      setMinAdvanceUnit(((settings as any).min_advance_unit ?? 'hours') as 'hours' | 'days');
+      setMaxAdvanceDays((settings as any).max_advance_days ?? 60);
       setSlug(settings.booking_link_slug || '');
     }
   }, [settings]);
@@ -113,6 +122,9 @@ export default function SchedulingSettings() {
         working_hours_end: endTime + ':00',
         slot_duration_minutes: slotDuration,
         buffer_minutes: bufferMinutes,
+        min_advance_value: minAdvanceValue,
+        min_advance_unit: minAdvanceUnit,
+        max_advance_days: maxAdvanceDays,
         booking_link_slug: slug || null,
       } as any);
       toast.success('Configurações salvas!');
@@ -346,6 +358,57 @@ export default function SchedulingSettings() {
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Janela de visualização (atleta) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Janela de Visualização do Atleta
+                </CardTitle>
+                <CardDescription>
+                  Controle a partir de quando e até quando o atleta consegue ver horários disponíveis no link público de agendamento
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Antecedência mínima</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={minAdvanceValue}
+                      onChange={(e) => setMinAdvanceValue(Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Unidade</Label>
+                    <Select value={minAdvanceUnit} onValueChange={(v) => setMinAdvanceUnit(v as 'hours' | 'days')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hours">Horas</SelectItem>
+                        <SelectItem value="days">Dias</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Até quantos dias à frente</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={maxAdvanceDays}
+                      onChange={(e) => setMaxAdvanceDays(Math.max(1, Number(e.target.value) || 1))}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Ex: <strong>{minAdvanceValue} {minAdvanceUnit === 'hours' ? 'horas' : 'dias'}</strong> antes • até <strong>{maxAdvanceDays} dias</strong> à frente. O atleta só verá horários dentro dessa janela.
+                </p>
               </CardContent>
             </Card>
 
