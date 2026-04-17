@@ -294,6 +294,40 @@ export function ScheduledCheckinsSection() {
                   </>
                 )}
               </Button>
+              {isOverdue && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      disabled={isSending}
+                      title="Cancelar envio"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancelar envio do check-in?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        O check-in agendado para <strong>{checkin.client_name_resolved}</strong> em{' '}
+                        <strong>{format(checkinDate, "dd/MM/yyyy", { locale: ptBR })}</strong> será marcado
+                        como cancelado e não será mais enviado. O registro ficará visível na aba <strong>Conferência</strong>.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Voltar</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => handleCancelDispatch(checkin.id, checkin.client_name_resolved)}
+                      >
+                        Sim, cancelar envio
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </>
           )}
         </div>
