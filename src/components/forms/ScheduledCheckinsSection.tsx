@@ -12,10 +12,21 @@ import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isAfter, isBefore, addDays, startOfDay, isSameDay, differenceInDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, Calendar, ClipboardCheck, User, Check, MessageCircle, Pause, Play, Search, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Calendar, ClipboardCheck, User, Check, MessageCircle, Pause, Play, Search, AlertCircle, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 type ViewFilter = 'overdue' | 'today' | 'week' | 'all';
 
@@ -119,6 +130,28 @@ export function ScheduledCheckinsSection() {
       toast({ title: newStatus === 'skipped' ? 'Pausado' : 'Reativado' });
     } catch {
       toast({ title: 'Erro', variant: 'destructive' });
+    }
+  };
+
+  const handleCancelDispatch = async (checkinId: string, clientName: string) => {
+    const stamp = format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+    const note = `Envio cancelado pelo admin em ${stamp}`;
+    try {
+      await updateCheckin.mutateAsync({
+        id: checkinId,
+        status: 'cancelled' as any,
+        notes: note,
+      } as any);
+      toast({
+        title: 'Envio cancelado',
+        description: `Check-in de ${clientName} marcado como cancelado.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao cancelar',
+        description: error?.message || 'Falha ao cancelar envio.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -261,6 +294,40 @@ export function ScheduledCheckinsSection() {
                   </>
                 )}
               </Button>
+              {isOverdue && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      disabled={isSending}
+                      title="Cancelar envio"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancelar envio do check-in?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        O check-in agendado para <strong>{checkin.client_name_resolved}</strong> em{' '}
+                        <strong>{format(checkinDate, "dd/MM/yyyy", { locale: ptBR })}</strong> será marcado
+                        como cancelado e não será mais enviado. O registro ficará visível na aba <strong>Conferência</strong>.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Voltar</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => handleCancelDispatch(checkin.id, checkin.client_name_resolved)}
+                      >
+                        Sim, cancelar envio
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </>
           )}
         </div>

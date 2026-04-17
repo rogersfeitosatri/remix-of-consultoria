@@ -16,7 +16,7 @@ import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isSam
 import { ptBR } from 'date-fns/locale';
 import {
   Loader2, Search, CheckCircle, Clock, AlertCircle,
-  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send, TrendingUp, Phone, ChevronDown
+  ChevronLeft, ChevronRight, Filter, CalendarDays, X, ExternalLink, MessageSquare, Send, TrendingUp, Phone, ChevronDown,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -30,9 +30,10 @@ type AuditItem = {
   client_id: string;
   date: string;
   form_title: string;
-  type: 'response' | 'unanswered';
-  feedback_status: 'pending' | 'sent' | 'reviewed' | 'no_feedback' | 'unanswered';
+  type: 'response' | 'unanswered' | 'cancelled';
+  feedback_status: 'pending' | 'sent' | 'reviewed' | 'no_feedback' | 'unanswered' | 'cancelled';
   response_id?: string;
+  cancel_note?: string;
 };
 
 const PAGE_SIZE = 30;
@@ -106,6 +107,25 @@ export function CheckinAuditTab() {
     staleTime: 60_000,
   });
 
+  const { data: cancelledCheckins = [], isLoading: cancelledLoading } = useQuery({
+    queryKey: ['checkin-audit-cancelled', user?.id, monthStart.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('scheduled_checkins')
+        .select('id, client_id, scheduled_send_date, scheduled_send_time, status, notes, updated_at')
+        .eq('user_id', user!.id)
+        .eq('status', 'cancelled')
+        .gte('updated_at', monthStart.toISOString())
+        .lte('updated_at', monthEnd.toISOString())
+        .order('updated_at', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
   const { data: evoResponses = [] } = useQuery({
     queryKey: ['checkin-audit-evo-responses', evolutionClientId],
     queryFn: async () => {
@@ -137,7 +157,7 @@ export function CheckinAuditTab() {
     enabled: !!evoFormId,
   });
 
-  const isLoading = responsesLoading || clientsLoading || feedbacksLoading || sendsLoading;
+  const isLoading = responsesLoading || clientsLoading || feedbacksLoading || sendsLoading || cancelledLoading;
 
   const clientsMap = useMemo(() => {
     return clients.reduce((acc, c) => { acc[c.id] = c; return acc; }, {} as Record<string, typeof clients[0]>);
@@ -196,8 +216,19 @@ export function CheckinAuditTab() {
         });
       }
     });
+    cancelledCheckins.forEach((c: any) => {
+      items.push({
+        id: `cancelled-${c.id}`,
+        client_id: c.client_id,
+        date: c.updated_at,
+        form_title: 'Check-in',
+        type: 'cancelled',
+        feedback_status: 'cancelled',
+        cancel_note: c.notes || 'Cancelado pelo admin',
+      });
+    });
     return items;
-  }, [responses, feedbackMap, checkinSends, respondedSendIds]);
+  }, [responses, feedbackMap, checkinSends, respondedSendIds, cancelledCheckins]);
 
   const filteredItems = useMemo(() => {
     return auditItems
@@ -253,7 +284,8 @@ export function CheckinAuditTab() {
     const pendingReview = baseItemsForStats.filter(i => i.feedback_status === 'pending' || i.feedback_status === 'no_feedback').length;
     const feedbackSent = baseItemsForStats.filter(i => i.feedback_status === 'sent').length;
     const unanswered = baseItemsForStats.filter(i => i.feedback_status === 'unanswered').length;
-    return { total, pendingReview, feedbackSent, unanswered };
+    const cancelled = baseItemsForStats.filter(i => i.feedback_status === 'cancelled').length;
+    return { total, pendingReview, feedbackSent, unanswered, cancelled };
   }, [baseItemsForStats]);
 
   const getStatusBadge = (status: AuditItem['feedback_status']) => {
@@ -268,6 +300,8 @@ export function CheckinAuditTab() {
         return <Badge variant="outline" className="text-muted-foreground"><MessageSquare className="h-3 w-3 mr-1" />Sem Feedback</Badge>;
       case 'unanswered':
         return <Badge className="bg-red-500/20 text-red-700 border-red-500/30"><Send className="h-3 w-3 mr-1" />Sem Resposta</Badge>;
+      case 'cancelled':
+        return <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30"><X className="h-3 w-3 mr-1" />Cancelado pelo admin</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -361,6 +395,7 @@ export function CheckinAuditTab() {
                 <SelectItem value="pending">Pendente Revisão</SelectItem>
                 <SelectItem value="sent">Feedback Enviado</SelectItem>
                 <SelectItem value="reviewed">Conferidos</SelectItem>
+                <SelectItem value="cancelled">Cancelado pelo admin</SelectItem>
               </SelectContent>
             </Select>
 
