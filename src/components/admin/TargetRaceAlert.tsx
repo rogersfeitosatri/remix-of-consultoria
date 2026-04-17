@@ -65,6 +65,79 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
     enabled: !alertData?.hasTargetRace && !isEditing,
   });
 
+  // Fetch completed/archived races for this athlete
+  const { data: completedRaces = [] } = useQuery({
+    queryKey: ['athlete-completed-races', clientId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('athlete_completed_races')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('race_date', { ascending: false, nullsFirst: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Detect if current target race date already passed
+  const isRacePast = !!(
+    alertData?.hasTargetRace &&
+    alertData?.targetDeadline &&
+    isBefore(parseISO(alertData.targetDeadline), startOfToday())
+  );
+
+  const archiveCurrentRace = async (): Promise<boolean> => {
+    if (!alertData?.targetRace) return true;
+    try {
+      const { data: client } = await supabase
+        .from('clients')
+        .select('user_id')
+        .eq('id', clientId)
+        .maybeSingle();
+      if (!client?.user_id) throw new Error('Cliente não encontrado');
+
+      const exists = completedRaces.some(
+        (r: any) => r.race_name === alertData.targetRace && r.race_date === alertData.targetDeadline
+      );
+      if (!exists) {
+        const { error } = await supabase.from('athlete_completed_races').insert({
+          client_id: clientId,
+          user_id: client.user_id,
+          race_name: alertData.targetRace,
+          race_date: alertData.targetDeadline || null,
+        });
+        if (error) throw error;
+      }
+      return true;
+    } catch (e: any) {
+      toast.error('Erro ao arquivar prova: ' + (e.message || 'Tente novamente'));
+      return false;
+    }
+  };
+
+  const handleArchiveAndAddNew = async () => {
+    setIsSaving(true);
+    const ok = await archiveCurrentRace();
+    if (!ok) { setIsSaving(false); return; }
+
+    const { error } = await supabase
+      .from('athlete_profiles')
+      .update({ target_race: null, target_deadline: null })
+      .eq('client_id', clientId);
+    setIsSaving(false);
+    if (error) {
+      toast.error('Erro ao limpar prova atual: ' + error.message);
+      return;
+    }
+    toast.success('Prova marcada como realizada!');
+    queryClient.invalidateQueries({ queryKey: ['target-race-alert', clientId] });
+    queryClient.invalidateQueries({ queryKey: ['athlete-completed-races', clientId] });
+    queryClient.invalidateQueries({ queryKey: ['athletes-target-race-alerts'] });
+    setTargetRace('');
+    setTargetDeadline('');
+    setIsEditing(true);
+  };
+
   const handleStartEdit = () => {
     setTargetRace(alertData?.targetRace || '');
     setTargetDeadline(alertData?.targetDeadline || '');
