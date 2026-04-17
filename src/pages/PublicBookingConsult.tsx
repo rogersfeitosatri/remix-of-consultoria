@@ -165,10 +165,11 @@ export default function PublicBookingConsult() {
   const minBookingMoment = useMemo(() => {
     if (!settings) return new Date();
     const now = new Date();
-    if (settings.min_advance_unit === 'days') {
-      return addDays(startOfDay(now), settings.min_advance_value);
-    }
-    return new Date(now.getTime() + settings.min_advance_value * 60 * 60 * 1000);
+    // Always compute as a rolling window from "now" (X hours, or X*24 hours if unit is days)
+    const hours = settings.min_advance_unit === 'days'
+      ? settings.min_advance_value * 24
+      : settings.min_advance_value;
+    return new Date(now.getTime() + hours * 60 * 60 * 1000);
   }, [settings]);
 
   // Calculate available dates based on availability rules and booking window
