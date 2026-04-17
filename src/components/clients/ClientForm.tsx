@@ -470,7 +470,15 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               <Label>Tipo de Serviço</Label>
               <Select
                 value={formData.service_type}
-                onValueChange={(v) => setFormData({ ...formData, service_type: v as 'nutrition' | 'training' | 'both' })}
+                onValueChange={(v) => {
+                  const newService = v as 'nutrition' | 'training' | 'both';
+                  setFormData({
+                    ...formData,
+                    service_type: newService,
+                    // Treino puro não comporta check-in
+                    has_checkin: newService === 'training' ? false : formData.has_checkin,
+                  });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -926,13 +934,19 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             <div className="flex items-center gap-4">
               <Switch
                 id="hasCheckin"
-                checked={formData.has_checkin}
+                checked={formData.service_type === 'training' ? false : formData.has_checkin}
+                disabled={formData.service_type === 'training'}
                 onCheckedChange={(v) => setFormData({ ...formData, has_checkin: v })}
               />
-              <Label htmlFor="hasCheckin">Possui Check-in</Label>
+              <Label htmlFor="hasCheckin" className={formData.service_type === 'training' ? 'text-muted-foreground' : ''}>
+                Possui Check-in
+                {formData.service_type === 'training' && (
+                  <span className="ml-2 text-xs text-muted-foreground">(indisponível para serviço apenas de Treino)</span>
+                )}
+              </Label>
             </div>
             
-            {formData.has_checkin && (
+            {formData.has_checkin && formData.service_type !== 'training' && (
               <div className="space-y-2">
                 <Label>Frequência do Check-in</Label>
                 <Select
