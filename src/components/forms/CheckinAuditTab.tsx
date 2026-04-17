@@ -107,6 +107,25 @@ export function CheckinAuditTab() {
     staleTime: 60_000,
   });
 
+  const { data: cancelledCheckins = [], isLoading: cancelledLoading } = useQuery({
+    queryKey: ['checkin-audit-cancelled', user?.id, monthStart.toISOString()],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('scheduled_checkins')
+        .select('id, client_id, scheduled_send_date, scheduled_send_time, status, notes, updated_at')
+        .eq('user_id', user!.id)
+        .eq('status', 'cancelled')
+        .gte('updated_at', monthStart.toISOString())
+        .lte('updated_at', monthEnd.toISOString())
+        .order('updated_at', { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
   const { data: evoResponses = [] } = useQuery({
     queryKey: ['checkin-audit-evo-responses', evolutionClientId],
     queryFn: async () => {
