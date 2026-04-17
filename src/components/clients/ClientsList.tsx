@@ -16,6 +16,7 @@ import { usePayments } from '@/hooks/useClients';
 import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
 import { ChangeAthletePasswordDialog } from './ChangeAthletePasswordDialog';
+import { PlanTypeBadge } from './PlanTypeBadge';
 
 const SERVICE_LABELS = {
   nutrition: 'Nutrição',
@@ -318,6 +319,7 @@ Qualquer dúvida, estou à disposição! 💪`;
                   <span className="inline-flex items-center rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
                     {PLAN_LABELS[client.plan_type]}
                   </span>
+                  <PlanTypeBadge client={client} />
                   {client.has_checkin && client.checkin_frequency && (
                     <span className="inline-flex items-center rounded-md bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
                       Check-in {CHECKIN_LABELS[client.checkin_frequency]}

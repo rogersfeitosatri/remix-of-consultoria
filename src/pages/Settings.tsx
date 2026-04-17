@@ -18,6 +18,7 @@ import { MessageTemplatesSection } from '@/components/settings/MessageTemplatesS
 import { LandingPageSettingsSection } from '@/components/settings/LandingPageSettingsSection';
 import { LayoutCustomizationSection } from '@/components/settings/LayoutCustomizationSection';
 import { ScanAnamneseTargetRaces } from '@/components/admin/ScanAnamneseTargetRaces';
+import { PlanTemplatesSection } from '@/components/settings/PlanTemplatesSection';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
