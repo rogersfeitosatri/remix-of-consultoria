@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { Client } from '@/hooks/useClients';
 import { addMonths, addWeeks, format } from 'date-fns';
 import { classifyPlan, validatePlanFeasibility } from '@/lib/planTypology';
-import { PlanTypeBadge } from './PlanTypeBadge';
+import { PlanTypeBadge } from '@/components/clients/PlanTypeBadge';
 import { Switch } from '@/components/ui/switch';
 
 const PLAN_DURATION_OPTIONS = [
