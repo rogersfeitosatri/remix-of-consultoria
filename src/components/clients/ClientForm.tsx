@@ -470,7 +470,15 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               <Label>Tipo de Serviço</Label>
               <Select
                 value={formData.service_type}
-                onValueChange={(v) => setFormData({ ...formData, service_type: v as 'nutrition' | 'training' | 'both' })}
+                onValueChange={(v) => {
+                  const newService = v as 'nutrition' | 'training' | 'both';
+                  setFormData({
+                    ...formData,
+                    service_type: newService,
+                    // Treino puro não comporta check-in
+                    has_checkin: newService === 'training' ? false : formData.has_checkin,
+                  });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
