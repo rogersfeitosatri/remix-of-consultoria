@@ -4,6 +4,7 @@
  */
 
 export type PlanTypeKey =
+  | 'training_only'     // T — Apenas treino (sem nutrição/check-in)
   | 'checkin_only'      // A — Só check-in (sem consultas)
   | 'single_consult'    // B — 1 consulta única
   | 'recurring_4w'      // C1 — Recorrente 4 semanas
