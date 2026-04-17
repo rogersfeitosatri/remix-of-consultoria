@@ -13,6 +13,8 @@ import { X, AlertCircle, Calculator, Calendar, RefreshCw } from 'lucide-react';
 import { addMonths, addWeeks, parseISO, format, nextMonday, isSameMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAdminSettings } from '@/hooks/useAdminSettings';
+import { PlanTypeBadge } from './PlanTypeBadge';
+import { validatePlanFeasibility } from '@/lib/planTypology';
 
 interface CalculatedWindow {
   windowStart: Date;
@@ -543,7 +545,36 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             )}
           </div>
 
-          {/* Consultation Config for Consultoria plan */}
+          {/* Plan typology preview + feasibility warning */}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>Tipo do plano:</span>
+            <PlanTypeBadge
+              client={{
+                has_consultations: formData.has_consultations,
+                consultation_count: formData.consultation_count,
+                consultation_frequency: formData.consultation_frequency === 'once' ? null : formData.consultation_frequency,
+                plan_type: formData.plan_type,
+              }}
+              variant="full"
+            />
+            {(() => {
+              const warn = validatePlanFeasibility({
+                has_consultations: formData.has_consultations,
+                consultation_count: formData.consultation_count,
+                consultation_frequency: formData.consultation_frequency === 'once' ? null : formData.consultation_frequency,
+                start_date: formData.start_date,
+                end_date: formData.end_date,
+              });
+              if (!warn) return null;
+              return (
+                <div className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1 text-destructive">
+                  <AlertCircle className="h-3 w-3" />
+                  <span>{warn}</span>
+                </div>
+              );
+            })()}
+          </div>
+
           {formData.plan_type === 'consultoria' && (
             <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
               <h3 className="font-semibold text-foreground">Consulta (opcional)</h3>
