@@ -4094,6 +4094,66 @@ export type Database = {
           },
         ]
       }
+      plan_templates: {
+        Row: {
+          checkin_frequency: string | null
+          consultation_count: number
+          consultation_frequency: string | null
+          created_at: string
+          description: string | null
+          has_checkin: boolean
+          has_consultations: boolean
+          id: string
+          is_active: boolean
+          name: string
+          order_index: number
+          plan_duration: string
+          plan_type: string
+          service_type: string
+          suggested_value: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checkin_frequency?: string | null
+          consultation_count?: number
+          consultation_frequency?: string | null
+          created_at?: string
+          description?: string | null
+          has_checkin?: boolean
+          has_consultations?: boolean
+          id?: string
+          is_active?: boolean
+          name: string
+          order_index?: number
+          plan_duration?: string
+          plan_type?: string
+          service_type?: string
+          suggested_value?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          checkin_frequency?: string | null
+          consultation_count?: number
+          consultation_frequency?: string | null
+          created_at?: string
+          description?: string | null
+          has_checkin?: boolean
+          has_consultations?: boolean
+          id?: string
+          is_active?: boolean
+          name?: string
+          order_index?: number
+          plan_duration?: string
+          plan_type?: string
+          service_type?: string
+          suggested_value?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -5139,6 +5199,10 @@ export type Database = {
           client_phone: string
           google_meet_link: string
         }[]
+      }
+      seed_default_plan_templates: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       validate_booking_email: {
         Args: { p_email: string; p_token: string }
