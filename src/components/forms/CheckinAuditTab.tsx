@@ -30,9 +30,10 @@ type AuditItem = {
   client_id: string;
   date: string;
   form_title: string;
-  type: 'response' | 'unanswered';
-  feedback_status: 'pending' | 'sent' | 'reviewed' | 'no_feedback' | 'unanswered';
+  type: 'response' | 'unanswered' | 'cancelled';
+  feedback_status: 'pending' | 'sent' | 'reviewed' | 'no_feedback' | 'unanswered' | 'cancelled';
   response_id?: string;
+  cancel_note?: string;
 };
 
 const PAGE_SIZE = 30;
