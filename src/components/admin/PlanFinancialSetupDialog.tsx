@@ -1,16 +1,19 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings2 } from 'lucide-react';
+import { Settings2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Client } from '@/hooks/useClients';
 import { addMonths, addWeeks, format } from 'date-fns';
+import { classifyPlan, validatePlanFeasibility } from '@/lib/planTypology';
+import { PlanTypeBadge } from './PlanTypeBadge';
+import { Switch } from '@/components/ui/switch';
 
 const PLAN_DURATION_OPTIONS = [
   { value: 'monthly', label: 'Mensal' },
@@ -53,6 +56,42 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
   const [paymentType, setPaymentType] = useState<string>(client.payment_type || 'pix');
   const [paymentDate, setPaymentDate] = useState(client.payment_date || format(new Date(), 'yyyy-MM-dd'));
 
+  // Configuração de consultas
+  const [hasConsultations, setHasConsultations] = useState<boolean>(client.has_consultations ?? false);
+  const [consultationCount, setConsultationCount] = useState<string>(
+    client.consultation_count !== null && client.consultation_count !== undefined
+      ? String(client.consultation_count)
+      : '0'
+  );
+  const [consultationFrequency, setConsultationFrequency] = useState<string>(
+    client.consultation_frequency || 'monthly'
+  );
+
+  const countNum = parseInt(consultationCount, 10) || 0;
+  const isSingleConsult = hasConsultations && countNum === 1;
+  const isUnlimited = hasConsultations && countNum === 0;
+  const cadenceRequired = hasConsultations && countNum !== 1;
+
+  const previewClient = {
+    has_consultations: hasConsultations,
+    consultation_count: countNum,
+    consultation_frequency: cadenceRequired ? consultationFrequency : null,
+    plan_type: planType,
+  };
+  const typology = classifyPlan(previewClient);
+
+  const feasibilityWarning = useMemo(
+    () =>
+      validatePlanFeasibility({
+        has_consultations: hasConsultations,
+        consultation_count: countNum,
+        consultation_frequency: cadenceRequired ? consultationFrequency : null,
+        start_date: startDate,
+        end_date: endDate,
+      }),
+    [hasConsultations, countNum, consultationFrequency, cadenceRequired, startDate, endDate]
+  );
+
   const handleDurationChange = (val: string) => {
     setPlanDuration(val);
     if (val !== 'custom' && startDate) {
@@ -67,6 +106,18 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
     }
   };
 
+  const handleHasConsultationsChange = (checked: boolean) => {
+    setHasConsultations(checked);
+    if (!checked) {
+      // Limpa configuração ao desabilitar consultas
+      setConsultationCount('0');
+      setConsultationFrequency('monthly');
+    } else if (countNum === 0) {
+      // Sugere padrão razoável
+      setConsultationCount('3');
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
     const value = parseFloat(monthlyValue);
@@ -76,6 +127,15 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
     }
     if (!endDate) {
       toast.error('Informe a data de término');
+      return;
+    }
+    // Validação de cadência
+    if (hasConsultations && countNum !== 1 && !consultationFrequency) {
+      toast.error('Selecione a periodicidade das consultas (4 ou 6 semanas)');
+      return;
+    }
+    if (feasibilityWarning) {
+      toast.error(feasibilityWarning);
       return;
     }
 
@@ -93,6 +153,9 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
           end_date: endDate,
           payment_type: paymentType,
           payment_date: paymentDate,
+          has_consultations: hasConsultations,
+          consultation_count: hasConsultations ? countNum : 0,
+          consultation_frequency: hasConsultations && countNum !== 1 ? consultationFrequency : null,
         })
         .eq('id', client.id);
 
@@ -138,7 +201,7 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="h-5 w-5" />
@@ -206,6 +269,70 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
             </div>
           </div>
 
+          {/* Configuração de Consultas */}
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-xs font-semibold">Consultas no plano</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Define se o atleta recebe links de agendamento
+                </p>
+              </div>
+              <Switch checked={hasConsultations} onCheckedChange={handleHasConsultationsChange} />
+            </div>
+
+            {hasConsultations && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Nº de Consultas</Label>
+                  <Select value={consultationCount} onValueChange={setConsultationCount}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Ilimitado (Premium)</SelectItem>
+                      <SelectItem value="1">1 (única)</SelectItem>
+                      <SelectItem value="2">2</SelectItem>
+                      <SelectItem value="3">3</SelectItem>
+                      <SelectItem value="4">4</SelectItem>
+                      <SelectItem value="6">6</SelectItem>
+                      <SelectItem value="8">8</SelectItem>
+                      <SelectItem value="12">12</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">
+                    Periodicidade {cadenceRequired && <span className="text-destructive">*</span>}
+                  </Label>
+                  <Select
+                    value={consultationFrequency}
+                    onValueChange={setConsultationFrequency}
+                    disabled={isSingleConsult}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isSingleConsult ? 'N/A (única)' : 'Selecione'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">A cada 4 semanas</SelectItem>
+                      <SelectItem value="six_weeks">A cada 6 semanas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Tipo:</span>
+              <PlanTypeBadge client={previewClient} variant="full" />
+            </div>
+
+            {feasibilityWarning && (
+              <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-2">
+                <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                <p className="text-[11px] text-destructive">{feasibilityWarning}</p>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Forma de Pagamento</Label>
@@ -223,7 +350,7 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
             </div>
           </div>
 
-          <Button onClick={handleSave} disabled={saving} className="w-full">
+          <Button onClick={handleSave} disabled={saving || !!feasibilityWarning} className="w-full">
             {saving ? 'Salvando...' : 'Salvar Plano & Registrar Pagamento'}
           </Button>
         </div>
