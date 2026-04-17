@@ -14,6 +14,7 @@ import { ConsultationSchedule, Client } from '@/hooks/useClients';
 import { Link } from 'react-router-dom';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
+import { PlanTypeBadge } from '@/components/clients/PlanTypeBadge';
 
 interface WeeklyPipelineViewProps {
   consultations: (ConsultationSchedule & { client_name: string })[];
@@ -395,6 +396,7 @@ export function WeeklyPipelineView({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-sm truncate">{item.clientName}</span>
+                          {item.client && <PlanTypeBadge client={item.client} />}
                           {item.consultationNumber && (
                             <Badge variant="outline" className="text-[10px] shrink-0">
                               Consulta #{item.consultationNumber}
