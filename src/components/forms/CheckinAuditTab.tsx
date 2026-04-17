@@ -157,7 +157,7 @@ export function CheckinAuditTab() {
     enabled: !!evoFormId,
   });
 
-  const isLoading = responsesLoading || clientsLoading || feedbacksLoading || sendsLoading;
+  const isLoading = responsesLoading || clientsLoading || feedbacksLoading || sendsLoading || cancelledLoading;
 
   const clientsMap = useMemo(() => {
     return clients.reduce((acc, c) => { acc[c.id] = c; return acc; }, {} as Record<string, typeof clients[0]>);
@@ -216,8 +216,19 @@ export function CheckinAuditTab() {
         });
       }
     });
+    cancelledCheckins.forEach((c: any) => {
+      items.push({
+        id: `cancelled-${c.id}`,
+        client_id: c.client_id,
+        date: c.updated_at,
+        form_title: 'Check-in',
+        type: 'cancelled',
+        feedback_status: 'cancelled',
+        cancel_note: c.notes || 'Cancelado pelo admin',
+      });
+    });
     return items;
-  }, [responses, feedbackMap, checkinSends, respondedSendIds]);
+  }, [responses, feedbackMap, checkinSends, respondedSendIds, cancelledCheckins]);
 
   const filteredItems = useMemo(() => {
     return auditItems
