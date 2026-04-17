@@ -4,6 +4,7 @@
  */
 
 export type PlanTypeKey =
+  | 'training_only'     // T — Apenas treino (sem nutrição/check-in)
   | 'checkin_only'      // A — Só check-in (sem consultas)
   | 'single_consult'    // B — 1 consulta única
   | 'recurring_4w'      // C1 — Recorrente 4 semanas
@@ -26,6 +27,8 @@ export interface ClientPlanLike {
   consultation_count?: number | null;
   consultation_frequency?: string | null;
   plan_type?: string | null;
+  service_type?: string | null;
+  has_checkin?: boolean | null;
 }
 
 export function classifyPlan(client: ClientPlanLike): PlanTypology {
@@ -33,6 +36,20 @@ export function classifyPlan(client: ClientPlanLike): PlanTypology {
   const count = client.consultation_count ?? 0;
   const freq = client.consultation_frequency || '';
   const isPremium = client.plan_type === 'premium';
+  const isTrainingOnly = client.service_type === 'training';
+  const hasCheckin = client.has_checkin === true;
+
+  // T — Apenas treino (sem check-in obrigatório)
+  if (isTrainingOnly && !hasCheckin) {
+    return {
+      key: 'training_only',
+      label: 'Apenas Treino',
+      shortLabel: 'Treino',
+      emoji: '🏃',
+      cadenceWeeks: null,
+      description: 'Plano de treino sem acompanhamento nutricional/check-in',
+    };
+  }
 
   // A — Só check-in
   if (!hasConsults) {

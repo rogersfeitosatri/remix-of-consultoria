@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { classifyPlan, ClientPlanLike, PlanTypeKey } from '@/lib/planTypology';
 
 const STYLES: Record<PlanTypeKey, string> = {
+  training_only: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30 dark:text-emerald-400',
   checkin_only: 'bg-slate-500/10 text-slate-600 border-slate-500/30 dark:text-slate-300',
   single_consult: 'bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400',
   recurring_4w: 'bg-blue-500/10 text-blue-700 border-blue-500/30 dark:text-blue-400',
