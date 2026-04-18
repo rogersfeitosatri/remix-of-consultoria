@@ -157,21 +157,12 @@ export function AthleteSummaryCheckinsCard({ client }: AthleteSummaryCheckinsCar
         </div>
         
         {/* Ações */}
-        <div className="flex gap-2 pt-1">
+        <div className="pt-1">
           <Button 
             variant="outline" 
             size="sm" 
-            className="flex-1 gap-1 text-xs h-8"
-            onClick={() => navigate(`/clients/${client.id}/history`)}
-          >
-            <History className="h-3 w-3" />
-            Histórico
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex-1 gap-1 text-xs h-8"
-            onClick={() => navigate('/checkin-hub')}
+            className="w-full gap-1 text-xs h-8"
+            onClick={() => navigate(`/clients/${client.id}/checkin-planning`)}
           >
             <Send className="h-3 w-3" />
             Check-ins
