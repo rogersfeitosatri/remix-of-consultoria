@@ -503,7 +503,7 @@ export default function PublicBookingConsult() {
                 Escolha a Data
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-2 sm:px-4">
               <Calendar
                 mode="single"
                 selected={selectedDate}
@@ -518,7 +518,24 @@ export default function PublicBookingConsult() {
                   );
                   return !isAvailable;
                 }}
-                className="rounded-md border border-gray-800"
+                className="rounded-md border border-gray-800 bg-gray-950/50 p-3 w-full"
+                classNames={{
+                  months: 'flex flex-col w-full',
+                  month: 'space-y-3 w-full',
+                  caption: 'flex justify-center pt-1 relative items-center',
+                  caption_label: 'text-base font-semibold text-white capitalize',
+                  nav_button: 'h-8 w-8 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-white rounded-md inline-flex items-center justify-center',
+                  table: 'w-full border-collapse',
+                  head_row: 'flex w-full',
+                  head_cell: 'text-gray-300 font-semibold uppercase text-[11px] tracking-wider flex-1 text-center py-2',
+                  row: 'flex w-full mt-1',
+                  cell: 'flex-1 aspect-square p-0.5 text-center',
+                  day: 'h-full w-full rounded-md text-base font-medium text-white hover:bg-gray-800 transition-colors inline-flex items-center justify-center',
+                  day_selected: 'bg-[hsl(43,74%,49%)] text-black hover:bg-[hsl(43,74%,49%)] font-bold ring-2 ring-[hsl(43,74%,60%)]',
+                  day_today: 'border border-[hsl(43,74%,49%)] text-[hsl(43,74%,60%)] font-bold',
+                  day_disabled: 'text-gray-700 opacity-40 hover:bg-transparent cursor-not-allowed',
+                  day_outside: 'text-gray-700 opacity-30',
+                }}
               />
             </CardContent>
           </Card>
