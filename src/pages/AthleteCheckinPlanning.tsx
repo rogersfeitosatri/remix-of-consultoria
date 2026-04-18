@@ -68,10 +68,12 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   scheduled: { label: 'Programado', cls: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
 };
 
-function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 12): Date[] {
+function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 12, endDate?: Date | null): Date[] {
   const out: Date[] = [];
   const start = parseISO(schedule.start_date);
-  const horizon = addWeeks(fromDate, weeksAhead);
+  const horizonByWeeks = addWeeks(fromDate, weeksAhead);
+  // Respect plan end_date: never project beyond plan vigency
+  const horizon = endDate && isBefore(endDate, horizonByWeeks) ? endDate : horizonByWeeks;
 
   const stepWeeks = (() => {
     switch (schedule.frequency_type) {
@@ -85,24 +87,24 @@ function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 
     }
   })();
 
-  if (['weekly', 'biweekly', 'three_weeks'].includes(schedule.frequency_type)) {
-    const days = schedule.weekly_days?.length ? schedule.weekly_days : [1];
-    let cursor = startOfDay(start);
-    while (isBefore(cursor, horizon)) {
-      for (const dow of days) {
-        const offset = (dow - cursor.getDay() + 7) % 7;
-        const d = addDays(cursor, offset);
-        if (!isBefore(d, fromDate) && isBefore(d, horizon)) out.push(d);
-      }
-      cursor = addWeeks(cursor, stepWeeks);
+  // Always honor weekly_days when present (defaults to Monday)
+  const days = schedule.weekly_days?.length ? schedule.weekly_days : [1];
+  // Anchor cursor to the FIRST configured weekday on/after start_date,
+  // so monthly/bimonthly/quarterly cadences land on the configured day, not on start_date's weekday.
+  const startDay = startOfDay(start);
+  const firstDow = days[0];
+  const initialOffset = (firstDow - startDay.getDay() + 7) % 7;
+  let cursor = addDays(startDay, initialOffset);
+
+  while (isBefore(cursor, horizon)) {
+    for (const dow of days) {
+      const offset = (dow - cursor.getDay() + 7) % 7;
+      const d = addDays(cursor, offset);
+      if (!isBefore(d, fromDate) && isBefore(d, horizon)) out.push(d);
     }
-  } else {
-    let cursor = startOfDay(start);
-    while (isBefore(cursor, horizon)) {
-      if (!isBefore(cursor, fromDate)) out.push(cursor);
-      cursor = addWeeks(cursor, stepWeeks);
-    }
+    cursor = addWeeks(cursor, stepWeeks);
   }
+
   const map = new Map<string, Date>();
   out.forEach(d => map.set(d.toISOString().slice(0, 10), d));
   return Array.from(map.values()).sort((a, b) => a.getTime() - b.getTime());
@@ -131,7 +133,7 @@ export default function AthleteCheckinPlanning() {
     queryKey: ['client-name', clientId],
     enabled: !!clientId,
     queryFn: async () => {
-      const { data } = await supabase.from('clients').select('id, name, checkin_frequency, user_id').eq('id', clientId!).maybeSingle();
+      const { data } = await supabase.from('clients').select('id, name, checkin_frequency, user_id, end_date').eq('id', clientId!).maybeSingle();
       return data;
     },
   });
@@ -253,9 +255,10 @@ export default function AthleteCheckinPlanning() {
 
   const futureRows = useMemo(() => {
     const now = new Date();
+    const planEnd = client?.end_date ? parseISO(client.end_date) : null;
     const items: { date: Date; formTitle: string; formId: string; scheduleId: string }[] = [];
     schedules.filter(s => s.is_active).forEach(s => {
-      projectFutureDates(s, now, 12).forEach(d => {
+      projectFutureDates(s, now, 12, planEnd).forEach(d => {
         const exists = dispatches.some(disp =>
           disp.checkin_form_id === s.checkin_form_id &&
           format(parseISO(disp.sent_at), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')
@@ -264,7 +267,7 @@ export default function AthleteCheckinPlanning() {
       });
     });
     return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 20);
-  }, [schedules, dispatches]);
+  }, [schedules, dispatches, client?.end_date]);
 
   const openEdit = (d: DispatchRow) => {
     setEditing(d);
