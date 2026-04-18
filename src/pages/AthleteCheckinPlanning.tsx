@@ -133,7 +133,7 @@ export default function AthleteCheckinPlanning() {
     queryKey: ['client-name', clientId],
     enabled: !!clientId,
     queryFn: async () => {
-      const { data } = await supabase.from('clients').select('id, name, checkin_frequency, user_id').eq('id', clientId!).maybeSingle();
+      const { data } = await supabase.from('clients').select('id, name, checkin_frequency, user_id, end_date').eq('id', clientId!).maybeSingle();
       return data;
     },
   });
