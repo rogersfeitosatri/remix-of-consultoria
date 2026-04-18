@@ -1189,6 +1189,7 @@ export function getExpiringThisMonth(clients: Client[], year: number, month: num
   return clients
     .filter(client => {
       if (!client.is_active) return false;
+      if ((client as any).is_frozen) return false;
       const endDate = parseISO(client.end_date);
       return isWithinInterval(endDate, { start: monthStart, end: monthEnd });
     })

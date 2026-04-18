@@ -20,11 +20,12 @@ export function useInactivityAlerts(thresholdDays = 14) {
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Get active clients
+      // Get active clients (exclude frozen)
       const { data: clients } = await supabase
         .from('clients')
         .select('id, name, phone, start_date')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_frozen', false);
 
       if (!clients || clients.length === 0) return [];
 
