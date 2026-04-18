@@ -59,6 +59,7 @@ const PublicStrategicCall = lazy(() => import("./pages/PublicStrategicCall"));
 const CallSchedulingConfig = lazy(() => import("./pages/CallSchedulingConfig"));
 const PublicCallBooking = lazy(() => import("./pages/PublicCallBooking"));
 const AssessoriaLanding = lazy(() => import("./pages/AssessoriaLanding"));
+const AthleteCheckinPlanning = lazy(() => import("./pages/AthleteCheckinPlanning"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -160,6 +161,7 @@ function AppRoutes() {
         <Route path="/anamnese/:formId" element={<ProtectedRoute adminOnly><AnamneseFormBuilder /></ProtectedRoute>} />
         <Route path="/clients/:clientId/analysis" element={<ProtectedRoute adminOnly><AthleteAnalysis /></ProtectedRoute>} />
         <Route path="/clients/:clientId/history" element={<ProtectedRoute adminOnly><AthleteHistory /></ProtectedRoute>} />
+        <Route path="/clients/:clientId/checkin-planning" element={<ProtectedRoute adminOnly><AthleteCheckinPlanning /></ProtectedRoute>} />
         <Route path="/checkin-review/:responseId" element={<ProtectedRoute adminOnly><CheckinReview /></ProtectedRoute>} />
         <Route path="/anamnese-response/:responseId" element={<ProtectedRoute adminOnly><AnamneseResponseDetail /></ProtectedRoute>} />
         <Route path="/appointments/:appointmentId" element={<ProtectedRoute adminOnly><AppointmentDetail /></ProtectedRoute>} />
