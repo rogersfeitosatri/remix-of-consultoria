@@ -101,6 +101,76 @@ Deno.serve(async (req) => {
     let dispatched = 0;
     let skipped = 0;
 
+    // ========== STEP 1: Promote pre-scheduled dispatches (admin overrides) ==========
+    // Dispatches with status='scheduled' and sent_at <= now should be sent now.
+    const { data: scheduledDispatches } = await supabase
+      .from('checkin_dispatches')
+      .select(`
+        *,
+        clients:client_id (id, name, phone, user_id, end_date, is_active, is_frozen),
+        checkin_forms:checkin_form_id (id, title, is_active),
+        athlete_checkin_schedules:schedule_id (due_in_hours)
+      `)
+      .eq('status', 'scheduled')
+      .lte('sent_at', now.toISOString());
+
+    for (const dispatch of scheduledDispatches || []) {
+      try {
+        const client = (dispatch as any).clients;
+        const form = (dispatch as any).checkin_forms;
+        const sched = (dispatch as any).athlete_checkin_schedules;
+
+        if (!client?.phone || !form?.is_active) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Cliente sem telefone ou formulário inativo' }).eq('id', dispatch.id);
+          skipped++;
+          continue;
+        }
+        if (client.is_frozen || !client.is_active) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Plano congelado/inativo' }).eq('id', dispatch.id);
+          skipped++;
+          continue;
+        }
+
+        const dueInHours = sched?.due_in_hours || 48;
+        const dueAt = dispatch.due_at || new Date(now.getTime() + dueInHours * 60 * 60 * 1000).toISOString();
+        const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
+        const codigoAcesso = formatPhoneAsAccessCode(client.phone);
+
+        const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
+          body: {
+            clientId: client.id,
+            templateKey: 'checkin_reminder',
+            context: {
+              nome: client.name.split(' ')[0],
+              link_checkin: checkinLink,
+              checkin_link: checkinLink,
+              codigo_acesso: codigoAcesso,
+              prazo_resposta: `${dueInHours}h`,
+            },
+          },
+        });
+
+        if (whatsappError) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: whatsappError.message }).eq('id', dispatch.id);
+        } else {
+          await supabase.from('checkin_dispatches').update({
+            status: 'sent',
+            sent_at: now.toISOString(),
+            due_at: dueAt,
+            link_checkin: checkinLink,
+          }).eq('id', dispatch.id);
+          if (dispatch.schedule_id) {
+            await supabase.from('athlete_checkin_schedules').update({ last_dispatched_at: now.toISOString() }).eq('id', dispatch.schedule_id);
+          }
+          dispatched++;
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      } catch (err: any) {
+        console.error(`[process-checkin-dispatches] Error promoting scheduled dispatch ${dispatch.id}:`, err);
+      }
+    }
+
+    // ========== STEP 2: Auto-generate dispatches from active schedules ==========
     for (const schedule of schedules || []) {
       try {
         const client = schedule.clients as any;

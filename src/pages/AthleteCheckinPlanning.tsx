@@ -2,19 +2,22 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, CalendarDays, CheckCircle2, Clock, MessageSquareText, Pencil, Send, Trash2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CheckCircle2, Clock, MessageSquareText, Pencil, Send, Trash2, AlertCircle, Plus } from 'lucide-react';
 import { format, parseISO, addDays, addWeeks, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -23,6 +26,7 @@ import { AthleteCheckinSchedules } from '@/components/admin/AthleteCheckinSchedu
 interface DispatchRow {
   id: string;
   client_id: string;
+  user_id: string;
   checkin_form_id: string;
   schedule_id: string | null;
   sent_at: string;
@@ -53,6 +57,7 @@ interface ScheduleRow {
   frequency_type: string;
   weekly_days: number[] | null;
   is_active: boolean;
+  due_in_hours: number | null;
   checkin_forms?: { title: string } | null;
 }
 
@@ -60,6 +65,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   sent: { label: 'Enviado', cls: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
   failed: { label: 'Falhou', cls: 'bg-destructive/10 text-destructive border-destructive/20' },
   pending: { label: 'Pendente', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' },
+  scheduled: { label: 'Programado', cls: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
 };
 
 function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 12): Date[] {
@@ -106,15 +112,26 @@ export default function AthleteCheckinPlanning() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const { data: forms = [] } = useCheckinForms();
+
+  // Edit existing dispatch (any status)
   const [editing, setEditing] = useState<DispatchRow | null>(null);
   const [editDate, setEditDate] = useState('');
+  const [editFormId, setEditFormId] = useState('');
   const [deleting, setDeleting] = useState<DispatchRow | null>(null);
+
+  // Add manual override (creates a 'scheduled' dispatch)
+  const [adding, setAdding] = useState(false);
+  const [addDate, setAddDate] = useState('');
+  const [addFormId, setAddFormId] = useState('');
+  const [addScheduleId, setAddScheduleId] = useState<string | null>(null);
 
   const { data: client } = useQuery({
     queryKey: ['client-name', clientId],
     enabled: !!clientId,
     queryFn: async () => {
-      const { data } = await supabase.from('clients').select('id, name, checkin_frequency').eq('id', clientId!).maybeSingle();
+      const { data } = await supabase.from('clients').select('id, name, checkin_frequency, user_id').eq('id', clientId!).maybeSingle();
       return data;
     },
   });
@@ -125,7 +142,7 @@ export default function AthleteCheckinPlanning() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('checkin_dispatches')
-        .select('id, client_id, checkin_form_id, schedule_id, sent_at, due_at, status, link_checkin, checkin_forms(title)')
+        .select('id, client_id, user_id, checkin_form_id, schedule_id, sent_at, due_at, status, link_checkin, checkin_forms(title)')
         .eq('client_id', clientId!)
         .order('sent_at', { ascending: false });
       if (error) throw error;
@@ -164,20 +181,23 @@ export default function AthleteCheckinPlanning() {
     queryFn: async () => {
       const { data } = await supabase
         .from('athlete_checkin_schedules')
-        .select('id, checkin_form_id, start_date, send_time, frequency_type, weekly_days, is_active, checkin_forms(title)')
+        .select('id, checkin_form_id, start_date, send_time, frequency_type, weekly_days, is_active, due_in_hours, checkin_forms(title)')
         .eq('client_id', clientId!);
       return (data || []) as unknown as ScheduleRow[];
     },
   });
 
   const updateDispatch = useMutation({
-    mutationFn: async ({ id, sent_at }: { id: string; sent_at: string }) => {
-      const { error } = await supabase.from('checkin_dispatches').update({ sent_at }).eq('id', id);
+    mutationFn: async ({ id, sent_at, checkin_form_id }: { id: string; sent_at: string; checkin_form_id: string }) => {
+      const { error } = await supabase
+        .from('checkin_dispatches')
+        .update({ sent_at, checkin_form_id })
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['planning-dispatches', clientId] });
-      toast.success('Data atualizada');
+      toast.success('Envio atualizado');
       setEditing(null);
     },
     onError: (e: any) => toast.error(e.message),
@@ -190,8 +210,32 @@ export default function AthleteCheckinPlanning() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['planning-dispatches', clientId] });
-      toast.success('Disparo excluído');
+      toast.success('Envio excluído');
       setDeleting(null);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const createOverride = useMutation({
+    mutationFn: async ({ sent_at, checkin_form_id, schedule_id }: { sent_at: string; checkin_form_id: string; schedule_id: string | null }) => {
+      const sched = schedules.find(s => s.id === schedule_id);
+      const dueInHours = sched?.due_in_hours || 48;
+      const dueAt = new Date(new Date(sent_at).getTime() + dueInHours * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase.from('checkin_dispatches').insert({
+        client_id: clientId!,
+        user_id: client?.user_id || user?.id,
+        checkin_form_id,
+        schedule_id,
+        sent_at,
+        due_at: dueAt,
+        status: 'scheduled',
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['planning-dispatches', clientId] });
+      toast.success('Envio programado');
+      setAdding(false);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -209,14 +253,14 @@ export default function AthleteCheckinPlanning() {
 
   const futureRows = useMemo(() => {
     const now = new Date();
-    const items: { date: Date; formTitle: string; scheduleId: string }[] = [];
+    const items: { date: Date; formTitle: string; formId: string; scheduleId: string }[] = [];
     schedules.filter(s => s.is_active).forEach(s => {
       projectFutureDates(s, now, 12).forEach(d => {
         const exists = dispatches.some(disp =>
           disp.checkin_form_id === s.checkin_form_id &&
           format(parseISO(disp.sent_at), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')
         );
-        if (!exists) items.push({ date: d, formTitle: s.checkin_forms?.title || 'Check-in', scheduleId: s.id });
+        if (!exists) items.push({ date: d, formTitle: s.checkin_forms?.title || 'Check-in', formId: s.checkin_form_id, scheduleId: s.id });
       });
     });
     return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 20);
@@ -225,7 +269,18 @@ export default function AthleteCheckinPlanning() {
   const openEdit = (d: DispatchRow) => {
     setEditing(d);
     setEditDate(format(parseISO(d.sent_at), "yyyy-MM-dd'T'HH:mm"));
+    setEditFormId(d.checkin_form_id);
   };
+
+  const openAddOverride = (initialDate?: Date, initialFormId?: string, initialScheduleId?: string | null) => {
+    const base = initialDate || new Date();
+    setAddDate(format(base, "yyyy-MM-dd'T'HH:mm"));
+    setAddFormId(initialFormId || forms[0]?.id || '');
+    setAddScheduleId(initialScheduleId ?? null);
+    setAdding(true);
+  };
+
+  const activeForms = forms.filter(f => f.is_active);
 
   return (
     <Layout>
@@ -247,10 +302,16 @@ export default function AthleteCheckinPlanning() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CalendarDays className="h-4 w-4" />
-              Linha do tempo de envios
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarDays className="h-4 w-4" />
+                Linha do tempo de envios
+              </CardTitle>
+              <Button size="sm" variant="outline" onClick={() => openAddOverride()} className="gap-1">
+                <Plus className="h-3 w-3" />
+                Programar envio
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
             {loadingDispatches && (
@@ -270,19 +331,20 @@ export default function AthleteCheckinPlanning() {
               const stat = STATUS_LABEL[dispatch.status] || { label: dispatch.status, cls: '' };
               const responded = !!response;
               const feedbackSent = feedback?.status === 'sent' || !!feedback?.sent_at;
+              const isFuture = dispatch.status === 'scheduled';
               return (
                 <div key={dispatch.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card">
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-sm truncate">{dispatch.checkin_forms?.title || 'Check-in'}</span>
                       <Badge variant="outline" className={stat.cls}>{stat.label}</Badge>
-                      {responded ? (
+                      {!isFuture && (responded ? (
                         <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20">
                           <CheckCircle2 className="h-3 w-3 mr-1" /> Respondido
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="bg-muted text-muted-foreground">Sem resposta</Badge>
-                      )}
+                      ))}
                       {responded && (
                         feedbackSent ? (
                           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
@@ -298,7 +360,7 @@ export default function AthleteCheckinPlanning() {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Send className="h-3 w-3" />
-                        Enviado {format(parseISO(dispatch.sent_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        {isFuture ? 'Programado para' : 'Enviado'} {format(parseISO(dispatch.sent_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                       </span>
                       {dispatch.due_at && (
                         <span className="flex items-center gap-1">
@@ -317,7 +379,7 @@ export default function AthleteCheckinPlanning() {
                         Revisar
                       </Button>
                     )}
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(dispatch)} title="Editar data">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(dispatch)} title="Editar">
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => setDeleting(dispatch)} title="Excluir">
@@ -330,18 +392,32 @@ export default function AthleteCheckinPlanning() {
 
             {futureRows.length > 0 && (
               <div className="pt-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Próximos envios programados</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Próximos envios projetados pela automação</p>
                 <div className="space-y-2">
                   {futureRows.map((f, i) => (
                     <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-dashed bg-muted/20">
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-2 text-sm flex-1 min-w-0">
                         <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{f.formTitle}</span>
-                        <span className="text-muted-foreground">
+                        <span className="font-medium truncate">{f.formTitle}</span>
+                        <span className="text-muted-foreground truncate">
                           {format(f.date, "EEEE, dd/MM/yyyy", { locale: ptBR })}
                         </span>
                       </div>
-                      <Badge variant="outline" className="text-xs">Programado</Badge>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="text-xs">Projetado</Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const d = new Date(f.date);
+                            d.setHours(9, 0, 0, 0);
+                            openAddOverride(d, f.formId, f.scheduleId);
+                          }}
+                          title="Personalizar este envio"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -351,22 +427,82 @@ export default function AthleteCheckinPlanning() {
         </Card>
       </div>
 
+      {/* EDIT EXISTING DISPATCH */}
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Alterar data de envio</DialogTitle>
+            <DialogTitle>Editar envio</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>Data e hora</Label>
-            <Input type="datetime-local" value={editDate} onChange={e => setEditDate(e.target.value)} />
+          <div className="space-y-3">
+            <div>
+              <Label>Tipo de check-in</Label>
+              <Select value={editFormId} onValueChange={setEditFormId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {activeForms.map(f => (
+                    <SelectItem key={f.id} value={f.id}>{f.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Data e hora</Label>
+              <Input type="datetime-local" value={editDate} onChange={e => setEditDate(e.target.value)} />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
             <Button
-              disabled={updateDispatch.isPending || !editDate}
-              onClick={() => editing && updateDispatch.mutate({ id: editing.id, sent_at: new Date(editDate).toISOString() })}
+              disabled={updateDispatch.isPending || !editDate || !editFormId}
+              onClick={() => editing && updateDispatch.mutate({
+                id: editing.id,
+                sent_at: new Date(editDate).toISOString(),
+                checkin_form_id: editFormId,
+              })}
             >
               Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CREATE OVERRIDE */}
+      <Dialog open={adding} onOpenChange={setAdding}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Programar envio personalizado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Tipo de check-in</Label>
+              <Select value={addFormId} onValueChange={setAddFormId}>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  {activeForms.map(f => (
+                    <SelectItem key={f.id} value={f.id}>{f.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Data e hora do envio</Label>
+              <Input type="datetime-local" value={addDate} onChange={e => setAddDate(e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1">
+                Será enviado automaticamente na data/hora selecionada.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdding(false)}>Cancelar</Button>
+            <Button
+              disabled={createOverride.isPending || !addDate || !addFormId}
+              onClick={() => createOverride.mutate({
+                sent_at: new Date(addDate).toISOString(),
+                checkin_form_id: addFormId,
+                schedule_id: addScheduleId,
+              })}
+            >
+              Programar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -375,7 +511,7 @@ export default function AthleteCheckinPlanning() {
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir disparo?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir envio?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta ação remove o registro do envio. Caso o atleta já tenha respondido, a resposta permanece preservada.
             </AlertDialogDescription>
