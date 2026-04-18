@@ -1,135 +1,70 @@
 
+## Auditoria de Consultas — Atletas Premium Recorrentes
 
-# Ajuste: Periodicidade de Consultas (4 ou 6 semanas) Integrada ao Fluxo
+### Escopo identificado
+Atletas ativos (`is_active=true`, `is_frozen=false`) com:
+- `plan_type = 'premium'` OU `plan_duration IN ('quarterly','semiannual','annual')`
+- `has_consultations = true`
+- `consultation_frequency IN ('monthly','six_weeks','4_weeks','6_weeks')`
 
-## Confirmação da Lógica Atual
-O sistema **já suporta** as duas cadências (`consultation_frequency`: `monthly`/`4_weeks` = 4 semanas | `six_weeks`/`6_weeks` = 6 semanas) nas funções `sync_pipeline_on_plan_change`, `update_consultation_journey` e `calculate_next_booking_send_date`. O ajuste aqui é tornar isso **explícito, validado e visível** em toda a operação.
+Hoje há ~25+ atletas no escopo (Aluísio Júnior, Alyne Ellen, Ana Kessy, Antônio Tupinamba, Brena Gava, Bruna Ribeiro, Caio Henrique, Diogo Ferreira, Francisco João Marcos, Igor Braga, Igor Diego, Ilana Mara, etc.).
 
----
+### Como vou executar
+Vou rodar **uma única auditoria SQL** consolidada (read-only, sem alterar dados) e gerar um **relatório PDF + CSV** em `/mnt/documents/`.
 
-## 1. Matriz de Tipos de Plano (Atualizada)
+**Fontes cruzadas:**
+- `clients` (plano, frequência, datas)
+- `appointments` (consultas: scheduled, confirmed, completed, cancelled, no_show)
+- `consultation_schedules` (pipeline de envio de links)
+- `consultation_schedule_rules` (cadência, próximo envio, último link enviado)
 
-| Tipo | Consultas | Cadência | Check-in | Exemplo |
-|------|-----------|----------|----------|---------|
-| **A — Só Check-in** | ❌ | — | ✅ | Consultoria mensal sem consultas |
-| **B — 1 Consulta Única** | 1 fixa | — (sem recorrência) | opcional | Plano avulso |
-| **C1 — Recorrente 4 semanas** | N | **4w** | ✅ | Trimestral 3 consultas (4w) |
-| **C2 — Recorrente 6 semanas** | N | **6w** | ✅ | Semestral 4 consultas (6w) |
-| **D1 — Premium 4w** | ∞ | 4w | ✅ | Premium intenso |
-| **D2 — Premium 6w** | ∞ | 6w | ✅ | Premium estendido |
+### Lógica de cálculo
 
----
+**1ª consulta:** primeira `appointment` com status `completed/confirmed/scheduled` (ordem `appointment_date`).
 
-## 2. O Que a Cadência (4w vs 6w) Controla no Sistema
+**Próxima consulta prevista:** `última realizada + cadência (4 ou 6 semanas)` conforme `consultation_frequency`.
 
-Quando admin escolhe `consultation_frequency`, **automaticamente afeta**:
+**Janela "em dia":** ±14 dias do prazo previsto.
 
-| Componente | Comportamento |
-|------------|---------------|
-| `sync_pipeline_on_plan_change` | Projeta próximas consultas em intervalos de 4 ou 6 semanas |
-| `update_consultation_journey` | Define `cadence_weeks` e calcula `next_link_send_date` |
-| `calculate_next_booking_send_date` | Retorna a segunda-feira da semana anterior à próxima consulta (4w ou 6w após a última) |
-| `send-booking-link` (cron) | Envia WhatsApp com link na semana correta conforme cadência |
-| Pipeline Semanal (UI) | Mostra próxima consulta projetada respeitando cadência |
-| Tarefas automáticas | Tarefa "Preparar consulta" gerada com prazo baseado na cadência |
-
----
-
-## 3. Ajustes Propostos para Garantir Consistência
-
-### 🔴 Sprint Crítico — Garantir Integridade
-1. **Validação no `PlanFinancialSetupDialog`**:
-   - Se `has_consultations = true` → `consultation_frequency` é **obrigatório** (4 ou 6 semanas)
-   - Se `consultation_count > 1` → cadência obrigatória
-   - Se `consultation_count = 1` → cadência irrelevante (esconder campo)
-   - Se `has_consultations = false` → bloquear seleção de cadência
-
-2. **Auditoria de dados existentes**:
-   - Identificar atletas com `has_consultations = true` mas `consultation_frequency` nulo
-   - Identificar atletas com `consultation_count = 1` que estão recebendo links recorrentes (bug)
-   - Identificar inconsistências entre `consultation_count` × cadência × `end_date` (ex: 6 consultas a cada 6w em plano de 3 meses = impossível)
-
-3. **Badge visual de cadência no card do atleta**:
-   - 🔄 4 semanas / 🔄 6 semanas / 1️⃣ Única / 📋 Só Check-in / ⭐ Premium
-
-### 🟡 Sprint UX
-4. **Catálogo de templates de plano** (Configurações → Templates):
-   | Template | has_cons | count | freq | check-in |
-   |----------|----------|-------|------|----------|
-   | Consultoria Mensal (só check-in) | false | 0 | — | mensal |
-   | Avulsa 1 Consulta | true | 1 | — | não |
-   | **Trimestral 3 Consultas (4w)** | true | 3 | 4w | quinzenal |
-   | **Trimestral 2 Consultas (6w)** | true | 2 | 6w | quinzenal |
-   | **Semestral 6 Consultas (4w)** | true | 6 | 4w | semanal |
-   | **Semestral 4 Consultas (6w)** | true | 4 | 6w | semanal |
-   | Premium Anual (4w) | true | 0 | 4w | semanal |
-   | Premium Anual (6w) | true | 0 | 6w | semanal |
-
-5. **Indicador na pipeline semanal**: mostrar a cadência ao lado do nome do atleta na lista (ex: "João Silva — próxima em 4w")
-
-### 🟢 Sprint Inteligência
-6. **Validação de viabilidade no setup**: alertar se `consultation_count × cadence_weeks > duração do plano em semanas` (ex: 6 consultas × 6w = 36 semanas, mas plano tem 12 semanas → inviável)
-
-7. **Histórico de mudança de cadência**: registrar em `client_plan_history` quando admin muda cadência no meio do plano (impacta projeções futuras)
-
----
-
-## 4. Fluxo Operacional Atualizado por Cadência
-
-```
-SETUP (após anamnese)
-├─ Admin escolhe template OU configura manual
-├─ Define cadência: [ 4 semanas | 6 semanas | sem consulta | única ]
-└─ Sistema valida coerência (count × cadência × duração)
-
-PROJEÇÃO AUTOMÁTICA
-├─ Trigger sync_pipeline_on_plan_change
-├─ Cria N entradas em consultation_schedules
-│   ├─ Cadência 4w: a cada 28 dias
-│   └─ Cadência 6w: a cada 42 dias
-└─ send_link_date = segunda-feira da semana anterior
-
-ENVIO DE LINK (cron diário)
-├─ Lê consultation_schedule_rules
-├─ Compara CURRENT_DATE com next_link_send_date
-└─ Dispara WhatsApp via send-booking-link
-
-PÓS-CONSULTA REALIZADA
-├─ Trigger update_consultation_journey
-├─ Recalcula next_link_send_date = última + cadence_weeks
-└─ Se atingiu consultation_count → is_enabled = false
+**Classificação:**
+```text
+Em dia        → existe próxima consulta agendada/confirmada dentro da janela
+Atenção       → próximo prazo a ≤14 dias e nenhuma futura agendada, OU sem link enviado
+Atrasado      → último prazo passou >14 dias sem nova consulta
+Crítico/Falha → sem 1ª consulta registrada, ou sem nenhuma futura, ou link nunca enviado
 ```
 
----
+**Status por consulta:** Agendada / Confirmada / Realizada / Cancelada / Remarcada (derivado de `appointments.status` + cruzamento com `consultation_schedules`).
 
-## 5. Arquivos a Editar (Quando Aprovado)
+### Pendências verificadas por atleta
+- [ ] 1ª consulta registrada
+- [ ] Histórico cronológico coerente
+- [ ] Link da próxima consulta enviado (`consultation_schedules.link_sent_at` ou `rules.last_link_sent_at`)
+- [ ] Próxima consulta agendada futura
+- [ ] Intervalo real entre consultas vs cadência contratada (detecta inconsistências)
+- [ ] Última consulta dentro da janela ±2 semanas
 
-**Validação & UI:**
-- `src/components/admin/PlanFinancialSetupDialog.tsx` — validações + UI condicional para cadência
-- `src/components/clients/ClientForm.tsx` — mesma lógica no cadastro principal
-- `src/components/clients/ClientsList.tsx` — badge de cadência
-- `src/components/scheduling/WeeklyPipelineView.tsx` — indicador "4w/6w" na lista
+### Entregáveis (em `/mnt/documents/`)
 
-**Templates:**
-- Nova tabela `plan_templates` (migration) + UI em Configurações
-- `src/pages/Settings.tsx` — nova aba "Templates de Plano"
+**1. `auditoria_premium_resumo.pdf`** — Relatório executivo com:
+- Resumo geral: total auditados, % em dia / atenção / atrasado / crítico
+- Gráfico de distribuição por status
+- Tabela individual: Nome | Plano | Frequência | Última | Próxima Prevista | Status | Pendências
 
-**Auditoria (script único):**
-- Query SQL de diagnóstico (executada e exibida ao admin)
+**2. `auditoria_premium_detalhado.csv`** — Dados completos por atleta para filtragem no Excel:
+```text
+nome, plan_type, plan_duration, frequencia_semanas, 
+data_inicio, data_fim, primeira_consulta, ultima_realizada,
+proxima_agendada, proxima_prevista, dias_desde_ultima,
+desvio_cadencia_dias, total_realizadas, total_canceladas,
+link_enviado, ultimo_envio_link, status_auditoria, pendencias
+```
 
----
+**3. `auditoria_premium_pendencias.csv`** — Apenas atletas com falhas, ordenados por criticidade (para ação imediata).
 
-## 6. Ordem de Implementação Sugerida
+### Garantias
+- **Read-only**: nenhuma alteração no banco, código ou fluxos do sistema (respeita escopo Core).
+- Timezone `America/Fortaleza` em todos os cálculos de data.
+- Considera apenas atletas ativos e não congelados (alinhado com a regra recém-implementada).
 
-1. **Auditoria primeiro** (entender o estado atual antes de mudar nada)
-2. **Validações no PlanFinancialSetupDialog** (parar o sangramento)
-3. **Badge visual de cadência** (visibilidade imediata)
-4. **Catálogo de templates** (padronização)
-5. **Indicador na pipeline + validação de viabilidade** (refinamento)
-
----
-
-## Pergunta Antes de Prosseguir
-
-Quer começar pela **auditoria** (descobrir quantos atletas estão com configuração inconsistente hoje) ou já partir direto para as **validações no dialog** (impedir novos erros)?
-
+Após sua aprovação, executo a auditoria e entrego os 3 arquivos prontos para download.
