@@ -245,8 +245,11 @@ export default function PublicBookingConsult() {
       }
     });
     
-    return slots.sort((a, b) => a.time.localeCompare(b.time));
-  }, [selectedDate, availabilityRules, existingAppointments, settings]);
+    // Only return slots that are actually available (hide past / before-min-advance / booked)
+    return slots
+      .filter(s => s.available)
+      .sort((a, b) => a.time.localeCompare(b.time));
+  }, [selectedDate, availabilityRules, existingAppointments, settings, minBookingMoment]);
 
   const handleConfirm = async () => {
     if (!selectedDate || !selectedTime || !bookingContext || !settings) return;
