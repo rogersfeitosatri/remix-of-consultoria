@@ -125,12 +125,13 @@ export function useMyDayToday() {
       }
       const pendingCheckins = Array.from(checkinMap.values()).sort((a, b) => b.days_waiting - a.days_waiting).slice(0, 5);
 
-      // 4. Urgent athletes (plan expiring in 7 days, active)
+      // 4. Urgent athletes (plan expiring in 7 days, active and not frozen)
       const sevenDaysLater = format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
       const { data: expiringClients } = await supabase
         .from('clients')
         .select('id, name, phone, end_date')
         .eq('is_active', true)
+        .eq('is_frozen', false)
         .lte('end_date', sevenDaysLater)
         .gte('end_date', today)
         .order('end_date');

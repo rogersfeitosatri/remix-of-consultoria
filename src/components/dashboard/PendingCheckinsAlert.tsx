@@ -41,13 +41,15 @@ export function PendingCheckinsAlert() {
           checkin_response_id,
           status,
           created_at,
-          clients (id, name),
+          clients!inner (id, name, is_active, is_frozen),
           checkin_responses (
             submitted_at,
             checkin_forms (title)
           )
         `)
         .in('status', ['pending', 'approved'])
+        .eq('clients.is_active', true)
+        .eq('clients.is_frozen', false)
         .order('created_at', { ascending: false })
         .limit(5);
 

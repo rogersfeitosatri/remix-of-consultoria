@@ -94,9 +94,10 @@ export function ActionCenterPanel() {
 
       const { data: clients } = await supabase
         .from('clients')
-        .select('id, name, phone')
+        .select('id, name, phone, is_frozen')
         .in('id', problematic.map(p => p.clientId))
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_frozen', false);
 
       const clientMap = new Map((clients || []).map(c => [c.id, { name: c.name, phone: c.phone }]));
 
@@ -115,14 +116,16 @@ export function ActionCenterPanel() {
     refetchInterval: 60000,
   });
 
-  // Pending checkin feedbacks
+  // Pending checkin feedbacks (excludes frozen/inactive clients)
   const { data: pendingCheckinFeedbacks = [] } = useQuery({
     queryKey: ['pending_checkins_dashboard'],
     queryFn: async () => {
       const { data } = await supabase
         .from('checkin_feedbacks')
-        .select('id, checkin_response_id, status, created_at, clients(id, name), checkin_responses(submitted_at, checkin_forms(title))')
+        .select('id, checkin_response_id, status, created_at, clients!inner(id, name, is_active, is_frozen), checkin_responses(submitted_at, checkin_forms(title))')
         .in('status', ['pending', 'approved'])
+        .eq('clients.is_active', true)
+        .eq('clients.is_frozen', false)
         .order('created_at', { ascending: false })
         .limit(10);
       return (data || []) as any[];

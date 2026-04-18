@@ -94,11 +94,12 @@ export function useDietCycleAlerts() {
   return useQuery({
     queryKey: ['diet-cycle-alerts', user?.id],
     queryFn: async () => {
-      // 1. Fetch eligible clients
+      // 1. Fetch eligible clients (exclude frozen)
       const { data: clients, error: clientsError } = await supabase
         .from('clients')
         .select('id, name, plan_type, checkin_frequency, consultation_frequency, consultation_count, start_date, end_date, is_active')
         .eq('is_active', true)
+        .eq('is_frozen', false)
         .or('plan_type.eq.consultoria,plan_type.eq.consulta_unica');
 
       if (clientsError) throw clientsError;
