@@ -255,9 +255,10 @@ export default function AthleteCheckinPlanning() {
 
   const futureRows = useMemo(() => {
     const now = new Date();
+    const planEnd = client?.end_date ? parseISO(client.end_date) : null;
     const items: { date: Date; formTitle: string; formId: string; scheduleId: string }[] = [];
     schedules.filter(s => s.is_active).forEach(s => {
-      projectFutureDates(s, now, 12).forEach(d => {
+      projectFutureDates(s, now, 12, planEnd).forEach(d => {
         const exists = dispatches.some(disp =>
           disp.checkin_form_id === s.checkin_form_id &&
           format(parseISO(disp.sent_at), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')
@@ -266,7 +267,7 @@ export default function AthleteCheckinPlanning() {
       });
     });
     return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 20);
-  }, [schedules, dispatches]);
+  }, [schedules, dispatches, client?.end_date]);
 
   const openEdit = (d: DispatchRow) => {
     setEditing(d);
