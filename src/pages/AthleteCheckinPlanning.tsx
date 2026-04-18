@@ -87,6 +87,15 @@ function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 
     }
   })();
 
+  // Cadence guard: if remaining days until plan end is shorter than the cadence interval,
+  // there's no time for another full cycle — do not project anything.
+  if (endDate) {
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const remainingDays = Math.floor((endDate.getTime() - fromDate.getTime()) / msPerDay);
+    const cadenceDays = stepWeeks * 7;
+    if (remainingDays < cadenceDays) return [];
+  }
+
   // Always honor weekly_days when present (defaults to Monday)
   const days = schedule.weekly_days?.length ? schedule.weekly_days : [1];
   // Anchor cursor to the FIRST configured weekday on/after start_date,
