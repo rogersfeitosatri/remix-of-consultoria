@@ -14,6 +14,7 @@ import { ptBR } from 'date-fns/locale';
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
 import { PremiumClientDetails } from '@/components/admin/PremiumClientDetails';
 import { AnamneseResponseSection } from '@/components/admin/AnamneseResponseSection';
+import { CheckinDispatchHistory } from '@/components/athlete/CheckinDispatchHistory';
 
 interface CheckinResponse {
   id: string;
@@ -295,6 +296,7 @@ export default function AthleteHistory() {
 
           {/* Responses Tab */}
           <TabsContent value="responses" className="space-y-4">
+            {clientId && <CheckinDispatchHistory clientId={clientId} />}
             {isLoading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
