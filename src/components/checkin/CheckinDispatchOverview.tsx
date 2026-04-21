@@ -12,8 +12,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CHECKIN_LABELS, CheckinFrequency } from '@/types/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CheckCircle2, Clock, XCircle, Send, Search, RefreshCw, Loader2 } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Send, Search, RefreshCw, Loader2, Play, Activity } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
 
 interface DispatchRow {
   id: string;
@@ -50,6 +51,40 @@ export function CheckinDispatchOverview() {
       setResendingId(null);
     }
   };
+
+  const [reprocessing, setReprocessing] = useState(false);
+  const handleReprocess = async () => {
+    if (!confirm('Reprocessar check-ins de hoje? Vai disparar envios para atletas elegíveis ainda não enviados.')) return;
+    setReprocessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-checkin-dispatches', {
+        body: { source: 'manual', forceReprocess: false },
+      });
+      if (error) throw error;
+      toast.success(`Concluído: ${data?.dispatched || 0} enviados, ${data?.failed || 0} falhas`);
+      await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-overview'] });
+      await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-runs'] });
+    } catch (err: any) {
+      toast.error(`Falha ao reprocessar: ${err.message || 'erro'}`);
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
+  const { data: lastRun } = useQuery({
+    queryKey: ['checkin-dispatch-runs', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('checkin_dispatch_runs')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id,
+    refetchInterval: 30000,
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['checkin-dispatch-overview', user?.id],
@@ -130,6 +165,34 @@ export function CheckinDispatchOverview() {
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <Activity className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <div className="text-sm font-semibold">Cron Automático — Diário 07:00 (Fortaleza)</div>
+              {lastRun ? (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Última execução: {formatDistanceToNow(new Date(lastRun.started_at), { addSuffix: true, locale: ptBR })}
+                  {' · '}
+                  <Badge variant={lastRun.status === 'success' ? 'default' : lastRun.status === 'error' ? 'destructive' : 'secondary'} className="ml-1">
+                    {lastRun.status}
+                  </Badge>
+                  {' · '}
+                  Analisados {lastRun.total_analyzed} · Enviados {lastRun.total_dispatched} · Falhas {lastRun.total_failed} · Ignorados {lastRun.total_skipped}
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground mt-1">Nenhuma execução registrada ainda.</div>
+              )}
+            </div>
+          </div>
+          <Button onClick={handleReprocess} disabled={reprocessing} size="sm">
+            {reprocessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+            Reprocessar check-ins de hoje
+          </Button>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4">
