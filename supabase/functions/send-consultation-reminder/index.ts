@@ -167,6 +167,28 @@ Deno.serve(async (req) => {
           console.error('Error updating reminder_sent_at:', updateError);
         }
 
+        // Find linked consultation_schedule_id (for audit trail)
+        const { data: linkedSchedule } = await supabase
+          .from('consultation_schedules')
+          .select('id, user_id')
+          .eq('appointment_id', appointment.id)
+          .maybeSingle();
+
+        // Audit log entry (idempotency already enforced by reminder_sent_at check)
+        await supabase.from('whatsapp_message_logs').insert({
+          user_id: linkedSchedule?.user_id ?? null,
+          client_id: appointment.client_id,
+          appointment_id: appointment.id,
+          consultation_schedule_id: linkedSchedule?.id ?? null,
+          message_type: 'reminder_24h',
+          template_key: 'consultation_reminder_24h_v1',
+          to_phone: phone,
+          payload_preview: message.substring(0, 500),
+          status: 'sent',
+          triggered_by: 'reminder_24h',
+          metadata: { zapi_response: zapiResult },
+        });
+
         results.push({ appointmentId: appointment.id, success: true });
 
       } catch (error: any) {
