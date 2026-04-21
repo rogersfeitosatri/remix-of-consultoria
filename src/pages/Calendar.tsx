@@ -15,9 +15,11 @@ import {
   useConsultationSchedules,
 } from '@/hooks/useClients';
 import { useConsultationAppointments } from '@/hooks/useConsultations';
-import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth } from 'date-fns';
+import { useWeeklyLinkLogs } from '@/hooks/useWeeklyLinkLogs';
+import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2, Phone, Mail, ExternalLink, History, LayoutList, Shield } from 'lucide-react';
+import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2, Phone, Mail, ExternalLink, History, LayoutList, Shield, AlertCircle, XCircle, BellOff, Activity } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
