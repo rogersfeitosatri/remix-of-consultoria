@@ -5224,7 +5224,28 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      checkin_send_audit: {
+        Row: {
+          audit_status: string | null
+          client_id: string | null
+          client_name: string | null
+          dispatch_id: string | null
+          log_id: string | null
+          log_status: string | null
+          sent_at: string | null
+          to_phone: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_message_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       calculate_next_booking_send_date: {
@@ -5240,6 +5261,15 @@ export type Database = {
           p_lead_phone?: string
           p_scheduling_link_id: string
           p_strategic_call_response_id?: string
+        }
+        Returns: string
+      }
+      create_checkin_dispatch_for_send: {
+        Args: {
+          p_client_id: string
+          p_link_checkin: string
+          p_source?: string
+          p_user_id: string
         }
         Returns: string
       }
