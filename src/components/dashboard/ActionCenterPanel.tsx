@@ -407,6 +407,18 @@ export function ActionCenterPanel() {
                   </Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger
+                value="queue"
+                className="relative data-[state=active]:bg-sky-500/10 data-[state=active]:text-sky-600 data-[state=active]:shadow-none rounded-t-lg rounded-b-none border-b-2 border-transparent data-[state=active]:border-sky-500 px-3 py-1.5 text-xs"
+              >
+                <Send className="h-3 w-3 mr-1" />
+                Fila de Envios
+                {queueCount > 0 && (
+                  <Badge className="ml-1.5 h-4 min-w-4 text-[10px] px-1 bg-sky-500 text-white">
+                    {queueCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
           </div>
 
