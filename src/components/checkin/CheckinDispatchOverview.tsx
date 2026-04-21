@@ -86,6 +86,7 @@ export function CheckinDispatchOverview() {
     refetchInterval: 30000,
   });
 
+  const { data, isLoading } = useQuery({
     queryKey: ['checkin-dispatch-overview', user?.id],
     queryFn: async (): Promise<DispatchRow[]> => {
       if (!user?.id) return [];
