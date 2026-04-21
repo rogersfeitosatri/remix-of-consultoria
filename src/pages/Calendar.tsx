@@ -606,11 +606,36 @@ export default function CalendarPage() {
                                 return null;
                               })}
                             </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
+                          {/* Weekly summary sidebar cell */}
+                          <div className="border-b border-l border-border bg-muted/20 p-1.5 flex flex-col items-center justify-center text-[10px] gap-0.5">
+                            {stats.sent > 0 && (
+                              <span className="flex items-center gap-0.5 text-emerald-600 font-semibold" title={`${stats.sent} link(s) enviado(s)`}>
+                                <Check className="h-3 w-3" />{stats.sent}
+                              </span>
+                            )}
+                            {stats.pending > 0 && (
+                              <span className="flex items-center gap-0.5 text-amber-600 font-semibold" title={`${stats.pending} envio(s) pendente(s)`}>
+                                <Send className="h-3 w-3" />{stats.pending}
+                              </span>
+                            )}
+                            {stats.appts > 0 && (
+                              <span className="flex items-center gap-0.5 text-primary font-semibold" title={`${stats.appts} consulta(s)`}>
+                                <CalendarCheck2 className="h-3 w-3" />{stats.appts}
+                              </span>
+                            )}
+                            {stats.sent === 0 && stats.pending === 0 && stats.appts === 0 && (
+                              <span className="text-muted-foreground/50">—</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
+                  </TooltipProvider>
                 </CardContent>
               </Card>
               {/* Day Agenda Panel - visible on calendar tab */}
