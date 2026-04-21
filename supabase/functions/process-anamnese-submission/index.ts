@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
           monthly_value: 0,
           is_active: true,
           has_checkin: false,
-          athlete_status: "pending_anamnese",
+          athlete_status: "pending_plan",
           registration_source: "anamnese_auto",
         })
         .select("id")
