@@ -190,6 +190,8 @@ export function WeeklyPipelineView({
           meetLink: matchingAppointment?.google_meet_link,
           daysSinceSent,
           isOverdue: status === 'no_show',
+          lastLinkSentAt: lastLinkByClient.get(schedule.client_id),
+          lastCompletedConsultDate: lastCompletedByClient.get(schedule.client_id),
         });
 
         processedClientIds.add(schedule.client_id);
