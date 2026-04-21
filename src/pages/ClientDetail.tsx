@@ -15,6 +15,7 @@ import {
   History,
   MessageCircle,
   CalendarCheck,
+  GitBranch,
   Key,
   Lock,
   Copy,
@@ -46,6 +47,7 @@ import { RenewPlanDialog } from '@/components/clients/RenewPlanDialog';
 import { FreezePlanDialog } from '@/components/clients/FreezePlanDialog';
 import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
 import { AthleteCheckinSchedules } from '@/components/admin/AthleteCheckinSchedules';
+import { PipelineTimelineTab } from '@/components/admin/PipelineTimelineTab';
 import { useQuery } from '@tanstack/react-query';
 import { useFreezePlan } from '@/hooks/useFreezePlan';
 import { differenceInCalendarDays } from 'date-fns';
@@ -507,6 +509,10 @@ export default function ClientDetail() {
               <MessageCircle className="h-4 w-4" />
               Check-ins
             </TabsTrigger>
+            <TabsTrigger value="pipeline" className="gap-2">
+              <GitBranch className="h-4 w-4" />
+              Pipeline
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="timeline">
@@ -514,6 +520,10 @@ export default function ClientDetail() {
               <h3 className="text-sm font-semibold mb-3 text-foreground">Histórico de Interações</h3>
               <AthleteTimeline clientId={client.id} />
             </div>
+          </TabsContent>
+
+          <TabsContent value="pipeline">
+            <PipelineTimelineTab clientId={client.id} />
           </TabsContent>
           
           <TabsContent value="anamnese">
