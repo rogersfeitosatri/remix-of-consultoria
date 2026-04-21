@@ -1,0 +1,236 @@
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { CHECKIN_LABELS, CheckinFrequency } from '@/types/client';
+import { format, formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { CheckCircle2, Clock, XCircle, Send, Search } from 'lucide-react';
+
+interface DispatchRow {
+  id: string;
+  client_id: string;
+  client_name: string;
+  checkin_frequency: string | null;
+  sent_at: string;
+  status: string;
+  error_message: string | null;
+  responded_at: string | null;
+  response_hours: number | null;
+}
+
+export function CheckinDispatchOverview() {
+  const { user } = useAuth();
+  const [search, setSearch] = useState('');
+  const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['checkin-dispatch-overview', user?.id],
+    queryFn: async (): Promise<DispatchRow[]> => {
+      if (!user?.id) return [];
+
+      const { data: dispatches, error } = await supabase
+        .from('checkin_dispatches')
+        .select('id, client_id, checkin_form_id, sent_at, status, error_message, clients(name, checkin_frequency)')
+        .eq('user_id', user.id)
+        .order('sent_at', { ascending: false })
+        .limit(1000);
+
+      if (error) throw error;
+      if (!dispatches?.length) return [];
+
+      const clientIds = Array.from(new Set(dispatches.map((d: any) => d.client_id)));
+      const { data: responses } = await supabase
+        .from('checkin_responses')
+        .select('client_id, form_id, submitted_at')
+        .in('client_id', clientIds)
+        .order('submitted_at', { ascending: true });
+
+      const respList = responses || [];
+
+      return dispatches.map((d: any) => {
+        const sentAt = new Date(d.sent_at);
+        const match = respList.find(
+          (r: any) =>
+            r.client_id === d.client_id &&
+            r.form_id === d.checkin_form_id &&
+            new Date(r.submitted_at) >= sentAt &&
+            new Date(r.submitted_at) <= new Date(sentAt.getTime() + 14 * 24 * 60 * 60 * 1000),
+        );
+        const respondedAt = match?.submitted_at || null;
+        const hours = respondedAt
+          ? Math.round(((new Date(respondedAt).getTime() - sentAt.getTime()) / 3600000) * 10) / 10
+          : null;
+
+        return {
+          id: d.id,
+          client_id: d.client_id,
+          client_name: d.clients?.name || 'Atleta removido',
+          checkin_frequency: d.clients?.checkin_frequency || null,
+          sent_at: d.sent_at,
+          status: d.status,
+          error_message: d.error_message,
+          responded_at: respondedAt,
+          response_hours: hours,
+        };
+      });
+    },
+    enabled: !!user?.id,
+  });
+
+  const filtered = useMemo(() => {
+    if (!data) return [];
+    return data.filter((d) => {
+      if (search && !d.client_name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (frequencyFilter !== 'all' && d.checkin_frequency !== frequencyFilter) return false;
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'responded' && !d.responded_at) return false;
+        if (statusFilter === 'pending' && (d.responded_at || d.status === 'failed')) return false;
+        if (statusFilter === 'failed' && d.status !== 'failed') return false;
+      }
+      return true;
+    });
+  }, [data, search, frequencyFilter, statusFilter]);
+
+  const stats = useMemo(() => {
+    const total = filtered.length;
+    const responded = filtered.filter((d) => d.responded_at).length;
+    const failed = filtered.filter((d) => d.status === 'failed').length;
+    const pending = total - responded - failed;
+    const rate = total > 0 ? Math.round((responded / total) * 100) : 0;
+    return { total, responded, failed, pending, rate };
+  }, [filtered]);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs"><Send className="h-3 w-3" />Enviados</div>
+            <div className="text-2xl font-bold mt-1">{stats.total}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-emerald-600 text-xs"><CheckCircle2 className="h-3 w-3" />Respondidos</div>
+            <div className="text-2xl font-bold mt-1">{stats.responded} <span className="text-sm text-muted-foreground">({stats.rate}%)</span></div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-amber-600 text-xs"><Clock className="h-3 w-3" />Pendentes</div>
+            <div className="text-2xl font-bold mt-1">{stats.pending}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-destructive text-xs"><XCircle className="h-3 w-3" />Falhas</div>
+            <div className="text-2xl font-bold mt-1">{stats.failed}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Histórico de Envios</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por atleta..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
+              <SelectTrigger className="md:w-48"><SelectValue placeholder="Frequência" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas frequências</SelectItem>
+                {Object.entries(CHECKIN_LABELS).map(([k, v]) => (
+                  <SelectItem key={k} value={k}>{v}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="md:w-48"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos status</SelectItem>
+                <SelectItem value="responded">Respondidos</SelectItem>
+                <SelectItem value="pending">Pendentes</SelectItem>
+                <SelectItem value="failed">Falhas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {isLoading ? (
+            <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">Nenhum envio encontrado.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Atleta</TableHead>
+                    <TableHead>Frequência</TableHead>
+                    <TableHead>Enviado em</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Respondido</TableHead>
+                    <TableHead>Tempo de resposta</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((d) => (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-medium">{d.client_name}</TableCell>
+                      <TableCell>
+                        {d.checkin_frequency
+                          ? <Badge variant="outline">{CHECKIN_LABELS[d.checkin_frequency as CheckinFrequency] || d.checkin_frequency}</Badge>
+                          : <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {format(new Date(d.sent_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell>
+                        {d.status === 'failed' ? (
+                          <Badge variant="destructive">Falha</Badge>
+                        ) : d.responded_at ? (
+                          <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Respondido</Badge>
+                        ) : (
+                          <Badge variant="secondary">Pendente</Badge>
+                        )}
+                        {d.error_message && <div className="text-xs text-destructive mt-1">{d.error_message}</div>}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {d.responded_at
+                          ? format(new Date(d.responded_at), "dd/MM HH:mm", { locale: ptBR })
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {d.response_hours !== null
+                          ? d.response_hours < 24
+                            ? `${d.response_hours}h`
+                            : `${Math.round(d.response_hours / 24)}d`
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
