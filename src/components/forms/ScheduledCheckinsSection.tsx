@@ -286,10 +286,23 @@ export function ScheduledCheckinsSection() {
                 <Badge variant="secondary" className="text-[10px] px-1.5 h-5">Pausado</Badge>
               )}
             </div>
-            <span className={cn("text-xs text-muted-foreground", isPaused && "line-through")}>
+            <span className={cn("text-xs text-muted-foreground block", isPaused && "line-through")}>
               {format(checkinDate, "EEE, dd/MM", { locale: ptBR })}
               {checkin.scheduled_send_time && ` · ${checkin.scheduled_send_time.substring(0, 5)}`}
             </span>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground mt-0.5">
+              <span>
+                Frequência: <span className="font-medium text-foreground">{frequencyLabel(clientsMap[checkin.client_id]?.checkin_frequency)}</span>
+              </span>
+              <span>
+                Último envio:{' '}
+                <span className="font-medium text-foreground">
+                  {lastSentMap[checkin.client_id]
+                    ? format(parseISO(lastSentMap[checkin.client_id]), "dd/MM/yyyy", { locale: ptBR })
+                    : 'Nunca enviado'}
+                </span>
+              </span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
