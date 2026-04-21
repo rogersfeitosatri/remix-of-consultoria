@@ -88,6 +88,8 @@ interface RequestBody {
   triggeredBy?: TriggeredBy;
   /** When true, skips eligibility checks (for confirmations triggered after booking) */
   skipEligibility?: boolean;
+  /** Explicit template_key override (e.g. booking_first_consultation, booking_followup_consultation) */
+  templateKey?: string;
 }
 
 const VALID_TRIGGERED_BY: TriggeredBy[] = [
@@ -159,9 +161,10 @@ Deno.serve(async (req) => {
 
     const messageType = body.messageType ?? 'booking_invite';
     const templateKey =
-      messageType === 'confirmation' ? 'booking_confirmed'
-      : messageType === 'followup' ? 'booking_followup_v1'
-      : 'weekly_booking_link';
+      body.templateKey ??
+      (messageType === 'confirmation' ? 'booking_confirmed'
+        : messageType === 'followup' ? 'booking_followup_v1'
+        : 'weekly_booking_link');
 
     // ===== ELIGIBILITY CHECK (skip for confirmations) =====
     if (!body.skipEligibility && messageType !== 'confirmation') {
