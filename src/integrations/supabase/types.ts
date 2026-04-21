@@ -1418,6 +1418,51 @@ export type Database = {
           },
         ]
       }
+      checkin_dispatch_runs: {
+        Row: {
+          details: Json | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          source: string
+          started_at: string
+          status: string
+          total_analyzed: number
+          total_dispatched: number
+          total_eligible: number
+          total_failed: number
+          total_skipped: number
+        }
+        Insert: {
+          details?: Json | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          source?: string
+          started_at?: string
+          status?: string
+          total_analyzed?: number
+          total_dispatched?: number
+          total_eligible?: number
+          total_failed?: number
+          total_skipped?: number
+        }
+        Update: {
+          details?: Json | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          source?: string
+          started_at?: string
+          status?: string
+          total_analyzed?: number
+          total_dispatched?: number
+          total_eligible?: number
+          total_failed?: number
+          total_skipped?: number
+        }
+        Relationships: []
+      }
       checkin_dispatches: {
         Row: {
           checkin_form_id: string
