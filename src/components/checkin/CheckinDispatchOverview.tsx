@@ -195,17 +195,30 @@ export function CheckinDispatchOverview() {
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    return data.filter((d) => {
+    const fromMs = dateRange?.from.getTime();
+    const toMs = dateRange?.to.getTime();
+    const result = data.filter((d) => {
+      if (fromMs && toMs) {
+        const t = new Date(d.sent_at).getTime();
+        if (t < fromMs || t > toMs) return false;
+      }
       if (search && !d.client_name.toLowerCase().includes(search.toLowerCase())) return false;
       if (frequencyFilter !== 'all' && d.checkin_frequency !== frequencyFilter) return false;
-      if (statusFilter !== 'all') {
+      if (pendingOnly) {
+        if (d.responded_at || d.status === 'failed') return false;
+      } else if (statusFilter !== 'all') {
         if (statusFilter === 'responded' && !d.responded_at) return false;
         if (statusFilter === 'pending' && (d.responded_at || d.status === 'failed')) return false;
         if (statusFilter === 'failed' && d.status !== 'failed') return false;
       }
       return true;
     });
-  }, [data, search, frequencyFilter, statusFilter]);
+    result.sort((a, b) => {
+      const diff = new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime();
+      return sortOrder === 'oldest' ? diff : -diff;
+    });
+    return result;
+  }, [data, search, frequencyFilter, statusFilter, dateRange, pendingOnly, sortOrder]);
 
   const stats = useMemo(() => {
     const total = filtered.length;
