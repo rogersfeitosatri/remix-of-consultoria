@@ -45,6 +45,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConsultationHistoryView } from '@/components/scheduling/ConsultationHistoryView';
 import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog';
 import { WeeklyPipelineView } from '@/components/scheduling/WeeklyPipelineView';
+import { PeriodicityControlView } from '@/components/scheduling/PeriodicityControlView';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
