@@ -960,21 +960,46 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             </div>
             
             {formData.has_checkin && formData.service_type !== 'training' && (
-              <div className="space-y-2">
-                <Label>Frequência do Check-in</Label>
-                <Select
-                  value={formData.checkin_frequency || 'weekly'}
-                  onValueChange={(v) => setFormData({ ...formData, checkin_frequency: v as typeof formData.checkin_frequency })}
-                >
-                  <SelectTrigger className="w-full sm:w-64">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(CHECKIN_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Frequência do Check-in</Label>
+                  <Select
+                    value={formData.checkin_frequency || 'weekly'}
+                    onValueChange={(v) => setFormData({ ...formData, checkin_frequency: v as typeof formData.checkin_frequency })}
+                  >
+                    <SelectTrigger className="w-full sm:w-64">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(CHECKIN_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="checkinWindow">Prazo para responder o check-in (horas)</Label>
+                  <Input
+                    id="checkinWindow"
+                    type="number"
+                    min={1}
+                    max={720}
+                    placeholder="36 (padrão)"
+                    className="w-full sm:w-64"
+                    value={formData.checkin_response_window_hours ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFormData({
+                        ...formData,
+                        checkin_response_window_hours: v === '' ? null : Math.max(1, parseInt(v, 10) || 36),
+                      });
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Tempo, em horas, que o atleta tem para preencher o check-in após o envio. Deixe em branco para usar o padrão de 36h.
+                  </p>
+                </div>
               </div>
             )}
           </div>
