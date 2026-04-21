@@ -21,6 +21,7 @@ import Financial from "./pages/Financial";
 import CalendarPage from "./pages/Calendar";
 import Settings from "./pages/Settings";
 import SchedulingSettings from "./pages/SchedulingSettings";
+import PeriodicityControl from "./pages/PeriodicityControl";
 import ContentManager from "./pages/ContentManager";
 import LinkBioManager from "./pages/LinkBioManager";
 import Forms from "./pages/Forms";
@@ -153,6 +154,7 @@ function AppRoutes() {
         <Route path="/calendar" element={<ProtectedRoute adminOnly><CalendarPage /></ProtectedRoute>} />
         <Route path="/scheduling" element={<ProtectedRoute adminOnly><SchedulingSettings /></ProtectedRoute>} />
         <Route path="/scheduling/audit" element={<ProtectedRoute adminOnly><SchedulingAudit /></ProtectedRoute>} />
+        <Route path="/scheduling/periodicity" element={<ProtectedRoute adminOnly><PeriodicityControl /></ProtectedRoute>} />
         <Route path="/content" element={<ProtectedRoute adminOnly><ContentManager /></ProtectedRoute>} />
         <Route path="/link-bio" element={<ProtectedRoute adminOnly><LinkBioManager /></ProtectedRoute>} />
         <Route path="/forms" element={<ProtectedRoute adminOnly><Forms /></ProtectedRoute>} />
