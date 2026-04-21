@@ -229,6 +229,23 @@ Deno.serve(async (req) => {
           checkin_link: checkinLink,
         });
 
+        // REGRA OBRIGATÓRIA: criar dispatch ANTES de enviar via Z-API
+        let dispatchId: string | null = null;
+        try {
+          const { data: dId, error: dErr } = await supabase.rpc('create_checkin_dispatch_for_send', {
+            p_client_id: checkin.client_id,
+            p_user_id: checkin.user_id,
+            p_link_checkin: checkinLink,
+            p_source: 'legacy_scheduled_checkins',
+          });
+          if (dErr) throw dErr;
+          dispatchId = dId as string;
+        } catch (e) {
+          console.error('[send-checkin-reminders] Failed to create dispatch, aborting send:', e);
+          results.push({ checkinId: checkin.id, status: 'failed', error: 'dispatch_create_failed' });
+          continue;
+        }
+
         // Call send-whatsapp edge function in TEMPLATE MODE
         // This delegates all template fetching/rendering to the unified service
         const sendResponse = await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
@@ -250,8 +267,37 @@ Deno.serve(async (req) => {
         if (!sendResponse.ok || sendResult.error) {
           const errorMsg = sendResult.error || 'Unknown error';
           console.error('[send-checkin-reminders] Send failed:', errorMsg);
+          // Atualiza dispatch como falha
+          if (dispatchId) {
+            await supabase.from('checkin_dispatches').update({
+              status: 'failed',
+              error_message: String(errorMsg).slice(0, 500),
+            }).eq('id', dispatchId);
+          }
           results.push({ checkinId: checkin.id, status: 'failed', error: errorMsg });
           continue;
+        }
+
+        // Atualiza dispatch como enviado
+        if (dispatchId) {
+          await supabase.from('checkin_dispatches').update({
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            provider_response: sendResult ?? null,
+          }).eq('id', dispatchId);
+
+          // Atualiza last_dispatched_at do schedule
+          const { data: disp } = await supabase
+            .from('checkin_dispatches')
+            .select('schedule_id')
+            .eq('id', dispatchId)
+            .maybeSingle();
+          if (disp?.schedule_id) {
+            await supabase
+              .from('athlete_checkin_schedules')
+              .update({ last_dispatched_at: new Date().toISOString() })
+              .eq('id', disp.schedule_id);
+          }
         }
 
         // Update checkin status to sent
