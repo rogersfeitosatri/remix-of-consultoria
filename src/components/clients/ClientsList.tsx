@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { createCheckinDispatchForSend, markDispatchSent, markDispatchFailed } from '@/lib/checkinDispatch';
+import { useAuth } from '@/hooks/useAuth';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { useSchedulingSettings } from '@/hooks/useScheduling';
 import { useAthletesWithTargetRaceAlerts, AthleteWithTargetRaceAlert } from '@/hooks/useTargetRaceAlert';
@@ -46,6 +48,7 @@ interface ClientsListProps {
 
 export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: checkinForms = [] } = useCheckinForms();
   const { data: schedulingSettings } = useSchedulingSettings();
   const { data: targetRaceAlerts = [] } = useAthletesWithTargetRaceAlerts();
@@ -109,6 +112,7 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
     }
 
     setSendingCheckin(client.id);
+    let dispatchId: string | null = null;
     try {
       const checkinLink = `https://rogersfeitosa.com.br/form/${activeForm.id}?client=${client.id}`;
       const codigoAcesso = formatPhoneAsAccessCode(client.phone);
@@ -121,17 +125,27 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
         codigo_acesso: codigoAcesso,
       };
 
-      const { error } = await supabase.functions.invoke('send-whatsapp', {
-        body: { 
-          clientId: client.id, 
+      // REGRA OBRIGATÓRIA: criar dispatch ANTES do envio
+      dispatchId = await createCheckinDispatchForSend({
+        clientId: client.id,
+        userId: user!.id,
+        linkCheckin: checkinLink,
+        source: 'manual_clients_list',
+      });
+
+      const { data: sendResult, error } = await supabase.functions.invoke('send-whatsapp', {
+        body: {
+          clientId: client.id,
           templateKey: 'checkin_reminder',
           context,
         },
       });
 
       if (error) throw error;
+      await markDispatchSent(dispatchId, sendResult);
       toast.success('Check-in enviado via WhatsApp!');
     } catch (error: any) {
+      if (dispatchId) await markDispatchFailed(dispatchId, error.message || 'erro');
       console.error('Error sending checkin:', error);
       toast.error('Erro ao enviar check-in: ' + (error.message || 'Verifique as configurações'));
     } finally {

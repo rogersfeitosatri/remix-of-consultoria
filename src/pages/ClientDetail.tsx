@@ -28,6 +28,8 @@ import { useClients, useDeleteClient, useUpdateClient } from '@/hooks/useClients
 import { useSchedulingSettings } from '@/hooks/useScheduling';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { supabase } from '@/integrations/supabase/client';
+import { createCheckinDispatchForSend, markDispatchSent, markDispatchFailed } from '@/lib/checkinDispatch';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
@@ -60,6 +62,7 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 export default function ClientDetail() {
+  const { user } = useAuth();
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -142,6 +145,7 @@ export default function ClientDetail() {
       return;
     }
     setSendingCheckin(true);
+    let dispatchId: string | null = null;
     try {
       const checkinLink = `https://rogersfeitosa.com.br/form/${activeForm.id}?client=${client.id}`;
       const codigoAcesso = formatPhoneAsAccessCode(client.phone);
@@ -152,12 +156,21 @@ export default function ClientDetail() {
         data: format(new Date(), "dd/MM/yyyy", { locale: ptBR }),
         codigo_acesso: codigoAcesso,
       };
-      const { error } = await supabase.functions.invoke('send-whatsapp', {
+      // REGRA OBRIGATÓRIA: criar dispatch ANTES do envio
+      dispatchId = await createCheckinDispatchForSend({
+        clientId: client.id,
+        userId: user!.id,
+        linkCheckin: checkinLink,
+        source: 'manual_client_detail',
+      });
+      const { data: sendResult, error } = await supabase.functions.invoke('send-whatsapp', {
         body: { clientId: client.id, templateKey: 'checkin_reminder', context },
       });
       if (error) throw error;
+      await markDispatchSent(dispatchId, sendResult);
       toast.success('Check-in enviado via WhatsApp!');
     } catch (error: any) {
+      if (dispatchId) await markDispatchFailed(dispatchId, error.message || 'erro');
       toast.error('Erro ao enviar check-in: ' + (error.message || 'Verifique as configurações'));
     } finally {
       setSendingCheckin(false);
