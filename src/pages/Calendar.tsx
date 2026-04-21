@@ -113,6 +113,48 @@ export default function CalendarPage() {
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   }, [currentMonth]);
 
+  // Group calendar days into weeks (each row of 7)
+  const calendarWeeks = useMemo(() => {
+    const weeks: Date[][] = [];
+    for (let i = 0; i < calendarDays.length; i += 7) {
+      weeks.push(calendarDays.slice(i, i + 7));
+    }
+    return weeks;
+  }, [calendarDays]);
+
+  // Index logs by day (yyyy-MM-dd) for fast lookup
+  const logsByDay = useMemo(() => {
+    const map = new Map<string, { success: number; failed: number; logs: typeof linkLogs }>();
+    linkLogs.forEach(log => {
+      const key = format(parseISO(log.created_at), 'yyyy-MM-dd');
+      const entry = map.get(key) || { success: 0, failed: 0, logs: [] };
+      if (log.status === 'success' || log.status === 'sent') entry.success += 1;
+      else entry.failed += 1;
+      entry.logs.push(log);
+      map.set(key, entry);
+    });
+    return map;
+  }, [linkLogs]);
+
+  // Compute weekly stats for each week (sent vs scheduled-to-send)
+  const getWeekStats = (week: Date[]) => {
+    let sent = 0;
+    let pending = 0;
+    let appts = 0;
+    week.forEach(day => {
+      const key = format(day, 'yyyy-MM-dd');
+      const log = logsByDay.get(key);
+      if (log) sent += log.success;
+      consultations.forEach(c => {
+        if (isSendLinkEventRow(c) && c.send_link_date === key) pending += 1;
+      });
+      (appointments || []).forEach(a => {
+        if ((a.status === 'scheduled' || a.status === 'confirmed') && a.appointment_date === key) appts += 1;
+      });
+    });
+    return { sent, pending, appts };
+  };
+
   const getEventsForDate = (date: Date) => {
     const events: { type: 'first' | 'sendLink' | 'appointment'; schedule?: ConsultationSchedule & { client_name: string }; client?: Client; appointment?: typeof appointments[0] }[] = [];
 
@@ -370,16 +412,29 @@ export default function CalendarPage() {
                     <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
                       <ChevronLeft className="h-5 w-5" />
                     </Button>
-                    <h3 className="text-lg font-semibold text-foreground capitalize">
-                      {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-foreground capitalize">
+                        {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+                      </h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          setCurrentMonth(new Date());
+                          setSelectedAgendaDay(new Date());
+                        }}
+                      >
+                        Hoje
+                      </Button>
+                    </div>
                     <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
                       <ChevronRight className="h-5 w-5" />
                     </Button>
                   </div>
 
                   {/* Legend */}
-                  <div className="flex flex-wrap gap-4 mb-4 text-xs">
+                  <div className="flex flex-wrap gap-3 mb-4 text-xs">
                     <div className="flex items-center gap-1.5">
                       <span className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500" />
                       <span className="text-muted-foreground">Consulta Agendada</span>
@@ -392,51 +447,96 @@ export default function CalendarPage() {
                       <span className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500" />
                       <span className="text-muted-foreground">Enviar Link</span>
                     </div>
+                    <div className="flex items-center gap-1.5">
+                      <Check className="h-3 w-3 text-emerald-600" />
+                      <span className="text-muted-foreground">Link enviado</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <XCircle className="h-3 w-3 text-destructive" />
+                      <span className="text-muted-foreground">Falha no envio</span>
+                    </div>
                   </div>
 
-                  {/* Calendar Grid */}
+                  {/* Calendar Grid with weekly summary column */}
+                  <TooltipProvider delayDuration={150}>
                   <div className="border border-border rounded-lg overflow-hidden">
-                    <div className="grid grid-cols-7 bg-muted/50">
-                      {weekDays.map(day => (
-                        <div key={day} className="p-2 text-center text-xs font-semibold text-foreground border-b border-border">
-                          {day}
-                        </div>
-                      ))}
+                    <div className="grid grid-cols-[1fr_64px] bg-muted/50">
+                      <div className="grid grid-cols-7">
+                        {weekDays.map(day => (
+                          <div key={day} className="p-2 text-center text-xs font-semibold text-foreground border-b border-border">
+                            {day}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-2 text-center text-[10px] font-semibold text-foreground border-b border-l border-border uppercase tracking-wide">
+                        Semana
+                      </div>
                     </div>
-                    <div className="grid grid-cols-7">
-                      {calendarDays.map((day, index) => {
-                        const events = getEventsForDate(day);
-                        const isCurrentMonth = isSameMonth(day, currentMonth);
-                        const isToday = isSameDay(day, new Date());
+                    {calendarWeeks.map((week, weekIdx) => {
+                      const stats = getWeekStats(week);
+                      return (
+                        <div key={`week-${weekIdx}`} className="grid grid-cols-[1fr_64px]">
+                          <div className="grid grid-cols-7">
+                            {week.map((day, index) => {
+                              const events = getEventsForDate(day);
+                              const isCurrentMonth = isSameMonth(day, currentMonth);
+                              const isToday = isSameDay(day, new Date());
+                              const dayKey = format(day, 'yyyy-MM-dd');
+                              const dayLogs = logsByDay.get(dayKey);
+                              const isMonday = getDay(day) === 1;
 
-                        return (
-                          <div
-                            key={day.toISOString()}
-                            onClick={() => {
-                              setSelectedAgendaDay(day);
-                              // Check if this day has send link events
-                              const dayEvents = getEventsForDate(day);
-                              const hasLinks = dayEvents.some(e => e.type === 'sendLink');
-                              if (hasLinks) {
-                                setLinkDialogDay(day);
-                              }
-                            }}
-                            className={cn(
-                              "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative cursor-pointer hover:bg-muted/50 transition-colors",
-                              !isCurrentMonth && "bg-muted/30",
-                              isToday && "bg-primary/5",
-                              isSameDay(day, selectedAgendaDay) && "ring-2 ring-primary ring-inset",
-                              index % 7 === 0 && "border-l-0",
-                              index < 7 && "border-t-0"
-                            )}
-                          >
-                            <div className={cn(
-                              "text-sm font-medium mb-1",
-                              !isCurrentMonth && "text-muted-foreground/50",
-                              isToday && "text-primary font-bold"
-                            )}>
-                              {format(day, 'd')}
-                            </div>
+                              return (
+                                <div
+                                  key={day.toISOString()}
+                                  onClick={() => {
+                                    setSelectedAgendaDay(day);
+                                    const dayEvents = getEventsForDate(day);
+                                    const hasLinks = dayEvents.some(e => e.type === 'sendLink');
+                                    if (hasLinks) setLinkDialogDay(day);
+                                  }}
+                                  className={cn(
+                                    "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative cursor-pointer hover:bg-muted/50 transition-colors",
+                                    !isCurrentMonth && "bg-muted/30",
+                                    isToday && "bg-primary/5",
+                                    isMonday && isCurrentMonth && "bg-amber-500/5",
+                                    isSameDay(day, selectedAgendaDay) && "ring-2 ring-primary ring-inset",
+                                    index === 0 && "border-l-0",
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className={cn(
+                                      "text-sm font-medium",
+                                      !isCurrentMonth && "text-muted-foreground/50",
+                                      isToday && "text-primary font-bold"
+                                    )}>
+                                      {format(day, 'd')}
+                                    </div>
+                                    {dayLogs && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                            {dayLogs.success > 0 && (
+                                              <span className="flex items-center text-[10px] text-emerald-600 font-semibold">
+                                                <Check className="h-3 w-3" />{dayLogs.success}
+                                              </span>
+                                            )}
+                                            {dayLogs.failed > 0 && (
+                                              <span className="flex items-center text-[10px] text-destructive font-semibold">
+                                                <XCircle className="h-3 w-3" />{dayLogs.failed}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="max-w-xs">
+                                          <div className="space-y-1 text-xs">
+                                            <p className="font-semibold">Envios em {format(day, 'dd/MM')}</p>
+                                            <p>✅ {dayLogs.success} enviado{dayLogs.success !== 1 ? 's' : ''}</p>
+                                            {dayLogs.failed > 0 && <p>❌ {dayLogs.failed} falha{dayLogs.failed !== 1 ? 's' : ''}</p>}
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </div>
                             <div className="space-y-1 overflow-y-auto max-h-[70px] sm:max-h-[85px]">
                               {events.map((event) => {
                                 if (event.type === 'appointment' && event.appointment) {
@@ -506,11 +606,36 @@ export default function CalendarPage() {
                                 return null;
                               })}
                             </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
+                          {/* Weekly summary sidebar cell */}
+                          <div className="border-b border-l border-border bg-muted/20 p-1.5 flex flex-col items-center justify-center text-[10px] gap-0.5">
+                            {stats.sent > 0 && (
+                              <span className="flex items-center gap-0.5 text-emerald-600 font-semibold" title={`${stats.sent} link(s) enviado(s)`}>
+                                <Check className="h-3 w-3" />{stats.sent}
+                              </span>
+                            )}
+                            {stats.pending > 0 && (
+                              <span className="flex items-center gap-0.5 text-amber-600 font-semibold" title={`${stats.pending} envio(s) pendente(s)`}>
+                                <Send className="h-3 w-3" />{stats.pending}
+                              </span>
+                            )}
+                            {stats.appts > 0 && (
+                              <span className="flex items-center gap-0.5 text-primary font-semibold" title={`${stats.appts} consulta(s)`}>
+                                <CalendarCheck2 className="h-3 w-3" />{stats.appts}
+                              </span>
+                            )}
+                            {stats.sent === 0 && stats.pending === 0 && stats.appts === 0 && (
+                              <span className="text-muted-foreground/50">—</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
+                  </TooltipProvider>
                 </CardContent>
               </Card>
               {/* Day Agenda Panel - visible on calendar tab */}
