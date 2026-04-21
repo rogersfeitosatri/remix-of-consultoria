@@ -169,13 +169,16 @@ Deno.serve(async (req) => {
       from += pageSize;
     }
 
-    // Check 36h expiration for fallback match
+    // Check expiration for fallback match
     let expired = false;
+    let windowHours: number | undefined;
     if (matchedClientId && body.formId) {
-      expired = await checkCheckinExpired(supabase, matchedClientId, body.formId);
+      const result = await checkCheckinExpired(supabase, matchedClientId, body.formId);
+      expired = result.expired;
+      windowHours = result.windowHours;
     }
 
-    return new Response(JSON.stringify({ valid: !!matchedClientId, clientId: matchedClientId, expired }), {
+    return new Response(JSON.stringify({ valid: !!matchedClientId, clientId: matchedClientId, expired, windowHours }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
