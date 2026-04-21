@@ -11,7 +11,22 @@ type VerifyRequest = {
   formId?: string;
 };
 
-async function checkCheckinExpired(supabase: any, clientId: string, formId: string): Promise<boolean> {
+const DEFAULT_WINDOW_HOURS = 36;
+
+async function checkCheckinExpired(
+  supabase: any,
+  clientId: string,
+  formId: string
+): Promise<{ expired: boolean; windowHours: number }> {
+  // Get athlete-specific window override
+  const { data: client } = await supabase
+    .from('clients')
+    .select('checkin_response_window_hours')
+    .eq('id', clientId)
+    .maybeSingle();
+
+  const windowHours = client?.checkin_response_window_hours ?? DEFAULT_WINDOW_HOURS;
+
   const { data: dispatch } = await supabase
     .from('checkin_dispatches')
     .select('sent_at')
@@ -26,9 +41,9 @@ async function checkCheckinExpired(supabase: any, clientId: string, formId: stri
     const sentAt = new Date(dispatch.sent_at).getTime();
     const now = Date.now();
     const hoursSinceSent = (now - sentAt) / (1000 * 60 * 60);
-    return hoursSinceSent > 36;
+    return { expired: hoursSinceSent > windowHours, windowHours };
   }
-  return false; // No dispatch found = allow access
+  return { expired: false, windowHours };
 }
 
 function normalizePhoneToE164(phone: string): string {
@@ -99,15 +114,19 @@ Deno.serve(async (req) => {
         const ok = normalizedDb === normalizedInput;
 
         if (ok) {
-          // Check 36h expiration if formId provided
+          // Check expiration if formId provided
           if (body.formId) {
-            const expired = await checkCheckinExpired(supabase, client.id, body.formId);
+            const { expired, windowHours } = await checkCheckinExpired(supabase, client.id, body.formId);
             if (expired) {
-              return new Response(JSON.stringify({ valid: true, clientId: client.id, expired: true }), {
+              return new Response(JSON.stringify({ valid: true, clientId: client.id, expired: true, windowHours }), {
                 status: 200,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
               });
             }
+            return new Response(JSON.stringify({ valid: true, clientId: client.id, expired: false, windowHours }), {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
           }
           return new Response(JSON.stringify({ valid: true, clientId: client.id, expired: false }), {
             status: 200,
@@ -150,13 +169,16 @@ Deno.serve(async (req) => {
       from += pageSize;
     }
 
-    // Check 36h expiration for fallback match
+    // Check expiration for fallback match
     let expired = false;
+    let windowHours: number | undefined;
     if (matchedClientId && body.formId) {
-      expired = await checkCheckinExpired(supabase, matchedClientId, body.formId);
+      const result = await checkCheckinExpired(supabase, matchedClientId, body.formId);
+      expired = result.expired;
+      windowHours = result.windowHours;
     }
 
-    return new Response(JSON.stringify({ valid: !!matchedClientId, clientId: matchedClientId, expired }), {
+    return new Response(JSON.stringify({ valid: !!matchedClientId, clientId: matchedClientId, expired, windowHours }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
