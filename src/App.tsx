@@ -60,6 +60,7 @@ const CallSchedulingConfig = lazy(() => import("./pages/CallSchedulingConfig"));
 const PublicCallBooking = lazy(() => import("./pages/PublicCallBooking"));
 const AssessoriaLanding = lazy(() => import("./pages/AssessoriaLanding"));
 const AthleteCheckinPlanning = lazy(() => import("./pages/AthleteCheckinPlanning"));
+const SchedulingAudit = lazy(() => import("./pages/SchedulingAudit"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -151,6 +152,7 @@ function AppRoutes() {
         <Route path="/financial" element={<ProtectedRoute adminOnly><Financial /></ProtectedRoute>} />
         <Route path="/calendar" element={<ProtectedRoute adminOnly><CalendarPage /></ProtectedRoute>} />
         <Route path="/scheduling" element={<ProtectedRoute adminOnly><SchedulingSettings /></ProtectedRoute>} />
+        <Route path="/scheduling/audit" element={<ProtectedRoute adminOnly><SchedulingAudit /></ProtectedRoute>} />
         <Route path="/content" element={<ProtectedRoute adminOnly><ContentManager /></ProtectedRoute>} />
         <Route path="/link-bio" element={<ProtectedRoute adminOnly><LinkBioManager /></ProtectedRoute>} />
         <Route path="/forms" element={<ProtectedRoute adminOnly><Forms /></ProtectedRoute>} />
