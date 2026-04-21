@@ -15,6 +15,7 @@ import {
   History,
   MessageCircle,
   CalendarCheck,
+  GitBranch,
   Key,
   Lock,
   Copy,
