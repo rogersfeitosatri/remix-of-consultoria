@@ -5353,6 +5353,20 @@ export type Database = {
           google_meet_link: string
         }[]
       }
+      preview_consultation_pipeline: {
+        Args: {
+          p_consultation_count: number
+          p_consultation_frequency: string
+          p_end_date?: string
+          p_start_date: string
+        }
+        Returns: {
+          exceeds_end_date: boolean
+          scheduled_date: string
+          send_link_date: string
+          sequence_index: number
+        }[]
+      }
       seed_default_plan_templates: {
         Args: { p_user_id: string }
         Returns: undefined
