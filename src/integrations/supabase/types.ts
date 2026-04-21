@@ -1817,6 +1817,7 @@ export type Database = {
           athlete_status: string | null
           athlete_user_id: string | null
           checkin_frequency: string | null
+          checkin_response_window_hours: number | null
           consultation_count: number | null
           consultation_frequency: string | null
           created_at: string
@@ -1860,6 +1861,7 @@ export type Database = {
           athlete_status?: string | null
           athlete_user_id?: string | null
           checkin_frequency?: string | null
+          checkin_response_window_hours?: number | null
           consultation_count?: number | null
           consultation_frequency?: string | null
           created_at?: string
@@ -1903,6 +1905,7 @@ export type Database = {
           athlete_status?: string | null
           athlete_user_id?: string | null
           checkin_frequency?: string | null
+          checkin_response_window_hours?: number | null
           consultation_count?: number | null
           consultation_frequency?: string | null
           created_at?: string
