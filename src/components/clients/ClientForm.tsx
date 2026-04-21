@@ -15,6 +15,7 @@ import { ptBR } from 'date-fns/locale';
 import { useAdminSettings } from '@/hooks/useAdminSettings';
 import { PlanTypeBadge } from './PlanTypeBadge';
 import { validatePlanFeasibility } from '@/lib/planTypology';
+import { PipelinePreviewDialog } from './PipelinePreviewDialog';
 
 interface CalculatedWindow {
   windowStart: Date;
@@ -377,13 +378,11 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     }
   }, [adminSettings?.enable_continuation_mode, formData.onboarding_type, client]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Se pular anamnese, definir status como ativo
+  const [showPipelinePreview, setShowPipelinePreview] = useState(false);
+
+  const buildSubmitPayload = () => {
     const athleteStatus = skipAnamnese ? 'active' : formData.athlete_status;
-    
-    // Build custom schedule dates for continuation mode
-    // This array will be used to override the auto-calculated dates
+
     const customSchedules = formData.onboarding_type === 'continuation' && Object.keys(customScheduleDates).length > 0
       ? calculatedWindows.map((window, index) => {
           const consultationNumber = (formData.last_consultation_index || 1) + index + 1;
@@ -395,9 +394,8 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
           };
         })
       : null;
-    
-    // Convert empty date strings to null for database compatibility
-    const dataToSubmit = {
+
+    return {
       ...formData,
       athlete_status: athleteStatus,
       first_consultation_date: formData.first_consultation_date || null,
@@ -406,10 +404,24 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       last_consultation_at: formData.last_consultation_at || null,
       remaining_consultations: formData.onboarding_type === 'continuation' ? formData.remaining_consultations : null,
       last_consultation_index: formData.onboarding_type === 'continuation' ? formData.last_consultation_index : null,
-      // Pass custom schedule dates if any
       custom_schedule_dates: customSchedules,
     };
+  };
+
+  const performSubmit = () => {
+    const dataToSubmit = buildSubmitPayload();
     onSubmit(dataToSubmit as any, { sendCredentials, skipAnamnese, sendBookingLink });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Mostra prévia da pipeline apenas para novos atletas com consultas
+    // Em edição, mantém comportamento direto para não interromper fluxo de ajustes
+    if (!client && formData.has_consultations && formData.start_date) {
+      setShowPipelinePreview(true);
+      return;
+    }
+    performSubmit();
   };
 
   const showContinuationOption = adminSettings?.enable_continuation_mode && formData.has_consultations;
@@ -1102,6 +1114,21 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
           </div>
         </form>
       </div>
+
+      <PipelinePreviewDialog
+        open={showPipelinePreview}
+        onOpenChange={setShowPipelinePreview}
+        onConfirm={() => {
+          setShowPipelinePreview(false);
+          performSubmit();
+        }}
+        startDate={formData.start_date}
+        endDate={formData.end_date}
+        consultationCount={formData.consultation_count}
+        consultationFrequency={formData.consultation_frequency}
+        hasConsultations={formData.has_consultations}
+        athleteName={formData.name}
+      />
     </div>
   );
 }
