@@ -1114,6 +1114,21 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
           </div>
         </form>
       </div>
+
+      <PipelinePreviewDialog
+        open={showPipelinePreview}
+        onOpenChange={setShowPipelinePreview}
+        onConfirm={() => {
+          setShowPipelinePreview(false);
+          performSubmit();
+        }}
+        startDate={formData.start_date}
+        endDate={formData.end_date}
+        consultationCount={formData.consultation_count}
+        consultationFrequency={formData.consultation_frequency}
+        hasConsultations={formData.has_consultations}
+        athleteName={formData.name}
+      />
     </div>
   );
 }
