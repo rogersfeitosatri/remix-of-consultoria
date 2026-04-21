@@ -70,6 +70,11 @@ export default function CalendarPage() {
   const deleteSchedule = useDeleteConsultationSchedule();
   const addSchedule = useAddConsultationSchedule();
 
+  // Logs WhatsApp para enriquecer o calendário (range = mês visível ± 1 semana)
+  const monthRangeStart = useMemo(() => startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 }).toISOString(), [currentMonth]);
+  const monthRangeEnd = useMemo(() => endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 0 }).toISOString(), [currentMonth]);
+  const { data: linkLogs = [] } = useWeeklyLinkLogs(monthRangeStart, monthRangeEnd);
+
   const activeClients = allClients.filter(c => c.is_active);
   const clientsWithConsultations = allClients.filter(c => c.has_consultations && c.is_active);
 
