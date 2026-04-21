@@ -488,6 +488,24 @@ export function WeeklyPipelineView({
                             </>
                           )}
                         </div>
+
+                        {/* Last link sent + last completed consultation */}
+                        {(item.lastLinkSentAt || item.lastCompletedConsultDate) && (
+                          <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground/80">
+                            {item.lastLinkSentAt && (
+                              <span className="flex items-center gap-0.5">
+                                <Send className="h-2.5 w-2.5" />
+                                Último link: {format(parseISO(item.lastLinkSentAt), "dd/MM/yy", { locale: ptBR })}
+                              </span>
+                            )}
+                            {item.lastCompletedConsultDate && (
+                              <span className="flex items-center gap-0.5">
+                                <CheckCircle2 className="h-2.5 w-2.5" />
+                                Última consulta: {format(parseISO(item.lastCompletedConsultDate), "dd/MM/yy", { locale: ptBR })}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
