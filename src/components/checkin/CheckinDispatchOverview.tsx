@@ -1,17 +1,19 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CHECKIN_LABELS, CheckinFrequency } from '@/types/client';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CheckCircle2, Clock, XCircle, Send, Search } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Send, Search, RefreshCw, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface DispatchRow {
   id: string;
@@ -27,9 +29,27 @@ interface DispatchRow {
 
 export function CheckinDispatchOverview() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  const handleResend = async (dispatchId: string, clientName: string) => {
+    setResendingId(dispatchId);
+    try {
+      const { error } = await supabase.functions.invoke('resend-checkin-dispatch', {
+        body: { dispatchId },
+      });
+      if (error) throw error;
+      toast.success(`Check-in reenviado para ${clientName}`);
+      await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-overview'] });
+    } catch (err: any) {
+      toast.error(`Falha ao reenviar: ${err.message || 'erro desconhecido'}`);
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['checkin-dispatch-overview', user?.id],
@@ -187,44 +207,66 @@ export function CheckinDispatchOverview() {
                     <TableHead>Status</TableHead>
                     <TableHead>Respondido</TableHead>
                     <TableHead>Tempo de resposta</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((d) => (
-                    <TableRow key={d.id}>
-                      <TableCell className="font-medium">{d.client_name}</TableCell>
-                      <TableCell>
-                        {d.checkin_frequency
-                          ? <Badge variant="outline">{CHECKIN_LABELS[d.checkin_frequency as CheckinFrequency] || d.checkin_frequency}</Badge>
-                          : <span className="text-muted-foreground text-xs">—</span>}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {format(new Date(d.sent_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                      </TableCell>
-                      <TableCell>
-                        {d.status === 'failed' ? (
-                          <Badge variant="destructive">Falha</Badge>
-                        ) : d.responded_at ? (
-                          <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Respondido</Badge>
-                        ) : (
-                          <Badge variant="secondary">Pendente</Badge>
-                        )}
-                        {d.error_message && <div className="text-xs text-destructive mt-1">{d.error_message}</div>}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {d.responded_at
-                          ? format(new Date(d.responded_at), "dd/MM HH:mm", { locale: ptBR })
-                          : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {d.response_hours !== null
-                          ? d.response_hours < 24
-                            ? `${d.response_hours}h`
-                            : `${Math.round(d.response_hours / 24)}d`
-                          : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filtered.map((d) => {
+                    const canResend = d.status === 'failed' && !d.responded_at;
+                    return (
+                      <TableRow key={d.id}>
+                        <TableCell className="font-medium">{d.client_name}</TableCell>
+                        <TableCell>
+                          {d.checkin_frequency
+                            ? <Badge variant="outline">{CHECKIN_LABELS[d.checkin_frequency as CheckinFrequency] || d.checkin_frequency}</Badge>
+                            : <span className="text-muted-foreground text-xs">—</span>}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {format(new Date(d.sent_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell>
+                          {d.status === 'failed' ? (
+                            <Badge variant="destructive">Falha</Badge>
+                          ) : d.responded_at ? (
+                            <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Respondido</Badge>
+                          ) : (
+                            <Badge variant="secondary">Pendente</Badge>
+                          )}
+                          {d.error_message && <div className="text-xs text-destructive mt-1">{d.error_message}</div>}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {d.responded_at
+                            ? format(new Date(d.responded_at), "dd/MM HH:mm", { locale: ptBR })
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {d.response_hours !== null
+                            ? d.response_hours < 24
+                              ? `${d.response_hours}h`
+                              : `${Math.round(d.response_hours / 24)}d`
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canResend && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={resendingId === d.id}
+                              onClick={() => handleResend(d.id, d.client_name)}
+                              className="gap-1.5"
+                            >
+                              {resendingId === d.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-3.5 w-3.5" />
+                              )}
+                              Reenviar
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
