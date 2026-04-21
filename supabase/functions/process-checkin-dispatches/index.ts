@@ -16,10 +16,17 @@ function formatPhoneAsAccessCode(phone: string): string {
   return `+55 ${phone}`;
 }
 
-// Map frequency_type to interval in weeks
+// E.164 validation: Brazilian mobile = +55 + 2 digit DDD + 8 or 9 digit number = 12 or 13 digits total
+function isValidE164BR(phone: string | null | undefined): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '');
+  const withDDI = digits.startsWith('55') ? digits : `55${digits}`;
+  return withDDI.length === 12 || withDDI.length === 13;
+}
+
 function getFrequencyWeeks(frequencyType: string): number {
   switch (frequencyType) {
-    case 'daily': return 1; // daily still sends weekly on Mondays
+    case 'daily': return 1;
     case 'weekly': return 1;
     case 'biweekly': return 2;
     case 'three_weeks': return 3;
@@ -39,28 +46,17 @@ function shouldSendForFrequency(
   now: Date
 ): boolean {
   const freqWeeks = getFrequencyWeeks(frequencyType);
-
-  // Check if today is a valid send day
   if (!weeklyDays.includes(currentDay)) return false;
+  if (freqWeeks === 1) return true;
 
-  if (freqWeeks === 1) {
-    // Weekly: send every week on the specified days
-    return true;
-  }
-
-  // NEW LOGIC: "last dispatch + cycle" instead of "weeks_since_start % cycle"
-  // This eliminates the alignment bug where start_date offset caused permanent skips.
   const MS_PER_DAY = 24 * 60 * 60 * 1000;
   const today = new Date(now.toISOString().split('T')[0] + 'T00:00:00Z');
 
   if (!lastDispatchedAt) {
-    // Never dispatched: send if start_date has passed
     const start = new Date(startDate + 'T00:00:00Z');
     return today.getTime() >= start.getTime();
   }
 
-  // Send if at least (freqWeeks * 7 - 1) days have passed since last dispatch
-  // The "-1" provides a small tolerance to avoid edge cases on the exact target day
   const last = new Date(lastDispatchedAt);
   const lastDay = new Date(last.toISOString().split('T')[0] + 'T00:00:00Z');
   const daysSinceLast = Math.floor((today.getTime() - lastDay.getTime()) / MS_PER_DAY);
@@ -72,16 +68,42 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
+  // Parse request body for source/options
+  let source = 'cron';
+  let forceReprocess = false;
+  try {
+    if (req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      source = body.source || 'cron';
+      forceReprocess = !!body.forceReprocess;
+    }
+  } catch (_) { /* ignore */ }
+
+  // Create run log
+  const { data: runRow } = await supabase
+    .from('checkin_dispatch_runs')
+    .insert({ source, status: 'running' })
+    .select()
+    .single();
+  const runId = runRow?.id;
+
+  let totalAnalyzed = 0;
+  let totalEligible = 0;
+  let dispatched = 0;
+  let skipped = 0;
+  let failed = 0;
+  const details: any[] = [];
+
+  try {
     const now = new Date();
     const currentDay = now.getDay();
     const currentTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'America/Fortaleza' });
 
-    console.log(`[process-checkin-dispatches] Running at ${now.toISOString()}, day=${currentDay}, time=${currentTime}`);
+    console.log(`[process-checkin-dispatches] Run ${runId} starting. day=${currentDay}, time=${currentTime}, source=${source}`);
 
     const { data: schedules, error: sErr } = await supabase
       .from('athlete_checkin_schedules')
@@ -93,16 +115,9 @@ Deno.serve(async (req) => {
       .eq('is_active', true)
       .lte('start_date', now.toISOString().split('T')[0]);
 
-    if (sErr) {
-      console.error('[process-checkin-dispatches] Error fetching schedules:', sErr);
-      throw sErr;
-    }
+    if (sErr) throw sErr;
 
-    let dispatched = 0;
-    let skipped = 0;
-
-    // ========== STEP 1: Promote pre-scheduled dispatches (admin overrides) ==========
-    // Dispatches with status='scheduled' and sent_at <= now should be sent now.
+    // STEP 1: Promote pre-scheduled dispatches
     const { data: scheduledDispatches } = await supabase
       .from('checkin_dispatches')
       .select(`
@@ -120,9 +135,14 @@ Deno.serve(async (req) => {
         const form = (dispatch as any).checkin_forms;
         const sched = (dispatch as any).athlete_checkin_schedules;
 
-        if (!client?.phone || !form?.is_active) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Cliente sem telefone ou formulário inativo' }).eq('id', dispatch.id);
-          skipped++;
+        if (!client?.phone || !isValidE164BR(client.phone)) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Telefone inválido (E.164)' }).eq('id', dispatch.id);
+          failed++;
+          continue;
+        }
+        if (!form?.is_active) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Formulário inativo' }).eq('id', dispatch.id);
+          failed++;
           continue;
         }
         if (client.is_frozen || !client.is_active) {
@@ -152,6 +172,7 @@ Deno.serve(async (req) => {
 
         if (whatsappError) {
           await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: whatsappError.message }).eq('id', dispatch.id);
+          failed++;
         } else {
           await supabase.from('checkin_dispatches').update({
             status: 'sent',
@@ -166,12 +187,14 @@ Deno.serve(async (req) => {
         }
         await new Promise(r => setTimeout(r, 1000));
       } catch (err: any) {
-        console.error(`[process-checkin-dispatches] Error promoting scheduled dispatch ${dispatch.id}:`, err);
+        failed++;
+        console.error(`[process-checkin-dispatches] Error promoting dispatch ${dispatch.id}:`, err);
       }
     }
 
-    // ========== STEP 2: Auto-generate dispatches from active schedules ==========
+    // STEP 2: Auto-generate from active schedules
     for (const schedule of schedules || []) {
+      totalAnalyzed++;
       try {
         const client = schedule.clients as any;
         const form = schedule.checkin_forms as any;
@@ -181,48 +204,46 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        if (!isValidE164BR(client.phone)) {
+          skipped++;
+          details.push({ client: client.name, reason: 'invalid_phone' });
+          continue;
+        }
+
         const todayDate = now.toISOString().split('T')[0];
 
-        if (client.is_frozen) {
-          console.log(`[process-checkin-dispatches] Skipping ${client.name}: plan is frozen`);
-          skipped++;
-          continue;
-        }
+        if (client.is_frozen) { skipped++; continue; }
 
         if (!client.is_active || (client.end_date && client.end_date < todayDate)) {
-          console.log(`[process-checkin-dispatches] Skipping ${client.name}: plan expired`);
-          await supabase
-            .from('athlete_checkin_schedules')
-            .update({ is_active: false })
-            .eq('id', schedule.id);
+          await supabase.from('athlete_checkin_schedules').update({ is_active: false }).eq('id', schedule.id);
           skipped++;
           continue;
         }
 
-        // Use the unified frequency check (now based on last_dispatched_at + cycle)
-        const weeklyDays = schedule.weekly_days || [1];
+        const weeklyDays = schedule.weekly_days || [];
+
+        // Validation: weekly type requires weekly_days
+        if (!weeklyDays || weeklyDays.length === 0) {
+          skipped++;
+          details.push({ client: client.name, reason: 'missing_weekly_days' });
+          continue;
+        }
+
         const shouldSendToday = shouldSendForFrequency(
           schedule.frequency_type,
           currentDay,
           weeklyDays,
           schedule.start_date,
-          schedule.last_dispatched_at,
+          forceReprocess ? null : schedule.last_dispatched_at,
           now
         );
 
-        if (!shouldSendToday) {
-          skipped++;
-          continue;
-        }
+        if (!shouldSendToday) { skipped++; continue; }
 
-        // Check send_time
         const scheduleTime = schedule.send_time?.substring(0, 5) || '09:00';
-        if (currentTime < scheduleTime) {
-          skipped++;
-          continue;
-        }
+        if (!forceReprocess && currentTime < scheduleTime) { skipped++; continue; }
 
-        // Idempotency check
+        // Idempotency
         const todayStr = now.toISOString().split('T')[0];
         const { data: existing } = await supabase
           .from('checkin_dispatches')
@@ -232,10 +253,9 @@ Deno.serve(async (req) => {
           .lte('sent_at', `${todayStr}T23:59:59`)
           .limit(1);
 
-        if (existing && existing.length > 0) {
-          skipped++;
-          continue;
-        }
+        if (existing && existing.length > 0 && !forceReprocess) { skipped++; continue; }
+
+        totalEligible++;
 
         const dueAt = schedule.due_in_hours
           ? new Date(now.getTime() + schedule.due_in_hours * 60 * 60 * 1000).toISOString()
@@ -255,10 +275,7 @@ Deno.serve(async (req) => {
           .select()
           .single();
 
-        if (dErr) {
-          console.error(`[process-checkin-dispatches] Error creating dispatch for ${client.name}:`, dErr);
-          continue;
-        }
+        if (dErr) { failed++; continue; }
 
         const codigoAcesso = formatPhoneAsAccessCode(client.phone);
         const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
@@ -278,32 +295,52 @@ Deno.serve(async (req) => {
         });
 
         if (whatsappError) {
-          await supabase
-            .from('checkin_dispatches')
-            .update({ status: 'failed', error_message: whatsappError.message })
-            .eq('id', dispatch.id);
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: whatsappError.message }).eq('id', dispatch.id);
+          failed++;
         } else {
-          await supabase
-            .from('athlete_checkin_schedules')
-            .update({ last_dispatched_at: now.toISOString() })
-            .eq('id', schedule.id);
+          await supabase.from('athlete_checkin_schedules').update({ last_dispatched_at: now.toISOString() }).eq('id', schedule.id);
+          dispatched++;
         }
-
-        dispatched++;
         await new Promise(r => setTimeout(r, 1000));
       } catch (err: any) {
-        console.error(`[process-checkin-dispatches] Error processing schedule ${schedule.id}:`, err);
+        failed++;
+        console.error(`[process-checkin-dispatches] Error schedule ${schedule.id}:`, err);
       }
     }
 
-    console.log(`[process-checkin-dispatches] Done. Dispatched: ${dispatched}, Skipped: ${skipped}`);
+    console.log(`[process-checkin-dispatches] Done. analyzed=${totalAnalyzed} eligible=${totalEligible} dispatched=${dispatched} failed=${failed} skipped=${skipped}`);
+
+    if (runId) {
+      await supabase.from('checkin_dispatch_runs').update({
+        finished_at: new Date().toISOString(),
+        status: 'success',
+        total_analyzed: totalAnalyzed,
+        total_eligible: totalEligible,
+        total_dispatched: dispatched,
+        total_failed: failed,
+        total_skipped: skipped,
+        details: details.slice(0, 50),
+      }).eq('id', runId);
+    }
 
     return new Response(
-      JSON.stringify({ success: true, dispatched, skipped }),
+      JSON.stringify({ success: true, runId, totalAnalyzed, totalEligible, dispatched, failed, skipped }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
-    console.error('[process-checkin-dispatches] Error:', error);
+    console.error('[process-checkin-dispatches] Fatal:', error);
+    if (runId) {
+      await supabase.from('checkin_dispatch_runs').update({
+        finished_at: new Date().toISOString(),
+        status: 'error',
+        error_message: error.message,
+        total_analyzed: totalAnalyzed,
+        total_eligible: totalEligible,
+        total_dispatched: dispatched,
+        total_failed: failed,
+        total_skipped: skipped,
+      }).eq('id', runId);
+    }
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
