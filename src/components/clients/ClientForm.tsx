@@ -15,6 +15,7 @@ import { ptBR } from 'date-fns/locale';
 import { useAdminSettings } from '@/hooks/useAdminSettings';
 import { PlanTypeBadge } from './PlanTypeBadge';
 import { validatePlanFeasibility } from '@/lib/planTypology';
+import { PipelinePreviewDialog } from './PipelinePreviewDialog';
 
 interface CalculatedWindow {
   windowStart: Date;
