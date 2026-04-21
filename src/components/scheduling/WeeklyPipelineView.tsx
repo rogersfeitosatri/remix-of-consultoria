@@ -252,6 +252,8 @@ export function WeeklyPipelineView({
           appointmentTime: apt.appointment_time,
           appointmentId: apt.id,
           meetLink: apt.google_meet_link,
+          lastLinkSentAt: lastLinkByClient.get(apt.client_id),
+          lastCompletedConsultDate: lastCompletedByClient.get(apt.client_id),
         });
         processedClientIds.add(apt.client_id);
       });
