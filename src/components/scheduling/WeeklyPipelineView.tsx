@@ -105,6 +105,31 @@ export function WeeklyPipelineView({
     return map;
   }, [clients]);
 
+  // Per-client: last link sent and last completed consultation
+  const lastLinkByClient = useMemo(() => {
+    const map = new Map<string, string>();
+    consultations.forEach(s => {
+      const sent = (s as any).link_sent_at as string | null;
+      if (!sent) return;
+      const prev = map.get(s.client_id);
+      if (!prev || new Date(sent) > new Date(prev)) map.set(s.client_id, sent);
+    });
+    return map;
+  }, [consultations]);
+
+  const lastCompletedByClient = useMemo(() => {
+    const map = new Map<string, string>();
+    (appointments || []).forEach((apt: any) => {
+      const aptDate = parseISO(apt.appointment_date);
+      const isPastConfirmed = (apt.status === 'completed') ||
+        ((apt.status === 'scheduled' || apt.status === 'confirmed') && isBefore(aptDate, today));
+      if (!isPastConfirmed) return;
+      const prev = map.get(apt.client_id);
+      if (!prev || aptDate > parseISO(prev)) map.set(apt.client_id, apt.appointment_date);
+    });
+    return map;
+  }, [appointments, today]);
+
   // Build pipeline items for the current week
   const pipelineItems = useMemo(() => {
     const items: PipelineItem[] = [];
