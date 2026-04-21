@@ -86,6 +86,27 @@ export function CheckinDispatchOverview() {
     refetchInterval: 30000,
   });
 
+  // Auditoria: envios via Z-API sem dispatch correspondente (últimos 90 dias)
+  const { data: auditMissing } = useQuery({
+    queryKey: ['checkin-audit-missing-dispatch', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from('checkin_send_audit' as any)
+        .select('log_id, client_name, sent_at, audit_status')
+        .eq('user_id', user.id)
+        .eq('audit_status', 'missing_dispatch')
+        .gte('sent_at', since)
+        .order('sent_at', { ascending: false })
+        .limit(50);
+      if (error) return [];
+      return (data || []) as any[];
+    },
+    enabled: !!user?.id,
+    staleTime: 60_000,
+  });
+
   const { data, isLoading } = useQuery({
     queryKey: ['checkin-dispatch-overview', user?.id],
     queryFn: async (): Promise<DispatchRow[]> => {
