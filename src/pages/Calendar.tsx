@@ -315,7 +315,7 @@ export default function CalendarPage() {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsList className="grid w-full max-w-2xl grid-cols-4">
               <TabsTrigger value="pipeline" className="gap-1">
                 <LayoutList className="h-4 w-4" />
                 <span className="hidden sm:inline">Pipeline</span>
@@ -323,6 +323,10 @@ export default function CalendarPage() {
               <TabsTrigger value="calendar" className="gap-1">
                 <CalendarDays className="h-4 w-4" />
                 <span className="hidden sm:inline">Calendário</span>
+              </TabsTrigger>
+              <TabsTrigger value="periodicity" className="gap-1">
+                <Activity className="h-4 w-4" />
+                <span className="hidden sm:inline">Periodicidade</span>
               </TabsTrigger>
               <TabsTrigger value="history" className="gap-1">
                 <History className="h-4 w-4" />
@@ -340,6 +344,11 @@ export default function CalendarPage() {
                 onMarkAsSent={handleMarkAsSent}
                 isSending={isSending}
               />
+            </TabsContent>
+
+            {/* Tab: Periodicity Control */}
+            <TabsContent value="periodicity" className="mt-4">
+              <PeriodicityControlView />
             </TabsContent>
 
             {/* Tab: Calendar View */}
