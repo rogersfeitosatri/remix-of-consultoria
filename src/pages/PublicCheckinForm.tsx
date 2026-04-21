@@ -132,6 +132,7 @@ export default function PublicCheckinForm() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [linkExpired, setLinkExpired] = useState(false);
+  const [windowHours, setWindowHours] = useState<number>(36);
 
   const [athletePhone, setAthletePhone] = useState('');
   const [verifiedClientId, setVerifiedClientId] = useState<string | null>(null);
