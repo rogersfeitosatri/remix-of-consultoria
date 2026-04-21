@@ -88,6 +88,8 @@ interface RequestBody {
   triggeredBy?: TriggeredBy;
   /** When true, skips eligibility checks (for confirmations triggered after booking) */
   skipEligibility?: boolean;
+  /** Explicit template_key override (e.g. booking_first_consultation, booking_followup_consultation) */
+  templateKey?: string;
 }
 
 const VALID_TRIGGERED_BY: TriggeredBy[] = [
