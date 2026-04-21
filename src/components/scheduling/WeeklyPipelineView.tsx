@@ -41,6 +41,8 @@ interface PipelineItem {
   meetLink?: string;
   daysSinceSent?: number;
   isOverdue?: boolean;
+  lastLinkSentAt?: string;
+  lastCompletedConsultDate?: string;
 }
 
 const STATUS_CONFIG: Record<PipelineStatus, { label: string; icon: any; className: string; bgClass: string }> = {
