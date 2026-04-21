@@ -412,13 +412,72 @@ export default function CalendarPage() {
                     <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
                       <ChevronLeft className="h-5 w-5" />
                     </Button>
-                    <h3 className="text-lg font-semibold text-foreground capitalize">
-                      {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-foreground capitalize">
+                        {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+                      </h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          setCurrentMonth(new Date());
+                          setSelectedAgendaDay(new Date());
+                        }}
+                      >
+                        Hoje
+                      </Button>
+                    </div>
                     <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
                       <ChevronRight className="h-5 w-5" />
                     </Button>
                   </div>
+
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-3 mb-4 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500" />
+                      <span className="text-muted-foreground">Consulta Agendada</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded bg-primary/20 border border-primary" />
+                      <span className="text-muted-foreground">1ª Consulta</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500" />
+                      <span className="text-muted-foreground">Enviar Link</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Check className="h-3 w-3 text-emerald-600" />
+                      <span className="text-muted-foreground">Link enviado</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <XCircle className="h-3 w-3 text-destructive" />
+                      <span className="text-muted-foreground">Falha no envio</span>
+                    </div>
+                  </div>
+
+                  {/* Calendar Grid with weekly summary column */}
+                  <TooltipProvider delayDuration={150}>
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-[1fr_64px] bg-muted/50">
+                      <div className="grid grid-cols-7">
+                        {weekDays.map(day => (
+                          <div key={day} className="p-2 text-center text-xs font-semibold text-foreground border-b border-border">
+                            {day}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="p-2 text-center text-[10px] font-semibold text-foreground border-b border-l border-border uppercase tracking-wide">
+                        Semana
+                      </div>
+                    </div>
+                    {calendarWeeks.map((week, weekIdx) => {
+                      const stats = getWeekStats(week);
+                      return (
+                        <div key={`week-${weekIdx}`} className="grid grid-cols-[1fr_64px]">
+                          <div className="grid grid-cols-7">
+                            {week.map((day, index) => {
 
                   {/* Legend */}
                   <div className="flex flex-wrap gap-4 mb-4 text-xs">
