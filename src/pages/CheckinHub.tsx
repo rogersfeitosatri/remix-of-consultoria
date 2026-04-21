@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ClipboardCheck, CalendarCheck, History } from 'lucide-react';
+import { ClipboardCheck, CalendarCheck, History, Send } from 'lucide-react';
 import { PendingReviewsList } from '@/components/forms/PendingReviewsList';
 import { ScheduledCheckinsSection } from '@/components/forms/ScheduledCheckinsSection';
 import { CheckinAuditTab } from '@/components/forms/CheckinAuditTab';
 import { CheckinAlertsBanner } from '@/components/checkin/CheckinAlertsBanner';
+import { CheckinDispatchOverview } from '@/components/checkin/CheckinDispatchOverview';
 
 export default function CheckinHub() {
   const [activeTab, setActiveTab] = useState('pendentes');
@@ -38,7 +39,7 @@ export default function CheckinHub() {
         <CheckinAlertsBanner />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-4 max-w-3xl">
             <TabsTrigger value="pendentes" className="gap-2">
               <ClipboardCheck className="h-4 w-4" />
               <span className="hidden sm:inline">Pendentes</span>
@@ -46,6 +47,10 @@ export default function CheckinHub() {
             <TabsTrigger value="agendados" className="gap-2">
               <CalendarCheck className="h-4 w-4" />
               <span className="hidden sm:inline">Agendados</span>
+            </TabsTrigger>
+            <TabsTrigger value="envios" className="gap-2">
+              <Send className="h-4 w-4" />
+              <span className="hidden sm:inline">Envios</span>
             </TabsTrigger>
             <TabsTrigger value="conferencia" className="gap-2">
               <History className="h-4 w-4" />
@@ -59,6 +64,10 @@ export default function CheckinHub() {
 
           <TabsContent value="agendados" className="space-y-6 mt-6">
             <ScheduledCheckinsSection />
+          </TabsContent>
+
+          <TabsContent value="envios" className="space-y-6 mt-6">
+            <CheckinDispatchOverview />
           </TabsContent>
 
           <TabsContent value="conferencia" className="space-y-6 mt-6">
