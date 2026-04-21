@@ -226,6 +226,8 @@ export function WeeklyPipelineView({
           appointmentTime: matchingAppointment?.appointment_time,
           appointmentId: matchingAppointment?.id,
           meetLink: matchingAppointment?.google_meet_link,
+          lastLinkSentAt: lastLinkByClient.get(client.id),
+          lastCompletedConsultDate: lastCompletedByClient.get(client.id),
         });
 
         processedClientIds.add(client.id);
