@@ -12,8 +12,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CHECKIN_LABELS, CheckinFrequency } from '@/types/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CheckCircle2, Clock, XCircle, Send, Search, RefreshCw, Loader2 } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Send, Search, RefreshCw, Loader2, Play, Activity } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
 
 interface DispatchRow {
   id: string;
