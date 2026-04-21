@@ -378,13 +378,23 @@ export function CheckinDispatchOverview() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="md:w-48"><SelectValue placeholder="Status" /></SelectTrigger>
+            <Select value={statusFilter} onValueChange={setStatusFilter} disabled={pendingOnly}>
+              <SelectTrigger className="md:w-44"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos status</SelectItem>
                 <SelectItem value="responded">Respondidos</SelectItem>
                 <SelectItem value="pending">Pendentes</SelectItem>
                 <SelectItem value="failed">Falhas</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
+              <SelectTrigger className="md:w-52">
+                <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Mais recentes primeiro</SelectItem>
+                <SelectItem value="oldest">Mais antigos primeiro</SelectItem>
               </SelectContent>
             </Select>
           </div>
