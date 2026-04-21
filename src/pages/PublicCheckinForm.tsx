@@ -342,6 +342,7 @@ export default function PublicCheckinForm() {
         },
       });
 
+      if (typeof recheck?.windowHours === 'number') setWindowHours(recheck.windowHours);
       if (recheck?.expired) {
         setLinkExpired(true);
         setSubmitting(false);
