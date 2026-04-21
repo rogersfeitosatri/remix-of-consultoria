@@ -15,6 +15,8 @@ const STATUS_LABELS: Record<PeriodicityStatus, string> = {
   on_track: '🟢 Em dia',
   attention: '🟡 Atenção',
   late: '🔴 Atrasado',
+  no_data: '⚫ Sem dados',
+  frozen: '⚫ Congelado',
   inactive: '⚫ Inativo',
 };
 
@@ -22,6 +24,8 @@ const STATUS_CLASSES: Record<PeriodicityStatus, string> = {
   on_track: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
   attention: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
   late: 'bg-red-500/10 text-red-600 border-red-500/30',
+  no_data: 'bg-muted text-muted-foreground border-border',
+  frozen: 'bg-sky-500/10 text-sky-600 border-sky-500/30',
   inactive: 'bg-muted text-muted-foreground border-border',
 };
 
