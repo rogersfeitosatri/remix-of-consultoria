@@ -9,12 +9,19 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { CHECKIN_LABELS, CheckinFrequency } from '@/types/client';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CheckCircle2, Clock, XCircle, Send, Search, RefreshCw, Loader2, Play, Activity } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Send, Search, RefreshCw, Loader2, Play, Activity, CalendarIcon, AlertCircle, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
+import type { DateRange } from 'react-day-picker';
+
+type PeriodPreset = 'today' | '7d' | '15d' | '30d' | 'this_month' | 'custom';
+type SortOrder = 'newest' | 'oldest';
 
 interface DispatchRow {
   id: string;
@@ -34,7 +41,32 @@ export function CheckinDispatchOverview() {
   const [search, setSearch] = useState('');
   const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [period, setPeriod] = useState<PeriodPreset>('30d');
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [pendingOnly, setPendingOnly] = useState(false);
+  const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [resendingId, setResendingId] = useState<string | null>(null);
+
+  // Resolve period to date range
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    switch (period) {
+      case 'today':
+        return { from: startOfDay(now), to: endOfDay(now) };
+      case '7d':
+        return { from: startOfDay(subDays(now, 6)), to: endOfDay(now) };
+      case '15d':
+        return { from: startOfDay(subDays(now, 14)), to: endOfDay(now) };
+      case '30d':
+        return { from: startOfDay(subDays(now, 29)), to: endOfDay(now) };
+      case 'this_month':
+        return { from: startOfMonth(now), to: endOfMonth(now) };
+      case 'custom':
+        return customRange?.from
+          ? { from: startOfDay(customRange.from), to: endOfDay(customRange.to || customRange.from) }
+          : null;
+    }
+  }, [period, customRange]);
 
   const handleResend = async (dispatchId: string, clientName: string) => {
     setResendingId(dispatchId);
@@ -163,17 +195,30 @@ export function CheckinDispatchOverview() {
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    return data.filter((d) => {
+    const fromMs = dateRange?.from.getTime();
+    const toMs = dateRange?.to.getTime();
+    const result = data.filter((d) => {
+      if (fromMs && toMs) {
+        const t = new Date(d.sent_at).getTime();
+        if (t < fromMs || t > toMs) return false;
+      }
       if (search && !d.client_name.toLowerCase().includes(search.toLowerCase())) return false;
       if (frequencyFilter !== 'all' && d.checkin_frequency !== frequencyFilter) return false;
-      if (statusFilter !== 'all') {
+      if (pendingOnly) {
+        if (d.responded_at || d.status === 'failed') return false;
+      } else if (statusFilter !== 'all') {
         if (statusFilter === 'responded' && !d.responded_at) return false;
         if (statusFilter === 'pending' && (d.responded_at || d.status === 'failed')) return false;
         if (statusFilter === 'failed' && d.status !== 'failed') return false;
       }
       return true;
     });
-  }, [data, search, frequencyFilter, statusFilter]);
+    result.sort((a, b) => {
+      const diff = new Date(a.sent_at).getTime() - new Date(b.sent_at).getTime();
+      return sortOrder === 'oldest' ? diff : -diff;
+    });
+    return result;
+  }, [data, search, frequencyFilter, statusFilter, dateRange, pendingOnly, sortOrder]);
 
   const stats = useMemo(() => {
     const total = filtered.length;
@@ -211,6 +256,74 @@ export function CheckinDispatchOverview() {
             {reprocessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
             Reprocessar check-ins de hoje
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Filtro de Período */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Período</span>
+              {dateRange && (
+                <Badge variant="secondary" className="ml-1 font-normal">
+                  {format(dateRange.from, "dd/MM", { locale: ptBR })} – {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+                </Badge>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}>
+                <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Hoje</SelectItem>
+                  <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                  <SelectItem value="15d">Últimos 15 dias</SelectItem>
+                  <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                  <SelectItem value="this_month">Este mês</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+              {period === 'custom' && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn('h-9 justify-start text-left font-normal', !customRange && 'text-muted-foreground')}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customRange?.from ? (
+                        customRange.to ? (
+                          <>{format(customRange.from, 'dd/MM/yy')} – {format(customRange.to, 'dd/MM/yy')}</>
+                        ) : (
+                          format(customRange.from, 'dd/MM/yy')
+                        )
+                      ) : (
+                        <span>Selecionar intervalo</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="range"
+                      selected={customRange}
+                      onSelect={setCustomRange}
+                      numberOfMonths={2}
+                      initialFocus
+                      className={cn('p-3 pointer-events-auto')}
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+              <Button
+                variant={pendingOnly ? 'default' : 'outline'}
+                size="sm"
+                className="h-9 gap-1.5"
+                onClick={() => setPendingOnly((v) => !v)}
+              >
+                <AlertCircle className="h-3.5 w-3.5" />
+                {pendingOnly ? 'Mostrando só pendentes' : 'Ver apenas pendentes'}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -265,13 +378,23 @@ export function CheckinDispatchOverview() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="md:w-48"><SelectValue placeholder="Status" /></SelectTrigger>
+            <Select value={statusFilter} onValueChange={setStatusFilter} disabled={pendingOnly}>
+              <SelectTrigger className="md:w-44"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos status</SelectItem>
                 <SelectItem value="responded">Respondidos</SelectItem>
                 <SelectItem value="pending">Pendentes</SelectItem>
                 <SelectItem value="failed">Falhas</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
+              <SelectTrigger className="md:w-52">
+                <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Mais recentes primeiro</SelectItem>
+                <SelectItem value="oldest">Mais antigos primeiro</SelectItem>
               </SelectContent>
             </Select>
           </div>
