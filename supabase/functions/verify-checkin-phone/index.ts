@@ -11,7 +11,22 @@ type VerifyRequest = {
   formId?: string;
 };
 
-async function checkCheckinExpired(supabase: any, clientId: string, formId: string): Promise<boolean> {
+const DEFAULT_WINDOW_HOURS = 36;
+
+async function checkCheckinExpired(
+  supabase: any,
+  clientId: string,
+  formId: string
+): Promise<{ expired: boolean; windowHours: number }> {
+  // Get athlete-specific window override
+  const { data: client } = await supabase
+    .from('clients')
+    .select('checkin_response_window_hours')
+    .eq('id', clientId)
+    .maybeSingle();
+
+  const windowHours = client?.checkin_response_window_hours ?? DEFAULT_WINDOW_HOURS;
+
   const { data: dispatch } = await supabase
     .from('checkin_dispatches')
     .select('sent_at')
@@ -26,9 +41,9 @@ async function checkCheckinExpired(supabase: any, clientId: string, formId: stri
     const sentAt = new Date(dispatch.sent_at).getTime();
     const now = Date.now();
     const hoursSinceSent = (now - sentAt) / (1000 * 60 * 60);
-    return hoursSinceSent > 36;
+    return { expired: hoursSinceSent > windowHours, windowHours };
   }
-  return false; // No dispatch found = allow access
+  return { expired: false, windowHours };
 }
 
 function normalizePhoneToE164(phone: string): string {
