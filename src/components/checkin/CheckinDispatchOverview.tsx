@@ -52,7 +52,40 @@ export function CheckinDispatchOverview() {
     }
   };
 
-  const { data, isLoading } = useQuery({
+  const [reprocessing, setReprocessing] = useState(false);
+  const handleReprocess = async () => {
+    if (!confirm('Reprocessar check-ins de hoje? Vai disparar envios para atletas elegíveis ainda não enviados.')) return;
+    setReprocessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-checkin-dispatches', {
+        body: { source: 'manual', forceReprocess: false },
+      });
+      if (error) throw error;
+      toast.success(`Concluído: ${data?.dispatched || 0} enviados, ${data?.failed || 0} falhas`);
+      await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-overview'] });
+      await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-runs'] });
+    } catch (err: any) {
+      toast.error(`Falha ao reprocessar: ${err.message || 'erro'}`);
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
+  const { data: lastRun } = useQuery({
+    queryKey: ['checkin-dispatch-runs', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('checkin_dispatch_runs')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id,
+    refetchInterval: 30000,
+  });
+
     queryKey: ['checkin-dispatch-overview', user?.id],
     queryFn: async (): Promise<DispatchRow[]> => {
       if (!user?.id) return [];
