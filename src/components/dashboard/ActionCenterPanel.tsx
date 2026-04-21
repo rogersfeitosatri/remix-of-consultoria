@@ -198,6 +198,63 @@ export function ActionCenterPanel() {
     refetchInterval: 300000,
   });
 
+  // Send queue: upcoming booking-link dispatches in next 7 days
+  const { data: sendQueue = [] } = useQuery({
+    queryKey: ['send-queue-7d', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const in7 = format(addDays(new Date(), 7), 'yyyy-MM-dd');
+
+      const { data } = await supabase
+        .from('consultation_schedules')
+        .select('id, scheduled_date, send_link_date, status, link_sent_at, client_id, clients!inner(id, name, phone, is_active, is_frozen)')
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'sent', 'link_sent'])
+        .gte('send_link_date', today)
+        .lte('send_link_date', in7)
+        .eq('clients.is_active', true)
+        .eq('clients.is_frozen', false)
+        .order('send_link_date', { ascending: true })
+        .limit(50);
+
+      return (data || []) as any[];
+    },
+    enabled: !!user?.id,
+    refetchInterval: 120000,
+  });
+
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const resendBookingLink = async (scheduleId: string, clientId: string) => {
+    setResendingId(scheduleId);
+    try {
+      // Determine first vs followup based on prior consultations
+      const { count } = await supabase
+        .from('consultation_schedules')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .in('status', ['completed', 'scheduled']);
+
+      const templateKey = (count || 0) === 0 ? 'booking_first_consultation' : 'booking_followup_consultation';
+
+      const { error } = await supabase.functions.invoke('send-booking-link', {
+        body: {
+          clientId,
+          consultationScheduleId: scheduleId,
+          templateKey,
+          triggeredBy: 'manual_admin',
+        },
+      });
+      if (error) throw error;
+      toast.success('Link enviado!');
+      queryClient.invalidateQueries({ queryKey: ['send-queue-7d'] });
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao enviar link');
+    } finally {
+      setResendingId(null);
+    }
+  };
+
   const appointments = dayData?.appointments || [];
   const overdueTasks = dayData?.tasks.filter(t => t.is_overdue) || [];
   const todayTasks = dayData?.tasks.filter(t => !t.is_overdue) || [];
@@ -210,13 +267,15 @@ export function ActionCenterPanel() {
   const pendingCount = pendingPlans.length + unlinkedAnamnese.length + pendingCheckinFeedbacks.length + inactiveAthletes.length;
   const retentionCount = retentionAthletes.length;
   const registrationCount = pendingRegistrations.length;
+  const queueCount = sendQueue.length;
 
-  const totalCount = urgentCount + todayCount + pendingCount + retentionCount + registrationCount;
+  const totalCount = urgentCount + todayCount + pendingCount + retentionCount + registrationCount + queueCount;
 
   const [activeTab, setActiveTab] = useState(() => {
     if (registrationCount > 0) return 'registrations';
     if (urgentCount > 0) return 'urgent';
     if (todayCount > 0) return 'today';
+    if (queueCount > 0) return 'queue';
     if (retentionCount > 0) return 'retention';
     return 'pending';
   });
