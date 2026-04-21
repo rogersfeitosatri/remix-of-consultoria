@@ -12,7 +12,8 @@ import {
 } from '@/hooks/useClients';
 import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth, addWeeks, nextMonday, isWithinInterval, startOfISOWeek, endOfISOWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, X } from 'lucide-react';
+import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, X, Activity } from 'lucide-react';
+import { Link as RouterLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -202,13 +203,20 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
               Tarefas de envio de link e primeiras consultas
             </CardDescription>
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="gap-1">
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Adicionar Tarefa</span>
-              </Button>
-            </DialogTrigger>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="gap-1" asChild>
+              <RouterLink to="/scheduling/periodicity">
+                <Activity className="h-4 w-4" />
+                <span className="hidden sm:inline">Controle de Periodicidade</span>
+              </RouterLink>
+            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-1">
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Adicionar Tarefa</span>
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Adicionar Tarefa de Envio de Link</DialogTitle>
