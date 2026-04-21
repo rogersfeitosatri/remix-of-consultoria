@@ -47,6 +47,39 @@ export function ScheduledCheckinsSection() {
     return clients.reduce((acc, c) => { acc[c.id] = c; return acc; }, {} as Record<string, typeof clients[0]>);
   }, [clients]);
 
+  // Last sent check-in date per client (from checkin_dispatches with status='sent')
+  const { data: lastSentMap = {} } = useQuery({
+    queryKey: ['checkin-last-sent-by-client', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return {};
+      const { data, error } = await supabase
+        .from('checkin_dispatches')
+        .select('client_id, sent_at')
+        .eq('user_id', user.id)
+        .eq('status', 'sent')
+        .order('sent_at', { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const row of data || []) {
+        if (!map[row.client_id]) map[row.client_id] = row.sent_at;
+      }
+      return map;
+    },
+    enabled: !!user?.id,
+    staleTime: 60_000,
+  });
+
+  const frequencyLabel = (freq?: string | null): string => {
+    switch (freq) {
+      case 'weekly': return 'Semanal';
+      case 'biweekly': return 'Quinzenal';
+      case 'monthly': return 'Mensal';
+      case 'six_weeks': return 'A cada 6 semanas';
+      default: return freq || 'Não definida';
+    }
+  };
+
   const getActiveForm = () => forms.find(f => f.is_active);
 
   const buildCheckinLink = (checkin: ScheduledCheckin, clientId: string): string | null => {
