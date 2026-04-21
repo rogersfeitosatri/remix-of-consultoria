@@ -9,6 +9,7 @@ import { useClients } from '@/hooks/useClients';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { useWhatsAppTemplates } from '@/hooks/useWhatsAppTemplates';
 import { supabase } from '@/integrations/supabase/client';
+import { createCheckinDispatchForSend, markDispatchSent, markDispatchFailed } from '@/lib/checkinDispatch';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isAfter, isBefore, addDays, startOfDay, isSameDay, differenceInDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
@@ -116,6 +117,7 @@ export function ScheduledCheckinsSection() {
     }
 
     setSendingCheckins(prev => new Set(prev).add(checkinId));
+    let dispatchId: string | null = null;
     try {
       const formatPhone = (phone: string): string => {
         let digits = phone.replace(/\D/g, '');
@@ -134,14 +136,24 @@ export function ScheduledCheckinsSection() {
         codigo_acesso: formatPhone(client.phone),
       };
 
-      const { error } = await supabase.functions.invoke('send-whatsapp', {
+      // REGRA OBRIGATÓRIA: criar dispatch ANTES do envio
+      dispatchId = await createCheckinDispatchForSend({
+        clientId,
+        userId: user!.id,
+        linkCheckin: checkinLink,
+        source: 'manual_scheduled_panel',
+      });
+
+      const { data: sendResult, error } = await supabase.functions.invoke('send-whatsapp', {
         body: { clientId, templateKey: 'checkin_reminder', context, scheduledCheckinId: checkinId },
       });
       if (error) throw error;
 
+      await markDispatchSent(dispatchId, sendResult);
       await updateCheckin.mutateAsync({ id: checkinId, status: 'sent', sent_at: new Date().toISOString() });
       toast({ title: 'Enviado!', description: `Check-in enviado para ${client.name}.` });
     } catch (error: any) {
+      if (dispatchId) await markDispatchFailed(dispatchId, error.message || 'Falha no envio');
       toast({ title: 'Erro ao enviar', description: error.message || 'Falha no envio.', variant: 'destructive' });
     } finally {
       setSendingCheckins(prev => { const s = new Set(prev); s.delete(checkinId); return s; });
