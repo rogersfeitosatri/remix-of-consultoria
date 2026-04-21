@@ -284,7 +284,8 @@ export default function PublicCheckinForm() {
         return;
       }
 
-      // Server-side 36h expiration check
+      // Server-side expiration check (window configurable per athlete)
+      if (typeof data?.windowHours === 'number') setWindowHours(data.windowHours);
       if (data?.expired) {
         setLinkExpired(true);
         return;
