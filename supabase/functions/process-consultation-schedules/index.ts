@@ -58,7 +58,6 @@ Deno.serve(async (req) => {
       const elig = Array.isArray(eligibility) ? eligibility[0] : eligibility;
       if (!elig?.eligible) {
         console.log(`Skipping ${schedule.client_id}: ${elig?.reason}`);
-        // Log the block attempt for auditing
         await supabase.from('whatsapp_message_logs').insert({
           user_id: schedule.user_id,
           client_id: schedule.client_id,
@@ -75,14 +74,28 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Detect first consultation vs follow-up by counting prior completed/scheduled
+      const { count: priorCount } = await supabase
+        .from('consultation_schedules')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', schedule.client_id)
+        .in('status', ['completed', 'scheduled'])
+        .neq('id', schedule.id);
+
+      const isFirstConsultation = (priorCount ?? 0) === 0;
+      const templateKey = isFirstConsultation
+        ? 'booking_first_consultation'
+        : 'booking_followup_consultation';
+
       // Delegate to send-booking-link (it handles idempotency, template, send, log)
       try {
         const { data: invokeRes, error: invokeErr } = await supabase.functions.invoke('send-booking-link', {
           body: {
-            client_id: schedule.client_id,
-            consultation_schedule_id: schedule.id,
-            triggered_by: 'cron_daily',
-            template_key: 'weekly_booking_link',
+            clientId: schedule.client_id,
+            consultationScheduleId: schedule.id,
+            triggeredBy: 'cron_daily',
+            templateKey,
+            messageType: 'booking_invite',
           },
         });
 
@@ -90,7 +103,7 @@ Deno.serve(async (req) => {
           console.error(`Invoke error for ${schedule.id}:`, invokeErr);
           results.push({ scheduleId: schedule.id, clientId: schedule.client_id, status: 'failed', reason: invokeErr.message });
         } else {
-          results.push({ scheduleId: schedule.id, clientId: schedule.client_id, status: invokeRes?.status || 'sent' });
+          results.push({ scheduleId: schedule.id, clientId: schedule.client_id, status: invokeRes?.success ? 'sent' : (invokeRes?.reason || 'skipped') });
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'unknown';
