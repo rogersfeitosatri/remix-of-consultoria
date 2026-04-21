@@ -165,6 +165,34 @@ export function CheckinDispatchOverview() {
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <Activity className="h-5 w-5 text-primary mt-0.5" />
+            <div>
+              <div className="text-sm font-semibold">Cron Automático — Diário 07:00 (Fortaleza)</div>
+              {lastRun ? (
+                <div className="text-xs text-muted-foreground mt-1">
+                  Última execução: {formatDistanceToNow(new Date(lastRun.started_at), { addSuffix: true, locale: ptBR })}
+                  {' · '}
+                  <Badge variant={lastRun.status === 'success' ? 'default' : lastRun.status === 'error' ? 'destructive' : 'secondary'} className="ml-1">
+                    {lastRun.status}
+                  </Badge>
+                  {' · '}
+                  Analisados {lastRun.total_analyzed} · Enviados {lastRun.total_dispatched} · Falhas {lastRun.total_failed} · Ignorados {lastRun.total_skipped}
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground mt-1">Nenhuma execução registrada ainda.</div>
+              )}
+            </div>
+          </div>
+          <Button onClick={handleReprocess} disabled={reprocessing} size="sm">
+            {reprocessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+            Reprocessar check-ins de hoje
+          </Button>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4">
