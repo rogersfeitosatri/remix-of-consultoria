@@ -439,7 +439,9 @@ export function CheckinDispatchOverview() {
                           ) : (
                             <Badge variant="secondary">Pendente</Badge>
                           )}
-                          {d.error_message && <div className="text-xs text-destructive mt-1">{d.error_message}</div>}
+                          {d.error_message && !d.error_message.startsWith('source:') && (
+                            <div className="text-xs text-destructive mt-1">{d.error_message}</div>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm">
                           {d.responded_at
