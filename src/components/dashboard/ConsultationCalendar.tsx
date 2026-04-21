@@ -273,6 +273,7 @@ export function ConsultationCalendar({ consultations, clients = [] }: Consultati
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-2 sm:p-4 lg:p-6">
