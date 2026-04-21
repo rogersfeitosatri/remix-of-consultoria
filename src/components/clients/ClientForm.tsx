@@ -100,6 +100,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     has_checkin: client?.has_checkin ?? true,
     has_agenda_access: client?.has_agenda_access ?? false,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly',
+    checkin_response_window_hours: (client as any)?.checkin_response_window_hours ?? null as number | null,
     start_date: client?.start_date || new Date().toISOString().split('T')[0],
     end_date: client?.end_date || '',
     monthly_value: client?.monthly_value || 0,
