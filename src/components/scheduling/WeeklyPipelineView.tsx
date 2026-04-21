@@ -574,8 +574,8 @@ export function WeeklyPipelineView({
                       )}
 
                       {/* View athlete */}
-                      <Button size="sm" variant="ghost" className="h-7 text-xs" asChild>
-                        <Link to={`/clients?search=${encodeURIComponent(item.clientName)}`}>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" title="Abrir perfil do atleta" asChild>
+                        <Link to={`/clients/${item.clientId}`}>
                           <User className="h-3 w-3" />
                         </Link>
                       </Button>
