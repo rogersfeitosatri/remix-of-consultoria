@@ -432,7 +432,7 @@ export default function PublicCheckinForm() {
           </div>
           <h1 className="text-2xl font-bold mb-2">Prazo Encerrado</h1>
           <p className="text-muted-foreground mb-4">
-            O prazo de 36 horas para preencher este check-in já foi encerrado.
+            O prazo de {windowHours} horas para preencher este check-in já foi encerrado.
           </p>
           <p className="text-muted-foreground mb-6">
             Caso queira informar algo ao seu nutricionista, envie diretamente pelo contato abaixo.
