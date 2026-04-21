@@ -41,7 +41,32 @@ export function CheckinDispatchOverview() {
   const [search, setSearch] = useState('');
   const [frequencyFilter, setFrequencyFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [period, setPeriod] = useState<PeriodPreset>('30d');
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [pendingOnly, setPendingOnly] = useState(false);
+  const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [resendingId, setResendingId] = useState<string | null>(null);
+
+  // Resolve period to date range
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    switch (period) {
+      case 'today':
+        return { from: startOfDay(now), to: endOfDay(now) };
+      case '7d':
+        return { from: startOfDay(subDays(now, 6)), to: endOfDay(now) };
+      case '15d':
+        return { from: startOfDay(subDays(now, 14)), to: endOfDay(now) };
+      case '30d':
+        return { from: startOfDay(subDays(now, 29)), to: endOfDay(now) };
+      case 'this_month':
+        return { from: startOfMonth(now), to: endOfMonth(now) };
+      case 'custom':
+        return customRange?.from
+          ? { from: startOfDay(customRange.from), to: endOfDay(customRange.to || customRange.from) }
+          : null;
+    }
+  }, [period, customRange]);
 
   const handleResend = async (dispatchId: string, clientName: string) => {
     setResendingId(dispatchId);
