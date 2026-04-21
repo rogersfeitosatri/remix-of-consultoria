@@ -47,6 +47,7 @@ import { RenewPlanDialog } from '@/components/clients/RenewPlanDialog';
 import { FreezePlanDialog } from '@/components/clients/FreezePlanDialog';
 import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
 import { AthleteCheckinSchedules } from '@/components/admin/AthleteCheckinSchedules';
+import { PipelineTimelineTab } from '@/components/admin/PipelineTimelineTab';
 import { useQuery } from '@tanstack/react-query';
 import { useFreezePlan } from '@/hooks/useFreezePlan';
 import { differenceInCalendarDays } from 'date-fns';
