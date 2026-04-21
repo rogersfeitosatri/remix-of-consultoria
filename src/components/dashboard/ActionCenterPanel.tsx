@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   AlertTriangle, Clock, CheckCircle, ChevronRight, Video, ExternalLink,
   ListTodo, MessageSquare, UtensilsCrossed, UserX, Zap, CalendarCheck,
-  Target, Users, Phone, UserPlus
+  Target, Users, Phone, UserPlus, Send, Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useMyDayToday } from '@/hooks/useMyDayToday';
@@ -198,6 +198,63 @@ export function ActionCenterPanel() {
     refetchInterval: 300000,
   });
 
+  // Send queue: upcoming booking-link dispatches in next 7 days
+  const { data: sendQueue = [] } = useQuery({
+    queryKey: ['send-queue-7d', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const in7 = format(addDays(new Date(), 7), 'yyyy-MM-dd');
+
+      const { data } = await supabase
+        .from('consultation_schedules')
+        .select('id, scheduled_date, send_link_date, status, link_sent_at, client_id, clients!inner(id, name, phone, is_active, is_frozen)')
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'sent', 'link_sent'])
+        .gte('send_link_date', today)
+        .lte('send_link_date', in7)
+        .eq('clients.is_active', true)
+        .eq('clients.is_frozen', false)
+        .order('send_link_date', { ascending: true })
+        .limit(50);
+
+      return (data || []) as any[];
+    },
+    enabled: !!user?.id,
+    refetchInterval: 120000,
+  });
+
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const resendBookingLink = async (scheduleId: string, clientId: string) => {
+    setResendingId(scheduleId);
+    try {
+      // Determine first vs followup based on prior consultations
+      const { count } = await supabase
+        .from('consultation_schedules')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', clientId)
+        .in('status', ['completed', 'scheduled']);
+
+      const templateKey = (count || 0) === 0 ? 'booking_first_consultation' : 'booking_followup_consultation';
+
+      const { error } = await supabase.functions.invoke('send-booking-link', {
+        body: {
+          clientId,
+          consultationScheduleId: scheduleId,
+          templateKey,
+          triggeredBy: 'manual_admin',
+        },
+      });
+      if (error) throw error;
+      toast.success('Link enviado!');
+      queryClient.invalidateQueries({ queryKey: ['send-queue-7d'] });
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao enviar link');
+    } finally {
+      setResendingId(null);
+    }
+  };
+
   const appointments = dayData?.appointments || [];
   const overdueTasks = dayData?.tasks.filter(t => t.is_overdue) || [];
   const todayTasks = dayData?.tasks.filter(t => !t.is_overdue) || [];
@@ -210,13 +267,15 @@ export function ActionCenterPanel() {
   const pendingCount = pendingPlans.length + unlinkedAnamnese.length + pendingCheckinFeedbacks.length + inactiveAthletes.length;
   const retentionCount = retentionAthletes.length;
   const registrationCount = pendingRegistrations.length;
+  const queueCount = sendQueue.length;
 
-  const totalCount = urgentCount + todayCount + pendingCount + retentionCount + registrationCount;
+  const totalCount = urgentCount + todayCount + pendingCount + retentionCount + registrationCount + queueCount;
 
   const [activeTab, setActiveTab] = useState(() => {
     if (registrationCount > 0) return 'registrations';
     if (urgentCount > 0) return 'urgent';
     if (todayCount > 0) return 'today';
+    if (queueCount > 0) return 'queue';
     if (retentionCount > 0) return 'retention';
     return 'pending';
   });
@@ -345,6 +404,18 @@ export function ActionCenterPanel() {
                 {retentionCount > 0 && (
                   <Badge className="ml-1.5 h-4 min-w-4 text-[10px] px-1 bg-orange-500 text-white">
                     {retentionCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="queue"
+                className="relative data-[state=active]:bg-sky-500/10 data-[state=active]:text-sky-600 data-[state=active]:shadow-none rounded-t-lg rounded-b-none border-b-2 border-transparent data-[state=active]:border-sky-500 px-3 py-1.5 text-xs"
+              >
+                <Send className="h-3 w-3 mr-1" />
+                Fila de Envios
+                {queueCount > 0 && (
+                  <Badge className="ml-1.5 h-4 min-w-4 text-[10px] px-1 bg-sky-500 text-white">
+                    {queueCount}
                   </Badge>
                 )}
               </TabsTrigger>
@@ -694,6 +765,85 @@ export function ActionCenterPanel() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* QUEUE TAB - Próximos envios de link de agendamento (7 dias) */}
+          <TabsContent value="queue" className="m-0 p-4 space-y-3">
+            {queueCount === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum envio programado nos próximos 7 dias ✓</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-sky-600 flex items-center gap-1">
+                    <Send className="h-3 w-3" /> Próximos envios de link ({queueCount})
+                  </p>
+                </div>
+                <p className="text-[10px] text-muted-foreground mb-2">
+                  Links de agendamento programados pelo cron diário. Reenvie manualmente se necessário.
+                </p>
+                <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
+                  {sendQueue.map((s: any) => {
+                    const sendDate = parseISO(s.send_link_date);
+                    const consultDate = parseISO(s.scheduled_date);
+                    const isSent = s.status === 'sent' || s.status === 'link_sent' || !!s.link_sent_at;
+                    const isToday = format(sendDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                    return (
+                      <div
+                        key={s.id}
+                        className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm border bg-background/80 border-border/50 hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <Send className={`h-3.5 w-3.5 shrink-0 ${isSent ? 'text-success' : 'text-sky-500'}`} />
+                          <div className="min-w-0 flex-1">
+                            <span className="truncate text-xs font-medium block">{s.clients?.name}</span>
+                            <div className="flex flex-wrap gap-1 mt-0.5 items-center">
+                              <Badge variant={isToday ? 'default' : 'secondary'} className="text-[9px] px-1 py-0">
+                                Envio: {format(sendDate, 'dd/MM', { locale: ptBR })}
+                              </Badge>
+                              <span className="text-[9px] text-muted-foreground">→</span>
+                              <Badge variant="outline" className="text-[9px] px-1 py-0">
+                                Consulta: {format(consultDate, 'dd/MM', { locale: ptBR })}
+                              </Badge>
+                              {isSent && (
+                                <Badge className="text-[9px] px-1 py-0 bg-success/15 text-success border-success/30">
+                                  ✓ Enviado
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            disabled={resendingId === s.id}
+                            onClick={() => resendBookingLink(s.id, s.client_id)}
+                          >
+                            {resendingId === s.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <>
+                                <Send className="h-3 w-3 mr-1" />
+                                {isSent ? 'Reenviar' : 'Enviar agora'}
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            onClick={() => navigate(`/clients/${s.client_id}`)}
+                          >
+                            <ChevronRight className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}
