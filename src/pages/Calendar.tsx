@@ -113,6 +113,48 @@ export default function CalendarPage() {
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   }, [currentMonth]);
 
+  // Group calendar days into weeks (each row of 7)
+  const calendarWeeks = useMemo(() => {
+    const weeks: Date[][] = [];
+    for (let i = 0; i < calendarDays.length; i += 7) {
+      weeks.push(calendarDays.slice(i, i + 7));
+    }
+    return weeks;
+  }, [calendarDays]);
+
+  // Index logs by day (yyyy-MM-dd) for fast lookup
+  const logsByDay = useMemo(() => {
+    const map = new Map<string, { success: number; failed: number; logs: typeof linkLogs }>();
+    linkLogs.forEach(log => {
+      const key = format(parseISO(log.created_at), 'yyyy-MM-dd');
+      const entry = map.get(key) || { success: 0, failed: 0, logs: [] };
+      if (log.status === 'success' || log.status === 'sent') entry.success += 1;
+      else entry.failed += 1;
+      entry.logs.push(log);
+      map.set(key, entry);
+    });
+    return map;
+  }, [linkLogs]);
+
+  // Compute weekly stats for each week (sent vs scheduled-to-send)
+  const getWeekStats = (week: Date[]) => {
+    let sent = 0;
+    let pending = 0;
+    let appts = 0;
+    week.forEach(day => {
+      const key = format(day, 'yyyy-MM-dd');
+      const log = logsByDay.get(key);
+      if (log) sent += log.success;
+      consultations.forEach(c => {
+        if (isSendLinkEventRow(c) && c.send_link_date === key) pending += 1;
+      });
+      (appointments || []).forEach(a => {
+        if ((a.status === 'scheduled' || a.status === 'confirmed') && a.appointment_date === key) appts += 1;
+      });
+    });
+    return { sent, pending, appts };
+  };
+
   const getEventsForDate = (date: Date) => {
     const events: { type: 'first' | 'sendLink' | 'appointment'; schedule?: ConsultationSchedule & { client_name: string }; client?: Client; appointment?: typeof appointments[0] }[] = [];
 
