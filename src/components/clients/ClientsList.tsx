@@ -48,6 +48,7 @@ interface ClientsListProps {
 
 export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: checkinForms = [] } = useCheckinForms();
   const { data: schedulingSettings } = useSchedulingSettings();
   const { data: targetRaceAlerts = [] } = useAthletesWithTargetRaceAlerts();
