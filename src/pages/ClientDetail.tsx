@@ -62,6 +62,7 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 export default function ClientDetail() {
+  const { user } = useAuth();
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
