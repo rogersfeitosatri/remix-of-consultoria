@@ -9,12 +9,19 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { CHECKIN_LABELS, CheckinFrequency } from '@/types/client';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CheckCircle2, Clock, XCircle, Send, Search, RefreshCw, Loader2, Play, Activity } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Send, Search, RefreshCw, Loader2, Play, Activity, CalendarIcon, AlertCircle, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
+import type { DateRange } from 'react-day-picker';
+
+type PeriodPreset = 'today' | '7d' | '15d' | '30d' | 'this_month' | 'custom';
+type SortOrder = 'newest' | 'oldest';
 
 interface DispatchRow {
   id: string;
