@@ -41,6 +41,8 @@ interface PipelineItem {
   meetLink?: string;
   daysSinceSent?: number;
   isOverdue?: boolean;
+  lastLinkSentAt?: string;
+  lastCompletedConsultDate?: string;
 }
 
 const STATUS_CONFIG: Record<PipelineStatus, { label: string; icon: any; className: string; bgClass: string }> = {
@@ -103,6 +105,31 @@ export function WeeklyPipelineView({
     return map;
   }, [clients]);
 
+  // Per-client: last link sent and last completed consultation
+  const lastLinkByClient = useMemo(() => {
+    const map = new Map<string, string>();
+    consultations.forEach(s => {
+      const sent = (s as any).link_sent_at as string | null;
+      if (!sent) return;
+      const prev = map.get(s.client_id);
+      if (!prev || new Date(sent) > new Date(prev)) map.set(s.client_id, sent);
+    });
+    return map;
+  }, [consultations]);
+
+  const lastCompletedByClient = useMemo(() => {
+    const map = new Map<string, string>();
+    (appointments || []).forEach((apt: any) => {
+      const aptDate = parseISO(apt.appointment_date);
+      const isPastConfirmed = (apt.status === 'completed') ||
+        ((apt.status === 'scheduled' || apt.status === 'confirmed') && isBefore(aptDate, today));
+      if (!isPastConfirmed) return;
+      const prev = map.get(apt.client_id);
+      if (!prev || aptDate > parseISO(prev)) map.set(apt.client_id, apt.appointment_date);
+    });
+    return map;
+  }, [appointments, today]);
+
   // Build pipeline items for the current week
   const pipelineItems = useMemo(() => {
     const items: PipelineItem[] = [];
@@ -163,6 +190,8 @@ export function WeeklyPipelineView({
           meetLink: matchingAppointment?.google_meet_link,
           daysSinceSent,
           isOverdue: status === 'no_show',
+          lastLinkSentAt: lastLinkByClient.get(schedule.client_id),
+          lastCompletedConsultDate: lastCompletedByClient.get(schedule.client_id),
         });
 
         processedClientIds.add(schedule.client_id);
@@ -197,6 +226,8 @@ export function WeeklyPipelineView({
           appointmentTime: matchingAppointment?.appointment_time,
           appointmentId: matchingAppointment?.id,
           meetLink: matchingAppointment?.google_meet_link,
+          lastLinkSentAt: lastLinkByClient.get(client.id),
+          lastCompletedConsultDate: lastCompletedByClient.get(client.id),
         });
 
         processedClientIds.add(client.id);
@@ -221,6 +252,8 @@ export function WeeklyPipelineView({
           appointmentTime: apt.appointment_time,
           appointmentId: apt.id,
           meetLink: apt.google_meet_link,
+          lastLinkSentAt: lastLinkByClient.get(apt.client_id),
+          lastCompletedConsultDate: lastCompletedByClient.get(apt.client_id),
         });
         processedClientIds.add(apt.client_id);
       });
@@ -455,6 +488,24 @@ export function WeeklyPipelineView({
                             </>
                           )}
                         </div>
+
+                        {/* Last link sent + last completed consultation */}
+                        {(item.lastLinkSentAt || item.lastCompletedConsultDate) && (
+                          <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground/80">
+                            {item.lastLinkSentAt && (
+                              <span className="flex items-center gap-0.5">
+                                <Send className="h-2.5 w-2.5" />
+                                Último link: {format(parseISO(item.lastLinkSentAt), "dd/MM/yy", { locale: ptBR })}
+                              </span>
+                            )}
+                            {item.lastCompletedConsultDate && (
+                              <span className="flex items-center gap-0.5">
+                                <CheckCircle2 className="h-2.5 w-2.5" />
+                                Última consulta: {format(parseISO(item.lastCompletedConsultDate), "dd/MM/yy", { locale: ptBR })}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
