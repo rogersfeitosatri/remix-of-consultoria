@@ -5053,7 +5053,9 @@ export type Database = {
       whatsapp_message_logs: {
         Row: {
           appointment_id: string | null
+          blocked_reason: string | null
           client_id: string | null
+          consultation_schedule_id: string | null
           created_at: string | null
           error_message: string | null
           id: string
@@ -5063,11 +5065,14 @@ export type Database = {
           status: string
           template_key: string | null
           to_phone: string
+          triggered_by: string | null
           user_id: string
         }
         Insert: {
           appointment_id?: string | null
+          blocked_reason?: string | null
           client_id?: string | null
+          consultation_schedule_id?: string | null
           created_at?: string | null
           error_message?: string | null
           id?: string
@@ -5077,11 +5082,14 @@ export type Database = {
           status?: string
           template_key?: string | null
           to_phone: string
+          triggered_by?: string | null
           user_id: string
         }
         Update: {
           appointment_id?: string | null
+          blocked_reason?: string | null
           client_id?: string | null
+          consultation_schedule_id?: string | null
           created_at?: string | null
           error_message?: string | null
           id?: string
@@ -5091,6 +5099,7 @@ export type Database = {
           status?: string
           template_key?: string | null
           to_phone?: string
+          triggered_by?: string | null
           user_id?: string
         }
         Relationships: [
@@ -5252,6 +5261,18 @@ export type Database = {
         Args: { p_cadence_weeks: number; p_last_appointment_at: string }
         Returns: string
       }
+      check_booking_send_duplicate: {
+        Args: {
+          _client_id: string
+          _consultation_schedule_id?: string
+          _template_key: string
+        }
+        Returns: {
+          existing_log_id: string
+          is_duplicate: boolean
+          reason: string
+        }[]
+      }
       create_call_booking: {
         Args: {
           p_booking_date: string
@@ -5314,6 +5335,13 @@ export type Database = {
         Returns: boolean
       }
       invoke_booking_links_processor: { Args: never; Returns: undefined }
+      is_client_eligible_for_booking: {
+        Args: { _client_id: string }
+        Returns: {
+          eligible: boolean
+          reason: string
+        }[]
+      }
       mark_pending_reminders: {
         Args: never
         Returns: {
