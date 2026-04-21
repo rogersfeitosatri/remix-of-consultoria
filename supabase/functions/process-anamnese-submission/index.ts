@@ -178,6 +178,35 @@ Deno.serve(async (req) => {
       console.warn("Could not update athlete profile anamnese status:", profileUpdateError);
     }
 
+    // 6. Notify admin via WhatsApp (Z-API) — non-blocking
+    try {
+      const adminPhone = "+5599984817697";
+      const zapiInstance = Deno.env.get("ZAPI_INSTANCE_ID");
+      const zapiToken = Deno.env.get("ZAPI_TOKEN");
+      const zapiClientToken = Deno.env.get("ZAPI_CLIENT_TOKEN");
+
+      if (zapiInstance && zapiToken && zapiClientToken) {
+        const message = clientCreated
+          ? `📋 Nova anamnese recebida\n\n👤 ${name}\n📧 ${email}\n\n⚠️ Atleta criado automaticamente — aguardando configuração de plano.`
+          : `📋 Anamnese recebida\n\n👤 ${name}\n📧 ${email}\n\nVinculada ao atleta existente.`;
+
+        const zapiUrl = `https://api.z-api.io/instances/${zapiInstance}/token/${zapiToken}/send-text`;
+        const phoneDigits = adminPhone.replace(/\D/g, "");
+
+        await fetch(zapiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Client-Token": zapiClientToken,
+          },
+          body: JSON.stringify({ phone: phoneDigits, message }),
+        });
+        console.log("Admin notified via WhatsApp");
+      }
+    } catch (notifyError) {
+      console.warn("Could not notify admin via WhatsApp:", notifyError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
