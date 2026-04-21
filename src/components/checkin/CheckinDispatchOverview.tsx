@@ -259,6 +259,74 @@ export function CheckinDispatchOverview() {
         </CardContent>
       </Card>
 
+      {/* Filtro de Período */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Período</span>
+              {dateRange && (
+                <Badge variant="secondary" className="ml-1 font-normal">
+                  {format(dateRange.from, "dd/MM", { locale: ptBR })} – {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+                </Badge>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}>
+                <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Hoje</SelectItem>
+                  <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                  <SelectItem value="15d">Últimos 15 dias</SelectItem>
+                  <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                  <SelectItem value="this_month">Este mês</SelectItem>
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+              {period === 'custom' && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn('h-9 justify-start text-left font-normal', !customRange && 'text-muted-foreground')}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customRange?.from ? (
+                        customRange.to ? (
+                          <>{format(customRange.from, 'dd/MM/yy')} – {format(customRange.to, 'dd/MM/yy')}</>
+                        ) : (
+                          format(customRange.from, 'dd/MM/yy')
+                        )
+                      ) : (
+                        <span>Selecionar intervalo</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="range"
+                      selected={customRange}
+                      onSelect={setCustomRange}
+                      numberOfMonths={2}
+                      initialFocus
+                      className={cn('p-3 pointer-events-auto')}
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+              <Button
+                variant={pendingOnly ? 'default' : 'outline'}
+                size="sm"
+                className="h-9 gap-1.5"
+                onClick={() => setPendingOnly((v) => !v)}
+              >
+                <AlertCircle className="h-3.5 w-3.5" />
+                {pendingOnly ? 'Mostrando só pendentes' : 'Ver apenas pendentes'}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4">
