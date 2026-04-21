@@ -17,7 +17,7 @@ import {
 import { useConsultationAppointments } from '@/hooks/useConsultations';
 import { format, parseISO, isSameDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2, Phone, Mail, ExternalLink, History, LayoutList } from 'lucide-react';
+import { CalendarDays, User, Send, ChevronLeft, ChevronRight, Trash2, Edit2, Plus, Check, Loader2, Search, CalendarCheck2, Phone, Mail, ExternalLink, History, LayoutList, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -239,6 +239,12 @@ export default function CalendarPage() {
               </p>
             </div>
             <div className="flex gap-2">
+              <Button asChild size="sm" variant="outline" className="gap-1">
+                <Link to="/scheduling/audit">
+                  <Shield className="h-4 w-4" />
+                  <span className="hidden sm:inline">Auditoria</span>
+                </Link>
+              </Button>
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline" className="gap-1">
