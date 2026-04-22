@@ -359,22 +359,22 @@ export default function CalendarPage() {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full max-w-2xl grid-cols-4">
-              <TabsTrigger value="pipeline" className="gap-1">
+            <TabsList className="grid w-full grid-cols-4 h-auto sm:max-w-2xl gap-0.5 sm:gap-1">
+              <TabsTrigger value="pipeline" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-[10px] sm:text-sm">
                 <LayoutList className="h-4 w-4" />
-                <span className="hidden sm:inline">Pipeline</span>
+                <span>Pipeline</span>
               </TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-1">
+              <TabsTrigger value="calendar" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-[10px] sm:text-sm">
                 <CalendarDays className="h-4 w-4" />
-                <span className="hidden sm:inline">Calendário</span>
+                <span>Mensal</span>
               </TabsTrigger>
-              <TabsTrigger value="periodicity" className="gap-1">
+              <TabsTrigger value="periodicity" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-[10px] sm:text-sm">
                 <Activity className="h-4 w-4" />
-                <span className="hidden sm:inline">Periodicidade</span>
+                <span>Frequência</span>
               </TabsTrigger>
-              <TabsTrigger value="history" className="gap-1">
+              <TabsTrigger value="history" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-[10px] sm:text-sm">
                 <History className="h-4 w-4" />
-                <span className="hidden sm:inline">Histórico</span>
+                <span>Histórico</span>
               </TabsTrigger>
             </TabsList>
 
