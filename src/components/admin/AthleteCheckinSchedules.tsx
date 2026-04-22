@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Plus, Trash2, Clock, CalendarDays, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
+import { supabase } from '@/integrations/supabase/client';
 
 const FREQ_LABELS: Record<string, string> = {
   daily: 'Diário (envio semanal)',
@@ -75,8 +76,21 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
     setShowAdd(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formId) return;
+    const hours = parseInt(dueInHours) || 48;
+
+    // Sincroniza o prazo de resposta no cadastro do atleta
+    // (usado pela tela "Prazo Encerrado" do check-in público)
+    try {
+      await supabase
+        .from('clients')
+        .update({ checkin_response_window_hours: hours })
+        .eq('id', clientId);
+    } catch (e) {
+      console.error('Falha ao sincronizar checkin_response_window_hours', e);
+    }
+
     saveSchedule.mutate({
       id: editId,
       client_id: clientId,
@@ -85,7 +99,7 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
       frequency_type: freqType,
       weekly_days: weeklyDays,
       send_time: sendTime,
-      due_in_hours: parseInt(dueInHours) || 48,
+      due_in_hours: hours,
       is_active: isActive,
     }, {
       onSuccess: () => setShowAdd(false),
@@ -219,7 +233,10 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
               </div>
               <div>
                 <Label>Prazo de resposta (horas)</Label>
-                <Input type="number" value={dueInHours} onChange={e => setDueInHours(e.target.value)} />
+                <Input type="number" min={1} max={720} value={dueInHours} onChange={e => setDueInHours(e.target.value)} />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Tempo que o atleta tem para preencher após receber o link.
+                </p>
               </div>
             </div>
 
