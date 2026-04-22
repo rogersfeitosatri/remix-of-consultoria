@@ -233,7 +233,10 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
               </div>
               <div>
                 <Label>Prazo de resposta (horas)</Label>
-                <Input type="number" value={dueInHours} onChange={e => setDueInHours(e.target.value)} />
+                <Input type="number" min={1} max={720} value={dueInHours} onChange={e => setDueInHours(e.target.value)} />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Tempo que o atleta tem para preencher após receber o link.
+                </p>
               </div>
             </div>
 
