@@ -461,22 +461,26 @@ export default function CalendarPage() {
                   {/* Calendar Grid with weekly summary column */}
                   <TooltipProvider delayDuration={150}>
                   <div className="border border-border rounded-lg overflow-hidden">
-                    <div className="grid grid-cols-[1fr_64px] bg-muted/50">
+                    <div className="grid grid-cols-[1fr_56px] sm:grid-cols-[1fr_64px] bg-muted/50">
                       <div className="grid grid-cols-7">
                         {weekDays.map(day => (
-                          <div key={day} className="p-2 text-center text-xs font-semibold text-foreground border-b border-border">
-                            {day}
+                          <div key={day} className="p-1.5 sm:p-2 text-center text-[10px] sm:text-xs font-semibold text-foreground border-b border-border">
+                            <span className="sm:hidden">{day.charAt(0)}</span>
+                            <span className="hidden sm:inline">{day}</span>
                           </div>
                         ))}
                       </div>
-                      <div className="p-2 text-center text-[10px] font-semibold text-foreground border-b border-l border-border uppercase tracking-wide">
+                      <div className="hidden sm:flex p-2 text-center text-[10px] font-semibold text-foreground border-b border-l border-border uppercase tracking-wide items-center justify-center">
                         Semana
+                      </div>
+                      <div className="sm:hidden p-1.5 text-center text-[10px] font-semibold text-foreground border-b border-l border-border">
+                        Σ
                       </div>
                     </div>
                     {calendarWeeks.map((week, weekIdx) => {
                       const stats = getWeekStats(week);
                       return (
-                        <div key={`week-${weekIdx}`} className="grid grid-cols-[1fr_64px]">
+                        <div key={`week-${weekIdx}`} className="grid grid-cols-[1fr_56px] sm:grid-cols-[1fr_64px]">
                           <div className="grid grid-cols-7">
                             {week.map((day, index) => {
                               const events = getEventsForDate(day);
@@ -496,7 +500,7 @@ export default function CalendarPage() {
                                     if (hasLinks) setLinkDialogDay(day);
                                   }}
                                   className={cn(
-                                    "min-h-[100px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative cursor-pointer hover:bg-muted/50 transition-colors",
+                                    "min-h-[64px] sm:min-h-[120px] p-1 sm:p-2 border-b border-r border-border relative cursor-pointer hover:bg-muted/50 transition-colors",
                                     !isCurrentMonth && "bg-muted/30",
                                     isToday && "bg-primary/5",
                                     isMonday && isCurrentMonth && "bg-amber-500/5",
@@ -506,7 +510,7 @@ export default function CalendarPage() {
                                 >
                                   <div className="flex items-center justify-between mb-1">
                                     <div className={cn(
-                                      "text-sm font-medium",
+                                      "text-xs sm:text-sm font-medium",
                                       !isCurrentMonth && "text-muted-foreground/50",
                                       isToday && "text-primary font-bold"
                                     )}>
@@ -517,13 +521,13 @@ export default function CalendarPage() {
                                         <TooltipTrigger asChild>
                                           <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                                             {dayLogs.success > 0 && (
-                                              <span className="flex items-center text-[10px] text-emerald-600 font-semibold">
-                                                <Check className="h-3 w-3" />{dayLogs.success}
+                                              <span className="flex items-center text-[9px] sm:text-[10px] text-emerald-600 font-semibold">
+                                                <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3" />{dayLogs.success}
                                               </span>
                                             )}
                                             {dayLogs.failed > 0 && (
-                                              <span className="flex items-center text-[10px] text-destructive font-semibold">
-                                                <XCircle className="h-3 w-3" />{dayLogs.failed}
+                                              <span className="flex items-center text-[9px] sm:text-[10px] text-destructive font-semibold">
+                                                <XCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />{dayLogs.failed}
                                               </span>
                                             )}
                                           </div>
@@ -538,7 +542,21 @@ export default function CalendarPage() {
                                       </Tooltip>
                                     )}
                                   </div>
-                            <div className="space-y-1 overflow-y-auto max-h-[70px] sm:max-h-[85px]">
+                                  {/* Mobile: show event dots only */}
+                                  <div className="sm:hidden flex flex-wrap gap-0.5 items-center">
+                                    {events.slice(0, 4).map((event, i) => {
+                                      const dotClass =
+                                        event.type === 'appointment' ? 'bg-emerald-500' :
+                                        event.type === 'first' ? 'bg-primary' :
+                                        'bg-amber-500';
+                                      return <span key={i} className={cn('w-1.5 h-1.5 rounded-full', dotClass)} />;
+                                    })}
+                                    {events.length > 4 && (
+                                      <span className="text-[8px] text-muted-foreground leading-none">+{events.length - 4}</span>
+                                    )}
+                                  </div>
+                                  {/* Desktop: show full event chips */}
+                                  <div className="hidden sm:block space-y-1 overflow-y-auto max-h-[85px]">
                               {events.map((event) => {
                                 if (event.type === 'appointment' && event.appointment) {
                                   const apt = event.appointment;
@@ -612,20 +630,20 @@ export default function CalendarPage() {
                             })}
                           </div>
                           {/* Weekly summary sidebar cell */}
-                          <div className="border-b border-l border-border bg-muted/20 p-1.5 flex flex-col items-center justify-center text-[10px] gap-0.5">
+                          <div className="border-b border-l border-border bg-muted/20 p-1 sm:p-1.5 flex flex-col items-center justify-center text-[9px] sm:text-[10px] gap-0.5">
                             {stats.sent > 0 && (
                               <span className="flex items-center gap-0.5 text-emerald-600 font-semibold" title={`${stats.sent} link(s) enviado(s)`}>
-                                <Check className="h-3 w-3" />{stats.sent}
+                                <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3" />{stats.sent}
                               </span>
                             )}
                             {stats.pending > 0 && (
                               <span className="flex items-center gap-0.5 text-amber-600 font-semibold" title={`${stats.pending} envio(s) pendente(s)`}>
-                                <Send className="h-3 w-3" />{stats.pending}
+                                <Send className="h-2.5 w-2.5 sm:h-3 sm:w-3" />{stats.pending}
                               </span>
                             )}
                             {stats.appts > 0 && (
                               <span className="flex items-center gap-0.5 text-primary font-semibold" title={`${stats.appts} consulta(s)`}>
-                                <CalendarCheck2 className="h-3 w-3" />{stats.appts}
+                                <CalendarCheck2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />{stats.appts}
                               </span>
                             )}
                             {stats.sent === 0 && stats.pending === 0 && stats.appts === 0 && (
