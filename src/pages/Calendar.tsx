@@ -277,22 +277,23 @@ export default function CalendarPage() {
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                Calendário de Consultas
+        <div className="flex flex-col gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold text-foreground flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
+                <span className="truncate">Calendário de Consultas</span>
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
                 Acompanhe o pipeline de envios, agendamentos e consultas
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button asChild size="sm" variant="outline" className="gap-1">
+            <div className="flex gap-2 overflow-x-auto -mx-1 px-1 sm:overflow-visible">
+              <Button asChild size="sm" variant="outline" className="gap-1 shrink-0">
                 <Link to="/scheduling/audit">
                   <Shield className="h-4 w-4" />
                   <span className="hidden sm:inline">Auditoria</span>
+                  <span className="sm:hidden text-xs">Audit</span>
                 </Link>
               </Button>
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
