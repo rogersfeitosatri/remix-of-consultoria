@@ -825,54 +825,55 @@ export function AthleteSummaryConsultCard({
                               </div>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1 mt-1.5 pl-6">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-5 px-1.5 text-[10px] gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                                className="h-8 text-[11px] gap-1 px-2 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 col-span-2 sm:col-span-1"
                                 onClick={() => {
                                   setConfirmingOverdueId(schedule.id);
                                   setOverdueConfirmDate(schedule.send_link_date);
                                 }}
                               >
-                                <CheckCircle2 className="h-2.5 w-2.5" />
-                                Confirmar Consulta
+                                <CheckCircle2 className="h-3 w-3 shrink-0" />
+                                <span className="truncate">Confirmar</span>
                               </Button>
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                className="h-5 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                className="h-8 text-[11px] gap-1 px-2"
                                 onClick={() => {
                                   setEditingScheduleId(schedule.id);
                                   setEditDate(schedule.send_link_date);
                                 }}
                               >
-                                <Pencil className="h-2.5 w-2.5" />
-                                Editar
+                                <Pencil className="h-3 w-3 shrink-0" />
+                                <span className="truncate">Editar</span>
                               </Button>
                               {canResend && (
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
-                                  className="h-5 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                  className="h-8 text-[11px] gap-1 px-2"
                                   onClick={() => handleResendLink(schedule.id)}
                                   disabled={isSendingLink === schedule.id}
                                 >
-                                  <Send className="h-2.5 w-2.5" />
-                                  Enviar
+                                  <Send className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">Enviar</span>
                                 </Button>
                               )}
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                className="h-5 px-1.5 text-[10px] gap-1 text-destructive hover:text-destructive"
+                                className="h-8 text-[11px] gap-1 px-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => {
                                   if (confirm('Remover esta consulta da pipeline?')) {
                                     removeConsultationMutation.mutate(schedule.id);
                                   }
                                 }}
                               >
-                                <Trash2 className="h-2.5 w-2.5" />
+                                <Trash2 className="h-3 w-3 shrink-0" />
+                                <span className="truncate sm:hidden">Excluir</span>
                               </Button>
                             </div>
                           )
