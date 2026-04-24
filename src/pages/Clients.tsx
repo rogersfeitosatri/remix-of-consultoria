@@ -48,13 +48,45 @@ export default function Clients() {
   const deleteClientMutation = useDeleteClient();
   const queryClient = useQueryClient();
   
-  const [searchQuery, setSearchQuery] = useState('');
+  // Persistência dos filtros em sessionStorage para manter estado ao navegar
+  const FILTERS_KEY = 'clients:filters:v1';
+  const loadPersisted = () => {
+    try {
+      const raw = sessionStorage.getItem(FILTERS_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as {
+        searchQuery?: string;
+        serviceFilter?: string;
+        planFilter?: string;
+        targetRaceFilter?: string;
+        activeTab?: string;
+      };
+    } catch {
+      return null;
+    }
+  };
+  const persisted = loadPersisted();
+
+  const [searchQuery, setSearchQuery] = useState(persisted?.searchQuery ?? '');
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | undefined>();
-  const [serviceFilter, setServiceFilter] = useState('all');
-  const [planFilter, setPlanFilter] = useState('all');
-  const [targetRaceFilter, setTargetRaceFilter] = useState('all');
+  const [serviceFilter, setServiceFilter] = useState(persisted?.serviceFilter ?? 'all');
+  const [planFilter, setPlanFilter] = useState(persisted?.planFilter ?? 'all');
+  const [targetRaceFilter, setTargetRaceFilter] = useState(persisted?.targetRaceFilter ?? 'all');
+  const [activeTab, setActiveTab] = useState(persisted?.activeTab ?? 'active');
   const { toast } = useToast();
+
+  // Persistir mudanças
+  useMemo(() => {
+    try {
+      sessionStorage.setItem(
+        FILTERS_KEY,
+        JSON.stringify({ searchQuery, serviceFilter, planFilter, targetRaceFilter, activeTab })
+      );
+    } catch {
+      // ignore
+    }
+  }, [searchQuery, serviceFilter, planFilter, targetRaceFilter, activeTab]);
 
   const activeClients = useMemo(() => {
     return clients.filter(c => c.is_active && !(c as any).is_frozen);
@@ -366,7 +398,7 @@ export default function Clients() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="active" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="active" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <Users className="h-3 w-3 sm:h-4 sm:w-4" />
