@@ -1015,30 +1015,124 @@ export function AthleteSummaryConsultCard({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-1.5">
-              <div className="space-y-1 max-h-[160px] overflow-y-auto">
-                {completedAppointments.map((apt) => (
-                  <div 
-                    key={apt.id}
-                    className="flex items-center justify-between p-2 rounded-md bg-muted/30 border border-border text-xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
-                      <div>
-                        <p className="font-medium">
-                          {format(parseISO(apt.appointment_date), "dd/MM/yyyy", { locale: ptBR })}
-                        </p>
-                        <p className="text-muted-foreground text-[10px]">
-                          {apt.appointment_time.slice(0, 5)}
-                        </p>
-                      </div>
+              <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
+                {completedAppointments.map((apt) => {
+                  const isEditingApt = editingAptId === apt.id;
+                  return (
+                    <div
+                      key={apt.id}
+                      className="p-2 rounded-md bg-emerald-500/5 border border-emerald-500/20 text-xs"
+                    >
+                      {isEditingApt ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <div>
+                              <label className="text-[10px] text-muted-foreground">Data</label>
+                              <Input
+                                type="date"
+                                value={editAptDate}
+                                onChange={e => setEditAptDate(e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-muted-foreground">Hora</label>
+                              <Input
+                                type="time"
+                                value={editAptTime}
+                                onChange={e => setEditAptTime(e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-foreground">Observações</label>
+                            <Textarea
+                              value={editAptNotes}
+                              onChange={e => setEditAptNotes(e.target.value)}
+                              placeholder="Notas da consulta…"
+                              className="min-h-[50px] text-xs"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <Button
+                              size="sm"
+                              className="h-8 text-[11px] gap-1"
+                              onClick={() => updateAppointmentMutation.mutate({
+                                id: apt.id,
+                                date: editAptDate,
+                                time: editAptTime,
+                                notes: editAptNotes,
+                              })}
+                              disabled={updateAppointmentMutation.isPending || !editAptDate || !editAptTime}
+                            >
+                              <Save className="h-3 w-3" /> Salvar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-[11px]"
+                              onClick={() => setEditingAptId(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2 min-w-0 flex-1">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <p className="font-medium">
+                                  {format(parseISO(apt.appointment_date), "dd/MM/yyyy", { locale: ptBR })}
+                                  <span className="text-muted-foreground font-normal ml-1.5">
+                                    {apt.appointment_time.slice(0, 5)}
+                                  </span>
+                                </p>
+                                {apt.notes_admin && (
+                                  <p className="text-muted-foreground text-[11px] mt-0.5 line-clamp-2">
+                                    {apt.notes_admin}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5 mt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-[11px] gap-1 px-2"
+                              onClick={() => {
+                                setEditingAptId(apt.id);
+                                setEditAptDate(apt.appointment_date);
+                                setEditAptTime(apt.appointment_time.slice(0, 5));
+                                setEditAptNotes(apt.notes_admin || '');
+                              }}
+                            >
+                              <Pencil className="h-3 w-3 shrink-0" />
+                              <span className="truncate">Editar</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-[11px] gap-1 px-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => {
+                                if (confirm('Excluir esta consulta realizada? A pipeline será revertida para pendente.')) {
+                                  deleteAppointmentMutation.mutate(apt.id);
+                                }
+                              }}
+                              disabled={deleteAppointmentMutation.isPending}
+                            >
+                              <Trash2 className="h-3 w-3 shrink-0" />
+                              <span className="truncate">Excluir</span>
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
-                    {apt.notes_admin && (
-                      <span className="text-muted-foreground truncate max-w-[100px]" title={apt.notes_admin}>
-                        {apt.notes_admin}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CollapsibleContent>
           </Collapsible>
