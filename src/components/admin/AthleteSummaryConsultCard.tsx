@@ -282,6 +282,47 @@ export function AthleteSummaryConsultCard({
     onError: () => toast.error('Erro ao remover consulta'),
   });
 
+  // Update completed appointment (date/time/notes)
+  const updateAppointmentMutation = useMutation({
+    mutationFn: async ({ id, date, time, notes }: { id: string; date: string; time: string; notes: string }) => {
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          appointment_date: date,
+          appointment_time: time.length === 5 ? `${time}:00` : time,
+          notes_admin: notes || null,
+        })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      setEditingAptId(null);
+      toast.success('Consulta atualizada');
+    },
+    onError: (e: any) => toast.error('Erro ao atualizar: ' + (e?.message || '')),
+  });
+
+  // Delete completed appointment
+  const deleteAppointmentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Unlink any schedule pointing to this appointment and revert to pending
+      await supabase
+        .from('consultation_schedules')
+        .update({ appointment_id: null, status: 'pending', confirmed_at: null, confirmation_status: null })
+        .eq('appointment_id', id);
+      const { error } = await supabase.from('appointments').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      toast.success('Consulta excluída');
+    },
+    onError: (e: any) => toast.error('Erro ao excluir: ' + (e?.message || '')),
+  });
+
   // Confirm consultation 1 and generate remaining pipeline
   const confirmAndGeneratePipelineMutation = useMutation({
     mutationFn: async (anchorDate: string) => {
