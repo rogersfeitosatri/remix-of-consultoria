@@ -686,7 +686,8 @@ export function AthleteSummaryConsultCard({
                   <p className="text-[10px] mt-0.5">Edite o cadastro do atleta para gerar o pipeline.</p>
                 </div>
               ) : (
-                <div className="space-y-1 max-h-[260px] overflow-y-auto">
+                <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
+                  {/* Note: with action buttons, schedules need more vertical room */}
                   {schedules.map((schedule, index) => {
                     const isEditingThis = editingScheduleId === schedule.id;
                     const canManage = ['pending', 'sent', 'link_sent'].includes(schedule.status);
