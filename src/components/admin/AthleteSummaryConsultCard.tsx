@@ -72,6 +72,11 @@ export function AthleteSummaryConsultCard({
   const [isSendingLink, setIsSendingLink] = useState<string | null>(null);
   const [showConfirmConsult1, setShowConfirmConsult1] = useState(false);
   const [confirmConsult1Date, setConfirmConsult1Date] = useState(format(new Date(), 'yyyy-MM-dd'));
+  // Edit state for completed appointments (history)
+  const [editingAptId, setEditingAptId] = useState<string | null>(null);
+  const [editAptDate, setEditAptDate] = useState('');
+  const [editAptTime, setEditAptTime] = useState('');
+  const [editAptNotes, setEditAptNotes] = useState('');
 
   // All appointments for this athlete
   const { data: appointments = [] } = useQuery({
@@ -275,6 +280,47 @@ export function AthleteSummaryConsultCard({
       toast.success('Consulta removida');
     },
     onError: () => toast.error('Erro ao remover consulta'),
+  });
+
+  // Update completed appointment (date/time/notes)
+  const updateAppointmentMutation = useMutation({
+    mutationFn: async ({ id, date, time, notes }: { id: string; date: string; time: string; notes: string }) => {
+      const { error } = await supabase
+        .from('appointments')
+        .update({
+          appointment_date: date,
+          appointment_time: time.length === 5 ? `${time}:00` : time,
+          notes_admin: notes || null,
+        })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      setEditingAptId(null);
+      toast.success('Consulta atualizada');
+    },
+    onError: (e: any) => toast.error('Erro ao atualizar: ' + (e?.message || '')),
+  });
+
+  // Delete completed appointment
+  const deleteAppointmentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Unlink any schedule pointing to this appointment and revert to pending
+      await supabase
+        .from('consultation_schedules')
+        .update({ appointment_id: null, status: 'pending', confirmed_at: null, confirmation_status: null })
+        .eq('appointment_id', id);
+      const { error } = await supabase.from('appointments').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      toast.success('Consulta excluída');
+    },
+    onError: (e: any) => toast.error('Erro ao excluir: ' + (e?.message || '')),
   });
 
   // Confirm consultation 1 and generate remaining pipeline
@@ -640,7 +686,8 @@ export function AthleteSummaryConsultCard({
                   <p className="text-[10px] mt-0.5">Edite o cadastro do atleta para gerar o pipeline.</p>
                 </div>
               ) : (
-                <div className="space-y-1 max-h-[260px] overflow-y-auto">
+                <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
+                  {/* Note: with action buttons, schedules need more vertical room */}
                   {schedules.map((schedule, index) => {
                     const isEditingThis = editingScheduleId === schedule.id;
                     const canManage = ['pending', 'sent', 'link_sent'].includes(schedule.status);
@@ -663,31 +710,30 @@ export function AthleteSummaryConsultCard({
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="text-muted-foreground font-mono w-4 text-center shrink-0">{index + 1}</span>
                             {isEditingThis ? (
-                              <div className="flex items-center gap-1 flex-1">
+                              <div className="flex items-center gap-1.5 flex-1 flex-wrap">
                                 <Input
                                   type="date"
                                   value={editDate}
                                   onChange={e => setEditDate(e.target.value)}
-                                  className="h-6 text-xs w-[120px]"
+                                  className="h-8 text-xs flex-1 min-w-[130px]"
                                 />
                                 <Button
-                                  variant="ghost"
                                   size="sm"
-                                  className="h-5 w-5 p-0"
+                                  className="h-8 w-8 p-0"
                                   onClick={() => {
                                     if (editDate) updateScheduleDateMutation.mutate({ id: schedule.id, newDate: editDate });
                                   }}
                                   disabled={updateScheduleDateMutation.isPending}
                                 >
-                                  <Save className="h-3 w-3" />
+                                  <Save className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-5 w-5 p-0"
+                                  className="h-8 w-8 p-0"
                                   onClick={() => setEditingScheduleId(null)}
                                 >
-                                  <X className="h-3 w-3" />
+                                  <X className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
                             ) : (
@@ -726,22 +772,25 @@ export function AthleteSummaryConsultCard({
                         {/* Overdue confirmation UI */}
                         {schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date)) && (
                           confirmingOverdueId === schedule.id ? (
-                            <div className="mt-1.5 pl-6 space-y-1.5">
-                              <p className="text-[10px] text-muted-foreground">Essa consulta foi realizada?</p>
-                              <div className="flex items-center gap-1">
+                            <div className="mt-2 space-y-2 p-2 rounded-md bg-background border border-border">
+                              <p className="text-[11px] font-medium">Essa consulta foi realizada?</p>
+                              <div>
+                                <label className="text-[10px] text-muted-foreground">Data da consulta</label>
                                 <Input
                                   type="date"
                                   value={overdueConfirmDate}
                                   onChange={e => setOverdueConfirmDate(e.target.value)}
-                                  className="h-6 text-xs w-[130px]"
+                                  className="h-8 text-xs"
                                 />
+                              </div>
+                              <div className="grid grid-cols-3 gap-1.5">
                                 <Button
                                   size="sm"
-                                  className="h-6 text-[10px] gap-1 px-2 bg-emerald-600 hover:bg-emerald-700"
+                                  className="h-8 text-[11px] gap-1 px-2 bg-emerald-600 hover:bg-emerald-700"
                                   onClick={() => {
                                     if (overdueConfirmDate) {
-                                      confirmOverdueConsultationMutation.mutate({ 
-                                        scheduleId: schedule.id, 
+                                      confirmOverdueConsultationMutation.mutate({
+                                        scheduleId: schedule.id,
                                         consultDate: overdueConfirmDate,
                                         wasRealized: true,
                                       });
@@ -749,98 +798,98 @@ export function AthleteSummaryConsultCard({
                                   }}
                                   disabled={!overdueConfirmDate || confirmOverdueConsultationMutation.isPending}
                                 >
-                                  <CheckCircle2 className="h-2.5 w-2.5" />
-                                  Realizada
+                                  <CheckCircle2 className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">Sim</span>
                                 </Button>
                                 <Button
                                   variant="destructive"
                                   size="sm"
-                                  className="h-6 text-[10px] gap-1 px-2"
+                                  className="h-8 text-[11px] gap-1 px-2"
                                   onClick={() => {
-                                    confirmOverdueConsultationMutation.mutate({ 
-                                      scheduleId: schedule.id, 
+                                    confirmOverdueConsultationMutation.mutate({
+                                      scheduleId: schedule.id,
                                       consultDate: schedule.send_link_date,
                                       wasRealized: false,
                                     });
                                   }}
                                   disabled={confirmOverdueConsultationMutation.isPending}
                                 >
-                                  <X className="h-2.5 w-2.5" />
-                                  Não realizada
+                                  <X className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">Não</span>
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 px-1.5"
+                                  className="h-8 text-[11px]"
                                   onClick={() => { setConfirmingOverdueId(null); setOverdueConfirmDate(''); }}
                                 >
-                                  <X className="h-3 w-3" />
+                                  Voltar
                                 </Button>
                               </div>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1 mt-1.5 pl-6">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-5 px-1.5 text-[10px] gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                                className="h-8 text-[11px] gap-1 px-2 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10 col-span-2 sm:col-span-1"
                                 onClick={() => {
                                   setConfirmingOverdueId(schedule.id);
                                   setOverdueConfirmDate(schedule.send_link_date);
                                 }}
                               >
-                                <CheckCircle2 className="h-2.5 w-2.5" />
-                                Confirmar Consulta
+                                <CheckCircle2 className="h-3 w-3 shrink-0" />
+                                <span className="truncate">Confirmar</span>
                               </Button>
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                className="h-5 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                className="h-8 text-[11px] gap-1 px-2"
                                 onClick={() => {
                                   setEditingScheduleId(schedule.id);
                                   setEditDate(schedule.send_link_date);
                                 }}
                               >
-                                <Pencil className="h-2.5 w-2.5" />
-                                Editar
+                                <Pencil className="h-3 w-3 shrink-0" />
+                                <span className="truncate">Editar</span>
                               </Button>
                               {canResend && (
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
-                                  className="h-5 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                  className="h-8 text-[11px] gap-1 px-2"
                                   onClick={() => handleResendLink(schedule.id)}
                                   disabled={isSendingLink === schedule.id}
                                 >
-                                  <Send className="h-2.5 w-2.5" />
-                                  Enviar
+                                  <Send className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">Enviar</span>
                                 </Button>
                               )}
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                className="h-5 px-1.5 text-[10px] gap-1 text-destructive hover:text-destructive"
+                                className="h-8 text-[11px] gap-1 px-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => {
                                   if (confirm('Remover esta consulta da pipeline?')) {
                                     removeConsultationMutation.mutate(schedule.id);
                                   }
                                 }}
                               >
-                                <Trash2 className="h-2.5 w-2.5" />
+                                <Trash2 className="h-3 w-3 shrink-0" />
+                                <span className="truncate sm:hidden">Excluir</span>
                               </Button>
                             </div>
                           )
                         )}
                         {/* Confirm realized for scheduled consultations whose date has passed */}
                         {schedule.status === 'scheduled' && schedule.appointment_id && isPast(parseISO(schedule.scheduled_date)) && !isToday(parseISO(schedule.scheduled_date)) && (
-                          <div className="flex items-center gap-1 mt-1.5 pl-6">
+                          <div className="mt-2">
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-5 px-1.5 text-[10px] gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
+                              className="w-full h-8 text-[11px] gap-1.5 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
                               onClick={async () => {
                                 try {
-                                  // Mark appointment as completed → trigger will sync schedule
                                   const { error } = await supabase
                                     .from('appointments')
                                     .update({ status: 'completed' })
@@ -855,49 +904,50 @@ export function AthleteSummaryConsultCard({
                                 }
                               }}
                             >
-                              <CheckCircle2 className="h-2.5 w-2.5" />
+                              <CheckCircle2 className="h-3 w-3" />
                               Confirmar Realizada
                             </Button>
                           </div>
                         )}
                         {/* Action buttons for non-overdue manageable schedules */}
                         {canManage && !isEditingThis && !(schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date))) && (
-                          <div className="flex items-center gap-1 mt-1.5 pl-6">
+                          <div className="grid grid-cols-3 gap-1.5 mt-2">
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="h-5 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                              className="h-8 text-[11px] gap-1 px-2"
                               onClick={() => {
                                 setEditingScheduleId(schedule.id);
                                 setEditDate(schedule.send_link_date);
                               }}
                             >
-                              <Pencil className="h-2.5 w-2.5" />
-                              Editar
+                              <Pencil className="h-3 w-3 shrink-0" />
+                              <span className="truncate">Editar</span>
                             </Button>
-                            {canResend && (
+                            {canResend ? (
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                className="h-5 px-1.5 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                className="h-8 text-[11px] gap-1 px-2"
                                 onClick={() => handleResendLink(schedule.id)}
                                 disabled={isSendingLink === schedule.id}
                               >
-                                <Send className="h-2.5 w-2.5" />
-                                {schedule.status === 'pending' ? 'Enviar' : 'Reenviar'}
+                                <Send className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{schedule.status === 'pending' ? 'Enviar' : 'Reenviar'}</span>
                               </Button>
-                            )}
+                            ) : <span />}
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="h-5 px-1.5 text-[10px] gap-1 text-destructive hover:text-destructive"
+                              className="h-8 text-[11px] gap-1 px-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
                               onClick={() => {
                                 if (confirm('Remover esta consulta da pipeline?')) {
                                   removeConsultationMutation.mutate(schedule.id);
                                 }
                               }}
                             >
-                              <Trash2 className="h-2.5 w-2.5" />
+                              <Trash2 className="h-3 w-3 shrink-0" />
+                              <span className="truncate">Excluir</span>
                             </Button>
                           </div>
                         )}
@@ -968,30 +1018,124 @@ export function AthleteSummaryConsultCard({
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-1.5">
-              <div className="space-y-1 max-h-[160px] overflow-y-auto">
-                {completedAppointments.map((apt) => (
-                  <div 
-                    key={apt.id}
-                    className="flex items-center justify-between p-2 rounded-md bg-muted/30 border border-border text-xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
-                      <div>
-                        <p className="font-medium">
-                          {format(parseISO(apt.appointment_date), "dd/MM/yyyy", { locale: ptBR })}
-                        </p>
-                        <p className="text-muted-foreground text-[10px]">
-                          {apt.appointment_time.slice(0, 5)}
-                        </p>
-                      </div>
+              <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
+                {completedAppointments.map((apt) => {
+                  const isEditingApt = editingAptId === apt.id;
+                  return (
+                    <div
+                      key={apt.id}
+                      className="p-2 rounded-md bg-emerald-500/5 border border-emerald-500/20 text-xs"
+                    >
+                      {isEditingApt ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <div>
+                              <label className="text-[10px] text-muted-foreground">Data</label>
+                              <Input
+                                type="date"
+                                value={editAptDate}
+                                onChange={e => setEditAptDate(e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-muted-foreground">Hora</label>
+                              <Input
+                                type="time"
+                                value={editAptTime}
+                                onChange={e => setEditAptTime(e.target.value)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-foreground">Observações</label>
+                            <Textarea
+                              value={editAptNotes}
+                              onChange={e => setEditAptNotes(e.target.value)}
+                              placeholder="Notas da consulta…"
+                              className="min-h-[50px] text-xs"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <Button
+                              size="sm"
+                              className="h-8 text-[11px] gap-1"
+                              onClick={() => updateAppointmentMutation.mutate({
+                                id: apt.id,
+                                date: editAptDate,
+                                time: editAptTime,
+                                notes: editAptNotes,
+                              })}
+                              disabled={updateAppointmentMutation.isPending || !editAptDate || !editAptTime}
+                            >
+                              <Save className="h-3 w-3" /> Salvar
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-[11px]"
+                              onClick={() => setEditingAptId(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2 min-w-0 flex-1">
+                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <p className="font-medium">
+                                  {format(parseISO(apt.appointment_date), "dd/MM/yyyy", { locale: ptBR })}
+                                  <span className="text-muted-foreground font-normal ml-1.5">
+                                    {apt.appointment_time.slice(0, 5)}
+                                  </span>
+                                </p>
+                                {apt.notes_admin && (
+                                  <p className="text-muted-foreground text-[11px] mt-0.5 line-clamp-2">
+                                    {apt.notes_admin}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5 mt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-[11px] gap-1 px-2"
+                              onClick={() => {
+                                setEditingAptId(apt.id);
+                                setEditAptDate(apt.appointment_date);
+                                setEditAptTime(apt.appointment_time.slice(0, 5));
+                                setEditAptNotes(apt.notes_admin || '');
+                              }}
+                            >
+                              <Pencil className="h-3 w-3 shrink-0" />
+                              <span className="truncate">Editar</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 text-[11px] gap-1 px-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => {
+                                if (confirm('Excluir esta consulta realizada? A pipeline será revertida para pendente.')) {
+                                  deleteAppointmentMutation.mutate(apt.id);
+                                }
+                              }}
+                              disabled={deleteAppointmentMutation.isPending}
+                            >
+                              <Trash2 className="h-3 w-3 shrink-0" />
+                              <span className="truncate">Excluir</span>
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
-                    {apt.notes_admin && (
-                      <span className="text-muted-foreground truncate max-w-[100px]" title={apt.notes_admin}>
-                        {apt.notes_admin}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CollapsibleContent>
           </Collapsible>
