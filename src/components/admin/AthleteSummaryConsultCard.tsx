@@ -771,22 +771,25 @@ export function AthleteSummaryConsultCard({
                         {/* Overdue confirmation UI */}
                         {schedule.status === 'pending' && isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date)) && (
                           confirmingOverdueId === schedule.id ? (
-                            <div className="mt-1.5 pl-6 space-y-1.5">
-                              <p className="text-[10px] text-muted-foreground">Essa consulta foi realizada?</p>
-                              <div className="flex items-center gap-1">
+                            <div className="mt-2 space-y-2 p-2 rounded-md bg-background border border-border">
+                              <p className="text-[11px] font-medium">Essa consulta foi realizada?</p>
+                              <div>
+                                <label className="text-[10px] text-muted-foreground">Data da consulta</label>
                                 <Input
                                   type="date"
                                   value={overdueConfirmDate}
                                   onChange={e => setOverdueConfirmDate(e.target.value)}
-                                  className="h-6 text-xs w-[130px]"
+                                  className="h-8 text-xs"
                                 />
+                              </div>
+                              <div className="grid grid-cols-3 gap-1.5">
                                 <Button
                                   size="sm"
-                                  className="h-6 text-[10px] gap-1 px-2 bg-emerald-600 hover:bg-emerald-700"
+                                  className="h-8 text-[11px] gap-1 px-2 bg-emerald-600 hover:bg-emerald-700"
                                   onClick={() => {
                                     if (overdueConfirmDate) {
-                                      confirmOverdueConsultationMutation.mutate({ 
-                                        scheduleId: schedule.id, 
+                                      confirmOverdueConsultationMutation.mutate({
+                                        scheduleId: schedule.id,
                                         consultDate: overdueConfirmDate,
                                         wasRealized: true,
                                       });
@@ -794,32 +797,32 @@ export function AthleteSummaryConsultCard({
                                   }}
                                   disabled={!overdueConfirmDate || confirmOverdueConsultationMutation.isPending}
                                 >
-                                  <CheckCircle2 className="h-2.5 w-2.5" />
-                                  Realizada
+                                  <CheckCircle2 className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">Sim</span>
                                 </Button>
                                 <Button
                                   variant="destructive"
                                   size="sm"
-                                  className="h-6 text-[10px] gap-1 px-2"
+                                  className="h-8 text-[11px] gap-1 px-2"
                                   onClick={() => {
-                                    confirmOverdueConsultationMutation.mutate({ 
-                                      scheduleId: schedule.id, 
+                                    confirmOverdueConsultationMutation.mutate({
+                                      scheduleId: schedule.id,
                                       consultDate: schedule.send_link_date,
                                       wasRealized: false,
                                     });
                                   }}
                                   disabled={confirmOverdueConsultationMutation.isPending}
                                 >
-                                  <X className="h-2.5 w-2.5" />
-                                  Não realizada
+                                  <X className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">Não</span>
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 px-1.5"
+                                  className="h-8 text-[11px]"
                                   onClick={() => { setConfirmingOverdueId(null); setOverdueConfirmDate(''); }}
                                 >
-                                  <X className="h-3 w-3" />
+                                  Voltar
                                 </Button>
                               </div>
                             </div>
