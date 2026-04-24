@@ -709,31 +709,30 @@ export function AthleteSummaryConsultCard({
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="text-muted-foreground font-mono w-4 text-center shrink-0">{index + 1}</span>
                             {isEditingThis ? (
-                              <div className="flex items-center gap-1 flex-1">
+                              <div className="flex items-center gap-1.5 flex-1 flex-wrap">
                                 <Input
                                   type="date"
                                   value={editDate}
                                   onChange={e => setEditDate(e.target.value)}
-                                  className="h-6 text-xs w-[120px]"
+                                  className="h-8 text-xs flex-1 min-w-[130px]"
                                 />
                                 <Button
-                                  variant="ghost"
                                   size="sm"
-                                  className="h-5 w-5 p-0"
+                                  className="h-8 w-8 p-0"
                                   onClick={() => {
                                     if (editDate) updateScheduleDateMutation.mutate({ id: schedule.id, newDate: editDate });
                                   }}
                                   disabled={updateScheduleDateMutation.isPending}
                                 >
-                                  <Save className="h-3 w-3" />
+                                  <Save className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-5 w-5 p-0"
+                                  className="h-8 w-8 p-0"
                                   onClick={() => setEditingScheduleId(null)}
                                 >
-                                  <X className="h-3 w-3" />
+                                  <X className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
                             ) : (
