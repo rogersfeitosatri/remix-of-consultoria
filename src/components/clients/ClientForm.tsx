@@ -409,9 +409,14 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     };
   };
 
-  const performSubmit = () => {
+  const performSubmit = (extra?: { firstConsultAlreadyDone?: boolean }) => {
     const dataToSubmit = buildSubmitPayload();
-    onSubmit(dataToSubmit as any, { sendCredentials, skipAnamnese, sendBookingLink });
+    onSubmit(dataToSubmit as any, {
+      sendCredentials,
+      skipAnamnese,
+      sendBookingLink,
+      firstConsultAlreadyDone: extra?.firstConsultAlreadyDone,
+    } as any);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
