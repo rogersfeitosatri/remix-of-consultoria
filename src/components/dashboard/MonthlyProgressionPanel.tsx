@@ -141,7 +141,7 @@ export function MonthlyProgressionPanel() {
     ending.sort((a, b) => a.daysToEnd - b.daysToEnd);
 
     return { newCycleGroups: groups, endingThisWeek: ending };
-  }, [clients, durationFilter]);
+  }, [clients, durationFilter, racesByClient]);
 
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
