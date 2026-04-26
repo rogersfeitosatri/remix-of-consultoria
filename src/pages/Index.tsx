@@ -2,7 +2,7 @@ import { Layout } from '@/components/layout/Layout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { GoogleOAuthAlert } from '@/components/dashboard/GoogleOAuthAlert';
 import { ActionCenterPanel } from '@/components/dashboard/ActionCenterPanel';
-import { DietAdjustmentAlert } from '@/components/dashboard/DietAdjustmentAlert';
+import { MonthlyProgressionPanel } from '@/components/dashboard/MonthlyProgressionPanel';
 import { PeriodizationOverview } from '@/components/dashboard/PeriodizationOverview';
 import { WeeklyReportPanel } from '@/components/dashboard/WeeklyReportPanel';
 import { useClients, usePayments, getExpiringThisMonth } from '@/hooks/useClients';
@@ -105,8 +105,8 @@ export default function Dashboard() {
         {/* Action Center — replaces all scattered alerts */}
         <ActionCenterPanel />
 
-        {/* Diet Adjustments — stays separate (has its own complex grouping) */}
-        <DietAdjustmentAlert />
+        {/* Evolução Mensal — atletas iniciando novo ciclo ou encerrando plano */}
+        <MonthlyProgressionPanel />
 
         {/* Weekly Report + Periodization */}
         <div className="grid gap-4 lg:grid-cols-2">
