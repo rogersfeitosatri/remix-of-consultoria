@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarClock, AlertTriangle, ChevronRight, TrendingUp } from 'lucide-react';
+import { CalendarClock, AlertTriangle, ChevronRight, TrendingUp, Trophy } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
+import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import {
   addMonths,
@@ -27,6 +29,8 @@ interface AthleteEntry {
   endingThisWeek: boolean;
   monthNumber: number; // 2, 3, 4... (mês que está iniciando)
   daysToEnd: number;
+  targetRace?: string | null;
+  targetDeadline?: string | null;
 }
 
 const DURATION_LABELS: Record<string, string> = {
@@ -41,6 +45,27 @@ const DURATION_LABELS: Record<string, string> = {
 export function MonthlyProgressionPanel() {
   const { data: clients = [] } = useClients();
   const [durationFilter, setDurationFilter] = useState<DurationFilter>('all');
+
+  const { data: targetRaces = [] } = useQuery({
+    queryKey: ['monthly-progression-target-races'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('athlete_profiles')
+        .select('client_id, target_race, target_deadline')
+        .not('target_race', 'is', null);
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const racesByClient = useMemo(() => {
+    const map: Record<string, { target_race: string | null; target_deadline: string | null }> = {};
+    for (const r of targetRaces) {
+      map[r.client_id] = { target_race: r.target_race, target_deadline: r.target_deadline };
+    }
+    return map;
+  }, [targetRaces]);
 
   const { newCycleGroups, endingThisWeek } = useMemo(() => {
     const today = new Date();
@@ -68,6 +93,8 @@ export function MonthlyProgressionPanel() {
 
       const planLabel = DURATION_LABELS[c.plan_duration] || c.plan_duration;
 
+      const race = racesByClient[c.id];
+
       // Encerrando nesta semana?
       if (isWithinInterval(end, { start: weekStart, end: weekEnd })) {
         ending.push({
@@ -77,6 +104,8 @@ export function MonthlyProgressionPanel() {
           endingThisWeek: true,
           monthNumber: 0,
           daysToEnd,
+          targetRace: race?.target_race ?? null,
+          targetDeadline: race?.target_deadline ?? null,
         });
         continue; // regra: se está encerrando, não mostrar mês
       }
@@ -96,6 +125,8 @@ export function MonthlyProgressionPanel() {
             endingThisWeek: false,
             monthNumber: monthNum,
             daysToEnd,
+            targetRace: race?.target_race ?? null,
+            targetDeadline: race?.target_deadline ?? null,
           });
           break;
         }
@@ -110,7 +141,7 @@ export function MonthlyProgressionPanel() {
     ending.sort((a, b) => a.daysToEnd - b.daysToEnd);
 
     return { newCycleGroups: groups, endingThisWeek: ending };
-  }, [clients, durationFilter]);
+  }, [clients, durationFilter, racesByClient]);
 
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
@@ -207,6 +238,17 @@ function AthleteRow({ athlete, highlight }: { athlete: AthleteEntry; highlight?:
           Plano: {athlete.planDurationLabel}
           {athlete.endingThisWeek && ` · encerra em ${athlete.daysToEnd}d`}
         </div>
+        {athlete.targetRace && (
+          <div className="mt-1 flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
+            <Trophy className="h-3 w-3 shrink-0" />
+            <span className="truncate font-medium">{athlete.targetRace}</span>
+            {athlete.targetDeadline && (
+              <span className="text-muted-foreground">
+                · {format(parseISO(athlete.targetDeadline), "dd/MM/yyyy")}
+              </span>
+            )}
+          </div>
+        )}
       </div>
       <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
     </Link>
