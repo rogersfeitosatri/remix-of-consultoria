@@ -93,6 +93,8 @@ export function MonthlyProgressionPanel() {
 
       const planLabel = DURATION_LABELS[c.plan_duration] || c.plan_duration;
 
+      const race = racesByClient[c.id];
+
       // Encerrando nesta semana?
       if (isWithinInterval(end, { start: weekStart, end: weekEnd })) {
         ending.push({
@@ -102,6 +104,8 @@ export function MonthlyProgressionPanel() {
           endingThisWeek: true,
           monthNumber: 0,
           daysToEnd,
+          targetRace: race?.target_race ?? null,
+          targetDeadline: race?.target_deadline ?? null,
         });
         continue; // regra: se está encerrando, não mostrar mês
       }
@@ -121,6 +125,8 @@ export function MonthlyProgressionPanel() {
             endingThisWeek: false,
             monthNumber: monthNum,
             daysToEnd,
+            targetRace: race?.target_race ?? null,
+            targetDeadline: race?.target_deadline ?? null,
           });
           break;
         }
