@@ -522,7 +522,8 @@ export default function ClientDetail() {
             </div>
           </TabsContent>
 
-          <TabsContent value="pipeline">
+          <TabsContent value="pipeline" className="space-y-4">
+            <PipelineAuditPanel clientId={client.id} />
             <PipelineTimelineTab clientId={client.id} />
           </TabsContent>
           
