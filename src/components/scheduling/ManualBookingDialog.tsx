@@ -172,18 +172,17 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
   
   const isDateDisabled = (date: Date) => {
     if (!settings) return true;
-    
-    const dayOfWeek = getDay(date);
-    if (!settings.working_days.includes(dayOfWeek)) return true;
-    
+
+    // ADMIN OVERRIDE: todos os dias da semana liberados (working_days vale só
+    // para o link público do atleta).
     const dateStr = format(date, 'yyyy-MM-dd');
     const hasFullDayBlock = blocks.some(
       b => b.block_date === dateStr && b.block_type === 'full_day'
     );
     if (hasFullDayBlock) return true;
-    
+
     if (isBefore(date, new Date()) && !isSameDay(date, new Date())) return true;
-    
+
     return false;
   };
   
