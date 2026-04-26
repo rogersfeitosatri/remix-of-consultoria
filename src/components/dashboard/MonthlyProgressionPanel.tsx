@@ -238,6 +238,17 @@ function AthleteRow({ athlete, highlight }: { athlete: AthleteEntry; highlight?:
           Plano: {athlete.planDurationLabel}
           {athlete.endingThisWeek && ` · encerra em ${athlete.daysToEnd}d`}
         </div>
+        {athlete.targetRace && (
+          <div className="mt-1 flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
+            <Trophy className="h-3 w-3 shrink-0" />
+            <span className="truncate font-medium">{athlete.targetRace}</span>
+            {athlete.targetDeadline && (
+              <span className="text-muted-foreground">
+                · {format(parseISO(athlete.targetDeadline), "dd/MM/yyyy")}
+              </span>
+            )}
+          </div>
+        )}
       </div>
       <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
     </Link>
