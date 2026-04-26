@@ -158,7 +158,7 @@ export default function Clients() {
 
   const handleSubmit = async (
     data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
-    options?: { sendCredentials: boolean; skipAnamnese: boolean; sendBookingLink?: boolean }
+    options?: { sendCredentials: boolean; skipAnamnese: boolean; sendBookingLink?: boolean; firstConsultAlreadyDone?: boolean }
   ) => {
     // OPTIMISTIC UI: Fechar o modal IMEDIATAMENTE
     setShowForm(false);
