@@ -1149,9 +1149,9 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       <PipelinePreviewDialog
         open={showPipelinePreview}
         onOpenChange={setShowPipelinePreview}
-        onConfirm={() => {
+        onConfirm={({ firstConsultAlreadyDone }) => {
           setShowPipelinePreview(false);
-          performSubmit();
+          performSubmit({ firstConsultAlreadyDone });
         }}
         startDate={formData.start_date}
         endDate={formData.end_date}
