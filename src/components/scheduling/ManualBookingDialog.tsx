@@ -77,11 +77,10 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
 
     const slots: string[] = [];
     const dayOfWeek = getDay(selectedDate);
-    
-    // Check if this day is a working day
-    if (!settings.working_days.includes(dayOfWeek)) {
-      return [];
-    }
+
+    // ADMIN OVERRIDE: agendamento manual pelo admin libera todos os dias da
+    // semana, mesmo fora dos working_days configurados (que se aplicam apenas
+    // ao link público enviado ao atleta).
 
     // Check for full day blocks
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -92,10 +91,10 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
 
     // Check if there are specific time blocks for this day
     const dayTimeBlocks = timeBlocks.filter(tb => tb.day_of_week === dayOfWeek);
-    
+
     // Define working periods
     const workingPeriods: { start: string; end: string }[] = [];
-    
+
     if (dayTimeBlocks.length > 0) {
       dayTimeBlocks.forEach(tb => {
         workingPeriods.push({
@@ -104,9 +103,10 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
         });
       });
     } else {
+      // Fallback admin: usa o expediente padrão para qualquer dia
       workingPeriods.push({
-        start: settings.working_hours_start.substring(0, 5),
-        end: settings.working_hours_end.substring(0, 5),
+        start: (settings.working_hours_start || '08:00').substring(0, 5),
+        end: (settings.working_hours_end || '20:00').substring(0, 5),
       });
     }
 
