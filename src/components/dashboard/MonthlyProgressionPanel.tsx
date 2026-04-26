@@ -29,6 +29,8 @@ interface AthleteEntry {
   endingThisWeek: boolean;
   monthNumber: number; // 2, 3, 4... (mês que está iniciando)
   daysToEnd: number;
+  targetRace?: string | null;
+  targetDeadline?: string | null;
 }
 
 const DURATION_LABELS: Record<string, string> = {
