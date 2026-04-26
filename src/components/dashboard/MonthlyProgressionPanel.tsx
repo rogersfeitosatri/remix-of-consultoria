@@ -46,6 +46,27 @@ export function MonthlyProgressionPanel() {
   const { data: clients = [] } = useClients();
   const [durationFilter, setDurationFilter] = useState<DurationFilter>('all');
 
+  const { data: targetRaces = [] } = useQuery({
+    queryKey: ['monthly-progression-target-races'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('athlete_profiles')
+        .select('client_id, target_race, target_deadline')
+        .not('target_race', 'is', null);
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const racesByClient = useMemo(() => {
+    const map: Record<string, { target_race: string | null; target_deadline: string | null }> = {};
+    for (const r of targetRaces) {
+      map[r.client_id] = { target_race: r.target_race, target_deadline: r.target_deadline };
+    }
+    return map;
+  }, [targetRaces]);
+
   const { newCycleGroups, endingThisWeek } = useMemo(() => {
     const today = new Date();
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
