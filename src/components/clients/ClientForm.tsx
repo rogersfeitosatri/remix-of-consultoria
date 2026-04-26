@@ -409,9 +409,14 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     };
   };
 
-  const performSubmit = () => {
+  const performSubmit = (extra?: { firstConsultAlreadyDone?: boolean }) => {
     const dataToSubmit = buildSubmitPayload();
-    onSubmit(dataToSubmit as any, { sendCredentials, skipAnamnese, sendBookingLink });
+    onSubmit(dataToSubmit as any, {
+      sendCredentials,
+      skipAnamnese,
+      sendBookingLink,
+      firstConsultAlreadyDone: extra?.firstConsultAlreadyDone,
+    } as any);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1144,9 +1149,9 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       <PipelinePreviewDialog
         open={showPipelinePreview}
         onOpenChange={setShowPipelinePreview}
-        onConfirm={() => {
+        onConfirm={({ firstConsultAlreadyDone }) => {
           setShowPipelinePreview(false);
-          performSubmit();
+          performSubmit({ firstConsultAlreadyDone });
         }}
         startDate={formData.start_date}
         endDate={formData.end_date}

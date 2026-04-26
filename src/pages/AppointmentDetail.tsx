@@ -138,21 +138,34 @@ export default function AppointmentDetail() {
     );
     if (fullDayBlock) return [];
     
-    // Get time blocks for this day - ONLY USE TIME BLOCKS
+    // ADMIN OVERRIDE: para reagendar internamente, qualquer dia da semana e
+    // qualquer horário dentro do expediente padrão fica disponível, mesmo que
+    // não exista bloco de tempo configurado para aquele dia. O link público
+    // de agendamento (PublicBookingConsult) NÃO usa esta lógica — ele continua
+    // restrito aos blocos cadastrados.
     const dayTimeBlocks = timeBlocks.filter(tb => tb.day_of_week === dayOfWeek);
-    
-    // If no time blocks for this day, no slots available
-    if (dayTimeBlocks.length === 0) {
-      return [];
-    }
-    
+
+    // Períodos efetivos: usar blocos configurados se houver; senão, usar
+    // working_hours_start/end do scheduling_settings como fallback admin.
+    const adminPeriods = dayTimeBlocks.length > 0
+      ? dayTimeBlocks.map(tb => ({
+          start: tb.start_time.substring(0, 5),
+          end: tb.end_time.substring(0, 5),
+        }))
+      : (schedulingSettings.working_hours_start && schedulingSettings.working_hours_end
+          ? [{
+              start: schedulingSettings.working_hours_start.substring(0, 5),
+              end: schedulingSettings.working_hours_end.substring(0, 5),
+            }]
+          : [{ start: '08:00', end: '20:00' }]);
+
     // Calculate slot step with buffer (same as PublicBooking)
     const slotStep = slotDuration + bufferMinutes;
     
-    // Generate slots ONLY from configured time blocks
-    dayTimeBlocks.forEach(tb => {
-      const [startHour, startMin] = tb.start_time.substring(0, 5).split(':').map(Number);
-      const [endHour, endMin] = tb.end_time.substring(0, 5).split(':').map(Number);
+    // Generate slots from admin periods (configured blocks OR fallback working hours)
+    adminPeriods.forEach(period => {
+      const [startHour, startMin] = period.start.split(':').map(Number);
+      const [endHour, endMin] = period.end.split(':').map(Number);
       
       let currentTime = new Date(newDate);
       currentTime.setHours(startHour, startMin, 0, 0);

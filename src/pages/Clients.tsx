@@ -158,7 +158,7 @@ export default function Clients() {
 
   const handleSubmit = async (
     data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
-    options?: { sendCredentials: boolean; skipAnamnese: boolean; sendBookingLink?: boolean }
+    options?: { sendCredentials: boolean; skipAnamnese: boolean; sendBookingLink?: boolean; firstConsultAlreadyDone?: boolean }
   ) => {
     // OPTIMISTIC UI: Fechar o modal IMEDIATAMENTE
     setShowForm(false);
@@ -183,7 +183,51 @@ export default function Clients() {
         } else {
           // Criar o atleta primeiro
           const newClient = await addClient.mutateAsync(data);
-          
+
+          // Marcar 1ª consulta como já realizada (caso a data inicial seja retroativa)
+          if (options?.firstConsultAlreadyDone && data.has_consultations && data.start_date) {
+            try {
+              const { data: firstSchedule } = await supabase
+                .from('consultation_schedules')
+                .select('id, scheduled_date')
+                .eq('client_id', newClient.id)
+                .order('scheduled_date', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+
+              if (firstSchedule) {
+                await supabase
+                  .from('consultation_schedules')
+                  .update({
+                    status: 'completed',
+                    confirmed_at: new Date().toISOString(),
+                  })
+                  .eq('id', firstSchedule.id);
+
+                await supabase.from('appointments').insert({
+                  client_id: newClient.id,
+                  user_id: newClient.user_id,
+                  appointment_date: firstSchedule.scheduled_date,
+                  appointment_time: '09:00',
+                  duration_minutes: 60,
+                  status: 'completed',
+                  notes_admin: 'Consulta inicial registrada como já realizada (cadastro retroativo)',
+                  timezone: 'America/Fortaleza',
+                });
+
+                queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+                queryClient.invalidateQueries({ queryKey: ['athlete-appointments'] });
+
+                toast({
+                  title: '✅ 1ª consulta registrada',
+                  description: 'Marcada como realizada. Os próximos envios começarão a partir da 2ª.',
+                });
+              }
+            } catch (err) {
+              console.error('Erro ao registrar 1ª consulta retroativa:', err);
+            }
+          }
+
           // Se email foi fornecido, criar conta de usuário auth
           if (data.email) {
             try {
