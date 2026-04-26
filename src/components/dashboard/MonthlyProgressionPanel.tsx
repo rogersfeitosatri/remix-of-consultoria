@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarClock, AlertTriangle, ChevronRight, TrendingUp } from 'lucide-react';
+import { CalendarClock, AlertTriangle, ChevronRight, TrendingUp, Trophy } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
+import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import {
   addMonths,
