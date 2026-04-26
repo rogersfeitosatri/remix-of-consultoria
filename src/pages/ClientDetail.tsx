@@ -48,6 +48,7 @@ import { FreezePlanDialog } from '@/components/clients/FreezePlanDialog';
 import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
 import { AthleteCheckinSchedules } from '@/components/admin/AthleteCheckinSchedules';
 import { PipelineTimelineTab } from '@/components/admin/PipelineTimelineTab';
+import { PipelineAuditPanel } from '@/components/admin/PipelineAuditPanel';
 import { useQuery } from '@tanstack/react-query';
 import { useFreezePlan } from '@/hooks/useFreezePlan';
 import { differenceInCalendarDays } from 'date-fns';
@@ -522,7 +523,8 @@ export default function ClientDetail() {
             </div>
           </TabsContent>
 
-          <TabsContent value="pipeline">
+          <TabsContent value="pipeline" className="space-y-4">
+            <PipelineAuditPanel clientId={client.id} />
             <PipelineTimelineTab clientId={client.id} />
           </TabsContent>
           
