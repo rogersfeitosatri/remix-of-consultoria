@@ -623,6 +623,22 @@ export function useUpdateClient() {
 
       if (fetchError) throw fetchError;
 
+      // For continuation clients, ensure consultation_count reflects the total
+      // (last_consultation_index + remaining_consultations). This keeps the DB
+      // trigger sync_pipeline_on_plan_change consistent with what the admin set,
+      // especially for custom plan_duration where remaining_consultations is edited manually.
+      if (
+        (dbUpdates.onboarding_type === 'continuation' || currentClient.onboarding_type === 'continuation') &&
+        (dbUpdates.remaining_consultations !== undefined || dbUpdates.last_consultation_index !== undefined)
+      ) {
+        const lastIdx = dbUpdates.last_consultation_index ?? currentClient.last_consultation_index ?? 0;
+        const remaining = dbUpdates.remaining_consultations ?? currentClient.remaining_consultations ?? 0;
+        const totalForContinuation = (lastIdx || 0) + (remaining || 0);
+        if (totalForContinuation > 0) {
+          dbUpdates.consultation_count = totalForContinuation;
+        }
+      }
+
       // Update the client
       const { data, error } = await supabase
         .from('clients')
