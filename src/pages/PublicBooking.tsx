@@ -29,7 +29,12 @@ export default function PublicBooking() {
   const [selectedTime, setSelectedTime] = useState<string>();
   const [booking, setBooking] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  
+
+  // Public lead form state (used when no token)
+  const [leadName, setLeadName] = useState('');
+  const [leadEmail, setLeadEmail] = useState('');
+  const [leadPhone, setLeadPhone] = useState('');
+
   const createAppointment = useCreateAppointment();
 
   // Fetch consultation schedule by token
