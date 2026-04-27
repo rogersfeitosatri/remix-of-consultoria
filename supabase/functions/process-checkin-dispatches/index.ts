@@ -142,8 +142,15 @@ Deno.serve(async (req) => {
         const form = (dispatch as any).checkin_forms;
         const sched = (dispatch as any).athlete_checkin_schedules;
 
-        if (!client?.phone || !isValidE164BR(client.phone)) {
+        const foreign = isForeignPhone(client?.phone);
+
+        if (!client?.phone || (!foreign && !isValidE164BR(client.phone))) {
           await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Telefone inválido (E.164)' }).eq('id', dispatch.id);
+          failed++;
+          continue;
+        }
+        if (foreign && !client.email) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Atleta estrangeiro sem email' }).eq('id', dispatch.id);
           failed++;
           continue;
         }
@@ -161,24 +168,43 @@ Deno.serve(async (req) => {
         const dueInHours = sched?.due_in_hours || 48;
         const dueAt = dispatch.due_at || new Date(now.getTime() + dueInHours * 60 * 60 * 1000).toISOString();
         const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
-        const codigoAcesso = formatPhoneAsAccessCode(client.phone);
+        const codigoAcesso = foreign ? client.email : formatPhoneAsAccessCode(client.phone);
 
-        const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
-          body: {
-            clientId: client.id,
-            templateKey: 'checkin_reminder',
-            context: {
-              nome: client.name.split(' ')[0],
-              link_checkin: checkinLink,
-              checkin_link: checkinLink,
-              codigo_acesso: codigoAcesso,
-              prazo_resposta: `${dueInHours}h`,
+        let sendError: any = null;
+        if (foreign) {
+          const { error } = await supabase.functions.invoke('send-transactional-email', {
+            body: {
+              templateName: 'checkin-link',
+              recipientEmail: client.email,
+              idempotencyKey: `checkin-${dispatch.id}`,
+              templateData: {
+                name: client.name.split(' ')[0],
+                link: checkinLink,
+                accessCode: client.email,
+                dueHours: `${dueInHours}h`,
+              },
             },
-          },
-        });
+          });
+          sendError = error;
+        } else {
+          const { error } = await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              clientId: client.id,
+              templateKey: 'checkin_reminder',
+              context: {
+                nome: client.name.split(' ')[0],
+                link_checkin: checkinLink,
+                checkin_link: checkinLink,
+                codigo_acesso: codigoAcesso,
+                prazo_resposta: `${dueInHours}h`,
+              },
+            },
+          });
+          sendError = error;
+        }
 
-        if (whatsappError) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: whatsappError.message }).eq('id', dispatch.id);
+        if (sendError) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: sendError.message }).eq('id', dispatch.id);
           failed++;
         } else {
           await supabase.from('checkin_dispatches').update({
