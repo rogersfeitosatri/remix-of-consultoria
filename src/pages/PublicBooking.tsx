@@ -434,9 +434,13 @@ export default function PublicBooking() {
 
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Olá, {consultationSchedule.clients.name}!</CardTitle>
+            <CardTitle>
+              {isPublicLeadFlow ? 'Agende sua consulta' : `Olá, ${consultationSchedule!.clients.name}!`}
+            </CardTitle>
             <CardDescription>
-              Escolha o melhor dia e horário para sua consulta
+              {isPublicLeadFlow
+                ? 'Escolha o melhor dia e horário e preencha seus dados para confirmar.'
+                : 'Escolha o melhor dia e horário para sua consulta'}
             </CardDescription>
           </CardHeader>
         </Card>
