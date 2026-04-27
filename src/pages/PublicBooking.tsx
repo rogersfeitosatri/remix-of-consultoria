@@ -66,6 +66,25 @@ export default function PublicBooking() {
   // Buffer minutes from settings
   const bufferMinutes = (settings as any)?.buffer_minutes || 0;
 
+  // Booking window (admin-configurable visibility for athletes/leads)
+  const minAdvanceValue = (settings as any)?.min_advance_value ?? 0;
+  const minAdvanceUnit = ((settings as any)?.min_advance_unit ?? 'hours') as 'hours' | 'days';
+  const maxAdvanceDays = (settings as any)?.max_advance_days ?? null;
+
+  const minBookableDateTime = useMemo(() => {
+    const now = new Date();
+    if (!minAdvanceValue || minAdvanceValue <= 0) return now;
+    if (minAdvanceUnit === 'days') {
+      return startOfDay(addDays(now, minAdvanceValue));
+    }
+    return addMinutes(now, minAdvanceValue * 60);
+  }, [minAdvanceValue, minAdvanceUnit]);
+
+  const maxBookableDate = useMemo(() => {
+    if (!maxAdvanceDays || maxAdvanceDays <= 0) return null;
+    return startOfDay(addDays(new Date(), maxAdvanceDays));
+  }, [maxAdvanceDays]);
+
   // Get days that have time blocks configured (source of truth)
   const configuredDays = useMemo(() => {
     if (!timeBlocks || timeBlocks.length === 0) {
@@ -150,10 +169,11 @@ export default function PublicBooking() {
           return slotStart < blockEnd && slotEnd > blockStart;
         });
 
-        // Check if slot is in the past (for today)
+        // Check if slot is in the past (for today) OR before min advance window
         const isPast = isSameDay(selectedDate, new Date()) && isBefore(currentTime, new Date());
+        const isBeforeMinAdvance = isBefore(currentTime, minBookableDateTime);
 
-        if (!isBlocked && !isBooked && !isPast) {
+        if (!isBlocked && !isBooked && !isPast && !isBeforeMinAdvance) {
           slots.push(timeStr);
         }
 
@@ -164,7 +184,7 @@ export default function PublicBooking() {
 
     // Sort and remove duplicates
     return [...new Set(slots)].sort();
-  }, [settings, selectedDate, blocks, existingAppointments, timeBlocks, bufferMinutes]);
+  }, [settings, selectedDate, blocks, existingAppointments, timeBlocks, bufferMinutes, minBookableDateTime]);
   
 
   const handleConfirmBooking = async () => {
@@ -309,7 +329,17 @@ export default function PublicBooking() {
     if (hasFullDayBlock) return true;
     
     if (isBefore(date, new Date()) && !isSameDay(date, new Date())) return true;
-    
+
+    // Enforce min advance window (days unit hides earlier dates entirely;
+    // hours unit handled at slot level, but if same-day fully past min, hide it too)
+    const dayStart = startOfDay(date);
+    if (minAdvanceUnit === 'days' && minAdvanceValue > 0) {
+      if (isBefore(dayStart, startOfDay(minBookableDateTime))) return true;
+    }
+
+    // Enforce max advance window
+    if (maxBookableDate && isBefore(maxBookableDate, dayStart)) return true;
+
     return false;
   };
 
