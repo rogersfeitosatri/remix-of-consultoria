@@ -237,9 +237,17 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        if (!isValidE164BR(client.phone)) {
+        const foreign = isForeignPhone(client.phone);
+
+        if (!foreign && !isValidE164BR(client.phone)) {
           skipped++;
           details.push({ client: client.name, reason: 'invalid_phone' });
+          continue;
+        }
+
+        if (foreign && !client.email) {
+          skipped++;
+          details.push({ client: client.name, reason: 'foreign_no_email' });
           continue;
         }
 
@@ -310,22 +318,42 @@ Deno.serve(async (req) => {
 
         if (dErr) { failed++; continue; }
 
-        const codigoAcesso = formatPhoneAsAccessCode(client.phone);
+        const codigoAcesso = foreign ? client.email : formatPhoneAsAccessCode(client.phone);
         const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
+        const dueHoursLabel = schedule.due_in_hours ? `${schedule.due_in_hours}h` : 'Sem prazo definido';
 
-        const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
-          body: {
-            clientId: client.id,
-            templateKey: 'checkin_reminder',
-            context: {
-              nome: client.name.split(' ')[0],
-              link_checkin: checkinLink,
-              checkin_link: checkinLink,
-              codigo_acesso: codigoAcesso,
-              prazo_resposta: schedule.due_in_hours ? `${schedule.due_in_hours}h` : 'Sem prazo definido',
+        let sendError: any = null;
+        if (foreign) {
+          const { error } = await supabase.functions.invoke('send-transactional-email', {
+            body: {
+              templateName: 'checkin-link',
+              recipientEmail: client.email,
+              idempotencyKey: `checkin-${dispatch.id}`,
+              templateData: {
+                name: client.name.split(' ')[0],
+                link: checkinLink,
+                accessCode: client.email,
+                dueHours: dueHoursLabel,
+              },
             },
-          },
-        });
+          });
+          sendError = error;
+        } else {
+          const { error } = await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              clientId: client.id,
+              templateKey: 'checkin_reminder',
+              context: {
+                nome: client.name.split(' ')[0],
+                link_checkin: checkinLink,
+                checkin_link: checkinLink,
+                codigo_acesso: codigoAcesso,
+                prazo_resposta: dueHoursLabel,
+              },
+            },
+          });
+          sendError = error;
+        }
 
         if (whatsappError) {
           await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: whatsappError.message }).eq('id', dispatch.id);
