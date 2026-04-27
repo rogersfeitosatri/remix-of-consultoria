@@ -539,19 +539,66 @@ export default function PublicBooking() {
           </Card>
         </div>
 
-        {/* Confirm Button */}
+        {/* Lead form (public flow only) + Confirm Button */}
         {selectedDate && selectedTime && (
           <Card className="mt-6">
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Agendamento selecionado:</p>
-                  <p className="font-semibold">
-                    {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })} às {selectedTime}
-                  </p>
+            <CardContent className="pt-6 space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Agendamento selecionado:</p>
+                <p className="font-semibold">
+                  {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })} às {selectedTime}
+                </p>
+              </div>
+
+              {isPublicLeadFlow && (
+                <div className="grid gap-3 sm:grid-cols-2 pt-2 border-t">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="lead-name" className="flex items-center gap-1.5 text-sm">
+                      <User className="h-3.5 w-3.5" /> Nome completo *
+                    </Label>
+                    <Input
+                      id="lead-name"
+                      value={leadName}
+                      onChange={(e) => setLeadName(e.target.value)}
+                      placeholder="Seu nome"
+                      autoComplete="name"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lead-email" className="flex items-center gap-1.5 text-sm">
+                      <Mail className="h-3.5 w-3.5" /> E-mail *
+                    </Label>
+                    <Input
+                      id="lead-email"
+                      type="email"
+                      value={leadEmail}
+                      onChange={(e) => setLeadEmail(e.target.value)}
+                      placeholder="voce@email.com"
+                      autoComplete="email"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lead-phone" className="flex items-center gap-1.5 text-sm">
+                      <Phone className="h-3.5 w-3.5" /> WhatsApp (opcional)
+                    </Label>
+                    <Input
+                      id="lead-phone"
+                      type="tel"
+                      value={leadPhone}
+                      onChange={(e) => setLeadPhone(e.target.value)}
+                      placeholder="+55 99 99999-9999"
+                      autoComplete="tel"
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
+              )}
+
+              <div className="flex justify-end pt-2">
                 <Button
-                  onClick={handleConfirmBooking}
+                  onClick={isPublicLeadFlow ? handlePublicLeadBooking : handleConfirmBooking}
                   disabled={booking}
                   size="lg"
                   className="w-full sm:w-auto"
