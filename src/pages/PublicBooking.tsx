@@ -244,6 +244,56 @@ export default function PublicBooking() {
     }
   };
 
+  const handlePublicLeadBooking = async () => {
+    if (!selectedDate || !selectedTime || !slug) {
+      toast.error('Selecione data e horário');
+      return;
+    }
+    if (!leadName.trim() || leadName.trim().length < 2) {
+      toast.error('Informe seu nome completo');
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(leadEmail.trim())) {
+      toast.error('Informe um e-mail válido');
+      return;
+    }
+
+    setBooking(true);
+    try {
+      const { data, error } = await supabase.rpc('create_public_lead_appointment', {
+        p_slug: slug,
+        p_date: format(selectedDate, 'yyyy-MM-dd'),
+        p_time: selectedTime + ':00',
+        p_name: leadName.trim(),
+        p_email: leadEmail.trim(),
+        p_phone: leadPhone.trim() || null,
+      });
+
+      if (error) throw error;
+
+      const result = Array.isArray(data) ? data[0] : data;
+      const appointmentId = result?.appointment_id;
+
+      // Best-effort Google Meet creation (non-blocking)
+      if (appointmentId) {
+        try {
+          await supabase.functions.invoke('create-calendar-event', {
+            body: { appointmentId },
+          });
+        } catch (calErr) {
+          console.error('Calendar creation error:', calErr);
+        }
+      }
+
+      setConfirmed(true);
+      toast.success('Consulta agendada com sucesso!');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao agendar');
+    } finally {
+      setBooking(false);
+    }
+  };
+
   const isDateDisabled = (date: Date) => {
     if (!settings) return true;
     
