@@ -169,8 +169,9 @@ export default function PublicBooking() {
           return slotStart < blockEnd && slotEnd > blockStart;
         });
 
-        // Check if slot is in the past (for today)
+        // Check if slot is in the past (for today) OR before min advance window
         const isPast = isSameDay(selectedDate, new Date()) && isBefore(currentTime, new Date());
+        const isBeforeMinAdvance = isBefore(currentTime, minBookableDateTime);
 
         if (!isBlocked && !isBooked && !isPast) {
           slots.push(timeStr);
