@@ -712,7 +712,8 @@ export function useUpdateClient() {
               updatedClient.end_date,
               updatedClient.remaining_consultations,
               updatedClient.last_consultation_at,
-              updatedClient.last_consultation_index
+              updatedClient.last_consultation_index,
+              custom_schedule_dates ?? null
             );
           }
           // New clients (standard flow) — use last completed consultation as anchor if available
