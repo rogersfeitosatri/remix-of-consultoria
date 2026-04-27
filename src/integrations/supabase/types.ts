@@ -5414,6 +5414,21 @@ export type Database = {
           appointment_id: string
         }[]
       }
+      create_public_lead_appointment: {
+        Args: {
+          p_date: string
+          p_email: string
+          p_name: string
+          p_phone?: string
+          p_slug: string
+          p_time: string
+        }
+        Returns: {
+          appointment_id: string
+          client_id: string
+          is_new_lead: boolean
+        }[]
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean

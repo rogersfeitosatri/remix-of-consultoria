@@ -4,7 +4,9 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { PersonStanding, CalendarDays, Clock, CheckCircle2, Loader2, AlertCircle, Info } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { PersonStanding, CalendarDays, Clock, CheckCircle2, Loader2, AlertCircle, Info, User, Mail, Phone } from 'lucide-react';
 import { useSchedulingSettingsBySlug, useSchedulingBlocks, useAppointmentsByDate, useCreateAppointment } from '@/hooks/useScheduling';
 import { useTimeBlocksBySettingsSlug } from '@/hooks/useTimeBlocks';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +29,12 @@ export default function PublicBooking() {
   const [selectedTime, setSelectedTime] = useState<string>();
   const [booking, setBooking] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  
+
+  // Public lead form state (used when no token)
+  const [leadName, setLeadName] = useState('');
+  const [leadEmail, setLeadEmail] = useState('');
+  const [leadPhone, setLeadPhone] = useState('');
+
   const createAppointment = useCreateAppointment();
 
   // Fetch consultation schedule by token
@@ -237,6 +244,56 @@ export default function PublicBooking() {
     }
   };
 
+  const handlePublicLeadBooking = async () => {
+    if (!selectedDate || !selectedTime || !slug) {
+      toast.error('Selecione data e horário');
+      return;
+    }
+    if (!leadName.trim() || leadName.trim().length < 2) {
+      toast.error('Informe seu nome completo');
+      return;
+    }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(leadEmail.trim())) {
+      toast.error('Informe um e-mail válido');
+      return;
+    }
+
+    setBooking(true);
+    try {
+      const { data, error } = await supabase.rpc('create_public_lead_appointment', {
+        p_slug: slug,
+        p_date: format(selectedDate, 'yyyy-MM-dd'),
+        p_time: selectedTime + ':00',
+        p_name: leadName.trim(),
+        p_email: leadEmail.trim(),
+        p_phone: leadPhone.trim() || null,
+      });
+
+      if (error) throw error;
+
+      const result = Array.isArray(data) ? data[0] : data;
+      const appointmentId = result?.appointment_id;
+
+      // Best-effort Google Meet creation (non-blocking)
+      if (appointmentId) {
+        try {
+          await supabase.functions.invoke('create-calendar-event', {
+            body: { appointmentId },
+          });
+        } catch (calErr) {
+          console.error('Calendar creation error:', calErr);
+        }
+      }
+
+      setConfirmed(true);
+      toast.success('Consulta agendada com sucesso!');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao agendar');
+    } finally {
+      setBooking(false);
+    }
+  };
+
   const isDateDisabled = (date: Date) => {
     if (!settings) return true;
     
@@ -318,17 +375,21 @@ export default function PublicBooking() {
     );
   }
 
-  if (!token || !consultationSchedule) {
+  // Only block when a token was provided but didn't resolve to a schedule.
+  // Without token, we offer the public lead booking flow.
+  if (token && !consultationSchedule) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <PersonStanding className="h-16 w-16 text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Acesso Inválido</h1>
+        <h1 className="text-2xl font-bold mb-2">Link inválido ou expirado</h1>
         <p className="text-muted-foreground text-center">
-          Use o link de agendamento enviado para você via WhatsApp.
+          Este link de agendamento expirou. Entre em contato para receber um novo.
         </p>
       </div>
     );
   }
+
+  const isPublicLeadFlow = !token;
 
   if (confirmed) {
     return (
@@ -373,9 +434,13 @@ export default function PublicBooking() {
 
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Olá, {consultationSchedule.clients.name}!</CardTitle>
+            <CardTitle>
+              {isPublicLeadFlow ? 'Agende sua consulta' : `Olá, ${consultationSchedule!.clients.name}!`}
+            </CardTitle>
             <CardDescription>
-              Escolha o melhor dia e horário para sua consulta
+              {isPublicLeadFlow
+                ? 'Escolha o melhor dia e horário e preencha seus dados para confirmar.'
+                : 'Escolha o melhor dia e horário para sua consulta'}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -474,19 +539,66 @@ export default function PublicBooking() {
           </Card>
         </div>
 
-        {/* Confirm Button */}
+        {/* Lead form (public flow only) + Confirm Button */}
         {selectedDate && selectedTime && (
           <Card className="mt-6">
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Agendamento selecionado:</p>
-                  <p className="font-semibold">
-                    {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })} às {selectedTime}
-                  </p>
+            <CardContent className="pt-6 space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Agendamento selecionado:</p>
+                <p className="font-semibold">
+                  {format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })} às {selectedTime}
+                </p>
+              </div>
+
+              {isPublicLeadFlow && (
+                <div className="grid gap-3 sm:grid-cols-2 pt-2 border-t">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="lead-name" className="flex items-center gap-1.5 text-sm">
+                      <User className="h-3.5 w-3.5" /> Nome completo *
+                    </Label>
+                    <Input
+                      id="lead-name"
+                      value={leadName}
+                      onChange={(e) => setLeadName(e.target.value)}
+                      placeholder="Seu nome"
+                      autoComplete="name"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lead-email" className="flex items-center gap-1.5 text-sm">
+                      <Mail className="h-3.5 w-3.5" /> E-mail *
+                    </Label>
+                    <Input
+                      id="lead-email"
+                      type="email"
+                      value={leadEmail}
+                      onChange={(e) => setLeadEmail(e.target.value)}
+                      placeholder="voce@email.com"
+                      autoComplete="email"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lead-phone" className="flex items-center gap-1.5 text-sm">
+                      <Phone className="h-3.5 w-3.5" /> WhatsApp (opcional)
+                    </Label>
+                    <Input
+                      id="lead-phone"
+                      type="tel"
+                      value={leadPhone}
+                      onChange={(e) => setLeadPhone(e.target.value)}
+                      placeholder="+55 99 99999-9999"
+                      autoComplete="tel"
+                      className="mt-1"
+                    />
+                  </div>
                 </div>
+              )}
+
+              <div className="flex justify-end pt-2">
                 <Button
-                  onClick={handleConfirmBooking}
+                  onClick={isPublicLeadFlow ? handlePublicLeadBooking : handleConfirmBooking}
                   disabled={booking}
                   size="lg"
                   className="w-full sm:w-auto"
