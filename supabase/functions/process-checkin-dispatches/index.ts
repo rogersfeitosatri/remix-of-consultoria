@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
       .from('athlete_checkin_schedules')
       .select(`
         *,
-        clients:client_id (id, name, phone, user_id, end_date, is_active, is_frozen),
+        clients:client_id (id, name, phone, email, user_id, end_date, is_active, is_frozen),
         checkin_forms:checkin_form_id (id, title, is_active)
       `)
       .eq('is_active', true)
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
       .from('checkin_dispatches')
       .select(`
         *,
-        clients:client_id (id, name, phone, user_id, end_date, is_active, is_frozen),
+        clients:client_id (id, name, phone, email, user_id, end_date, is_active, is_frozen),
         checkin_forms:checkin_form_id (id, title, is_active),
         athlete_checkin_schedules:schedule_id (due_in_hours)
       `)
