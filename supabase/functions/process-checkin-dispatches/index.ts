@@ -355,8 +355,8 @@ Deno.serve(async (req) => {
           sendError = error;
         }
 
-        if (whatsappError) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: whatsappError.message }).eq('id', dispatch.id);
+        if (sendError) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: sendError.message }).eq('id', dispatch.id);
           failed++;
         } else {
           await supabase.from('athlete_checkin_schedules').update({ last_dispatched_at: now.toISOString() }).eq('id', schedule.id);
