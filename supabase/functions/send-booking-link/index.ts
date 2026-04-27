@@ -220,6 +220,99 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ===== EMAIL CHANNEL: foreign athletes (non-+55) =====
+    const phoneDigits = (client.phone || '').replace(/\D/g, '');
+    const isForeign = client.phone && !phoneDigits.startsWith('55');
+
+    if (isForeign) {
+      // Load full client (need email + onboarding fields)
+      const { data: fullClient } = await supabase
+        .from('clients')
+        .select('email, name, onboarding_type')
+        .eq('id', resolvedClientId)
+        .single();
+
+      if (!fullClient?.email) {
+        await supabase.from('whatsapp_message_logs').insert({
+          user_id: client.user_id, client_id: resolvedClientId,
+          consultation_schedule_id: resolvedScheduleId,
+          message_type: messageType, template_key: templateKey,
+          to_phone: client.phone, status: 'skipped',
+          blocked_reason: 'foreign_no_email', triggered_by: triggeredBy,
+          error_message: 'Foreign athlete without email',
+        });
+        return new Response(JSON.stringify({ success: false, skipped: true, reason: 'foreign_no_email' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Resolve link / data per messageType
+      let emailTemplate = '';
+      let templateData: Record<string, any> = { name: client.name.split(' ')[0] };
+
+      if (messageType === 'booking_invite' || messageType === 'followup') {
+        let { data: bookingLink } = await supabase
+          .from('booking_links').select('*')
+          .eq('client_id', resolvedClientId).eq('active', true).maybeSingle();
+        if (!bookingLink) {
+          const { data: newLink } = await supabase
+            .from('booking_links').insert({ client_id: resolvedClientId, active: true })
+            .select().single();
+          bookingLink = newLink;
+        }
+        const bookingUrl = `${appUrl}/booking/${bookingLink.token}`;
+        emailTemplate = 'booking-link';
+        templateData.link = bookingUrl;
+        templateData.isFollowup = messageType === 'followup' || (fullClient.onboarding_type === 'continuation');
+
+        await supabase
+          .from('booking_links')
+          .update({ last_sent_at: new Date().toISOString(), usage_count: (bookingLink.usage_count || 0) + 1 })
+          .eq('id', bookingLink.id);
+      } else if (messageType === 'confirmation' && body.appointmentData) {
+        emailTemplate = 'consultation-confirmation';
+        templateData.date = formatDateBR(body.appointmentData.date);
+        templateData.time = body.appointmentData.time.substring(0, 5);
+        templateData.meetLink = body.appointmentData.meetLink;
+      } else {
+        throw new Error('Invalid message type for email channel');
+      }
+
+      const idempotencyKey = `booking-${messageType}-${resolvedScheduleId || resolvedClientId}-${new Date().toISOString().split('T')[0]}`;
+
+      const { error: emailError } = await supabase.functions.invoke('send-transactional-email', {
+        body: {
+          templateName: emailTemplate,
+          recipientEmail: fullClient.email,
+          idempotencyKey,
+          templateData,
+        },
+      });
+
+      await supabase.from('whatsapp_message_logs').insert({
+        user_id: client.user_id, client_id: resolvedClientId,
+        consultation_schedule_id: resolvedScheduleId,
+        message_type: messageType, template_key: templateKey,
+        to_phone: client.phone, payload_preview: `[EMAIL] ${emailTemplate} → ${fullClient.email}`,
+        status: emailError ? 'failed' : 'sent',
+        triggered_by: triggeredBy,
+        error_message: emailError?.message,
+        metadata: { channel: 'email', email: fullClient.email, template: emailTemplate },
+      });
+
+      if (!emailError && (messageType === 'booking_invite' || messageType === 'followup')) {
+        if (resolvedScheduleId) {
+          await supabase.from('consultation_schedules')
+            .update({ status: 'sent', updated_at: new Date().toISOString() })
+            .eq('id', resolvedScheduleId);
+        }
+      }
+
+      return new Response(JSON.stringify({ success: !emailError, channel: 'email' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ===== Phone validation =====
     if (!client.phone) {
       await supabase.from('whatsapp_message_logs').insert({
