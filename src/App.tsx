@@ -62,6 +62,7 @@ const PublicCallBooking = lazy(() => import("./pages/PublicCallBooking"));
 const AssessoriaLanding = lazy(() => import("./pages/AssessoriaLanding"));
 const AthleteCheckinPlanning = lazy(() => import("./pages/AthleteCheckinPlanning"));
 const SchedulingAudit = lazy(() => import("./pages/SchedulingAudit"));
+const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -142,6 +143,7 @@ function AppRoutes() {
         <Route path="/booking/:token" element={<PublicBookingConsult />} />
         <Route path="/metabolic-screening" element={<PublicMetabolicScreening />} />
         <Route path="/call/:slug" element={<PublicStrategicCall />} />
+        <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
         <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />

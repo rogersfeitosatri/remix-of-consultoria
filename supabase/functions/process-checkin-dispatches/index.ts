@@ -24,6 +24,13 @@ function isValidE164BR(phone: string | null | undefined): boolean {
   return withDDI.length === 12 || withDDI.length === 13;
 }
 
+// True when phone is foreign (does NOT start with country code 55)
+function isForeignPhone(phone: string | null | undefined): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '');
+  return !digits.startsWith('55');
+}
+
 function getFrequencyWeeks(frequencyType: string): number {
   switch (frequencyType) {
     case 'daily': return 1;
@@ -109,7 +116,7 @@ Deno.serve(async (req) => {
       .from('athlete_checkin_schedules')
       .select(`
         *,
-        clients:client_id (id, name, phone, user_id, end_date, is_active, is_frozen),
+        clients:client_id (id, name, phone, email, user_id, end_date, is_active, is_frozen),
         checkin_forms:checkin_form_id (id, title, is_active)
       `)
       .eq('is_active', true)
@@ -122,7 +129,7 @@ Deno.serve(async (req) => {
       .from('checkin_dispatches')
       .select(`
         *,
-        clients:client_id (id, name, phone, user_id, end_date, is_active, is_frozen),
+        clients:client_id (id, name, phone, email, user_id, end_date, is_active, is_frozen),
         checkin_forms:checkin_form_id (id, title, is_active),
         athlete_checkin_schedules:schedule_id (due_in_hours)
       `)
@@ -135,8 +142,15 @@ Deno.serve(async (req) => {
         const form = (dispatch as any).checkin_forms;
         const sched = (dispatch as any).athlete_checkin_schedules;
 
-        if (!client?.phone || !isValidE164BR(client.phone)) {
+        const foreign = isForeignPhone(client?.phone);
+
+        if (!client?.phone || (!foreign && !isValidE164BR(client.phone))) {
           await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Telefone inválido (E.164)' }).eq('id', dispatch.id);
+          failed++;
+          continue;
+        }
+        if (foreign && !client.email) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Atleta estrangeiro sem email' }).eq('id', dispatch.id);
           failed++;
           continue;
         }
@@ -154,24 +168,43 @@ Deno.serve(async (req) => {
         const dueInHours = sched?.due_in_hours || 48;
         const dueAt = dispatch.due_at || new Date(now.getTime() + dueInHours * 60 * 60 * 1000).toISOString();
         const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
-        const codigoAcesso = formatPhoneAsAccessCode(client.phone);
+        const codigoAcesso = foreign ? client.email : formatPhoneAsAccessCode(client.phone);
 
-        const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
-          body: {
-            clientId: client.id,
-            templateKey: 'checkin_reminder',
-            context: {
-              nome: client.name.split(' ')[0],
-              link_checkin: checkinLink,
-              checkin_link: checkinLink,
-              codigo_acesso: codigoAcesso,
-              prazo_resposta: `${dueInHours}h`,
+        let sendError: any = null;
+        if (foreign) {
+          const { error } = await supabase.functions.invoke('send-transactional-email', {
+            body: {
+              templateName: 'checkin-link',
+              recipientEmail: client.email,
+              idempotencyKey: `checkin-${dispatch.id}`,
+              templateData: {
+                name: client.name.split(' ')[0],
+                link: checkinLink,
+                accessCode: client.email,
+                dueHours: `${dueInHours}h`,
+              },
             },
-          },
-        });
+          });
+          sendError = error;
+        } else {
+          const { error } = await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              clientId: client.id,
+              templateKey: 'checkin_reminder',
+              context: {
+                nome: client.name.split(' ')[0],
+                link_checkin: checkinLink,
+                checkin_link: checkinLink,
+                codigo_acesso: codigoAcesso,
+                prazo_resposta: `${dueInHours}h`,
+              },
+            },
+          });
+          sendError = error;
+        }
 
-        if (whatsappError) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: whatsappError.message }).eq('id', dispatch.id);
+        if (sendError) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: sendError.message }).eq('id', dispatch.id);
           failed++;
         } else {
           await supabase.from('checkin_dispatches').update({
@@ -204,9 +237,17 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        if (!isValidE164BR(client.phone)) {
+        const foreign = isForeignPhone(client.phone);
+
+        if (!foreign && !isValidE164BR(client.phone)) {
           skipped++;
           details.push({ client: client.name, reason: 'invalid_phone' });
+          continue;
+        }
+
+        if (foreign && !client.email) {
+          skipped++;
+          details.push({ client: client.name, reason: 'foreign_no_email' });
           continue;
         }
 
@@ -277,25 +318,45 @@ Deno.serve(async (req) => {
 
         if (dErr) { failed++; continue; }
 
-        const codigoAcesso = formatPhoneAsAccessCode(client.phone);
+        const codigoAcesso = foreign ? client.email : formatPhoneAsAccessCode(client.phone);
         const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
+        const dueHoursLabel = schedule.due_in_hours ? `${schedule.due_in_hours}h` : 'Sem prazo definido';
 
-        const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
-          body: {
-            clientId: client.id,
-            templateKey: 'checkin_reminder',
-            context: {
-              nome: client.name.split(' ')[0],
-              link_checkin: checkinLink,
-              checkin_link: checkinLink,
-              codigo_acesso: codigoAcesso,
-              prazo_resposta: schedule.due_in_hours ? `${schedule.due_in_hours}h` : 'Sem prazo definido',
+        let sendError: any = null;
+        if (foreign) {
+          const { error } = await supabase.functions.invoke('send-transactional-email', {
+            body: {
+              templateName: 'checkin-link',
+              recipientEmail: client.email,
+              idempotencyKey: `checkin-${dispatch.id}`,
+              templateData: {
+                name: client.name.split(' ')[0],
+                link: checkinLink,
+                accessCode: client.email,
+                dueHours: dueHoursLabel,
+              },
             },
-          },
-        });
+          });
+          sendError = error;
+        } else {
+          const { error } = await supabase.functions.invoke('send-whatsapp', {
+            body: {
+              clientId: client.id,
+              templateKey: 'checkin_reminder',
+              context: {
+                nome: client.name.split(' ')[0],
+                link_checkin: checkinLink,
+                checkin_link: checkinLink,
+                codigo_acesso: codigoAcesso,
+                prazo_resposta: dueHoursLabel,
+              },
+            },
+          });
+          sendError = error;
+        }
 
-        if (whatsappError) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: whatsappError.message }).eq('id', dispatch.id);
+        if (sendError) {
+          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: sendError.message }).eq('id', dispatch.id);
           failed++;
         } else {
           await supabase.from('athlete_checkin_schedules').update({ last_dispatched_at: now.toISOString() }).eq('id', schedule.id);
