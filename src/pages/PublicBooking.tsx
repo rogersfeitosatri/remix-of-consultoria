@@ -375,17 +375,21 @@ export default function PublicBooking() {
     );
   }
 
-  if (!token || !consultationSchedule) {
+  // Only block when a token was provided but didn't resolve to a schedule.
+  // Without token, we offer the public lead booking flow.
+  if (token && !consultationSchedule) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <PersonStanding className="h-16 w-16 text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Acesso Inválido</h1>
+        <h1 className="text-2xl font-bold mb-2">Link inválido ou expirado</h1>
         <p className="text-muted-foreground text-center">
-          Use o link de agendamento enviado para você via WhatsApp.
+          Este link de agendamento expirou. Entre em contato para receber um novo.
         </p>
       </div>
     );
   }
+
+  const isPublicLeadFlow = !token;
 
   if (confirmed) {
     return (
