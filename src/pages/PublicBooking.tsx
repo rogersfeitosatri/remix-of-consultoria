@@ -173,7 +173,7 @@ export default function PublicBooking() {
         const isPast = isSameDay(selectedDate, new Date()) && isBefore(currentTime, new Date());
         const isBeforeMinAdvance = isBefore(currentTime, minBookableDateTime);
 
-        if (!isBlocked && !isBooked && !isPast) {
+        if (!isBlocked && !isBooked && !isPast && !isBeforeMinAdvance) {
           slots.push(timeStr);
         }
 
@@ -184,7 +184,7 @@ export default function PublicBooking() {
 
     // Sort and remove duplicates
     return [...new Set(slots)].sort();
-  }, [settings, selectedDate, blocks, existingAppointments, timeBlocks, bufferMinutes]);
+  }, [settings, selectedDate, blocks, existingAppointments, timeBlocks, bufferMinutes, minBookableDateTime]);
   
 
   const handleConfirmBooking = async () => {
