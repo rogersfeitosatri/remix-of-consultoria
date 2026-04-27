@@ -24,6 +24,13 @@ function isValidE164BR(phone: string | null | undefined): boolean {
   return withDDI.length === 12 || withDDI.length === 13;
 }
 
+// True when phone is foreign (does NOT start with country code 55)
+function isForeignPhone(phone: string | null | undefined): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, '');
+  return !digits.startsWith('55');
+}
+
 function getFrequencyWeeks(frequencyType: string): number {
   switch (frequencyType) {
     case 'daily': return 1;
