@@ -329,7 +329,17 @@ export default function PublicBooking() {
     if (hasFullDayBlock) return true;
     
     if (isBefore(date, new Date()) && !isSameDay(date, new Date())) return true;
-    
+
+    // Enforce min advance window (days unit hides earlier dates entirely;
+    // hours unit handled at slot level, but if same-day fully past min, hide it too)
+    const dayStart = startOfDay(date);
+    if (minAdvanceUnit === 'days' && minAdvanceValue > 0) {
+      if (isBefore(dayStart, startOfDay(minBookableDateTime))) return true;
+    }
+
+    // Enforce max advance window
+    if (maxBookableDate && isBefore(maxBookableDate, dayStart)) return true;
+
     return false;
   };
 
