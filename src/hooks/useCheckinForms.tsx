@@ -119,7 +119,7 @@ export function useCreateCheckinForm() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (formData: { title: string; description?: string }) => {
+    mutationFn: async (formData: { title: string; description?: string; is_periodization?: boolean }) => {
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
@@ -127,7 +127,7 @@ export function useCreateCheckinForm() {
         .insert({
           ...formData,
           user_id: user.id,
-        })
+        } as any)
         .select()
         .single();
 
