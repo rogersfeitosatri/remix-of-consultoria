@@ -3688,6 +3688,48 @@ export type Database = {
           },
         ]
       }
+      np_evolution_summaries: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          logs_analyzed: number
+          model: string
+          phase: string | null
+          race_id: string | null
+          recommendations: Json
+          summary_markdown: string
+          user_id: string
+          weeks_to_race: number | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          logs_analyzed?: number
+          model?: string
+          phase?: string | null
+          race_id?: string | null
+          recommendations?: Json
+          summary_markdown: string
+          user_id: string
+          weeks_to_race?: number | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          logs_analyzed?: number
+          model?: string
+          phase?: string | null
+          race_id?: string | null
+          recommendations?: Json
+          summary_markdown?: string
+          user_id?: string
+          weeks_to_race?: number | null
+        }
+        Relationships: []
+      }
       np_gut_training_logs: {
         Row: {
           adherence_pct: number | null
