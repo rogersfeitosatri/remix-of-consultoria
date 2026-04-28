@@ -140,8 +140,9 @@ Gere ${audience === 'athlete' ? 'a mensagem motivacional para o atleta' : 'o res
         summary_markdown: summary,
         recommendations: [],
         model: "openai/gpt-5",
+        audience,
       })
-      .select("id, created_at, summary_markdown, phase, weeks_to_race, logs_analyzed, model")
+      .select("id, created_at, summary_markdown, phase, weeks_to_race, logs_analyzed, model, audience")
       .single();
 
     if (insErr) throw insErr;
