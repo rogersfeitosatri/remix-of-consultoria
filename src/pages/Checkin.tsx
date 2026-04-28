@@ -121,7 +121,6 @@ export default function Checkin() {
                     rows={3}
                   />
                 </div>
-              </div>
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <div className="flex items-center gap-2">
                     <Trophy className="h-4 w-4 text-amber-500" />
