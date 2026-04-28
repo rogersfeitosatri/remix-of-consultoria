@@ -59,6 +59,8 @@ function buildMessage(eventType: string, ctx: {
       return `🪶 *${ctx.athleteName}*, você entrou na fase TAPER da preparação para *${ctx.raceName}* (${dateBR}).\n\nHora de polir: reduzir volume, manter intensidade curta e iniciar o protocolo de carbo-loading conforme combinado. Sem testar nada novo a partir de agora!`;
     case 'carboloading_start':
       return `🍝 *${ctx.athleteName}*, faltam *${ctx.daysToRace} dias* para *${ctx.raceName}*. É hora de começar o *carbo-loading*!\n\nSiga o protocolo definido (carboidrato alto, fibra reduzida, hidratação caprichada). Em caso de dúvida, fale comigo.`;
+    case 'protocol_7_days_pre_race':
+      return `📋 *${ctx.athleteName}*, faltam *7 dias* para *${ctx.raceName}* (${dateBR}).\n\nProtocolo da última semana:\n• Hidratação reforçada (35–40 ml/kg/dia)\n• Sono ≥ 8h e zero novidades alimentares\n• Carbo-loading começa em 4 dias (se prova ≥ 21k)\n• Confira gel/bebida/sal já testados nos longos\n• Pré-treino race-day já validado\n\nQualquer dúvida, me chama. Vamos fechar essa preparação com tudo!`;
     case 'gut_training_weekly':
       return `🦠 Bom dia, *${ctx.athleteName}*! Lembrete da semana: rodar o *treino intestinal* nos longos da fase ${ctx.phaseLabel}.\n\nNão esqueça de registrar a taxa de CHO (g/h) e os sintomas após o treino para ajustarmos a progressão.`;
     case 'race_day':
@@ -125,6 +127,14 @@ Deno.serve(async (req) => {
         type: 'carboloading_start',
         key: `${race.race_date}`,
         shouldFire: days === 3 && distanceKm >= 21,
+        phaseLabel: 'Taper',
+      });
+
+      // 2b) protocol_7_days_pre_race — 7 dias antes
+      events.push({
+        type: 'protocol_7_days_pre_race',
+        key: `${race.race_date}`,
+        shouldFire: days === 7,
         phaseLabel: 'Taper',
       });
 
