@@ -205,25 +205,29 @@ export default function Checkin() {
                       Editar
                     </Button>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => copyFormLink(form.id, form.is_periodization)}
-                    >
-                      <Copy className="h-3 w-3" />
-                      Copiar Link
-                    </Button>
+                    {!form.is_periodization && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => copyFormLink(form.id, false)}
+                        >
+                          <Copy className="h-3 w-3" />
+                          Copiar Link
+                        </Button>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => window.open(form.is_periodization ? `/np-form/${form.id}` : `/form/${form.id}`, '_blank')}
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      Abrir
-                    </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => window.open(`/form/${form.id}`, '_blank')}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Abrir
+                        </Button>
+                      </>
+                    )}
 
                     <Button
                       variant="ghost"
