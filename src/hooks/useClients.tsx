@@ -671,7 +671,14 @@ export function useUpdateClient() {
         const updatedClient = data as Client;
 
         // Recalculate consultation_count dynamically if frequency or duration changed
+        // RESPECT admin overrides:
+        //  - skip when admin explicitly sent consultation_count in this update
+        //  - skip when plan_duration is 'custom' (manual mode, see Custom Plan Duration memory)
+        const adminProvidedCount = dbUpdates.consultation_count !== undefined;
+        const isCustomDuration = (updatedClient.plan_duration as any) === 'custom';
         if (
+          !adminProvidedCount &&
+          !isCustomDuration &&
           (dbUpdates.consultation_frequency !== undefined || dbUpdates.plan_duration !== undefined) &&
           updatedClient.has_consultations &&
           updatedClient.consultation_frequency &&
