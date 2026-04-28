@@ -520,16 +520,26 @@ export default function CheckinFormBuilder() {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-1" onClick={copyFormLink}>
-              <Copy className="h-3 w-3" />
-              Copiar Link
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1" onClick={() => window.open(formPath, '_blank')}>
-              <ExternalLink className="h-3 w-3" />
-              Visualizar
-            </Button>
+            {!form.is_periodization && (
+              <>
+                <Button variant="outline" size="sm" className="gap-1" onClick={copyFormLink}>
+                  <Copy className="h-3 w-3" />
+                  Copiar Link
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => window.open(formPath, '_blank')}>
+                  <ExternalLink className="h-3 w-3" />
+                  Visualizar
+                </Button>
+              </>
+            )}
           </div>
         </div>
+
+        {form.is_periodization && (
+          <div className="text-sm text-muted-foreground bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-md p-3">
+            🏆 <strong>Formulário de Periodização:</strong> o link público é gerado individualmente por atleta. Acesse o perfil de um atleta com Preparação de Prova ativa e use o card <em>"Check-ins de Periodização"</em> → botão <em>"Gerar link para o atleta"</em>. Para envio automático semanal, vincule este formulário em <em>Automação de Check-ins</em>.
+          </div>
+        )}
 
         <Tabs defaultValue="questions" className="space-y-4">
           <TabsList>

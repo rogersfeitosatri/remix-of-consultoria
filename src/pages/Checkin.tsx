@@ -205,25 +205,29 @@ export default function Checkin() {
                       Editar
                     </Button>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => copyFormLink(form.id, form.is_periodization)}
-                    >
-                      <Copy className="h-3 w-3" />
-                      Copiar Link
-                    </Button>
+                    {!form.is_periodization && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => copyFormLink(form.id, false)}
+                        >
+                          <Copy className="h-3 w-3" />
+                          Copiar Link
+                        </Button>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => window.open(form.is_periodization ? `/np-form/${form.id}` : `/form/${form.id}`, '_blank')}
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      Abrir
-                    </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => window.open(`/form/${form.id}`, '_blank')}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Abrir
+                        </Button>
+                      </>
+                    )}
 
                     <Button
                       variant="ghost"
@@ -262,6 +266,12 @@ export default function Checkin() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
+
+                  {form.is_periodization && (
+                    <div className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded p-2">
+                      🏆 Formulário exclusivo para atletas com <strong>Preparação de Prova</strong> ativa. O link é gerado individualmente no perfil do atleta (card "Check-ins de Periodização") ou enviado automaticamente quando vinculado em <strong>Automação de Check-ins</strong>.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
