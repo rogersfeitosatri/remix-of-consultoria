@@ -5940,6 +5940,8 @@ export type Database = {
         Args: { p_token: string }
         Returns: {
           admin_user_id: string
+          checkin_form_id: string
+          checkin_form_title: string
           client_id: string
           client_name: string
           link_id: string
