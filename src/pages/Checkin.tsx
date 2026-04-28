@@ -266,6 +266,12 @@ export default function Checkin() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
+
+                  {form.is_periodization && (
+                    <div className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded p-2">
+                      🏆 Formulário exclusivo para atletas com <strong>Preparação de Prova</strong> ativa. O link é gerado individualmente no perfil do atleta (card "Check-ins de Periodização") ou enviado automaticamente quando vinculado em <strong>Automação de Check-ins</strong>.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
