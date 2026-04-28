@@ -463,6 +463,28 @@ export function LinkScheduleEditDialog({
                       )}
                     </div>
 
+                    {/* Booking link preview */}
+                    {!isEditing && getBookingUrl(schedule.client_id) && (
+                      <div className="mt-2 flex items-center gap-1.5 rounded-md bg-muted/60 px-2 py-1.5">
+                        <Link2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span
+                          className="text-[11px] text-muted-foreground truncate flex-1"
+                          title={getBookingUrl(schedule.client_id) || ''}
+                        >
+                          {getBookingUrl(schedule.client_id)}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-[11px] gap-1"
+                          onClick={() => handleCopyBookingLink(schedule.client_id, schedule.client_name)}
+                        >
+                          <Copy className="h-3 w-3" />
+                          Copiar
+                        </Button>
+                      </div>
+                    )}
+
                     {/* Edit panel */}
                     {isEditing && (
                       <div className="mt-3 space-y-3">
