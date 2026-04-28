@@ -169,7 +169,15 @@ export default function Checkin() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg truncate">{form.title}</CardTitle>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <CardTitle className="text-lg truncate">{form.title}</CardTitle>
+                        {form.is_periodization && (
+                          <Badge variant="outline" className="border-amber-500 text-amber-600 gap-1">
+                            <Trophy className="h-3 w-3" />
+                            Periodização
+                          </Badge>
+                        )}
+                      </div>
                       {form.description && (
                         <CardDescription className="line-clamp-2 mt-1">
                           {form.description}
