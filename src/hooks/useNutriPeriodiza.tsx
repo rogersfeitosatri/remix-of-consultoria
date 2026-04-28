@@ -111,7 +111,7 @@ export function useCreateGutLog(clientId?: string, userId?: string) {
   return useMutation({
     mutationFn: async (input: Partial<GutLogRow>) => {
       if (!clientId || !userId) throw new Error('clientId/userId obrigatórios');
-      const { error } = await supabase.from('np_gut_training_logs').insert({
+      const { error } = await (supabase as any).from('np_gut_training_logs').insert({
         client_id: clientId,
         user_id: userId,
         checkin_date: input.checkin_date || new Date().toISOString().slice(0, 10),
