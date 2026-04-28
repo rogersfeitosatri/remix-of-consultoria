@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trophy, Calendar, Edit, Plus, Activity, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Trophy, Calendar, Edit, Plus, Activity, AlertTriangle, CheckCircle2, Sparkles, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
