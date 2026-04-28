@@ -7,7 +7,7 @@ import { format, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks, isBefore,
 import { ptBR } from 'date-fns/locale';
 import {
   Send, User, Calendar, Clock, ChevronLeft, ChevronRight, CheckCircle2,
-  AlertTriangle, Video, ExternalLink, RefreshCw, Loader2, Eye
+  AlertTriangle, Video, ExternalLink, RefreshCw, Loader2, Eye, Copy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConsultationSchedule, Client } from '@/hooks/useClients';
@@ -15,6 +15,8 @@ import { Link } from 'react-router-dom';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { PlanTypeBadge } from '@/components/clients/PlanTypeBadge';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface WeeklyPipelineViewProps {
   consultations: (ConsultationSchedule & { client_name: string })[];
