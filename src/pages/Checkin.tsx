@@ -8,7 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, FileText, Copy, ExternalLink, Trash2, Eye, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, FileText, Copy, ExternalLink, Trash2, Eye, ToggleLeft, ToggleRight, Trophy } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { useCheckinForms, useCreateCheckinForm, useDeleteCheckinForm, useUpdateCheckinForm } from '@/hooks/useCheckinForms';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -25,6 +26,7 @@ export default function Checkin() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newFormTitle, setNewFormTitle] = useState('');
   const [newFormDescription, setNewFormDescription] = useState('');
+  const [newFormIsPeriodization, setNewFormIsPeriodization] = useState(false);
 
   const handleCreateForm = async () => {
     if (!newFormTitle.trim()) {
@@ -36,11 +38,13 @@ export default function Checkin() {
       const form = await createForm.mutateAsync({
         title: newFormTitle,
         description: newFormDescription || undefined,
+        is_periodization: newFormIsPeriodization,
       });
       toast.success('Formulário criado!');
       setIsCreateOpen(false);
       setNewFormTitle('');
       setNewFormDescription('');
+      setNewFormIsPeriodization(false);
       navigate(`/checkin/${form.id}`);
     } catch (error) {
       toast.error('Erro ao criar formulário');
@@ -65,8 +69,9 @@ export default function Checkin() {
     }
   };
 
-  const copyFormLink = (formId: string) => {
-    const link = `${window.location.origin}/form/${formId}`;
+  const copyFormLink = (formId: string, isPeriodization?: boolean) => {
+    const path = isPeriodization ? `/np-form/${formId}` : `/form/${formId}`;
+    const link = `${window.location.origin}${path}`;
     navigator.clipboard.writeText(link);
     toast.success('Link copiado!');
   };
@@ -116,6 +121,16 @@ export default function Checkin() {
                     rows={3}
                   />
                 </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-amber-500" />
+                    <div>
+                      <Label htmlFor="is_periodization" className="cursor-pointer">Formulário de Periodização</Label>
+                      <p className="text-xs text-muted-foreground">Use para o check-in da Preparação de Prova (NutriPeriodiza). O link público inclui o bloco de métricas core (GI, energia, sono, aderência).</p>
+                    </div>
+                  </div>
+                  <Switch id="is_periodization" checked={newFormIsPeriodization} onCheckedChange={setNewFormIsPeriodization} />
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -154,7 +169,15 @@ export default function Checkin() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg truncate">{form.title}</CardTitle>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <CardTitle className="text-lg truncate">{form.title}</CardTitle>
+                        {form.is_periodization && (
+                          <Badge variant="outline" className="border-amber-500 text-amber-600 gap-1">
+                            <Trophy className="h-3 w-3" />
+                            Periodização
+                          </Badge>
+                        )}
+                      </div>
                       {form.description && (
                         <CardDescription className="line-clamp-2 mt-1">
                           {form.description}
@@ -186,7 +209,7 @@ export default function Checkin() {
                       variant="outline"
                       size="sm"
                       className="gap-1"
-                      onClick={() => copyFormLink(form.id)}
+                      onClick={() => copyFormLink(form.id, form.is_periodization)}
                     >
                       <Copy className="h-3 w-3" />
                       Copiar Link
@@ -196,7 +219,7 @@ export default function Checkin() {
                       variant="outline"
                       size="sm"
                       className="gap-1"
-                      onClick={() => window.open(`/form/${form.id}`, '_blank')}
+                      onClick={() => window.open(form.is_periodization ? `/np-form/${form.id}` : `/form/${form.id}`, '_blank')}
                     >
                       <ExternalLink className="h-3 w-3" />
                       Abrir

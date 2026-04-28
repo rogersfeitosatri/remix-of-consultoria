@@ -26,6 +26,8 @@ Deno.serve(async (req) => {
       long_run_completed,
       notes,
       symptoms,
+      form_id,
+      dynamic_responses,
     } = body || {};
 
     if (!token || typeof token !== "string") {
@@ -75,7 +77,7 @@ Deno.serve(async (req) => {
       return Math.max(min, Math.min(max, n));
     };
 
-    const insertPayload = {
+    const insertPayload: any = {
       user_id: ctx.admin_user_id,
       client_id: ctx.client_id,
       link_id: ctx.link_id,
@@ -90,6 +92,11 @@ Deno.serve(async (req) => {
       long_run_completed: typeof long_run_completed === "boolean" ? long_run_completed : null,
       notes: notes ? String(notes).slice(0, 2000) : null,
       symptoms: Array.isArray(symptoms) ? symptoms.slice(0, 20) : [],
+      dynamic_form_id: form_id || ctx.checkin_form_id || null,
+      dynamic_responses:
+        dynamic_responses && typeof dynamic_responses === "object" && !Array.isArray(dynamic_responses)
+          ? dynamic_responses
+          : {},
       submitted_at: new Date().toISOString(),
     };
 

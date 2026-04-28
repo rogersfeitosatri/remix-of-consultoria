@@ -1612,6 +1612,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          is_periodization: boolean
           title: string
           updated_at: string
           user_id: string
@@ -1621,6 +1622,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_periodization?: boolean
           title: string
           updated_at?: string
           user_id: string
@@ -1630,6 +1632,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_periodization?: boolean
           title?: string
           updated_at?: string
           user_id?: string
@@ -3911,6 +3914,8 @@ export type Database = {
           decided_by: string | null
           decision: string | null
           decision_note: string | null
+          dynamic_form_id: string | null
+          dynamic_responses: Json
           energy_score: number | null
           gi_score: number | null
           id: string
@@ -3935,6 +3940,8 @@ export type Database = {
           decided_by?: string | null
           decision?: string | null
           decision_note?: string | null
+          dynamic_form_id?: string | null
+          dynamic_responses?: Json
           energy_score?: number | null
           gi_score?: number | null
           id?: string
@@ -3959,6 +3966,8 @@ export type Database = {
           decided_by?: string | null
           decision?: string | null
           decision_note?: string | null
+          dynamic_form_id?: string | null
+          dynamic_responses?: Json
           energy_score?: number | null
           gi_score?: number | null
           id?: string
@@ -3976,6 +3985,13 @@ export type Database = {
           weight_kg?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "np_periodization_checkins_dynamic_form_id_fkey"
+            columns: ["dynamic_form_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "np_periodization_checkins_link_id_fkey"
             columns: ["link_id"]
@@ -5937,6 +5953,8 @@ export type Database = {
         Args: { p_token: string }
         Returns: {
           admin_user_id: string
+          checkin_form_id: string
+          checkin_form_title: string
           client_id: string
           client_name: string
           link_id: string

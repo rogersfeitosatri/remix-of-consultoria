@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Plus, GripVertical, Trash2, Copy, ExternalLink, Eye, FileText, X, Edit } from 'lucide-react';
+import { ArrowLeft, Plus, GripVertical, Trash2, Copy, ExternalLink, Eye, FileText, X, Edit, Trophy } from 'lucide-react';
 import { useCheckinFormWithQuestions, useUpdateCheckinForm, useAddCheckinQuestion, useUpdateCheckinQuestion, useDeleteCheckinQuestion, useCheckinFormResponses, useReorderCheckinQuestions, type QuestionType, type CheckinQuestion } from '@/hooks/useCheckinForms';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -340,8 +340,9 @@ export default function CheckinFormBuilder() {
     }
   };
 
+  const formPath = form.is_periodization ? `/np-form/${form.id}` : `/form/${form.id}`;
   const copyFormLink = () => {
-    const link = `${window.location.origin}/form/${form.id}`;
+    const link = `${window.location.origin}${formPath}`;
     navigator.clipboard.writeText(link);
     toast.success('Link copiado!');
   };
@@ -510,6 +511,12 @@ export default function CheckinFormBuilder() {
             <Badge variant={form.is_active ? 'default' : 'secondary'}>
               {form.is_active ? 'Ativo' : 'Inativo'}
             </Badge>
+            {form.is_periodization && (
+              <Badge variant="outline" className="border-amber-500 text-amber-600 gap-1">
+                <Trophy className="h-3 w-3" />
+                Periodização
+              </Badge>
+            )}
           </div>
 
           <div className="flex gap-2">
@@ -517,7 +524,7 @@ export default function CheckinFormBuilder() {
               <Copy className="h-3 w-3" />
               Copiar Link
             </Button>
-            <Button variant="outline" size="sm" className="gap-1" onClick={() => window.open(`/form/${form.id}`, '_blank')}>
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => window.open(formPath, '_blank')}>
               <ExternalLink className="h-3 w-3" />
               Visualizar
             </Button>

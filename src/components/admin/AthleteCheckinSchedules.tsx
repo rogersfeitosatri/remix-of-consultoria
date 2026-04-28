@@ -182,7 +182,9 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   {availableForms.filter(f => !usedFormIds.includes(f.id) || f.id === formId).map(f => (
-                    <SelectItem key={f.id} value={f.id}>{f.title}</SelectItem>
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.title}{(f as any).is_periodization ? ' 🏆 Periodização' : ''}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
