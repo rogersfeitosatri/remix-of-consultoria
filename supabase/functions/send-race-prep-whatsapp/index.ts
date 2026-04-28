@@ -130,6 +130,14 @@ Deno.serve(async (req) => {
         phaseLabel: 'Taper',
       });
 
+      // 2b) protocol_7_days_pre_race — 7 dias antes
+      events.push({
+        type: 'protocol_7_days_pre_race',
+        key: `${race.race_date}`,
+        shouldFire: days === 7,
+        phaseLabel: 'Taper',
+      });
+
       // 3) gut_training_weekly — toda segunda em build/specific/peak
       events.push({
         type: 'gut_training_weekly',
