@@ -3637,6 +3637,57 @@ export type Database = {
           },
         ]
       }
+      np_event_dispatches: {
+        Row: {
+          client_id: string
+          error_message: string | null
+          event_key: string
+          event_type: string
+          id: string
+          race_id: string | null
+          sent_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          error_message?: string | null
+          event_key: string
+          event_type: string
+          id?: string
+          race_id?: string | null
+          sent_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          error_message?: string | null
+          event_key?: string
+          event_type?: string
+          id?: string
+          race_id?: string | null
+          sent_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_event_dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "np_event_dispatches_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "np_athlete_races"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       np_gut_training_logs: {
         Row: {
           adherence_pct: number | null
