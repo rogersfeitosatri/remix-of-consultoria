@@ -26,6 +26,7 @@ export default function Checkin() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newFormTitle, setNewFormTitle] = useState('');
   const [newFormDescription, setNewFormDescription] = useState('');
+  const [newFormIsPeriodization, setNewFormIsPeriodization] = useState(false);
 
   const handleCreateForm = async () => {
     if (!newFormTitle.trim()) {
@@ -37,11 +38,13 @@ export default function Checkin() {
       const form = await createForm.mutateAsync({
         title: newFormTitle,
         description: newFormDescription || undefined,
+        is_periodization: newFormIsPeriodization,
       });
       toast.success('Formulário criado!');
       setIsCreateOpen(false);
       setNewFormTitle('');
       setNewFormDescription('');
+      setNewFormIsPeriodization(false);
       navigate(`/checkin/${form.id}`);
     } catch (error) {
       toast.error('Erro ao criar formulário');
