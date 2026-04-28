@@ -62,7 +62,60 @@ export function LinkScheduleEditDialog({
   const deleteSchedule = useDeleteConsultationSchedule();
   const queryClient = useQueryClient();
 
-  if (!selectedDate) return null;
+  // Fetch booking links for the athletes shown in this dialog
+  const dayClientIds = selectedDate
+    ? Array.from(
+        new Set(
+          schedules
+            .filter(
+              (s) =>
+                s.status === 'pending' &&
+                format(parseISO(s.send_link_date), 'yyyy-MM-dd') ===
+                  format(selectedDate, 'yyyy-MM-dd')
+            )
+            .map((s) => s.client_id)
+        )
+      )
+    : [];
+
+  const { data: bookingLinks } = useQuery({
+    queryKey: ['booking-links-by-clients', dayClientIds.sort().join(',')],
+    queryFn: async () => {
+      if (dayClientIds.length === 0) return {} as Record<string, string>;
+      const { data, error } = await supabase
+        .from('booking_links')
+        .select('client_id, token')
+        .in('client_id', dayClientIds)
+        .eq('active', true);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      (data || []).forEach((l: any) => {
+        if (l.client_id && l.token) map[l.client_id] = l.token;
+      });
+      return map;
+    },
+    enabled: open && dayClientIds.length > 0,
+  });
+
+  const getBookingUrl = (clientId: string) => {
+    const token = bookingLinks?.[clientId];
+    if (!token) return null;
+    return `${window.location.origin}/booking/${token}`;
+  };
+
+  const handleCopyBookingLink = async (clientId: string, clientName: string) => {
+    const url = getBookingUrl(clientId);
+    if (!url) {
+      toast.error('Link de agendamento não disponível para este atleta');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(`Link de ${clientName} copiado!`);
+    } catch {
+      toast.error('Não foi possível copiar o link');
+    }
+  };
 
   const daySchedules = schedules.filter(
     (s) =>
