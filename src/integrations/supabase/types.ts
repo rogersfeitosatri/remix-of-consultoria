@@ -3584,6 +3584,74 @@ export type Database = {
           },
         ]
       }
+      np_gut_training_logs: {
+        Row: {
+          adherence_pct: number | null
+          athlete_notes: string | null
+          checkin_date: string
+          cho_source: string | null
+          client_id: string
+          created_at: string
+          current_cho_rate_g_h: number | null
+          decision: string | null
+          gi_bloating: number | null
+          gi_cramps: number | null
+          gi_diarrhea: number | null
+          gi_nausea: number | null
+          gi_score_global: number | null
+          id: string
+          next_cho_rate_g_h: number | null
+          nutritionist_notes: string | null
+          user_id: string
+        }
+        Insert: {
+          adherence_pct?: number | null
+          athlete_notes?: string | null
+          checkin_date?: string
+          cho_source?: string | null
+          client_id: string
+          created_at?: string
+          current_cho_rate_g_h?: number | null
+          decision?: string | null
+          gi_bloating?: number | null
+          gi_cramps?: number | null
+          gi_diarrhea?: number | null
+          gi_nausea?: number | null
+          gi_score_global?: number | null
+          id?: string
+          next_cho_rate_g_h?: number | null
+          nutritionist_notes?: string | null
+          user_id: string
+        }
+        Update: {
+          adherence_pct?: number | null
+          athlete_notes?: string | null
+          checkin_date?: string
+          cho_source?: string | null
+          client_id?: string
+          created_at?: string
+          current_cho_rate_g_h?: number | null
+          decision?: string | null
+          gi_bloating?: number | null
+          gi_cramps?: number | null
+          gi_diarrhea?: number | null
+          gi_nausea?: number | null
+          gi_score_global?: number | null
+          id?: string
+          next_cho_rate_g_h?: number | null
+          nutritionist_notes?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_gut_training_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       np_lab_results: {
         Row: {
           client_id: string
@@ -3809,6 +3877,153 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      np_phase_protocols: {
+        Row: {
+          carboloading_active: boolean | null
+          carboloading_checklist: Json | null
+          carboloading_protocol: string | null
+          cho_daily_range: string | null
+          cho_intra_protocol: string | null
+          cho_intra_target_g_h: number | null
+          cho_pre_protocol: string | null
+          client_id: string
+          created_at: string
+          current_phase: string | null
+          gut_training_target_g_h: number | null
+          id: string
+          override_reason: string | null
+          phase_override: string | null
+          race_goal_id: string | null
+          updated_at: string
+          user_id: string
+          weeks_to_race: number | null
+        }
+        Insert: {
+          carboloading_active?: boolean | null
+          carboloading_checklist?: Json | null
+          carboloading_protocol?: string | null
+          cho_daily_range?: string | null
+          cho_intra_protocol?: string | null
+          cho_intra_target_g_h?: number | null
+          cho_pre_protocol?: string | null
+          client_id: string
+          created_at?: string
+          current_phase?: string | null
+          gut_training_target_g_h?: number | null
+          id?: string
+          override_reason?: string | null
+          phase_override?: string | null
+          race_goal_id?: string | null
+          updated_at?: string
+          user_id: string
+          weeks_to_race?: number | null
+        }
+        Update: {
+          carboloading_active?: boolean | null
+          carboloading_checklist?: Json | null
+          carboloading_protocol?: string | null
+          cho_daily_range?: string | null
+          cho_intra_protocol?: string | null
+          cho_intra_target_g_h?: number | null
+          cho_pre_protocol?: string | null
+          client_id?: string
+          created_at?: string
+          current_phase?: string | null
+          gut_training_target_g_h?: number | null
+          id?: string
+          override_reason?: string | null
+          phase_override?: string | null
+          race_goal_id?: string | null
+          updated_at?: string
+          user_id?: string
+          weeks_to_race?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_phase_protocols_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "np_phase_protocols_race_goal_id_fkey"
+            columns: ["race_goal_id"]
+            isOneToOne: false
+            referencedRelation: "target_races"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      np_protocol_defaults: {
+        Row: {
+          alerts_contraindications: string | null
+          carboloading_duration_days: number | null
+          carboloading_indicated: boolean | null
+          carboloading_max_gkg: number | null
+          carboloading_min_gkg: number | null
+          carboloading_protocol: string | null
+          cho_daily_range: string | null
+          cho_intra_description: string | null
+          cho_intra_max_g_h: number | null
+          cho_intra_min_g_h: number | null
+          cho_intra_source: string | null
+          clinical_focus: string | null
+          created_at: string
+          distance_category: string
+          gut_training_description: string | null
+          id: string
+          phase: string
+          pre_training_protocol: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alerts_contraindications?: string | null
+          carboloading_duration_days?: number | null
+          carboloading_indicated?: boolean | null
+          carboloading_max_gkg?: number | null
+          carboloading_min_gkg?: number | null
+          carboloading_protocol?: string | null
+          cho_daily_range?: string | null
+          cho_intra_description?: string | null
+          cho_intra_max_g_h?: number | null
+          cho_intra_min_g_h?: number | null
+          cho_intra_source?: string | null
+          clinical_focus?: string | null
+          created_at?: string
+          distance_category: string
+          gut_training_description?: string | null
+          id?: string
+          phase: string
+          pre_training_protocol?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alerts_contraindications?: string | null
+          carboloading_duration_days?: number | null
+          carboloading_indicated?: boolean | null
+          carboloading_max_gkg?: number | null
+          carboloading_min_gkg?: number | null
+          carboloading_protocol?: string | null
+          cho_daily_range?: string | null
+          cho_intra_description?: string | null
+          cho_intra_max_g_h?: number | null
+          cho_intra_min_g_h?: number | null
+          cho_intra_source?: string | null
+          clinical_focus?: string | null
+          created_at?: string
+          distance_category?: string
+          gut_training_description?: string | null
+          id?: string
+          phase?: string
+          pre_training_protocol?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       np_running_schedule: {
         Row: {
@@ -4815,19 +5030,34 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_active: boolean
           name: string
+          race_distance_km: number | null
+          race_type: string | null
+          target_time_minutes: number | null
+          updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          is_active?: boolean
           name: string
+          race_distance_km?: number | null
+          race_type?: string | null
+          target_time_minutes?: number | null
+          updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          is_active?: boolean
           name?: string
+          race_distance_km?: number | null
+          race_type?: string | null
+          target_time_minutes?: number | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
