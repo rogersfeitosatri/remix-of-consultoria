@@ -272,6 +272,16 @@ export default function NutriPeriodizaProtocols() {
                         </div>
 
                         <div className="flex justify-end gap-2 pt-2">
+                          <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => {
+                              setDraft((d) => ({ ...d, [key]: emptyRow(activePhase, activeDistance) }));
+                            }}
+                            disabled={upsert.isPending}
+                          >
+                            Restaurar padrão científico
+                          </Button>
                           <Button onClick={handleSave} disabled={upsert.isPending}>
                             <Save className="h-4 w-4 mr-2" />
                             {stored ? 'Atualizar' : 'Salvar protocolo'}
