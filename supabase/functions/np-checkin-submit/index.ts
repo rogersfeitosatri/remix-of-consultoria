@@ -26,6 +26,8 @@ Deno.serve(async (req) => {
       long_run_completed,
       notes,
       symptoms,
+      form_id,
+      dynamic_responses,
     } = body || {};
 
     if (!token || typeof token !== "string") {
