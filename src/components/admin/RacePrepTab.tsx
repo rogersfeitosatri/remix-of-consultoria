@@ -308,24 +308,36 @@ export function RacePrepTab({ clientId, userId }: Props) {
         </CardContent>
       </Card>
 
+      {/* Painel de Check-ins de Periodização */}
+      <NpCheckinPanel clientId={clientId} userId={userId} />
+
       {/* Resumo de Evolução por IA */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             <CardTitle className="text-base">Resumo de Evolução (IA)</CardTitle>
           </div>
-          <Button
-            size="sm"
-            onClick={() => generateSummary.mutate()}
-            disabled={generateSummary.isPending || logs.length === 0}
-          >
-            {generateSummary.isPending ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
-            ) : (
-              <><Sparkles className="h-4 w-4 mr-2" /> Gerar resumo</>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setAthleteSummaryOpen(true)}
+            >
+              <Sparkles className="h-3 w-3 mr-1" /> Versão Atleta
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => generateSummary.mutate('admin')}
+              disabled={generateSummary.isPending || logs.length === 0}
+            >
+              {generateSummary.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
+              ) : (
+                <><Sparkles className="h-4 w-4 mr-2" /> Gerar resumo técnico</>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {logs.length === 0 && (
@@ -335,7 +347,7 @@ export function RacePrepTab({ clientId, userId }: Props) {
           )}
           {summaries.length === 0 && logs.length > 0 && (
             <p className="text-sm text-muted-foreground">
-              Nenhum resumo gerado ainda. Clique em "Gerar resumo" para criar uma análise da evolução.
+              Nenhum resumo gerado ainda. Clique em "Gerar resumo técnico" para criar uma análise da evolução.
             </p>
           )}
           {summaries.map((s) => (
@@ -354,6 +366,12 @@ export function RacePrepTab({ clientId, userId }: Props) {
           ))}
         </CardContent>
       </Card>
+
+      <NpAthleteSummaryDialog
+        clientId={clientId}
+        open={athleteSummaryOpen}
+        onOpenChange={setAthleteSummaryOpen}
+      />
 
       <RaceDialog
         open={raceDialogOpen}
