@@ -370,6 +370,21 @@ export function LinkScheduleEditDialog({
 
                       {!isEditing && (
                         <div className="flex items-center gap-1">
+                          {/* Copy booking link */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-primary hover:text-primary"
+                            onClick={() => handleCopyBookingLink(schedule.client_id, schedule.client_name)}
+                            title={
+                              getBookingUrl(schedule.client_id)
+                                ? 'Copiar link de agendamento'
+                                : 'Link de agendamento indisponível'
+                            }
+                            disabled={!getBookingUrl(schedule.client_id)}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
                           {/* Show confirm button for overdue items */}
                           {isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date)) && (
                             <Button
