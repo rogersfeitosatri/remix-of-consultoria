@@ -122,6 +122,17 @@ export default function Checkin() {
                   />
                 </div>
               </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-amber-500" />
+                    <div>
+                      <Label htmlFor="is_periodization" className="cursor-pointer">Formulário de Periodização</Label>
+                      <p className="text-xs text-muted-foreground">Use para o check-in da Preparação de Prova (NutriPeriodiza). O link público inclui o bloco de métricas core (GI, energia, sono, aderência).</p>
+                    </div>
+                  </div>
+                  <Switch id="is_periodization" checked={newFormIsPeriodization} onCheckedChange={setNewFormIsPeriodization} />
+                </div>
+              </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancelar
