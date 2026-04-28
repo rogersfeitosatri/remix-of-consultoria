@@ -340,8 +340,9 @@ export default function CheckinFormBuilder() {
     }
   };
 
+  const formPath = form.is_periodization ? `/np-form/${form.id}` : `/form/${form.id}`;
   const copyFormLink = () => {
-    const link = `${window.location.origin}/form/${form.id}`;
+    const link = `${window.location.origin}${formPath}`;
     navigator.clipboard.writeText(link);
     toast.success('Link copiado!');
   };
