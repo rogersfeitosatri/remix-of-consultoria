@@ -108,6 +108,21 @@ Deno.serve(async (req) => {
       .update({ used_at: new Date().toISOString(), active: false })
       .eq("id", ctx.link_id);
 
+    // Alert admin via WhatsApp when GI score is high (>= 7) — desconforto gastrointestinal relevante
+    try {
+      const gi = insertPayload.gi_score;
+      if (gi != null && gi >= 7) {
+        const adherenceTxt = insertPayload.adherence_pct != null ? `${insertPayload.adherence_pct}%` : '—';
+        const energyTxt = insertPayload.energy_score != null ? `${insertPayload.energy_score}/10` : '—';
+        const msg = `⚠️ *Alerta de GI alto na Periodização*\n\nAtleta: *${ctx.client_name}*\nProva: ${ctx.race_name || '—'}\nFase atual: ${phase || '—'}\nGI score: *${gi}/10*\nAderência: ${adherenceTxt}\nEnergia: ${energyTxt}\n\nRevisar protocolo de carboidrato/gut training no perfil do atleta.`;
+        await supabase.functions.invoke('send-whatsapp', {
+          body: { phone: '+5599984817697', message: msg },
+        });
+      }
+    } catch (alertErr) {
+      console.error('GI alert dispatch failed', alertErr);
+    }
+
     return json({ ok: true });
   } catch (e) {
     console.error("np-checkin-submit fatal", e);
