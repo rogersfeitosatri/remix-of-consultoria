@@ -100,3 +100,6 @@ verify_jwt = false
 
 [functions.handle-email-suppression]
 verify_jwt = false
+
+[functions.np-checkin-submit]
+verify_jwt = false
