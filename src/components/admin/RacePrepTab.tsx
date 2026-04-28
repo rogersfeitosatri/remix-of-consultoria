@@ -51,6 +51,8 @@ export function RacePrepTab({ clientId, userId }: Props) {
   const upsertRace = useUpsertActiveRace(clientId, userId);
   const upsertProtocol = useUpsertPhaseProtocol(clientId, userId);
   const createLog = useCreateGutLog(clientId, userId);
+  const { data: summaries = [] } = useEvolutionSummaries(clientId);
+  const generateSummary = useGenerateEvolutionSummary(clientId);
 
   const [raceDialogOpen, setRaceDialogOpen] = useState(false);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
