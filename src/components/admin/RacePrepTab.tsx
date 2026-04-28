@@ -111,9 +111,16 @@ export function RacePrepTab({ clientId, userId }: Props) {
               <Trophy className="h-5 w-5 text-primary" />
               <CardTitle className="text-base">Prova-alvo</CardTitle>
             </div>
-            <Button size="sm" variant="outline" onClick={() => setRaceDialogOpen(true)}>
-              <Edit className="h-3 w-3 mr-1" /> Editar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="ghost" asChild>
+                <Link to="/nutriperiodiza/protocols">
+                  <SettingsIcon className="h-3 w-3 mr-1" /> Editor de Protocolos
+                </Link>
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setRaceDialogOpen(true)}>
+                <Edit className="h-3 w-3 mr-1" /> Editar
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
