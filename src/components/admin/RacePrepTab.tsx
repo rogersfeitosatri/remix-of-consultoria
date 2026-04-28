@@ -20,12 +20,15 @@ import {
   usePhaseProtocol, useUpsertPhaseProtocol,
   type ActiveRace,
 } from '@/hooks/useNutriPeriodiza';
+import { useProtocolDefaults, getMergedProtocol } from '@/hooks/useNutriPeriodizaDefaults';
 import {
   calculateWeeksToRace, calculatePhase, categorizeDistance,
-  PHASE_META, DISTANCE_LABEL, getStaticProtocol,
+  PHASE_META, DISTANCE_LABEL,
   suggestProgression, giScoreColorClass,
   type RacePhase,
 } from '@/lib/nutriperiodiza';
+import { Link } from 'react-router-dom';
+import { Settings as SettingsIcon } from 'lucide-react';
 
 interface Props {
   clientId: string;
@@ -57,7 +60,8 @@ export function RacePrepTab({ clientId, userId }: Props) {
   const overridePhase = (protocol?.phase_override as RacePhase | null) || null;
   const currentPhase: RacePhase | null = overridePhase || autoPhase;
   const phaseMeta = currentPhase ? PHASE_META[currentPhase] : null;
-  const protocolView = currentPhase ? getStaticProtocol(currentPhase, distance) : null;
+  const { data: defaultsRows = [] } = useProtocolDefaults(userId);
+  const protocolView = currentPhase ? getMergedProtocol(defaultsRows, currentPhase, distance) : null;
   const suggestion = useMemo(() => suggestProgression(logs as any, currentPhase), [logs, currentPhase]);
   const lastLog = logs[0];
 
@@ -107,9 +111,16 @@ export function RacePrepTab({ clientId, userId }: Props) {
               <Trophy className="h-5 w-5 text-primary" />
               <CardTitle className="text-base">Prova-alvo</CardTitle>
             </div>
-            <Button size="sm" variant="outline" onClick={() => setRaceDialogOpen(true)}>
-              <Edit className="h-3 w-3 mr-1" /> Editar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="ghost" asChild>
+                <Link to="/nutriperiodiza/protocols">
+                  <SettingsIcon className="h-3 w-3 mr-1" /> Editor de Protocolos
+                </Link>
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setRaceDialogOpen(true)}>
+                <Edit className="h-3 w-3 mr-1" /> Editar
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">

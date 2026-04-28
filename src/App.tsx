@@ -63,6 +63,7 @@ const AssessoriaLanding = lazy(() => import("./pages/AssessoriaLanding"));
 const AthleteCheckinPlanning = lazy(() => import("./pages/AthleteCheckinPlanning"));
 const SchedulingAudit = lazy(() => import("./pages/SchedulingAudit"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
+const NutriPeriodizaProtocols = lazy(() => import("./pages/NutriPeriodizaProtocols"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -177,6 +178,7 @@ function AppRoutes() {
         <Route path="/scheduling-links" element={<ProtectedRoute adminOnly><CallScheduling /></ProtectedRoute>} />
         <Route path="/scheduling-links/:linkId" element={<ProtectedRoute adminOnly><CallSchedulingConfig /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
+        <Route path="/nutriperiodiza/protocols" element={<ProtectedRoute adminOnly><NutriPeriodizaProtocols /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
