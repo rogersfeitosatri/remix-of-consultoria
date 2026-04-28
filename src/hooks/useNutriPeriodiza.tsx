@@ -18,12 +18,11 @@ export function useActiveRace(clientId?: string) {
     queryKey: ['np-active-race', clientId],
     enabled: !!clientId,
     queryFn: async (): Promise<ActiveRace | null> => {
-      const { data, error } = await supabase
-        .from('target_races')
+      const { data, error } = await (supabase as any)
+        .from('np_athlete_races')
         .select('id, race_name, race_date, race_distance_km, race_type, target_time_minutes, notes, is_active')
         .eq('client_id', clientId!)
         .eq('is_active', true)
-        .is('archived_at', null)
         .order('race_date', { ascending: true })
         .limit(1)
         .maybeSingle();
@@ -38,28 +37,28 @@ export function useUpsertActiveRace(clientId?: string, userId?: string) {
   return useMutation({
     mutationFn: async (input: Partial<ActiveRace>) => {
       if (!clientId || !userId) throw new Error('clientId/userId obrigatórios');
-      const payload = {
+      const payload: any = {
         client_id: clientId,
         user_id: userId,
         race_name: input.race_name ?? null,
-        race_date: input.race_date ?? null,
-        race_distance_km: input.race_distance_km ?? null,
+        race_date: input.race_date,
+        race_distance_km: input.race_distance_km,
         race_type: input.race_type ?? 'road',
         target_time_minutes: input.target_time_minutes ?? null,
         notes: input.notes ?? null,
         is_active: true,
       };
       if (input.id) {
-        const { error } = await supabase.from('target_races').update(payload).eq('id', input.id);
+        const { error } = await (supabase as any).from('np_athlete_races').update(payload).eq('id', input.id);
         if (error) throw error;
         return input.id;
       }
-      // Marcar provas anteriores como inativas
-      await supabase.from('target_races')
+      // Desativar provas anteriores
+      await (supabase as any).from('np_athlete_races')
         .update({ is_active: false })
         .eq('client_id', clientId)
         .eq('is_active', true);
-      const { data, error } = await supabase.from('target_races').insert(payload).select('id').single();
+      const { data, error } = await (supabase as any).from('np_athlete_races').insert(payload).select('id').single();
       if (error) throw error;
       return data.id;
     },
