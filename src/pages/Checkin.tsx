@@ -69,8 +69,9 @@ export default function Checkin() {
     }
   };
 
-  const copyFormLink = (formId: string) => {
-    const link = `${window.location.origin}/form/${formId}`;
+  const copyFormLink = (formId: string, isPeriodization?: boolean) => {
+    const path = isPeriodization ? `/np-form/${formId}` : `/form/${formId}`;
+    const link = `${window.location.origin}${path}`;
     navigator.clipboard.writeText(link);
     toast.success('Link copiado!');
   };
