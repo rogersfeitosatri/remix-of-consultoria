@@ -117,6 +117,8 @@ export function LinkScheduleEditDialog({
     }
   };
 
+  if (!selectedDate) return null;
+
   const daySchedules = schedules.filter(
     (s) =>
       s.status === 'pending' &&
