@@ -612,6 +612,22 @@ export function WeeklyPipelineView({
                         {config.label}
                       </Badge>
 
+                      {/* Copy WhatsApp message (exact text sent to athlete) */}
+                      {item.client && (item.status === 'link_pending' || item.status === 'link_sent' || item.status === 'no_show') && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs gap-1"
+                          title="Copiar mensagem do WhatsApp para envio manual"
+                          onClick={() => handleCopyBookingMessage(item)}
+                          disabled={copyingId === item.clientId}
+                        >
+                          {copyingId === item.clientId
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <Copy className="h-3 w-3" />}
+                        </Button>
+                      )}
+
                       {/* Send link button */}
                       {item.status === 'link_pending' && item.scheduleId && (
                         <Button
