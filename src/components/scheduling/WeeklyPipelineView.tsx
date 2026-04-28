@@ -7,7 +7,7 @@ import { format, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks, isBefore,
 import { ptBR } from 'date-fns/locale';
 import {
   Send, User, Calendar, Clock, ChevronLeft, ChevronRight, CheckCircle2,
-  AlertTriangle, Video, ExternalLink, RefreshCw, Loader2, Eye
+  AlertTriangle, Video, ExternalLink, RefreshCw, Loader2, Eye, Copy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConsultationSchedule, Client } from '@/hooks/useClients';
@@ -15,6 +15,8 @@ import { Link } from 'react-router-dom';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { PlanTypeBadge } from '@/components/clients/PlanTypeBadge';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface WeeklyPipelineViewProps {
   consultations: (ConsultationSchedule & { client_name: string })[];
@@ -94,6 +96,101 @@ export function WeeklyPipelineView({
 }: WeeklyPipelineViewProps) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+
+  const APP_URL = 'https://rogersfeitosa.com.br';
+
+  const renderTpl = (tpl: { title?: string | null; body: string }, vars: Record<string, string>) => {
+    let title = tpl.title || '';
+    let body = tpl.body;
+    for (const [k, v] of Object.entries(vars)) {
+      const re = new RegExp(`\\{${k}\\}`, 'g');
+      title = title.replace(re, v ?? '');
+      body = body.replace(re, v ?? '');
+    }
+    return title ? `*${title}*\n\n${body}` : body;
+  };
+
+  const handleCopyBookingMessage = async (item: PipelineItem) => {
+    if (!item.client) return;
+    setCopyingId(item.clientId);
+    try {
+      // 1) Get or create active booking_link for this client
+      let { data: link } = await supabase
+        .from('booking_links')
+        .select('token, usage_count')
+        .eq('client_id', item.clientId)
+        .eq('active', true)
+        .maybeSingle();
+
+      if (!link) {
+        const { data: newLink, error: createErr } = await supabase
+          .from('booking_links')
+          .insert({ client_id: item.clientId, active: true })
+          .select('token, usage_count')
+          .single();
+        if (createErr) throw createErr;
+        link = newLink;
+      }
+
+      const bookingUrl = `${APP_URL}/booking/${link!.token}`;
+
+      // 2) Decide template_key (mirror process-consultation-schedules logic)
+      //    First consultation if no prior completed/scheduled, else followup
+      const { count: priorCount } = await supabase
+        .from('consultation_schedules')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', item.clientId)
+        .in('status', ['completed', 'scheduled'])
+        .neq('id', item.scheduleId ?? '00000000-0000-0000-0000-000000000000');
+
+      const isFirst = (priorCount ?? 0) === 0;
+      const templateKey = isFirst ? 'booking_first_consultation' : 'booking_followup_consultation';
+
+      // 3) Fetch template
+      const { data: tpl, error: tplErr } = await supabase
+        .from('whatsapp_templates')
+        .select('title, body, is_active')
+        .eq('user_id', item.client.user_id)
+        .eq('template_key', templateKey)
+        .maybeSingle();
+
+      if (tplErr) throw tplErr;
+      if (!tpl) {
+        toast({
+          title: 'Template não encontrado',
+          description: `Configure o template "${templateKey}" em Configurações → WhatsApp.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const firstName = item.client.name.split(' ')[0];
+      const message = renderTpl(
+        { title: tpl.title, body: tpl.body },
+        {
+          nome: firstName,
+          client_name: firstName,
+          booking_link: bookingUrl,
+          link: bookingUrl,
+        },
+      );
+
+      await navigator.clipboard.writeText(message);
+      toast({
+        title: 'Mensagem copiada!',
+        description: 'O texto exato do WhatsApp foi copiado para a área de transferência.',
+      });
+    } catch (e) {
+      toast({
+        title: 'Erro ao copiar',
+        description: e instanceof Error ? e.message : 'Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCopyingId(null);
+    }
+  };
 
   const today = startOfDay(new Date());
   const currentWeekStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
@@ -514,6 +611,22 @@ export function WeeklyPipelineView({
                       <Badge variant="outline" className={cn("text-[10px]", config.className)}>
                         {config.label}
                       </Badge>
+
+                      {/* Copy WhatsApp message (exact text sent to athlete) */}
+                      {item.client && (item.status === 'link_pending' || item.status === 'link_sent' || item.status === 'no_show') && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs gap-1"
+                          title="Copiar mensagem do WhatsApp para envio manual"
+                          onClick={() => handleCopyBookingMessage(item)}
+                          disabled={copyingId === item.clientId}
+                        >
+                          {copyingId === item.clientId
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <Copy className="h-3 w-3" />}
+                        </Button>
+                      )}
 
                       {/* Send link button */}
                       {item.status === 'link_pending' && item.scheduleId && (
