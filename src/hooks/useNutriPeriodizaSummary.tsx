@@ -76,17 +76,26 @@ export function useSendAthleteSummaryWhatsapp(clientId?: string) {
   return useMutation({
     mutationFn: async (input: { id: string; content: string }) => {
       if (!clientId) throw new Error('clientId obrigatório');
-      const { data, error } = await supabase.functions.invoke('send-race-prep-whatsapp', {
+      // Buscar telefone do atleta
+      const { data: client, error: cErr } = await (supabase as any)
+        .from('clients')
+        .select('phone, name')
+        .eq('id', clientId)
+        .maybeSingle();
+      if (cErr) throw cErr;
+      if (!client?.phone) throw new Error('Atleta sem telefone cadastrado');
+
+      const { data, error } = await supabase.functions.invoke('send-whatsapp', {
         body: {
+          phone: client.phone,
+          message: input.content,
           client_id: clientId,
-          event_type: 'athlete_evolution_summary',
-          summary_id: input.id,
-          custom_message: input.content,
+          template_key: 'np_athlete_evolution_summary',
         },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      // Mark sent
+
       await (supabase as any)
         .from('np_evolution_summaries')
         .update({ whatsapp_sent_at: new Date().toISOString() })
