@@ -305,6 +305,53 @@ export function RacePrepTab({ clientId, userId }: Props) {
         </CardContent>
       </Card>
 
+      {/* Resumo de Evolução por IA */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Resumo de Evolução (IA)</CardTitle>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => generateSummary.mutate()}
+            disabled={generateSummary.isPending || logs.length === 0}
+          >
+            {generateSummary.isPending ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Gerando…</>
+            ) : (
+              <><Sparkles className="h-4 w-4 mr-2" /> Gerar resumo</>
+            )}
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {logs.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Registre ao menos um log de gut training para que a IA possa gerar o resumo.
+            </p>
+          )}
+          {summaries.length === 0 && logs.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Nenhum resumo gerado ainda. Clique em "Gerar resumo" para criar uma análise da evolução.
+            </p>
+          )}
+          {summaries.map((s) => (
+            <div key={s.id} className="border rounded-md p-4 bg-muted/20 space-y-2">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">{format(parseISO(s.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</Badge>
+                {s.phase && <Badge variant="secondary">Fase: {PHASE_META[s.phase as RacePhase]?.label ?? s.phase}</Badge>}
+                {s.weeks_to_race != null && <Badge variant="secondary">{s.weeks_to_race}w até a prova</Badge>}
+                <Badge variant="outline">{s.logs_analyzed} logs</Badge>
+                <span>· {s.model}</span>
+              </div>
+              <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm leading-relaxed">
+                {s.summary_markdown}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
       <RaceDialog
         open={raceDialogOpen}
         onOpenChange={setRaceDialogOpen}
