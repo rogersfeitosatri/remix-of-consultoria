@@ -28,6 +28,7 @@ export interface CheckinForm {
   title: string;
   description: string | null;
   is_active: boolean;
+  is_periodization?: boolean;
   created_at: string;
   updated_at: string;
 }
