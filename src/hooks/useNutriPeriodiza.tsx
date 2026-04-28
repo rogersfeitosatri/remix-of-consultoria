@@ -94,7 +94,7 @@ export function useGutLogs(clientId?: string) {
     queryKey: ['np-gut-logs', clientId],
     enabled: !!clientId,
     queryFn: async (): Promise<GutLogRow[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('np_gut_training_logs')
         .select('*')
         .eq('client_id', clientId!)
@@ -151,7 +151,7 @@ export function usePhaseProtocol(clientId?: string) {
     queryKey: ['np-phase-protocol', clientId],
     enabled: !!clientId,
     queryFn: async (): Promise<PhaseProtocol | null> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('np_phase_protocols')
         .select('id, client_id, phase_override, override_reason, carboloading_checklist')
         .eq('client_id', clientId!)
@@ -167,7 +167,7 @@ export function useUpsertPhaseProtocol(clientId?: string, userId?: string) {
   return useMutation({
     mutationFn: async (input: Partial<PhaseProtocol>) => {
       if (!clientId || !userId) throw new Error('clientId/userId obrigatórios');
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('np_phase_protocols')
         .upsert({
           client_id: clientId,
