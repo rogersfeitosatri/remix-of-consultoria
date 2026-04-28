@@ -146,6 +146,7 @@ function AppRoutes() {
         <Route path="/metabolic-screening" element={<PublicMetabolicScreening />} />
         <Route path="/call/:slug" element={<PublicStrategicCall />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
+        <Route path="/np-checkin/:token" element={<PublicNpCheckin />} />
         <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
         <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
