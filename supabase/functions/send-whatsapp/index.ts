@@ -28,6 +28,50 @@ interface WhatsAppTemplate {
   updated_at: string;
 }
 
+/**
+ * Sanitize and validate a Brazilian phone number to E.164 (digits only, country code 55).
+ * Handles common cadastro corruption: extra spaces, parentheses, hyphens, duplicated DDI,
+ * leading zeros, missing 9th digit, etc.
+ *
+ * Returns { ok:true, phone } when normalized to 12 or 13 digits starting with 55.
+ * Returns { ok:false, reason } with a precise human-readable cause otherwise.
+ */
+function sanitizeBrazilianPhone(rawPhone: string | null | undefined): { ok: true; phone: string } | { ok: false; reason: string } {
+  if (!rawPhone) return { ok: false, reason: 'Telefone não cadastrado' };
+  // Strip everything except digits
+  let digits = String(rawPhone).replace(/\D/g, '');
+  if (digits.length === 0) return { ok: false, reason: 'Telefone vazio após sanitização' };
+
+  // Strip leading zeros (international trunk prefix)
+  while (digits.startsWith('0')) digits = digits.substring(1);
+
+  // Collapse duplicated DDI: "5555..." where second "55" is a real DDD is rare; treat
+  // any 14+ digit number that starts with "5555" as duplicated DDI.
+  if (digits.length >= 14 && digits.startsWith('5555')) {
+    digits = digits.substring(2);
+  }
+
+  // Add DDI if missing
+  if (!digits.startsWith('55')) {
+    digits = '55' + digits;
+  }
+
+  // Final validation: BR = 55 + 2-digit DDD + 8 or 9 digit subscriber = 12 or 13 digits
+  if (digits.length === 12 || digits.length === 13) {
+    // Sanity check: DDD must be 11..99 (no Brazilian DDD starts with 0 or 1 alone)
+    const ddd = parseInt(digits.substring(2, 4), 10);
+    if (ddd < 11 || ddd > 99) {
+      return { ok: false, reason: `DDD inválido (${digits.substring(2, 4)}) no telefone "${rawPhone}"` };
+    }
+    return { ok: true, phone: digits };
+  }
+
+  return {
+    ok: false,
+    reason: `Telefone com formato inválido: "${rawPhone}" → ${digits.length} dígitos (esperado 12 ou 13). Corrija o cadastro.`,
+  };
+}
+
 // Render template with variables - supports both {var} and {{var}} syntax
 function renderTemplateVars(
   template: { title?: string | null; body: string },
@@ -197,14 +241,38 @@ Deno.serve(async (req) => {
       throw new Error('Either message or templateKey+context must be provided');
     }
 
-    // Format phone number
-    let phone = client.phone.replace(/\D/g, '');
-    if (phone.startsWith('0')) {
-      phone = phone.substring(1);
+    // Sanitize and validate phone (E.164 BR). Fail-fast with a precise reason
+    // and log the rejection in whatsapp_message_logs so admins can audit/correct.
+    const phoneCheck = sanitizeBrazilianPhone(client.phone);
+    if (!phoneCheck.ok) {
+      console.error('[send-whatsapp] Invalid phone for client', clientId, '-', phoneCheck.reason);
+      try {
+        await supabase.from('whatsapp_message_logs').insert({
+          user_id: client.user_id,
+          client_id: clientId,
+          appointment_id: appointmentId || null,
+          message_type: templateKey || 'manual',
+          template_key: templateKey || null,
+          to_phone: String(client.phone || 'N/A').slice(0, 50),
+          status: 'failed',
+          blocked_reason: 'invalid_phone_format',
+          error_message: phoneCheck.reason,
+          payload_preview: finalMessage.substring(0, 500),
+          metadata: {
+            raw_phone: client.phone,
+            scheduled_checkin_id: scheduledCheckinId,
+            context: context || null,
+          },
+        });
+      } catch (logErr) {
+        console.error('[send-whatsapp] Failed to log invalid_phone:', logErr);
+      }
+      return new Response(
+        JSON.stringify({ error: phoneCheck.reason, blocked_reason: 'invalid_phone_format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-    if (!phone.startsWith('55')) {
-      phone = '55' + phone;
-    }
+    const phone = phoneCheck.phone;
 
     console.log('[send-whatsapp] Sending to phone:', phone);
 

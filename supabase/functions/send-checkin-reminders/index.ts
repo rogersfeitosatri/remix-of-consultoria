@@ -262,16 +262,20 @@ Deno.serve(async (req) => {
           }),
         });
 
-        const sendResult = await sendResponse.json();
+        const sendResult = await sendResponse.json().catch(() => ({}));
 
         if (!sendResponse.ok || sendResult.error) {
-          const errorMsg = sendResult.error || 'Unknown error';
-          console.error('[send-checkin-reminders] Send failed:', errorMsg);
-          // Atualiza dispatch como falha
+          // Surface the precise failure reason (telephone format, ZAPI rejection, etc.)
+          const errorMsg = sendResult.error
+            || sendResult.message
+            || `HTTP ${sendResponse.status} ${sendResponse.statusText}`;
+          const blockedReason = sendResult.blocked_reason || null;
+          console.error('[send-checkin-reminders] Send failed for client', checkin.client_id, '-', errorMsg);
           if (dispatchId) {
             await supabase.from('checkin_dispatches').update({
               status: 'failed',
               error_message: String(errorMsg).slice(0, 500),
+              provider_response: { blocked_reason: blockedReason, raw: sendResult },
             }).eq('id', dispatchId);
           }
           results.push({ checkinId: checkin.id, status: 'failed', error: errorMsg });
