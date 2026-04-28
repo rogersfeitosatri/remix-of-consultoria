@@ -3914,6 +3914,8 @@ export type Database = {
           decided_by: string | null
           decision: string | null
           decision_note: string | null
+          dynamic_form_id: string | null
+          dynamic_responses: Json
           energy_score: number | null
           gi_score: number | null
           id: string
@@ -3938,6 +3940,8 @@ export type Database = {
           decided_by?: string | null
           decision?: string | null
           decision_note?: string | null
+          dynamic_form_id?: string | null
+          dynamic_responses?: Json
           energy_score?: number | null
           gi_score?: number | null
           id?: string
@@ -3962,6 +3966,8 @@ export type Database = {
           decided_by?: string | null
           decision?: string | null
           decision_note?: string | null
+          dynamic_form_id?: string | null
+          dynamic_responses?: Json
           energy_score?: number | null
           gi_score?: number | null
           id?: string
@@ -3979,6 +3985,13 @@ export type Database = {
           weight_kg?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "np_periodization_checkins_dynamic_form_id_fkey"
+            columns: ["dynamic_form_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "np_periodization_checkins_link_id_fkey"
             columns: ["link_id"]
