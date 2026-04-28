@@ -21,6 +21,7 @@ import {
   type ActiveRace,
 } from '@/hooks/useNutriPeriodiza';
 import { useProtocolDefaults, getMergedProtocol } from '@/hooks/useNutriPeriodizaDefaults';
+import { useEvolutionSummaries, useGenerateEvolutionSummary } from '@/hooks/useNutriPeriodizaSummary';
 import {
   calculateWeeksToRace, calculatePhase, categorizeDistance,
   PHASE_META, DISTANCE_LABEL,
