@@ -511,6 +511,12 @@ export default function CheckinFormBuilder() {
             <Badge variant={form.is_active ? 'default' : 'secondary'}>
               {form.is_active ? 'Ativo' : 'Inativo'}
             </Badge>
+            {form.is_periodization && (
+              <Badge variant="outline" className="border-amber-500 text-amber-600 gap-1">
+                <Trophy className="h-3 w-3" />
+                Periodização
+              </Badge>
+            )}
           </div>
 
           <div className="flex gap-2">
@@ -518,7 +524,7 @@ export default function CheckinFormBuilder() {
               <Copy className="h-3 w-3" />
               Copiar Link
             </Button>
-            <Button variant="outline" size="sm" className="gap-1" onClick={() => window.open(`/form/${form.id}`, '_blank')}>
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => window.open(formPath, '_blank')}>
               <ExternalLink className="h-3 w-3" />
               Visualizar
             </Button>
