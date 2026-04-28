@@ -58,6 +58,7 @@ export function RacePrepTab({ clientId, userId }: Props) {
 
   const [raceDialogOpen, setRaceDialogOpen] = useState(false);
   const [logDialogOpen, setLogDialogOpen] = useState(false);
+  const [athleteSummaryOpen, setAthleteSummaryOpen] = useState(false);
 
   const weeks = useMemo(() => calculateWeeksToRace(race?.race_date), [race?.race_date]);
   const autoPhase = useMemo(() => calculatePhase(weeks), [weeks]);
