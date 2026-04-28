@@ -108,19 +108,49 @@ Deno.serve(async (req) => {
       .update({ used_at: new Date().toISOString(), active: false })
       .eq("id", ctx.link_id);
 
-    // Alert admin via WhatsApp when GI score is high (>= 7) — desconforto gastrointestinal relevante
+    // Notify admin via WhatsApp on EVERY check-in with system suggestion (advance/maintain/regress)
     try {
       const gi = insertPayload.gi_score;
-      if (gi != null && gi >= 7) {
-        const adherenceTxt = insertPayload.adherence_pct != null ? `${insertPayload.adherence_pct}%` : '—';
-        const energyTxt = insertPayload.energy_score != null ? `${insertPayload.energy_score}/10` : '—';
-        const msg = `⚠️ *Alerta de GI alto na Periodização*\n\nAtleta: *${ctx.client_name}*\nProva: ${ctx.race_name || '—'}\nFase atual: ${phase || '—'}\nGI score: *${gi}/10*\nAderência: ${adherenceTxt}\nEnergia: ${energyTxt}\n\nRevisar protocolo de carboidrato/gut training no perfil do atleta.`;
-        await supabase.functions.invoke('send-whatsapp', {
-          body: { phone: '+5599984817697', message: msg },
-        });
+      const adh = insertPayload.adherence_pct;
+      const energy = insertPayload.energy_score;
+      const sleep = insertPayload.sleep_score;
+
+      // Fetch last 2 GI scores for suggestion (this one + previous)
+      const { data: prevCheckins } = await supabase
+        .from('np_periodization_checkins')
+        .select('gi_score')
+        .eq('client_id', ctx.client_id)
+        .order('submitted_at', { ascending: false })
+        .limit(2);
+      const lastGI = prevCheckins?.[0]?.gi_score ?? gi;
+      const prevGI = prevCheckins?.[1]?.gi_score ?? null;
+
+      // Suggestion logic mirroring lib/nutriperiodiza.suggestProgression
+      let suggestion = '➡️ Manter';
+      let suggestionReason = 'Sintomas moderados ou histórico insuficiente.';
+      const high = (lastGI != null && lastGI > 4) || (prevGI != null && prevGI > 4);
+      const low = lastGI != null && lastGI <= 3 && prevGI != null && prevGI <= 3;
+      if (high) {
+        suggestion = '⬇️ Regredir';
+        suggestionReason = `GI elevado (último: ${lastGI ?? '—'}/10). Reduzir taxa CHO em ~10 g/h.`;
+      } else if (low) {
+        suggestion = '⬆️ Avançar';
+        suggestionReason = `GI baixo nos 2 últimos (${prevGI} e ${lastGI}). Avançar +10 g/h.`;
       }
+
+      const adherenceTxt = adh != null ? `${adh}%` : '—';
+      const energyTxt = energy != null ? `${energy}/10` : '—';
+      const sleepTxt = sleep != null ? `${sleep}/10` : '—';
+      const giTxt = gi != null ? `${gi}/10` : '—';
+      const giAlert = gi != null && gi >= 7 ? '\n\n⚠️ *ATENÇÃO: GI alto — revisar protocolo de gut training.*' : '';
+
+      const msg = `📋 *Novo check-in de Periodização*\n\nAtleta: *${ctx.client_name}*\nProva: ${ctx.race_name || '—'}\nFase atual: ${phase || '—'}\n\n• GI score: *${giTxt}*\n• Aderência: ${adherenceTxt}\n• Energia: ${energyTxt}\n• Sono: ${sleepTxt}\n\n*Sugestão do sistema:* ${suggestion}\n_${suggestionReason}_${giAlert}`;
+
+      await supabase.functions.invoke('send-whatsapp', {
+        body: { phone: '+5599984817697', message: msg },
+      });
     } catch (alertErr) {
-      console.error('GI alert dispatch failed', alertErr);
+      console.error('Check-in notification dispatch failed', alertErr);
     }
 
     return json({ ok: true });

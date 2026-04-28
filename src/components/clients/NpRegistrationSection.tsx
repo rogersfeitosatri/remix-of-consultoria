@@ -180,12 +180,41 @@ export function NpRegistrationSection({ clientId, onDraftChange }: Props) {
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="np_distance">Distância (km)</Label>
+                  <Label htmlFor="np_distance">Distância</Label>
+                  <Select
+                    value={
+                      draft.race_distance_km === 5 ? '5' :
+                      draft.race_distance_km === 10 ? '10' :
+                      draft.race_distance_km === 21.1 ? '21.1' :
+                      draft.race_distance_km === 42.2 ? '42.2' :
+                      draft.race_distance_km != null && draft.race_distance_km >= 50 ? 'ultra' :
+                      draft.race_distance_km != null ? 'custom' : ''
+                    }
+                    onValueChange={(v) => {
+                      if (v === 'custom' || v === 'ultra') {
+                        setDraft({ ...draft, race_distance_km: draft.race_distance_km ?? (v === 'ultra' ? 50 : null) });
+                      } else {
+                        setDraft({ ...draft, race_distance_km: Number(v) });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="np_distance">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5K</SelectItem>
+                      <SelectItem value="10">10K</SelectItem>
+                      <SelectItem value="21.1">Meia-maratona (21,1K)</SelectItem>
+                      <SelectItem value="42.2">Maratona (42,2K)</SelectItem>
+                      <SelectItem value="ultra">Ultramaratona (50K+)</SelectItem>
+                      <SelectItem value="custom">Personalizado</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Input
-                    id="np_distance"
                     type="number"
                     step="0.1"
                     min="0"
+                    placeholder="km exatos"
                     value={draft.race_distance_km ?? ''}
                     onChange={(e) =>
                       setDraft({ ...draft, race_distance_km: e.target.value ? Number(e.target.value) : null })
