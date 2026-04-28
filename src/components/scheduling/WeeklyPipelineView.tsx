@@ -192,6 +192,7 @@ export function WeeklyPipelineView({
     }
   };
 
+  const today = startOfDay(new Date());
   const currentWeekStart = startOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
   const currentWeekEnd = endOfWeek(addWeeks(today, weekOffset), { weekStartsOn: 1 });
 
