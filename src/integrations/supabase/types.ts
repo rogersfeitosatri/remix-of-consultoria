@@ -3295,6 +3295,59 @@ export type Database = {
           },
         ]
       }
+      np_athlete_races: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          race_date: string
+          race_distance_km: number
+          race_name: string | null
+          race_type: string
+          target_time_minutes: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          race_date: string
+          race_distance_km: number
+          race_name?: string | null
+          race_type?: string
+          target_time_minutes?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          race_date?: string
+          race_distance_km?: number
+          race_name?: string | null
+          race_type?: string
+          target_time_minutes?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_athlete_races_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       np_body_assessments: {
         Row: {
           abdomen: number | null
@@ -3951,7 +4004,7 @@ export type Database = {
             foreignKeyName: "np_phase_protocols_race_goal_id_fkey"
             columns: ["race_goal_id"]
             isOneToOne: false
-            referencedRelation: "target_races"
+            referencedRelation: "np_athlete_races"
             referencedColumns: ["id"]
           },
         ]
@@ -5030,34 +5083,19 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          is_active: boolean
           name: string
-          race_distance_km: number | null
-          race_type: string | null
-          target_time_minutes: number | null
-          updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          is_active?: boolean
           name: string
-          race_distance_km?: number | null
-          race_type?: string | null
-          target_time_minutes?: number | null
-          updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
-          is_active?: boolean
           name?: string
-          race_distance_km?: number | null
-          race_type?: string | null
-          target_time_minutes?: number | null
-          updated_at?: string
           user_id?: string
         }
         Relationships: []
