@@ -14,13 +14,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
-  Send, User, Edit2, Trash2, Check, RefreshCw, ArrowRight, CalendarDays, AlertTriangle, CheckCircle2,
+  Send, User, Edit2, Trash2, Check, RefreshCw, ArrowRight, CalendarDays, AlertTriangle, CheckCircle2, Copy, Link2,
 } from 'lucide-react';
 import { format, parseISO, getDay, addWeeks, nextMonday, isBefore, isPast, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ConsultationSchedule,
   Client,
