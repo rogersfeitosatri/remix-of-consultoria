@@ -14,13 +14,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
-  Send, User, Edit2, Trash2, Check, RefreshCw, ArrowRight, CalendarDays, AlertTriangle, CheckCircle2,
+  Send, User, Edit2, Trash2, Check, RefreshCw, ArrowRight, CalendarDays, AlertTriangle, CheckCircle2, Copy, Link2,
 } from 'lucide-react';
 import { format, parseISO, getDay, addWeeks, nextMonday, isBefore, isPast, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ConsultationSchedule,
   Client,
@@ -61,6 +61,61 @@ export function LinkScheduleEditDialog({
   const updateSchedule = useUpdateConsultationSchedule();
   const deleteSchedule = useDeleteConsultationSchedule();
   const queryClient = useQueryClient();
+
+  // Fetch booking links for the athletes shown in this dialog
+  const dayClientIds = selectedDate
+    ? Array.from(
+        new Set(
+          schedules
+            .filter(
+              (s) =>
+                s.status === 'pending' &&
+                format(parseISO(s.send_link_date), 'yyyy-MM-dd') ===
+                  format(selectedDate, 'yyyy-MM-dd')
+            )
+            .map((s) => s.client_id)
+        )
+      )
+    : [];
+
+  const { data: bookingLinks } = useQuery({
+    queryKey: ['booking-links-by-clients', dayClientIds.sort().join(',')],
+    queryFn: async () => {
+      if (dayClientIds.length === 0) return {} as Record<string, string>;
+      const { data, error } = await supabase
+        .from('booking_links')
+        .select('client_id, token')
+        .in('client_id', dayClientIds)
+        .eq('active', true);
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      (data || []).forEach((l: any) => {
+        if (l.client_id && l.token) map[l.client_id] = l.token;
+      });
+      return map;
+    },
+    enabled: open && dayClientIds.length > 0,
+  });
+
+  const getBookingUrl = (clientId: string) => {
+    const token = bookingLinks?.[clientId];
+    if (!token) return null;
+    return `${window.location.origin}/booking/${token}`;
+  };
+
+  const handleCopyBookingLink = async (clientId: string, clientName: string) => {
+    const url = getBookingUrl(clientId);
+    if (!url) {
+      toast.error('Link de agendamento não disponível para este atleta');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(`Link de ${clientName} copiado!`);
+    } catch {
+      toast.error('Não foi possível copiar o link');
+    }
+  };
 
   if (!selectedDate) return null;
 
@@ -315,6 +370,21 @@ export function LinkScheduleEditDialog({
 
                       {!isEditing && (
                         <div className="flex items-center gap-1">
+                          {/* Copy booking link */}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-primary hover:text-primary"
+                            onClick={() => handleCopyBookingLink(schedule.client_id, schedule.client_name)}
+                            title={
+                              getBookingUrl(schedule.client_id)
+                                ? 'Copiar link de agendamento'
+                                : 'Link de agendamento indisponível'
+                            }
+                            disabled={!getBookingUrl(schedule.client_id)}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
                           {/* Show confirm button for overdue items */}
                           {isPast(parseISO(schedule.send_link_date)) && !isToday(parseISO(schedule.send_link_date)) && (
                             <Button
@@ -392,6 +462,28 @@ export function LinkScheduleEditDialog({
                         </div>
                       )}
                     </div>
+
+                    {/* Booking link preview */}
+                    {!isEditing && getBookingUrl(schedule.client_id) && (
+                      <div className="mt-2 flex items-center gap-1.5 rounded-md bg-muted/60 px-2 py-1.5">
+                        <Link2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span
+                          className="text-[11px] text-muted-foreground truncate flex-1"
+                          title={getBookingUrl(schedule.client_id) || ''}
+                        >
+                          {getBookingUrl(schedule.client_id)}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-[11px] gap-1"
+                          onClick={() => handleCopyBookingLink(schedule.client_id, schedule.client_name)}
+                        >
+                          <Copy className="h-3 w-3" />
+                          Copiar
+                        </Button>
+                      </div>
+                    )}
 
                     {/* Edit panel */}
                     {isEditing && (
