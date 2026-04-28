@@ -3690,8 +3690,10 @@ export type Database = {
       }
       np_evolution_summaries: {
         Row: {
+          audience: string
           client_id: string
           created_at: string
+          edited_content: string | null
           id: string
           logs_analyzed: number
           model: string
@@ -3701,10 +3703,13 @@ export type Database = {
           summary_markdown: string
           user_id: string
           weeks_to_race: number | null
+          whatsapp_sent_at: string | null
         }
         Insert: {
+          audience?: string
           client_id: string
           created_at?: string
+          edited_content?: string | null
           id?: string
           logs_analyzed?: number
           model?: string
@@ -3714,10 +3719,13 @@ export type Database = {
           summary_markdown: string
           user_id: string
           weeks_to_race?: number | null
+          whatsapp_sent_at?: string | null
         }
         Update: {
+          audience?: string
           client_id?: string
           created_at?: string
+          edited_content?: string | null
           id?: string
           logs_analyzed?: number
           model?: string
@@ -3727,6 +3735,7 @@ export type Database = {
           summary_markdown?: string
           user_id?: string
           weeks_to_race?: number | null
+          whatsapp_sent_at?: string | null
         }
         Relationships: []
       }
@@ -3853,6 +3862,125 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      np_periodization_checkin_links: {
+        Row: {
+          active: boolean
+          client_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          token: string
+          updated_at: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          client_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          token: string
+          updated_at?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          client_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          token?: string
+          updated_at?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      np_periodization_checkins: {
+        Row: {
+          adherence_pct: number | null
+          client_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision: string | null
+          decision_note: string | null
+          energy_score: number | null
+          gi_score: number | null
+          id: string
+          link_id: string | null
+          long_run_completed: boolean | null
+          notes: string | null
+          phase: string | null
+          race_id: string | null
+          sleep_score: number | null
+          submitted_at: string
+          symptoms: Json | null
+          updated_at: string
+          user_id: string
+          weekly_mileage_km: number | null
+          weight_kg: number | null
+        }
+        Insert: {
+          adherence_pct?: number | null
+          client_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string | null
+          decision_note?: string | null
+          energy_score?: number | null
+          gi_score?: number | null
+          id?: string
+          link_id?: string | null
+          long_run_completed?: boolean | null
+          notes?: string | null
+          phase?: string | null
+          race_id?: string | null
+          sleep_score?: number | null
+          submitted_at?: string
+          symptoms?: Json | null
+          updated_at?: string
+          user_id: string
+          weekly_mileage_km?: number | null
+          weight_kg?: number | null
+        }
+        Update: {
+          adherence_pct?: number | null
+          client_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string | null
+          decision_note?: string | null
+          energy_score?: number | null
+          gi_score?: number | null
+          id?: string
+          link_id?: string | null
+          long_run_completed?: boolean | null
+          notes?: string | null
+          phase?: string | null
+          race_id?: string | null
+          sleep_score?: number | null
+          submitted_at?: string
+          symptoms?: Json | null
+          updated_at?: string
+          user_id?: string
+          weekly_mileage_km?: number | null
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_periodization_checkins_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "np_periodization_checkin_links"
             referencedColumns: ["id"]
           },
         ]
@@ -5803,6 +5931,17 @@ export type Database = {
         Returns: {
           available: boolean
           slot_time: string
+        }[]
+      }
+      get_np_checkin_context: {
+        Args: { p_token: string }
+        Returns: {
+          admin_user_id: string
+          client_id: string
+          client_name: string
+          link_id: string
+          race_date: string
+          race_name: string
         }[]
       }
       get_pending_booking_invites: {

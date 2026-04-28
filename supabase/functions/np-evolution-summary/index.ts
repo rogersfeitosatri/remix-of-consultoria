@@ -30,6 +30,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const clientId: string | undefined = body?.client_id;
+    const audience: 'admin' | 'athlete' = body?.audience === 'athlete' ? 'athlete' : 'admin';
     if (!clientId) {
       return new Response(JSON.stringify({ error: "client_id obrigatório" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -79,7 +80,11 @@ Deno.serve(async (req) => {
       else phase = "base";
     }
 
-    const systemPrompt = `Você é um nutricionista esportivo especialista em endurance, periodização nutricional e treino intestinal (gut training). Gere um resumo de evolução conciso, técnico e acionável para o profissional. Use português brasileiro. Estruture em markdown com seções: 1) Visão Geral, 2) Tolerância GI e progressão CHO, 3) Aderência ao protocolo, 4) Recomendações para a próxima semana. Seja específico com números (g/h, % aderência, GI Score 0-15). Máximo 350 palavras.`;
+    const firstName = (client.name || '').split(' ')[0] || 'atleta';
+
+    const systemPrompt = audience === 'athlete'
+      ? `Você é um nutricionista esportivo carismático escrevendo uma mensagem MOTIVACIONAL e PESSOAL para um atleta de endurance. Use português brasileiro, 2ª pessoa (você), tom acolhedor mas técnico-confiante. Estruture com emojis e linhas curtas. NÃO use markdown pesado nem títulos secos. Inclua: 1) reconhecimento honesto do que está indo bem, 2) ponto que precisa de atenção (sem dramatizar), 3) o que mudar para a próxima semana (1-3 ações claras), 4) frase final de incentivo conectada à prova alvo. Máximo 200 palavras. Trate o atleta pelo primeiro nome (${firstName}).`
+      : `Você é um nutricionista esportivo especialista em endurance, periodização nutricional e treino intestinal (gut training). Gere um resumo de evolução conciso, técnico e acionável para o profissional. Use português brasileiro. Estruture em markdown com seções: 1) Visão Geral, 2) Tolerância GI e progressão CHO, 3) Aderência ao protocolo, 4) Recomendações para a próxima semana. Seja específico com números (g/h, % aderência, GI Score 0-15). Máximo 350 palavras.`;
 
     const userPrompt = `Atleta: ${client.name}
 Prova alvo: ${race?.race_name ?? "(não definida)"} | distância: ${race?.race_distance_km ?? "?"}km | tipo: ${race?.race_type ?? "?"} | data: ${race?.race_date ?? "?"} | meta: ${race?.target_time_minutes ? race.target_time_minutes + "min" : "?"}
@@ -89,7 +94,7 @@ Protocolo da fase: ${protocol ? `CHO ${protocol.cho_target_g_h ?? "?"} g/h, Na $
 Logs de gut training (mais recentes primeiro, ${logs.length} registros):
 ${logs.map((l: any) => `- ${l.checkin_date}: CHO ${l.current_cho_rate_g_h ?? "?"} g/h (${l.cho_source ?? "?"}), aderência ${l.adherence_pct ?? "?"}%, GI Score ${l.gi_score_global ?? "?"}/15 (náusea ${l.gi_nausea}, distensão ${l.gi_bloating}, cólicas ${l.gi_cramps}, refluxo ${l.gi_reflux}, urgência ${l.gi_urgency}, diarreia ${l.gi_diarrhea})${l.notes ? " | " + l.notes : ""}`).join("\n") || "(sem logs)"}
 
-Gere o resumo de evolução agora.`;
+Gere ${audience === 'athlete' ? 'a mensagem motivacional para o atleta' : 'o resumo de evolução técnico'} agora.`;
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -135,8 +140,9 @@ Gere o resumo de evolução agora.`;
         summary_markdown: summary,
         recommendations: [],
         model: "openai/gpt-5",
+        audience,
       })
-      .select("id, created_at, summary_markdown, phase, weeks_to_race, logs_analyzed, model")
+      .select("id, created_at, summary_markdown, phase, weeks_to_race, logs_analyzed, model, audience")
       .single();
 
     if (insErr) throw insErr;
