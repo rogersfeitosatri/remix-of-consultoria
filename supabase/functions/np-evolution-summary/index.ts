@@ -30,6 +30,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const clientId: string | undefined = body?.client_id;
+    const audience: 'admin' | 'athlete' = body?.audience === 'athlete' ? 'athlete' : 'admin';
     if (!clientId) {
       return new Response(JSON.stringify({ error: "client_id obrigatório" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
