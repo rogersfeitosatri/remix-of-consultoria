@@ -241,14 +241,38 @@ Deno.serve(async (req) => {
       throw new Error('Either message or templateKey+context must be provided');
     }
 
-    // Format phone number
-    let phone = client.phone.replace(/\D/g, '');
-    if (phone.startsWith('0')) {
-      phone = phone.substring(1);
+    // Sanitize and validate phone (E.164 BR). Fail-fast with a precise reason
+    // and log the rejection in whatsapp_message_logs so admins can audit/correct.
+    const phoneCheck = sanitizeBrazilianPhone(client.phone);
+    if (!phoneCheck.ok) {
+      console.error('[send-whatsapp] Invalid phone for client', clientId, '-', phoneCheck.reason);
+      try {
+        await supabase.from('whatsapp_message_logs').insert({
+          user_id: client.user_id,
+          client_id: clientId,
+          appointment_id: appointmentId || null,
+          message_type: templateKey || 'manual',
+          template_key: templateKey || null,
+          to_phone: String(client.phone || 'N/A').slice(0, 50),
+          status: 'failed',
+          blocked_reason: 'invalid_phone_format',
+          error_message: phoneCheck.reason,
+          payload_preview: finalMessage.substring(0, 500),
+          metadata: {
+            raw_phone: client.phone,
+            scheduled_checkin_id: scheduledCheckinId,
+            context: context || null,
+          },
+        });
+      } catch (logErr) {
+        console.error('[send-whatsapp] Failed to log invalid_phone:', logErr);
+      }
+      return new Response(
+        JSON.stringify({ error: phoneCheck.reason, blocked_reason: 'invalid_phone_format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-    if (!phone.startsWith('55')) {
-      phone = '55' + phone;
-    }
+    const phone = phoneCheck.phone;
 
     console.log('[send-whatsapp] Sending to phone:', phone);
 
