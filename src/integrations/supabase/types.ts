@@ -1612,6 +1612,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          is_periodization: boolean
           title: string
           updated_at: string
           user_id: string
@@ -1621,6 +1622,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_periodization?: boolean
           title: string
           updated_at?: string
           user_id: string
@@ -1630,6 +1632,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_periodization?: boolean
           title?: string
           updated_at?: string
           user_id?: string
