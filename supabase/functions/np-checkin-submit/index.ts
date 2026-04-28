@@ -99,6 +99,8 @@ Deno.serve(async (req) => {
           : {},
       submitted_at: new Date().toISOString(),
     };
+
+    const { error: insErr } = await supabase
       .from("np_periodization_checkins")
       .insert(insertPayload);
 
