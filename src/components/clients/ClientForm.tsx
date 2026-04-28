@@ -16,6 +16,7 @@ import { useAdminSettings } from '@/hooks/useAdminSettings';
 import { PlanTypeBadge } from './PlanTypeBadge';
 import { validatePlanFeasibility } from '@/lib/planTypology';
 import { PipelinePreviewDialog } from './PipelinePreviewDialog';
+import { NpRegistrationSection } from './NpRegistrationSection';
 
 interface CalculatedWindow {
   windowStart: Date;
@@ -1044,6 +1045,9 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               rows={3}
             />
           </div>
+
+          {/* Periodização Nutricional + Prova Alvo */}
+          <NpRegistrationSection clientId={client?.id} />
 
           {/* Status do Atleta */}
           <div className="grid gap-4 sm:grid-cols-2">
