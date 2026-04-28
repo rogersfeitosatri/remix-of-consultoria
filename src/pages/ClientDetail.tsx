@@ -23,8 +23,10 @@ import {
   TrendingUp,
   Snowflake,
   Play,
-  RefreshCw
+  RefreshCw,
+  Trophy
 } from 'lucide-react';
+import { RacePrepTab } from '@/components/admin/RacePrepTab';
 import { useClients, useDeleteClient, useUpdateClient } from '@/hooks/useClients';
 import { useSchedulingSettings } from '@/hooks/useScheduling';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
@@ -514,6 +516,10 @@ export default function ClientDetail() {
               <GitBranch className="h-4 w-4" />
               Pipeline
             </TabsTrigger>
+            <TabsTrigger value="raceprep" className="gap-2">
+              <Trophy className="h-4 w-4" />
+              Preparação de Prova
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="timeline">
@@ -526,6 +532,10 @@ export default function ClientDetail() {
           <TabsContent value="pipeline" className="space-y-4">
             <PipelineAuditPanel clientId={client.id} />
             <PipelineTimelineTab clientId={client.id} />
+          </TabsContent>
+
+          <TabsContent value="raceprep">
+            {user?.id && <RacePrepTab clientId={client.id} userId={user.id} />}
           </TabsContent>
           
           <TabsContent value="anamnese">
