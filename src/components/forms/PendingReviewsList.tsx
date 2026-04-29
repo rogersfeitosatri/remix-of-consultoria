@@ -259,6 +259,15 @@ export function PendingReviewsList() {
                 {CHECKIN_LABELS[freq]}
               </Badge>
             )}
+            {response.planTypology && (
+              <Badge
+                variant="outline"
+                className="text-[9px] sm:text-[10px] px-1 py-0 h-4 sm:h-5 bg-secondary/40 text-secondary-foreground border-secondary"
+                title={response.planTypology.description}
+              >
+                {response.planTypology.emoji} {response.planTypology.shortLabel}
+              </Badge>
+            )}
             {response.targetRace && (
               <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 py-0 h-4 sm:h-5 bg-accent text-accent-foreground border-accent gap-0.5">
                 <Target className="h-2.5 w-2.5" />
@@ -266,6 +275,11 @@ export function PendingReviewsList() {
               </Badge>
             )}
           </div>
+          {response.planTypology?.description && (
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 italic line-clamp-1">
+              {response.planTypology.description}
+            </p>
+          )}
         </div>
 
         {/* Actions - compact on mobile */}
