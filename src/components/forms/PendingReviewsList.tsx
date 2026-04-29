@@ -13,6 +13,7 @@ import { parseISO, format, differenceInHours, differenceInDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { CHECKIN_LABELS, type CheckinFrequency } from '@/types/client';
+import { classifyPlan, type PlanTypology } from '@/lib/planTypology';
 
 interface PendingCheckinResponse {
   id: string;
@@ -24,6 +25,11 @@ interface PendingCheckinResponse {
     name: string;
     checkin_frequency: string | null;
     has_checkin: boolean;
+    has_consultations: boolean | null;
+    consultation_count: number | null;
+    consultation_frequency: string | null;
+    plan_type: string | null;
+    service_type: string | null;
   };
   checkin_forms: {
     title: string;
@@ -31,6 +37,7 @@ interface PendingCheckinResponse {
   hasFeedback: boolean;
   feedbackStatus: string | null;
   targetRace: string | null;
+  planTypology: PlanTypology;
 }
 
 const FREQUENCY_OPTIONS = [
