@@ -33,6 +33,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { EvolutionAnalysisTab } from '@/components/checkin/EvolutionAnalysisTab';
+import { CheckinReviewPdfButton } from '@/components/checkin/CheckinReviewPdfButton';
 
 interface CheckinResponse {
   id: string;
