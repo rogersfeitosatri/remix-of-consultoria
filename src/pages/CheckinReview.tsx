@@ -33,6 +33,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { EvolutionAnalysisTab } from '@/components/checkin/EvolutionAnalysisTab';
+import { CheckinReviewPdfButton } from '@/components/checkin/CheckinReviewPdfButton';
 
 interface CheckinResponse {
   id: string;
@@ -552,6 +553,12 @@ export default function CheckinReview() {
           </div>
 
           <div className="flex items-center gap-2">
+            <CheckinReviewPdfButton
+              checkinResponse={checkinResponse as any}
+              questions={questions as any}
+              athleteProfile={athleteProfile as any}
+              targetRaceDays={targetRaceDays}
+            />
             <Button
               variant="outline"
               size="sm"
