@@ -79,7 +79,7 @@ export function PendingReviewsList() {
           client_id,
           submitted_at,
           form_id,
-          clients (id, name, checkin_frequency, has_checkin),
+          clients (id, name, checkin_frequency, has_checkin, has_consultations, consultation_count, consultation_frequency, plan_type, service_type),
           checkin_forms (title)
         `)
         .order('submitted_at', { ascending: false })
@@ -111,6 +111,7 @@ export function PendingReviewsList() {
           hasFeedback: feedbackMap.has(r.id),
           feedbackStatus: feedbackMap.get(r.id) || null,
           targetRace: targetRaceMap.get(r.client_id) || null,
+          planTypology: classifyPlan(r.clients || {}),
         })) as PendingCheckinResponse[];
     },
     enabled: !!user,
