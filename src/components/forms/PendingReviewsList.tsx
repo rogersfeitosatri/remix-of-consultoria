@@ -13,6 +13,7 @@ import { parseISO, format, differenceInHours, differenceInDays } from 'date-fns'
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { CHECKIN_LABELS, type CheckinFrequency } from '@/types/client';
+import { classifyPlan, type PlanTypology } from '@/lib/planTypology';
 
 interface PendingCheckinResponse {
   id: string;
@@ -24,6 +25,11 @@ interface PendingCheckinResponse {
     name: string;
     checkin_frequency: string | null;
     has_checkin: boolean;
+    has_consultations: boolean | null;
+    consultation_count: number | null;
+    consultation_frequency: string | null;
+    plan_type: string | null;
+    service_type: string | null;
   };
   checkin_forms: {
     title: string;
@@ -31,6 +37,7 @@ interface PendingCheckinResponse {
   hasFeedback: boolean;
   feedbackStatus: string | null;
   targetRace: string | null;
+  planTypology: PlanTypology;
 }
 
 const FREQUENCY_OPTIONS = [
@@ -72,7 +79,7 @@ export function PendingReviewsList() {
           client_id,
           submitted_at,
           form_id,
-          clients (id, name, checkin_frequency, has_checkin),
+          clients (id, name, checkin_frequency, has_checkin, has_consultations, consultation_count, consultation_frequency, plan_type, service_type),
           checkin_forms (title)
         `)
         .order('submitted_at', { ascending: false })
@@ -104,6 +111,7 @@ export function PendingReviewsList() {
           hasFeedback: feedbackMap.has(r.id),
           feedbackStatus: feedbackMap.get(r.id) || null,
           targetRace: targetRaceMap.get(r.client_id) || null,
+          planTypology: classifyPlan(r.clients || {}),
         })) as PendingCheckinResponse[];
     },
     enabled: !!user,
@@ -251,6 +259,15 @@ export function PendingReviewsList() {
                 {CHECKIN_LABELS[freq]}
               </Badge>
             )}
+            {response.planTypology && (
+              <Badge
+                variant="outline"
+                className="text-[9px] sm:text-[10px] px-1 py-0 h-4 sm:h-5 bg-secondary/40 text-secondary-foreground border-secondary"
+                title={response.planTypology.description}
+              >
+                {response.planTypology.emoji} {response.planTypology.shortLabel}
+              </Badge>
+            )}
             {response.targetRace && (
               <Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 py-0 h-4 sm:h-5 bg-accent text-accent-foreground border-accent gap-0.5">
                 <Target className="h-2.5 w-2.5" />
@@ -258,6 +275,11 @@ export function PendingReviewsList() {
               </Badge>
             )}
           </div>
+          {response.planTypology?.description && (
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 italic line-clamp-1">
+              {response.planTypology.description}
+            </p>
+          )}
         </div>
 
         {/* Actions - compact on mobile */}
