@@ -284,6 +284,7 @@ export default function AppointmentDetail() {
         appointmentId,
         notifyClient: true,
         reason: cancelReason,
+        force: true,
       });
       
       toast.success('Consulta cancelada');
