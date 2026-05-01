@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       .from('google_calendar_connections')
       .select('*')
       .eq('user_id', adminUserId)
-      .single();
+      .maybeSingle();
 
     // Delete Google Calendar event if exists
     if (appointment.google_calendar_event_id && calendarConnection?.is_connected) {
