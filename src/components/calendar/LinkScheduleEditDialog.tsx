@@ -253,10 +253,16 @@ export function LinkScheduleEditDialog({
       const schedule = allSchedules.find((s) => s.id === scheduleId);
       if (!schedule) throw new Error('Schedule not found');
 
-      // Mark schedule as completed
+      // Determine if the consultation date is in the future or past/today
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const isFuture = consultDate > todayStr;
+      const targetStatus = isFuture ? 'scheduled' : 'completed';
+      const targetApptStatus = isFuture ? 'confirmed' : 'completed';
+
+      // Update schedule status accordingly
       await supabase
         .from('consultation_schedules')
-        .update({ status: 'completed', scheduled_date: consultDate, updated_at: new Date().toISOString() })
+        .update({ status: targetStatus, scheduled_date: consultDate, updated_at: new Date().toISOString() })
         .eq('id', scheduleId);
 
       // Check if appointment exists
@@ -283,13 +289,15 @@ export function LinkScheduleEditDialog({
             appointment_date: consultDate,
             appointment_time: '09:00',
             duration_minutes: 60,
-            status: 'completed',
-            notes_admin: 'Consulta confirmada manualmente (retroativa)',
+            status: targetApptStatus,
+            notes_admin: isFuture
+              ? 'Consulta confirmada manualmente (futura)'
+              : 'Consulta confirmada manualmente (retroativa)',
             timezone: 'America/Fortaleza',
           });
         }
       } else {
-        await supabase.from('appointments').update({ status: 'completed' }).eq('id', existingApt.id);
+        await supabase.from('appointments').update({ status: targetApptStatus }).eq('id', existingApt.id);
       }
 
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
