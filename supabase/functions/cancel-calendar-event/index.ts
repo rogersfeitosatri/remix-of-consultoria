@@ -9,6 +9,7 @@ interface CancelEventRequest {
   appointmentId: string;
   notifyClient?: boolean;
   reason?: string;
+  force?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -21,8 +22,8 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { appointmentId, notifyClient = true, reason }: CancelEventRequest = await req.json();
-    console.log('Cancelling appointment:', appointmentId);
+    const { appointmentId, notifyClient = true, reason, force = false }: CancelEventRequest = await req.json();
+    console.log('Cancelling appointment:', appointmentId, 'force:', force);
 
     // Get appointment details
     const { data: appointment, error: appointmentError } = await supabase
@@ -35,23 +36,29 @@ Deno.serve(async (req) => {
       .single();
 
     if (appointmentError || !appointment) {
-      throw new Error('Appointment not found');
+      console.error('Appointment fetch error:', appointmentError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Agendamento não encontrado' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Check 24h rule
-    const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
-    const now = new Date();
-    const hoursUntilAppointment = (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    // Check 24h rule (skip when force=true, e.g. admin override)
+    if (!force) {
+      const appointmentDateTime = new Date(`${appointment.appointment_date}T${appointment.appointment_time}`);
+      const now = new Date();
+      const hoursUntilAppointment = (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (hoursUntilAppointment < 24) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Não é possível cancelar com menos de 24 horas de antecedência',
-          hoursRemaining: Math.round(hoursUntilAppointment),
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      if (hoursUntilAppointment < 24) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Não é possível cancelar com menos de 24 horas de antecedência',
+            hoursRemaining: Math.round(hoursUntilAppointment),
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Get admin's Google Calendar connection
@@ -60,7 +67,7 @@ Deno.serve(async (req) => {
       .from('google_calendar_connections')
       .select('*')
       .eq('user_id', adminUserId)
-      .single();
+      .maybeSingle();
 
     // Delete Google Calendar event if exists
     if (appointment.google_calendar_event_id && calendarConnection?.is_connected) {
