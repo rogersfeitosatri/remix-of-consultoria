@@ -9,6 +9,7 @@ interface CancelEventRequest {
   appointmentId: string;
   notifyClient?: boolean;
   reason?: string;
+  force?: boolean;
 }
 
 Deno.serve(async (req) => {
