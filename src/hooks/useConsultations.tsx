@@ -586,14 +586,16 @@ export function useCancelAppointment() {
     mutationFn: async ({ 
       appointmentId, 
       notifyClient = true, 
-      reason 
+      reason,
+      force = false,
     }: { 
       appointmentId: string; 
       notifyClient?: boolean; 
       reason?: string;
+      force?: boolean;
     }) => {
       const { data, error } = await supabase.functions.invoke('cancel-calendar-event', {
-        body: { appointmentId, notifyClient, reason },
+        body: { appointmentId, notifyClient, reason, force },
       });
 
       if (error) throw error;
