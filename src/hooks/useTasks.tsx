@@ -256,6 +256,9 @@ export function useCreateTask() {
           recurrence_interval: data.recurrence_interval ?? 1,
           recurrence_end_date: data.recurrence_end_date ?? null,
           xp_reward: data.xp_reward ?? 10,
+          reminder_enabled: data.reminder_enabled ?? false,
+          reminder_minutes_before: data.reminder_minutes_before ?? 15,
+          reminder_method: data.reminder_method ?? 'app',
         })
         .select()
         .single();
