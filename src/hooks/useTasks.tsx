@@ -234,6 +234,8 @@ export function useCreateTask() {
       reminder_enabled?: boolean;
       reminder_minutes_before?: number;
       reminder_method?: 'app' | 'whatsapp' | 'both';
+    }) => {
+      if (!user?.id) throw new Error('Not authenticated');
 
       const { data: task, error } = await supabase
         .from('tasks')
