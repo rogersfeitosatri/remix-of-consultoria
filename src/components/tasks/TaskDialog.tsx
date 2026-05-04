@@ -84,6 +84,12 @@ export function TaskDialog({
   const [clientId, setClientId] = useState<string>('');
   const [taskType, setTaskType] = useState<TaskType>('custom');
   const [priority, setPriority] = useState<TaskPriority>('medium');
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('none');
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
+  const [recurrenceDayOfMonth, setRecurrenceDayOfMonth] = useState<number>(1);
+  const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>();
+  const [xpReward, setXpReward] = useState<number>(10);
 
   const createLabel = useCreateLabel();
   const deleteLabel = useDeleteLabel();
@@ -101,6 +107,12 @@ export function TaskDialog({
       setClientId(task.client_id || '');
       setTaskType(task.task_type || 'custom');
       setPriority(task.priority || 'medium');
+      setRecurrenceType(task.recurrence_type || 'none');
+      setRecurrenceDays(task.recurrence_days || []);
+      setRecurrenceDayOfMonth(task.recurrence_day_of_month || 1);
+      setRecurrenceInterval(task.recurrence_interval || 1);
+      setRecurrenceEndDate(task.recurrence_end_date ? new Date(task.recurrence_end_date + 'T12:00:00') : undefined);
+      setXpReward(task.xp_reward ?? 10);
     } else {
       setTitle('');
       setDescription('');
@@ -111,6 +123,12 @@ export function TaskDialog({
       setClientId('');
       setTaskType('custom');
       setPriority('medium');
+      setRecurrenceType('none');
+      setRecurrenceDays([]);
+      setRecurrenceDayOfMonth(1);
+      setRecurrenceInterval(1);
+      setRecurrenceEndDate(undefined);
+      setXpReward(10);
     }
     setShowNewLabel(false);
     setNewLabelName('');
@@ -130,6 +148,12 @@ export function TaskDialog({
       client_id: clientId && clientId !== 'none' ? clientId : undefined,
       task_type: taskType,
       priority,
+      recurrence_type: recurrenceType,
+      recurrence_days: recurrenceType === 'weekly' ? recurrenceDays : null,
+      recurrence_day_of_month: recurrenceType === 'monthly' ? recurrenceDayOfMonth : null,
+      recurrence_interval: recurrenceInterval,
+      recurrence_end_date: recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : null,
+      xp_reward: xpReward,
     });
 
     onOpenChange(false);
