@@ -381,7 +381,8 @@ export function useCompleteTask() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      toast.success('Tarefa concluída!');
+      queryClient.invalidateQueries({ queryKey: ['task-gamification'] });
+      toast.success('Tarefa concluída! +XP 🎉');
     },
     onError: () => {
       toast.error('Erro ao concluir tarefa');
