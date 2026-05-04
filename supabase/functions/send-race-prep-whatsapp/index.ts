@@ -45,29 +45,21 @@ function fortalezaToday(): { dateStr: string; dow: number } {
   return { dateStr, dow };
 }
 
-function buildMessage(eventType: string, ctx: {
-  athleteName: string;
-  raceName: string;
-  raceDate: string;
-  daysToRace: number;
-  distanceKm: number;
-  phaseLabel: string;
-}): string {
-  const dateBR = new Date(ctx.raceDate + 'T00:00:00').toLocaleDateString('pt-BR');
-  switch (eventType) {
-    case 'phase_taper_entry':
-      return `🪶 *${ctx.athleteName}*, você entrou na fase TAPER da preparação para *${ctx.raceName}* (${dateBR}).\n\nHora de polir: reduzir volume, manter intensidade curta e iniciar o protocolo de carbo-loading conforme combinado. Sem testar nada novo a partir de agora!`;
-    case 'carboloading_start':
-      return `🍝 *${ctx.athleteName}*, faltam *${ctx.daysToRace} dias* para *${ctx.raceName}*. É hora de começar o *carbo-loading*!\n\nSiga o protocolo definido (carboidrato alto, fibra reduzida, hidratação caprichada). Em caso de dúvida, fale comigo.`;
-    case 'protocol_7_days_pre_race':
-      return `📋 *${ctx.athleteName}*, faltam *7 dias* para *${ctx.raceName}* (${dateBR}).\n\nProtocolo da última semana:\n• Hidratação reforçada (35–40 ml/kg/dia)\n• Sono ≥ 8h e zero novidades alimentares\n• Carbo-loading começa em 4 dias (se prova ≥ 21k)\n• Confira gel/bebida/sal já testados nos longos\n• Pré-treino race-day já validado\n\nQualquer dúvida, me chama. Vamos fechar essa preparação com tudo!`;
-    case 'gut_training_weekly':
-      return `🦠 Bom dia, *${ctx.athleteName}*! Lembrete da semana: rodar o *treino intestinal* nos longos da fase ${ctx.phaseLabel}.\n\nNão esqueça de registrar a taxa de CHO (g/h) e os sintomas após o treino para ajustarmos a progressão.`;
-    case 'race_day':
-      return `🏁 É HOJE, *${ctx.athleteName}*! Sua prova: *${ctx.raceName}*.\n\nProtocolo race-day já testado: respeite o pré, intra e a hidratação. Boa prova! Estarei na torcida 🚀`;
-    default:
-      return `Lembrete da preparação para ${ctx.raceName}.`;
+// Mapa de event_type → template_key na Central de Mensagens
+const EVENT_TEMPLATE_MAP: Record<string, string> = {
+  phase_taper_entry: 'np_phase_taper_entry',
+  carboloading_start: 'np_carboloading_start',
+  protocol_7_days_pre_race: 'np_protocol_7_days_pre_race',
+  gut_training_weekly: 'np_gut_training_weekly',
+  race_day: 'np_race_day',
+};
+
+function renderTemplate(body: string, vars: Record<string, string | number>): string {
+  let out = body;
+  for (const [k, v] of Object.entries(vars)) {
+    out = out.split(`{${k}}`).join(String(v));
   }
+  return out;
 }
 
 Deno.serve(async (req) => {
@@ -158,7 +150,35 @@ Deno.serve(async (req) => {
       for (const ev of events) {
         if (!ev.shouldFire) continue;
 
-        // Verificar idempotência
+        const templateKey = EVENT_TEMPLATE_MAP[ev.type];
+        if (!templateKey) continue;
+
+        // 1) Verificar se o template está ATIVO na Central de Mensagens
+        const { data: tpl } = await supabase
+          .from('whatsapp_templates')
+          .select('body, is_active')
+          .eq('user_id', race.user_id)
+          .eq('template_key', templateKey)
+          .maybeSingle();
+
+        if (!tpl || tpl.is_active === false) {
+          console.log('[race-prep] template inactive/missing:', templateKey, '— skipping');
+          continue;
+        }
+
+        // 2) Verificar opt-out do atleta
+        const { data: optOut } = await supabase
+          .from('athlete_notification_settings')
+          .select('disabled_all, disabled_template_keys')
+          .eq('client_id', race.client_id)
+          .maybeSingle();
+
+        if (optOut?.disabled_all || optOut?.disabled_template_keys?.includes(templateKey)) {
+          console.log('[race-prep] athlete opted out:', client.name, templateKey);
+          continue;
+        }
+
+        // 3) Verificar idempotência
         const { data: already } = await supabase
           .from('np_event_dispatches')
           .select('id')
@@ -169,18 +189,18 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (already) continue;
 
-        const message = buildMessage(ev.type, {
-          athleteName: client.name,
-          raceName: race.race_name || 'sua prova',
-          raceDate: race.race_date,
-          daysToRace: days,
-          distanceKm,
-          phaseLabel: ev.phaseLabel,
+        const dateBR = new Date(race.race_date + 'T00:00:00').toLocaleDateString('pt-BR');
+        const message = renderTemplate(tpl.body, {
+          nome: client.name,
+          race_name: race.race_name || 'sua prova',
+          race_date: dateBR,
+          days_to_race: days,
+          phase_label: ev.phaseLabel,
         });
 
         // Disparar via send-whatsapp existente
         const { error: sendErr } = await supabase.functions.invoke('send-whatsapp', {
-          body: { clientId: race.client_id, message },
+          body: { clientId: race.client_id, message, templateKey },
         });
 
         // Registrar dispatch (mesmo se falhou, para evitar loop)
