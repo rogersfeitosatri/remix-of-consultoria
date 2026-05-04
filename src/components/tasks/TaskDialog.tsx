@@ -23,6 +23,7 @@ import {
   TaskLabel,
   TaskType,
   TaskPriority,
+  RecurrenceType,
   TASK_TYPE_LABELS,
   TASK_PRIORITY_LABELS,
   useCreateLabel,
@@ -54,6 +55,12 @@ interface TaskDialogProps {
     client_id?: string;
     task_type?: TaskType;
     priority?: TaskPriority;
+    recurrence_type?: RecurrenceType;
+    recurrence_days?: number[] | null;
+    recurrence_day_of_month?: number | null;
+    recurrence_interval?: number;
+    recurrence_end_date?: string | null;
+    xp_reward?: number;
   }) => void;
 }
 
