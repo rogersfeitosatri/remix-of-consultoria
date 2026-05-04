@@ -150,7 +150,35 @@ Deno.serve(async (req) => {
       for (const ev of events) {
         if (!ev.shouldFire) continue;
 
-        // Verificar idempotência
+        const templateKey = EVENT_TEMPLATE_MAP[ev.type];
+        if (!templateKey) continue;
+
+        // 1) Verificar se o template está ATIVO na Central de Mensagens
+        const { data: tpl } = await supabase
+          .from('whatsapp_templates')
+          .select('body, is_active')
+          .eq('user_id', race.user_id)
+          .eq('template_key', templateKey)
+          .maybeSingle();
+
+        if (!tpl || tpl.is_active === false) {
+          console.log('[race-prep] template inactive/missing:', templateKey, '— skipping');
+          continue;
+        }
+
+        // 2) Verificar opt-out do atleta
+        const { data: optOut } = await supabase
+          .from('athlete_notification_settings')
+          .select('disabled_all, disabled_template_keys')
+          .eq('client_id', race.client_id)
+          .maybeSingle();
+
+        if (optOut?.disabled_all || optOut?.disabled_template_keys?.includes(templateKey)) {
+          console.log('[race-prep] athlete opted out:', client.name, templateKey);
+          continue;
+        }
+
+        // 3) Verificar idempotência
         const { data: already } = await supabase
           .from('np_event_dispatches')
           .select('id')
@@ -161,18 +189,18 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (already) continue;
 
-        const message = buildMessage(ev.type, {
-          athleteName: client.name,
-          raceName: race.race_name || 'sua prova',
-          raceDate: race.race_date,
-          daysToRace: days,
-          distanceKm,
-          phaseLabel: ev.phaseLabel,
+        const dateBR = new Date(race.race_date + 'T00:00:00').toLocaleDateString('pt-BR');
+        const message = renderTemplate(tpl.body, {
+          nome: client.name,
+          race_name: race.race_name || 'sua prova',
+          race_date: dateBR,
+          days_to_race: days,
+          phase_label: ev.phaseLabel,
         });
 
         // Disparar via send-whatsapp existente
         const { error: sendErr } = await supabase.functions.invoke('send-whatsapp', {
-          body: { clientId: race.client_id, message },
+          body: { clientId: race.client_id, message, templateKey },
         });
 
         // Registrar dispatch (mesmo se falhou, para evitar loop)
