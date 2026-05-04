@@ -52,6 +52,7 @@ export type Database = {
       }
       admin_settings: {
         Row: {
+          admin_whatsapp_number: string | null
           created_at: string | null
           enable_continuation_mode: boolean | null
           id: string
@@ -59,6 +60,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          admin_whatsapp_number?: string | null
           created_at?: string | null
           enable_continuation_mode?: boolean | null
           id?: string
@@ -66,6 +68,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          admin_whatsapp_number?: string | null
           created_at?: string | null
           enable_continuation_mode?: boolean | null
           id?: string
