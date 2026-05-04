@@ -93,6 +93,9 @@ export function TaskDialog({
   const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>();
   const [xpReward, setXpReward] = useState<number>(10);
+  const [reminderEnabled, setReminderEnabled] = useState<boolean>(false);
+  const [reminderMinutesBefore, setReminderMinutesBefore] = useState<number>(15);
+  const [reminderMethod, setReminderMethod] = useState<'app' | 'whatsapp' | 'both'>('app');
 
   const createLabel = useCreateLabel();
   const deleteLabel = useDeleteLabel();
