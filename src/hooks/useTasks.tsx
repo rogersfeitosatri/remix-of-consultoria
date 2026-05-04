@@ -38,6 +38,8 @@ export interface TaskLabel {
   created_at: string;
 }
 
+export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly';
+
 export interface Task {
   id: string;
   user_id: string;
@@ -57,6 +59,13 @@ export interface Task {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  recurrence_type: RecurrenceType;
+  recurrence_days: number[] | null;
+  recurrence_day_of_month: number | null;
+  recurrence_interval: number;
+  recurrence_end_date: string | null;
+  parent_task_id: string | null;
+  xp_reward: number;
   labels?: TaskLabel[];
   client_name?: string;
 }
