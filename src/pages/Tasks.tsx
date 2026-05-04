@@ -27,11 +27,14 @@ export default function Tasks() {
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Tarefas</h1>
-          <p className="mt-1 text-sm sm:text-base text-muted-foreground">
-            Organize suas tarefas manualmente, configure recorrências e ganhe XP ao concluí-las.
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Tarefas</h1>
+            <p className="mt-1 text-sm sm:text-base text-muted-foreground">
+              Organize suas tarefas manualmente, configure recorrências e ganhe XP ao concluí-las.
+            </p>
+          </div>
+          <TaskNotificationsBell />
         </div>
 
         <GamificationPanel />
