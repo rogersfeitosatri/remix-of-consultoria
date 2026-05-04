@@ -300,6 +300,12 @@ export function useUpdateTask() {
       client_id?: string | null;
       task_type?: TaskType;
       completed_at?: string | null;
+      recurrence_type?: RecurrenceType;
+      recurrence_days?: number[] | null;
+      recurrence_day_of_month?: number | null;
+      recurrence_interval?: number;
+      recurrence_end_date?: string | null;
+      xp_reward?: number;
     }) => {
       const { id, label_ids, ...updateData } = data;
 
