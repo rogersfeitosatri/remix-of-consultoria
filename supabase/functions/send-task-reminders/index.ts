@@ -57,11 +57,11 @@ Deno.serve(async (req) => {
     // WhatsApp
     if (t.reminder_method === 'whatsapp' || t.reminder_method === 'both') {
       const { data: prof } = await supabase
-        .from('profiles')
-        .select('whatsapp, phone')
-        .eq('id', t.user_id)
+        .from('admin_settings')
+        .select('admin_whatsapp_number')
+        .eq('user_id', t.user_id)
         .maybeSingle();
-      const phone = (prof as any)?.whatsapp || (prof as any)?.phone;
+      const phone = (prof as any)?.admin_whatsapp_number;
       if (phone) {
         try {
           await supabase.functions.invoke('send-whatsapp', {
