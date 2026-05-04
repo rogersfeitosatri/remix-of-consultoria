@@ -231,8 +231,9 @@ export function useCreateTask() {
       recurrence_interval?: number;
       recurrence_end_date?: string | null;
       xp_reward?: number;
-    }) => {
-      if (!user?.id) throw new Error('Not authenticated');
+      reminder_enabled?: boolean;
+      reminder_minutes_before?: number;
+      reminder_method?: 'app' | 'whatsapp' | 'both';
 
       const { data: task, error } = await supabase
         .from('tasks')
