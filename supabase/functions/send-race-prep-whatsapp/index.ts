@@ -45,29 +45,21 @@ function fortalezaToday(): { dateStr: string; dow: number } {
   return { dateStr, dow };
 }
 
-function buildMessage(eventType: string, ctx: {
-  athleteName: string;
-  raceName: string;
-  raceDate: string;
-  daysToRace: number;
-  distanceKm: number;
-  phaseLabel: string;
-}): string {
-  const dateBR = new Date(ctx.raceDate + 'T00:00:00').toLocaleDateString('pt-BR');
-  switch (eventType) {
-    case 'phase_taper_entry':
-      return `🪶 *${ctx.athleteName}*, você entrou na fase TAPER da preparação para *${ctx.raceName}* (${dateBR}).\n\nHora de polir: reduzir volume, manter intensidade curta e iniciar o protocolo de carbo-loading conforme combinado. Sem testar nada novo a partir de agora!`;
-    case 'carboloading_start':
-      return `🍝 *${ctx.athleteName}*, faltam *${ctx.daysToRace} dias* para *${ctx.raceName}*. É hora de começar o *carbo-loading*!\n\nSiga o protocolo definido (carboidrato alto, fibra reduzida, hidratação caprichada). Em caso de dúvida, fale comigo.`;
-    case 'protocol_7_days_pre_race':
-      return `📋 *${ctx.athleteName}*, faltam *7 dias* para *${ctx.raceName}* (${dateBR}).\n\nProtocolo da última semana:\n• Hidratação reforçada (35–40 ml/kg/dia)\n• Sono ≥ 8h e zero novidades alimentares\n• Carbo-loading começa em 4 dias (se prova ≥ 21k)\n• Confira gel/bebida/sal já testados nos longos\n• Pré-treino race-day já validado\n\nQualquer dúvida, me chama. Vamos fechar essa preparação com tudo!`;
-    case 'gut_training_weekly':
-      return `🦠 Bom dia, *${ctx.athleteName}*! Lembrete da semana: rodar o *treino intestinal* nos longos da fase ${ctx.phaseLabel}.\n\nNão esqueça de registrar a taxa de CHO (g/h) e os sintomas após o treino para ajustarmos a progressão.`;
-    case 'race_day':
-      return `🏁 É HOJE, *${ctx.athleteName}*! Sua prova: *${ctx.raceName}*.\n\nProtocolo race-day já testado: respeite o pré, intra e a hidratação. Boa prova! Estarei na torcida 🚀`;
-    default:
-      return `Lembrete da preparação para ${ctx.raceName}.`;
+// Mapa de event_type → template_key na Central de Mensagens
+const EVENT_TEMPLATE_MAP: Record<string, string> = {
+  phase_taper_entry: 'np_phase_taper_entry',
+  carboloading_start: 'np_carboloading_start',
+  protocol_7_days_pre_race: 'np_protocol_7_days_pre_race',
+  gut_training_weekly: 'np_gut_training_weekly',
+  race_day: 'np_race_day',
+};
+
+function renderTemplate(body: string, vars: Record<string, string | number>): string {
+  let out = body;
+  for (const [k, v] of Object.entries(vars)) {
+    out = out.split(`{${k}}`).join(String(v));
   }
+  return out;
 }
 
 Deno.serve(async (req) => {
