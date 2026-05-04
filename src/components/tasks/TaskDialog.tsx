@@ -101,6 +101,10 @@ export function TaskDialog({
   const createLabel = useCreateLabel();
   const deleteLabel = useDeleteLabel();
   const { data: clients = [] } = useClients();
+  const { data: adminSettings } = useAdminSettings();
+  const saveAdminSettings = useSaveAdminSettings();
+  const [adminWhatsapp, setAdminWhatsapp] = useState('');
+  useEffect(() => { setAdminWhatsapp(adminSettings?.admin_whatsapp_number || ''); }, [adminSettings?.admin_whatsapp_number]);
   const activeClients = clients.filter(c => c.is_active).sort((a, b) => a.name.localeCompare(b.name));
 
   useEffect(() => {
