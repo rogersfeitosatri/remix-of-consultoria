@@ -577,6 +577,33 @@ export default function CalendarPage() {
                                               {format(parseISO(apt.appointment_date), "dd/MM/yyyy")} • {apt.appointment_time?.substring(0, 5)}
                                             </p>
                                           </div>
+                                          {apt.google_meet_link && (
+                                            <div className="text-[11px] p-2 rounded bg-muted/50 border border-border break-all">
+                                              <span className="font-medium">Meet:</span> {apt.google_meet_link}
+                                            </div>
+                                          )}
+                                          <Button
+                                            size="sm"
+                                            variant="default"
+                                            className="w-full text-xs gap-1.5"
+                                            onClick={async () => {
+                                              const t = toast.loading('Reenviando confirmação no WhatsApp...');
+                                              try {
+                                                const { data, error } = await supabase.functions.invoke('resend-appointment-confirmation', {
+                                                  body: { appointmentId: apt.id },
+                                                });
+                                                if (error || (data as any)?.error) {
+                                                  throw new Error((data as any)?.error || error?.message || 'Falha no envio');
+                                                }
+                                                toast.success('Confirmação enviada no WhatsApp', { id: t });
+                                              } catch (e: any) {
+                                                toast.error(e?.message || 'Erro ao reenviar', { id: t });
+                                              }
+                                            }}
+                                          >
+                                            <Send className="h-3 w-3" />
+                                            Reenviar confirmação WhatsApp
+                                          </Button>
                                           <div className="flex gap-2">
                                             <Button size="sm" variant="outline" className="flex-1 text-xs" asChild>
                                               <Link to={`/appointments/${apt.id}`}>Detalhes</Link>
