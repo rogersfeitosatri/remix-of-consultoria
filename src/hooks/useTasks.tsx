@@ -38,6 +38,8 @@ export interface TaskLabel {
   created_at: string;
 }
 
+export type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly';
+
 export interface Task {
   id: string;
   user_id: string;
@@ -57,6 +59,13 @@ export interface Task {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  recurrence_type: RecurrenceType;
+  recurrence_days: number[] | null;
+  recurrence_day_of_month: number | null;
+  recurrence_interval: number;
+  recurrence_end_date: string | null;
+  parent_task_id: string | null;
+  xp_reward: number;
   labels?: TaskLabel[];
   client_name?: string;
 }
@@ -212,6 +221,12 @@ export function useCreateTask() {
       client_id?: string;
       task_type?: TaskType;
       priority?: TaskPriority;
+      recurrence_type?: RecurrenceType;
+      recurrence_days?: number[] | null;
+      recurrence_day_of_month?: number | null;
+      recurrence_interval?: number;
+      recurrence_end_date?: string | null;
+      xp_reward?: number;
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
@@ -228,6 +243,12 @@ export function useCreateTask() {
           task_type: data.task_type || 'custom',
           priority: data.priority || 'medium',
           source: 'manual',
+          recurrence_type: data.recurrence_type || 'none',
+          recurrence_days: data.recurrence_days ?? null,
+          recurrence_day_of_month: data.recurrence_day_of_month ?? null,
+          recurrence_interval: data.recurrence_interval ?? 1,
+          recurrence_end_date: data.recurrence_end_date ?? null,
+          xp_reward: data.xp_reward ?? 10,
         })
         .select()
         .single();
@@ -279,6 +300,12 @@ export function useUpdateTask() {
       client_id?: string | null;
       task_type?: TaskType;
       completed_at?: string | null;
+      recurrence_type?: RecurrenceType;
+      recurrence_days?: number[] | null;
+      recurrence_day_of_month?: number | null;
+      recurrence_interval?: number;
+      recurrence_end_date?: string | null;
+      xp_reward?: number;
     }) => {
       const { id, label_ids, ...updateData } = data;
 
@@ -354,7 +381,8 @@ export function useCompleteTask() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      toast.success('Tarefa concluída!');
+      queryClient.invalidateQueries({ queryKey: ['task-gamification'] });
+      toast.success('Tarefa concluída! +XP 🎉');
     },
     onError: () => {
       toast.error('Erro ao concluir tarefa');

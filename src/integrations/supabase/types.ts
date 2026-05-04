@@ -5337,6 +5337,39 @@ export type Database = {
         }
         Relationships: []
       }
+      task_gamification: {
+        Row: {
+          created_at: string
+          current_streak: number
+          last_completed_date: string | null
+          level: number
+          longest_streak: number
+          total_xp: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_streak?: number
+          last_completed_date?: string | null
+          level?: number
+          longest_streak?: number
+          total_xp?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_streak?: number
+          last_completed_date?: string | null
+          level?: number
+          longest_streak?: number
+          total_xp?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       task_label_assignments: {
         Row: {
           created_at: string
@@ -5410,13 +5443,20 @@ export type Database = {
           is_archived: boolean
           is_pinned: boolean
           order_index: number
+          parent_task_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
+          recurrence_day_of_month: number | null
+          recurrence_days: number[] | null
+          recurrence_end_date: string | null
+          recurrence_interval: number
+          recurrence_type: string
           source: Database["public"]["Enums"]["task_source"]
           status: Database["public"]["Enums"]["task_status"]
           task_type: Database["public"]["Enums"]["task_type"]
           title: string
           updated_at: string
           user_id: string
+          xp_reward: number
         }
         Insert: {
           client_id?: string | null
@@ -5430,13 +5470,20 @@ export type Database = {
           is_archived?: boolean
           is_pinned?: boolean
           order_index?: number
+          parent_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_day_of_month?: number | null
+          recurrence_days?: number[] | null
+          recurrence_end_date?: string | null
+          recurrence_interval?: number
+          recurrence_type?: string
           source?: Database["public"]["Enums"]["task_source"]
           status?: Database["public"]["Enums"]["task_status"]
           task_type?: Database["public"]["Enums"]["task_type"]
           title: string
           updated_at?: string
           user_id: string
+          xp_reward?: number
         }
         Update: {
           client_id?: string | null
@@ -5450,13 +5497,20 @@ export type Database = {
           is_archived?: boolean
           is_pinned?: boolean
           order_index?: number
+          parent_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_day_of_month?: number | null
+          recurrence_days?: number[] | null
+          recurrence_end_date?: string | null
+          recurrence_interval?: number
+          recurrence_type?: string
           source?: Database["public"]["Enums"]["task_source"]
           status?: Database["public"]["Enums"]["task_status"]
           task_type?: Database["public"]["Enums"]["task_type"]
           title?: string
           updated_at?: string
           user_id?: string
+          xp_reward?: number
         }
         Relationships: [
           {
@@ -5464,6 +5518,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -5876,6 +5937,7 @@ export type Database = {
       }
     }
     Functions: {
+      calc_task_level: { Args: { p_xp: number }; Returns: number }
       calculate_next_booking_send_date: {
         Args: { p_cadence_weeks: number; p_last_appointment_at: string }
         Returns: string
@@ -6016,6 +6078,16 @@ export type Database = {
           source_queue: string
         }
         Returns: number
+      }
+      next_recurrence_date: {
+        Args: {
+          p_day_of_month: number
+          p_days: number[]
+          p_from: string
+          p_interval: number
+          p_type: string
+        }
+        Returns: string
       }
       preview_consultation_pipeline: {
         Args: {

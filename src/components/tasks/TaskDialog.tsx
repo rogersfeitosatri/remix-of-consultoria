@@ -23,6 +23,7 @@ import {
   TaskLabel,
   TaskType,
   TaskPriority,
+  RecurrenceType,
   TASK_TYPE_LABELS,
   TASK_PRIORITY_LABELS,
   useCreateLabel,
@@ -54,6 +55,12 @@ interface TaskDialogProps {
     client_id?: string;
     task_type?: TaskType;
     priority?: TaskPriority;
+    recurrence_type?: RecurrenceType;
+    recurrence_days?: number[] | null;
+    recurrence_day_of_month?: number | null;
+    recurrence_interval?: number;
+    recurrence_end_date?: string | null;
+    xp_reward?: number;
   }) => void;
 }
 
@@ -77,6 +84,12 @@ export function TaskDialog({
   const [clientId, setClientId] = useState<string>('');
   const [taskType, setTaskType] = useState<TaskType>('custom');
   const [priority, setPriority] = useState<TaskPriority>('medium');
+  const [recurrenceType, setRecurrenceType] = useState<RecurrenceType>('none');
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
+  const [recurrenceDayOfMonth, setRecurrenceDayOfMonth] = useState<number>(1);
+  const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>();
+  const [xpReward, setXpReward] = useState<number>(10);
 
   const createLabel = useCreateLabel();
   const deleteLabel = useDeleteLabel();
@@ -94,6 +107,12 @@ export function TaskDialog({
       setClientId(task.client_id || '');
       setTaskType(task.task_type || 'custom');
       setPriority(task.priority || 'medium');
+      setRecurrenceType(task.recurrence_type || 'none');
+      setRecurrenceDays(task.recurrence_days || []);
+      setRecurrenceDayOfMonth(task.recurrence_day_of_month || 1);
+      setRecurrenceInterval(task.recurrence_interval || 1);
+      setRecurrenceEndDate(task.recurrence_end_date ? new Date(task.recurrence_end_date + 'T12:00:00') : undefined);
+      setXpReward(task.xp_reward ?? 10);
     } else {
       setTitle('');
       setDescription('');
@@ -104,6 +123,12 @@ export function TaskDialog({
       setClientId('');
       setTaskType('custom');
       setPriority('medium');
+      setRecurrenceType('none');
+      setRecurrenceDays([]);
+      setRecurrenceDayOfMonth(1);
+      setRecurrenceInterval(1);
+      setRecurrenceEndDate(undefined);
+      setXpReward(10);
     }
     setShowNewLabel(false);
     setNewLabelName('');
@@ -123,6 +148,12 @@ export function TaskDialog({
       client_id: clientId && clientId !== 'none' ? clientId : undefined,
       task_type: taskType,
       priority,
+      recurrence_type: recurrenceType,
+      recurrence_days: recurrenceType === 'weekly' ? recurrenceDays : null,
+      recurrence_day_of_month: recurrenceType === 'monthly' ? recurrenceDayOfMonth : null,
+      recurrence_interval: recurrenceInterval,
+      recurrence_end_date: recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : null,
+      xp_reward: xpReward,
     });
 
     onOpenChange(false);
@@ -249,7 +280,104 @@ export function TaskDialog({
               </div>
             </div>
 
-            {/* Labels */}
+            {/* Recurrence */}
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <Label>Recorrência</Label>
+              <Select value={recurrenceType} onValueChange={(v) => setRecurrenceType(v as RecurrenceType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma (única)</SelectItem>
+                  <SelectItem value="daily">Diária</SelectItem>
+                  <SelectItem value="weekly">Semanal (dias específicos)</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {recurrenceType === 'weekly' && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Repetir nos dias</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {WEEKDAY_NAMES.map((n, i) => (
+                      <Button
+                        key={i}
+                        type="button"
+                        size="sm"
+                        variant={recurrenceDays.includes(i) ? 'default' : 'outline'}
+                        onClick={() =>
+                          setRecurrenceDays((p) =>
+                            p.includes(i) ? p.filter((x) => x !== i) : [...p, i]
+                          )
+                        }
+                      >
+                        {n.slice(0, 3)}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {recurrenceType === 'monthly' && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Dia do mês (1–28)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={28}
+                    value={recurrenceDayOfMonth}
+                    onChange={(e) => setRecurrenceDayOfMonth(Number(e.target.value))}
+                    className="w-24"
+                  />
+                </div>
+              )}
+
+              {recurrenceType !== 'none' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">A cada</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={recurrenceInterval}
+                      onChange={(e) => setRecurrenceInterval(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Termina em (opcional)</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-3 w-3" />
+                          {recurrenceEndDate ? format(recurrenceEndDate, 'dd/MM/yy', { locale: ptBR }) : '—'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={recurrenceEndDate} onSelect={setRecurrenceEndDate} initialFocus locale={ptBR} />
+                        {recurrenceEndDate && (
+                          <div className="p-2 border-t">
+                            <Button variant="ghost" size="sm" className="w-full" onClick={() => setRecurrenceEndDate(undefined)}>Limpar</Button>
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* XP */}
+            <div className="space-y-2">
+              <Label htmlFor="xp">XP ao concluir</Label>
+              <Input
+                id="xp"
+                type="number"
+                min={0}
+                max={500}
+                value={xpReward}
+                onChange={(e) => setXpReward(Number(e.target.value))}
+                className="w-32"
+              />
+            </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Etiquetas</Label>
