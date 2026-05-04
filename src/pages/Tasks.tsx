@@ -5,6 +5,7 @@ import { TaskBoard } from '@/components/tasks/TaskBoard';
 import { DailyTaskView } from '@/components/tasks/DailyTaskView';
 import { MonthlyTaskView } from '@/components/tasks/MonthlyTaskView';
 import { GamificationPanel } from '@/components/tasks/GamificationPanel';
+import { TaskNotificationsBell } from '@/components/tasks/TaskNotificationsBell';
 import { CalendarDays, Calendar, LayoutGrid, Sun } from 'lucide-react';
 
 const STORAGE_KEY = 'tasks_view_preference_v1';
