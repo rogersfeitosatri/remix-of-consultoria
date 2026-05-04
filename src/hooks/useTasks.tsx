@@ -316,8 +316,9 @@ export function useUpdateTask() {
       recurrence_interval?: number;
       recurrence_end_date?: string | null;
       xp_reward?: number;
-    }) => {
-      const { id, label_ids, ...updateData } = data;
+      reminder_enabled?: boolean;
+      reminder_minutes_before?: number;
+      reminder_method?: 'app' | 'whatsapp' | 'both';
 
       const { error } = await supabase
         .from('tasks')
