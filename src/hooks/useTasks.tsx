@@ -66,6 +66,10 @@ export interface Task {
   recurrence_end_date: string | null;
   parent_task_id: string | null;
   xp_reward: number;
+  reminder_enabled: boolean;
+  reminder_minutes_before: number;
+  reminder_method: 'app' | 'whatsapp' | 'both';
+  reminder_sent_at: string | null;
   labels?: TaskLabel[];
   client_name?: string;
 }
@@ -227,6 +231,9 @@ export function useCreateTask() {
       recurrence_interval?: number;
       recurrence_end_date?: string | null;
       xp_reward?: number;
+      reminder_enabled?: boolean;
+      reminder_minutes_before?: number;
+      reminder_method?: 'app' | 'whatsapp' | 'both';
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
@@ -249,6 +256,9 @@ export function useCreateTask() {
           recurrence_interval: data.recurrence_interval ?? 1,
           recurrence_end_date: data.recurrence_end_date ?? null,
           xp_reward: data.xp_reward ?? 10,
+          reminder_enabled: data.reminder_enabled ?? false,
+          reminder_minutes_before: data.reminder_minutes_before ?? 15,
+          reminder_method: data.reminder_method ?? 'app',
         })
         .select()
         .single();
@@ -306,6 +316,9 @@ export function useUpdateTask() {
       recurrence_interval?: number;
       recurrence_end_date?: string | null;
       xp_reward?: number;
+      reminder_enabled?: boolean;
+      reminder_minutes_before?: number;
+      reminder_method?: 'app' | 'whatsapp' | 'both';
     }) => {
       const { id, label_ids, ...updateData } = data;
 

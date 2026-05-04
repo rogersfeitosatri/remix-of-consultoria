@@ -30,6 +30,7 @@ import {
   useDeleteLabel,
 } from '@/hooks/useTasks';
 import { useClients } from '@/hooks/useClients';
+import { useAdminSettings, useSaveAdminSettings } from '@/hooks/useAdminSettings';
 
 const WEEKDAY_NAMES = [
   'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado',
@@ -61,6 +62,9 @@ interface TaskDialogProps {
     recurrence_interval?: number;
     recurrence_end_date?: string | null;
     xp_reward?: number;
+    reminder_enabled?: boolean;
+    reminder_minutes_before?: number;
+    reminder_method?: 'app' | 'whatsapp' | 'both';
   }) => void;
 }
 
@@ -90,10 +94,17 @@ export function TaskDialog({
   const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState<Date | undefined>();
   const [xpReward, setXpReward] = useState<number>(10);
+  const [reminderEnabled, setReminderEnabled] = useState<boolean>(false);
+  const [reminderMinutesBefore, setReminderMinutesBefore] = useState<number>(15);
+  const [reminderMethod, setReminderMethod] = useState<'app' | 'whatsapp' | 'both'>('app');
 
   const createLabel = useCreateLabel();
   const deleteLabel = useDeleteLabel();
   const { data: clients = [] } = useClients();
+  const { data: adminSettings } = useAdminSettings();
+  const saveAdminSettings = useSaveAdminSettings();
+  const [adminWhatsapp, setAdminWhatsapp] = useState('');
+  useEffect(() => { setAdminWhatsapp(adminSettings?.admin_whatsapp_number || ''); }, [adminSettings?.admin_whatsapp_number]);
   const activeClients = clients.filter(c => c.is_active).sort((a, b) => a.name.localeCompare(b.name));
 
   useEffect(() => {
@@ -113,6 +124,9 @@ export function TaskDialog({
       setRecurrenceInterval(task.recurrence_interval || 1);
       setRecurrenceEndDate(task.recurrence_end_date ? new Date(task.recurrence_end_date + 'T12:00:00') : undefined);
       setXpReward(task.xp_reward ?? 10);
+      setReminderEnabled((task as any).reminder_enabled ?? false);
+      setReminderMinutesBefore((task as any).reminder_minutes_before ?? 15);
+      setReminderMethod(((task as any).reminder_method ?? 'app') as any);
     } else {
       setTitle('');
       setDescription('');
@@ -129,6 +143,9 @@ export function TaskDialog({
       setRecurrenceInterval(1);
       setRecurrenceEndDate(undefined);
       setXpReward(10);
+      setReminderEnabled(false);
+      setReminderMinutesBefore(15);
+      setReminderMethod('app');
     }
     setShowNewLabel(false);
     setNewLabelName('');
@@ -154,6 +171,9 @@ export function TaskDialog({
       recurrence_interval: recurrenceInterval,
       recurrence_end_date: recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : null,
       xp_reward: xpReward,
+      reminder_enabled: reminderEnabled,
+      reminder_minutes_before: reminderMinutesBefore,
+      reminder_method: reminderMethod,
     });
 
     onOpenChange(false);
@@ -364,7 +384,49 @@ export function TaskDialog({
               )}
             </div>
 
-            {/* XP */}
+            {/* Reminder */}
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <div className="flex items-center gap-2">
+                <Checkbox id="reminder-enabled" checked={reminderEnabled} onCheckedChange={(v) => setReminderEnabled(!!v)} />
+                <Label htmlFor="reminder-enabled" className="cursor-pointer">Lembrete (notificação)</Label>
+              </div>
+              {reminderEnabled && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Antecedência (min)</Label>
+                    <Input type="number" min={0} max={1440} value={reminderMinutesBefore} onChange={(e) => setReminderMinutesBefore(Number(e.target.value))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Canal</Label>
+                    <Select value={reminderMethod} onValueChange={(v) => setReminderMethod(v as any)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="app">Apenas no app</SelectItem>
+                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                        <SelectItem value="both">App + WhatsApp</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {!dueTime && (
+                    <p className="col-span-2 text-[11px] text-muted-foreground">Defina horário acima para o lembrete ser disparado.</p>
+                  )}
+                  {(reminderMethod === 'whatsapp' || reminderMethod === 'both') && (
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs">Seu WhatsApp (com DDD/país, ex: +5599984817697)</Label>
+                      <Input
+                        value={adminWhatsapp}
+                        onChange={(e) => setAdminWhatsapp(e.target.value)}
+                        onBlur={() => saveAdminSettings.mutate({ admin_whatsapp_number: adminWhatsapp || null })}
+                        placeholder="+55..."
+                      />
+                      <p className="text-[10px] text-muted-foreground">Salvo automaticamente. Usado para todos os lembretes via WhatsApp.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+
             <div className="space-y-2">
               <Label htmlFor="xp">XP ao concluir</Label>
               <Input

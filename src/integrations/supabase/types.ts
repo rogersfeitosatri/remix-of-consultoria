@@ -52,6 +52,7 @@ export type Database = {
       }
       admin_settings: {
         Row: {
+          admin_whatsapp_number: string | null
           created_at: string | null
           enable_continuation_mode: boolean | null
           id: string
@@ -59,6 +60,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          admin_whatsapp_number?: string | null
           created_at?: string | null
           enable_continuation_mode?: boolean | null
           id?: string
@@ -66,6 +68,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          admin_whatsapp_number?: string | null
           created_at?: string | null
           enable_continuation_mode?: boolean | null
           id?: string
@@ -5430,6 +5433,44 @@ export type Database = {
         }
         Relationships: []
       }
+      task_notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          task_id: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          task_id?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          task_id?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           client_id: string | null
@@ -5450,6 +5491,10 @@ export type Database = {
           recurrence_end_date: string | null
           recurrence_interval: number
           recurrence_type: string
+          reminder_enabled: boolean
+          reminder_method: string
+          reminder_minutes_before: number
+          reminder_sent_at: string | null
           source: Database["public"]["Enums"]["task_source"]
           status: Database["public"]["Enums"]["task_status"]
           task_type: Database["public"]["Enums"]["task_type"]
@@ -5477,6 +5522,10 @@ export type Database = {
           recurrence_end_date?: string | null
           recurrence_interval?: number
           recurrence_type?: string
+          reminder_enabled?: boolean
+          reminder_method?: string
+          reminder_minutes_before?: number
+          reminder_sent_at?: string | null
           source?: Database["public"]["Enums"]["task_source"]
           status?: Database["public"]["Enums"]["task_status"]
           task_type?: Database["public"]["Enums"]["task_type"]
@@ -5504,6 +5553,10 @@ export type Database = {
           recurrence_end_date?: string | null
           recurrence_interval?: number
           recurrence_type?: string
+          reminder_enabled?: boolean
+          reminder_method?: string
+          reminder_minutes_before?: number
+          reminder_sent_at?: string | null
           source?: Database["public"]["Enums"]["task_source"]
           status?: Database["public"]["Enums"]["task_status"]
           task_type?: Database["public"]["Enums"]["task_type"]

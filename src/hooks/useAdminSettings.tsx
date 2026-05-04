@@ -6,6 +6,7 @@ export interface AdminSettings {
   id: string;
   user_id: string;
   enable_continuation_mode: boolean;
+  admin_whatsapp_number?: string | null;
   created_at: string;
   updated_at: string;
 }
