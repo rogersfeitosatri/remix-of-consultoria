@@ -379,7 +379,37 @@ export function TaskDialog({
               )}
             </div>
 
-            {/* XP */}
+            {/* Reminder */}
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <div className="flex items-center gap-2">
+                <Checkbox id="reminder-enabled" checked={reminderEnabled} onCheckedChange={(v) => setReminderEnabled(!!v)} />
+                <Label htmlFor="reminder-enabled" className="cursor-pointer">Lembrete (notificação)</Label>
+              </div>
+              {reminderEnabled && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Antecedência (min)</Label>
+                    <Input type="number" min={0} max={1440} value={reminderMinutesBefore} onChange={(e) => setReminderMinutesBefore(Number(e.target.value))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Canal</Label>
+                    <Select value={reminderMethod} onValueChange={(v) => setReminderMethod(v as any)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="app">Apenas no app</SelectItem>
+                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                        <SelectItem value="both">App + WhatsApp</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {!dueTime && (
+                    <p className="col-span-2 text-[11px] text-muted-foreground">Defina horário acima para o lembrete ser disparado.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+
             <div className="space-y-2">
               <Label htmlFor="xp">XP ao concluir</Label>
               <Input
