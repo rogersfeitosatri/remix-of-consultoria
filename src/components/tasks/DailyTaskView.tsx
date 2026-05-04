@@ -91,6 +91,7 @@ export function DailyTaskView() {
   const completeTask = useCompleteTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const createTask = useCreateTask();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskWithLabels | null>(null);
   const [defaultShift, setDefaultShift] = useState<Shift>('morning');
