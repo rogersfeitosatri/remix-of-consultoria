@@ -61,6 +61,9 @@ interface TaskDialogProps {
     recurrence_interval?: number;
     recurrence_end_date?: string | null;
     xp_reward?: number;
+    reminder_enabled?: boolean;
+    reminder_minutes_before?: number;
+    reminder_method?: 'app' | 'whatsapp' | 'both';
   }) => void;
 }
 
