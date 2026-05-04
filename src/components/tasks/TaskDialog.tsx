@@ -405,6 +405,18 @@ export function TaskDialog({
                   {!dueTime && (
                     <p className="col-span-2 text-[11px] text-muted-foreground">Defina horário acima para o lembrete ser disparado.</p>
                   )}
+                  {(reminderMethod === 'whatsapp' || reminderMethod === 'both') && (
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs">Seu WhatsApp (com DDD/país, ex: +5599984817697)</Label>
+                      <Input
+                        value={adminWhatsapp}
+                        onChange={(e) => setAdminWhatsapp(e.target.value)}
+                        onBlur={() => saveAdminSettings.mutate({ admin_whatsapp_number: adminWhatsapp || null })}
+                        placeholder="+55..."
+                      />
+                      <p className="text-[10px] text-muted-foreground">Salvo automaticamente. Usado para todos os lembretes via WhatsApp.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
