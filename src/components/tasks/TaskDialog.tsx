@@ -138,6 +138,9 @@ export function TaskDialog({
       setRecurrenceInterval(1);
       setRecurrenceEndDate(undefined);
       setXpReward(10);
+      setReminderEnabled(false);
+      setReminderMinutesBefore(15);
+      setReminderMethod('app');
     }
     setShowNewLabel(false);
     setNewLabelName('');
