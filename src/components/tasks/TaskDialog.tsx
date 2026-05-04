@@ -280,7 +280,104 @@ export function TaskDialog({
               </div>
             </div>
 
-            {/* Labels */}
+            {/* Recurrence */}
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <Label>Recorrência</Label>
+              <Select value={recurrenceType} onValueChange={(v) => setRecurrenceType(v as RecurrenceType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma (única)</SelectItem>
+                  <SelectItem value="daily">Diária</SelectItem>
+                  <SelectItem value="weekly">Semanal (dias específicos)</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {recurrenceType === 'weekly' && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Repetir nos dias</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {WEEKDAY_NAMES.map((n, i) => (
+                      <Button
+                        key={i}
+                        type="button"
+                        size="sm"
+                        variant={recurrenceDays.includes(i) ? 'default' : 'outline'}
+                        onClick={() =>
+                          setRecurrenceDays((p) =>
+                            p.includes(i) ? p.filter((x) => x !== i) : [...p, i]
+                          )
+                        }
+                      >
+                        {n.slice(0, 3)}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {recurrenceType === 'monthly' && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Dia do mês (1–28)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={28}
+                    value={recurrenceDayOfMonth}
+                    onChange={(e) => setRecurrenceDayOfMonth(Number(e.target.value))}
+                    className="w-24"
+                  />
+                </div>
+              )}
+
+              {recurrenceType !== 'none' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">A cada</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={recurrenceInterval}
+                      onChange={(e) => setRecurrenceInterval(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Termina em (opcional)</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-3 w-3" />
+                          {recurrenceEndDate ? format(recurrenceEndDate, 'dd/MM/yy', { locale: ptBR }) : '—'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={recurrenceEndDate} onSelect={setRecurrenceEndDate} initialFocus locale={ptBR} />
+                        {recurrenceEndDate && (
+                          <div className="p-2 border-t">
+                            <Button variant="ghost" size="sm" className="w-full" onClick={() => setRecurrenceEndDate(undefined)}>Limpar</Button>
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* XP */}
+            <div className="space-y-2">
+              <Label htmlFor="xp">XP ao concluir</Label>
+              <Input
+                id="xp"
+                type="number"
+                min={0}
+                max={500}
+                value={xpReward}
+                onChange={(e) => setXpReward(Number(e.target.value))}
+                className="w-32"
+              />
+            </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Etiquetas</Label>
