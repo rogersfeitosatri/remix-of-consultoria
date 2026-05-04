@@ -166,6 +166,9 @@ export function TaskDialog({
       recurrence_interval: recurrenceInterval,
       recurrence_end_date: recurrenceEndDate ? format(recurrenceEndDate, 'yyyy-MM-dd') : null,
       xp_reward: xpReward,
+      reminder_enabled: reminderEnabled,
+      reminder_minutes_before: reminderMinutesBefore,
+      reminder_method: reminderMethod,
     });
 
     onOpenChange(false);
