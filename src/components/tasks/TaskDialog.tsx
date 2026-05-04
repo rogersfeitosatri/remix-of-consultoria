@@ -30,6 +30,7 @@ import {
   useDeleteLabel,
 } from '@/hooks/useTasks';
 import { useClients } from '@/hooks/useClients';
+import { useAdminSettings, useSaveAdminSettings } from '@/hooks/useAdminSettings';
 
 const WEEKDAY_NAMES = [
   'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado',
