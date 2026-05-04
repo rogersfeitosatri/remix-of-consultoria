@@ -119,6 +119,9 @@ export function TaskDialog({
       setRecurrenceInterval(task.recurrence_interval || 1);
       setRecurrenceEndDate(task.recurrence_end_date ? new Date(task.recurrence_end_date + 'T12:00:00') : undefined);
       setXpReward(task.xp_reward ?? 10);
+      setReminderEnabled((task as any).reminder_enabled ?? false);
+      setReminderMinutesBefore((task as any).reminder_minutes_before ?? 15);
+      setReminderMethod(((task as any).reminder_method ?? 'app') as any);
     } else {
       setTitle('');
       setDescription('');
