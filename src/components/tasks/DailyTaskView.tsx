@@ -126,8 +126,7 @@ export function DailyTaskView() {
     if (editingTask) {
       updateTask.mutate({ id: editingTask.id, ...payload });
     } else {
-      // useCreateTask not used here; reuse via inline insert through updateTask not possible
-      import('@/hooks/useTasks');
+      createTask.mutate({ ...payload, day_of_week: date.getDay() });
     }
   };
 
