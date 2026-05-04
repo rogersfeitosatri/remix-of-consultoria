@@ -319,6 +319,8 @@ export function useUpdateTask() {
       reminder_enabled?: boolean;
       reminder_minutes_before?: number;
       reminder_method?: 'app' | 'whatsapp' | 'both';
+    }) => {
+      const { id, label_ids, ...updateData } = data;
 
       const { error } = await supabase
         .from('tasks')
