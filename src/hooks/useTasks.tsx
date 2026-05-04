@@ -66,6 +66,10 @@ export interface Task {
   recurrence_end_date: string | null;
   parent_task_id: string | null;
   xp_reward: number;
+  reminder_enabled: boolean;
+  reminder_minutes_before: number;
+  reminder_method: 'app' | 'whatsapp' | 'both';
+  reminder_sent_at: string | null;
   labels?: TaskLabel[];
   client_name?: string;
 }
