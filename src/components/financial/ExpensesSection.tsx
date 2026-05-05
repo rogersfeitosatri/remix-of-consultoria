@@ -36,6 +36,7 @@ interface ExpensesSectionProps {
 
 export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, onCloseDialog }: ExpensesSectionProps) {
   const { data: expenses = [], isLoading } = useExpenses();
+  const { data: expensePayments = [] } = useExpensePayments();
   const addExpense = useAddExpense();
   const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
