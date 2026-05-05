@@ -1,0 +1,1 @@
+ALTER TABLE public.strategic_calls ADD COLUMN IF NOT EXISTS redirect_url text;

@@ -5209,6 +5209,7 @@ export type Database = {
           page_image_url: string | null
           page_text: string | null
           page_title: string | null
+          redirect_url: string | null
           slug: string
           status: string
           updated_at: string
@@ -5227,6 +5228,7 @@ export type Database = {
           page_image_url?: string | null
           page_text?: string | null
           page_title?: string | null
+          redirect_url?: string | null
           slug: string
           status?: string
           updated_at?: string
@@ -5245,6 +5247,7 @@ export type Database = {
           page_image_url?: string | null
           page_text?: string | null
           page_title?: string | null
+          redirect_url?: string | null
           slug?: string
           status?: string
           updated_at?: string
