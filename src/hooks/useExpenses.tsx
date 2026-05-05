@@ -43,6 +43,56 @@ export function useExpenses() {
   });
 }
 
+export interface ExpensePayment {
+  id: string;
+  expense_id: string;
+  period_year: number;
+  period_month: number;
+  paid_at: string;
+}
+
+export function useExpensePayments() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['expense_payments', user?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('expense_payments')
+        .select('*');
+      if (error) throw error;
+      return (data || []) as ExpensePayment[];
+    },
+    enabled: !!user,
+  });
+}
+
+export function useToggleSubscriptionPaid() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ expense_id, year, month, paid }: { expense_id: string; year: number; month: number; paid: boolean }) => {
+      if (!user) throw new Error('Not authenticated');
+      if (paid) {
+        const { error } = await (supabase as any)
+          .from('expense_payments')
+          .insert({ expense_id, user_id: user.id, period_year: year, period_month: month });
+        if (error && !String(error.message).includes('duplicate')) throw error;
+      } else {
+        const { error } = await (supabase as any)
+          .from('expense_payments')
+          .delete()
+          .eq('expense_id', expense_id)
+          .eq('period_year', year)
+          .eq('period_month', month);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expense_payments'] });
+    },
+  });
+}
+
 export type AddExpenseInput = {
   description: string;
   amount: number;
