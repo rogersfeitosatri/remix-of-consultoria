@@ -2423,6 +2423,44 @@ export type Database = {
           },
         ]
       }
+      expense_payments: {
+        Row: {
+          created_at: string
+          expense_id: string
+          id: string
+          paid_at: string
+          period_month: number
+          period_year: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expense_id: string
+          id?: string
+          paid_at?: string
+          period_month: number
+          period_year: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expense_id?: string
+          id?: string
+          paid_at?: string
+          period_month?: number
+          period_year?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_payments_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number
