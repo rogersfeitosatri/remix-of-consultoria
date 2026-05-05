@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefreshCw, Receipt, Check, X, Pencil, Trash2, Plus } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useExpenses, useUpdateExpense, useDeleteExpense, VirtualExpense, getExpensesForPeriod } from '@/hooks/useExpenses';
+import { useExpenses, useUpdateExpense, useDeleteExpense, useExpensePayments, useToggleSubscriptionPaid, VirtualExpense, getExpensesForPeriod } from '@/hooks/useExpenses';
 import { toast } from 'sonner';
 
 const EXPENSE_CATEGORIES: Record<string, string> = {
