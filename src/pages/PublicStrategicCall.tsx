@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PhoneInput } from '@/components/ui/phone-input';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 
 type Phase = 'landing' | 'wizard' | 'done';
 
@@ -254,14 +255,33 @@ export default function PublicStrategicCall() {
   }
 
   // LANDING
+  const redirectUrl = (call as any).redirect_url as string | undefined;
+  const pageHtml = call.page_text || '';
+  const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(pageHtml);
+
+  const handleCta = () => {
+    if (redirectUrl) {
+      window.open(redirectUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setPhase('wizard');
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-2xl space-y-8 py-12">
         {call.page_image_url && <img src={call.page_image_url} alt="" className="w-full rounded-xl max-h-80 object-cover" />}
         <h1 className="text-3xl sm:text-4xl font-bold text-foreground leading-tight">{call.page_title}</h1>
-        <div className="text-foreground/80 whitespace-pre-line text-base sm:text-lg leading-relaxed">{call.page_text}</div>
+        {looksLikeHtml ? (
+          <div
+            className="prose prose-invert max-w-none text-foreground/80 text-base sm:text-lg leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(pageHtml) }}
+          />
+        ) : (
+          <div className="text-foreground/80 whitespace-pre-line text-base sm:text-lg leading-relaxed">{pageHtml}</div>
+        )}
         <Button
-          onClick={() => setPhase('wizard')}
+          onClick={handleCta}
           size="lg"
           className="text-lg px-8 py-6"
           style={{ backgroundColor: call.button_color }}

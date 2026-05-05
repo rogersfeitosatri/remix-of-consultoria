@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -54,6 +55,7 @@ export default function StrategicCallBuilder() {
   const [status, setStatus] = useState('active');
   const [closingDate, setClosingDate] = useState('');
   const [googleFormUrl, setGoogleFormUrl] = useState('');
+  const [redirectUrl, setRedirectUrl] = useState('');
 
   // Questions state
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
@@ -68,6 +70,7 @@ export default function StrategicCallBuilder() {
       setStatus(call.status);
       setClosingDate(call.closing_date ? call.closing_date.split('T')[0] : '');
       setGoogleFormUrl(call.google_form_url || '');
+      setRedirectUrl((call as any).redirect_url || '');
     }
   }, [call]);
 
@@ -127,6 +130,7 @@ export default function StrategicCallBuilder() {
       status,
       closing_date: closingDate || null,
       google_form_url: googleFormUrl || null,
+      redirect_url: redirectUrl || null,
     } as any);
 
     // Sync linked scheduling links status
@@ -225,7 +229,8 @@ export default function StrategicCallBuilder() {
                 </div>
                 <div>
                   <Label>Texto Principal</Label>
-                  <Textarea value={pageText} onChange={e => setPageText(e.target.value)} rows={12} />
+                  <RichTextEditor value={pageText} onChange={setPageText} minHeight={280} />
+                  <p className="text-xs text-muted-foreground mt-1">Use a barra de ferramentas para formatar (negrito, cor, fonte, tamanho), inserir links e imagens.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -244,12 +249,23 @@ export default function StrategicCallBuilder() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Google Forms (opcional)</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">Se preenchido, o formulário do Google Forms será exibido no lugar das perguntas internas.</p>
+              <CardHeader><CardTitle>Ação do Botão</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <Label>URL do Google Forms (embed)</Label>
+                  <Label>Link de Redirecionamento (opcional)</Label>
+                  <Input
+                    value={redirectUrl}
+                    onChange={e => setRedirectUrl(e.target.value)}
+                    placeholder="https://calendly.com/seu-link ou https://wa.me/55..."
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Se preenchido, o botão da página pública abrirá este link em uma nova aba <strong>em vez de</strong> abrir o questionário interno ou o Google Forms.
+                  </p>
+                </div>
+                <div className="border-t pt-4">
+                  <Label>URL do Google Forms (embed) — opcional</Label>
                   <Input value={googleFormUrl} onChange={e => setGoogleFormUrl(e.target.value)} placeholder="https://docs.google.com/forms/d/e/.../viewform?embedded=true" />
+                  <p className="text-xs text-muted-foreground mt-1">Usado apenas quando o link de redirecionamento acima estiver vazio.</p>
                 </div>
               </CardContent>
             </Card>
