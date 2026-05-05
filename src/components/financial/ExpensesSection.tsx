@@ -40,6 +40,7 @@ export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, on
   const addExpense = useAddExpense();
   const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
+  const toggleSubPaid = useToggleSubscriptionPaid();
   
   const [isOpen, setIsOpen] = useState(false);
 
