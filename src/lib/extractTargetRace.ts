@@ -104,6 +104,8 @@ export async function autoFillTargetRace(
   raceDate: string | null
 ): Promise<boolean> {
   if (!raceName) return false;
+  // Defensive: never store paragraphs/strategy text as target race
+  if (!isPlausibleRaceName(raceName)) return false;
 
   try {
     // Check current profile
