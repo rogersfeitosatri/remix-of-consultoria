@@ -1,11 +1,24 @@
 import { supabase } from '@/integrations/supabase/client';
 
-// Keywords that indicate a question/answer is about a target race
+// Keywords that indicate a question/answer is about a target race.
+// IMPORTANT: keep keywords very specific to avoid matching questions like
+// "Alimentação durante o treino/competição" (which is a strategy answer, not a race name).
 const RACE_QUESTION_KEYWORDS = [
-  'prova alvo', 'prova objetivo', 'qual prova', 'próxima prova',
-  'prova principal', 'corrida alvo', 'competição', 'prova que',
-  'evento esportivo', 'próximo evento', 'prova inscrit'
+  'prova alvo', 'prova objetivo', 'qual a sua prova', 'qual sua prova',
+  'qual é a prova', 'próxima prova', 'prova principal', 'corrida alvo',
+  'nome da prova', 'prova que pretende', 'prova inscrit'
 ];
+
+// Reject obviously invalid race-name answers (paragraphs, strategies, etc.)
+function isPlausibleRaceName(text: string): boolean {
+  if (!text) return false;
+  const trimmed = text.trim();
+  if (trimmed.length < 2 || trimmed.length > 80) return false;
+  if (/[\n\r]/.test(trimmed)) return false;
+  // Reject answers that look like food/strategy descriptions
+  if (/\b(gel|carbo|carboidrato|gatorade|isotônico|pão|café|banana|km|min|ml|hora)\b/i.test(trimmed)) return false;
+  return true;
+}
 
 const DATE_QUESTION_KEYWORDS = [
   'data da prova', 'quando será', 'data do evento',
