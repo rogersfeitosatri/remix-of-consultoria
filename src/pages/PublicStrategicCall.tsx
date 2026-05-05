@@ -259,9 +259,17 @@ export default function PublicStrategicCall() {
   const pageHtml = call.page_text || '';
   const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(pageHtml);
 
+  const normalizeUrl = (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    if (/^(https?:|mailto:|tel:)/i.test(trimmed)) return trimmed;
+    return `https://${trimmed.replace(/^\/+/, '')}`;
+  };
+
   const handleCta = () => {
-    if (redirectUrl) {
-      window.open(redirectUrl, '_blank', 'noopener,noreferrer');
+    const target = redirectUrl ? normalizeUrl(redirectUrl) : '';
+    if (target) {
+      window.open(target, '_blank', 'noopener,noreferrer');
       return;
     }
     setPhase('wizard');
