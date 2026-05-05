@@ -225,7 +225,7 @@ export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, on
   const displayEndDate = filterEndDate || endOfMonth(today);
   
   // Get expenses for the display period (including virtual subscription entries)
-  const displayExpenses = getExpensesForPeriod(expenses, displayStartDate, displayEndDate);
+  const displayExpenses = getExpensesForPeriod(expenses, displayStartDate, displayEndDate, expensePayments);
   
   const pendingExpenses = displayExpenses.filter(e => e.status !== 'paid');
   const totalPending = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
