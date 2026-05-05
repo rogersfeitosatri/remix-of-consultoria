@@ -27,14 +27,16 @@ interface MonthlyCostsPanelProps {
 
 export function MonthlyCostsPanel({ filterStartDate, filterEndDate, onAddNew }: MonthlyCostsPanelProps) {
   const { data: expenses = [] } = useExpenses();
+  const { data: expensePayments = [] } = useExpensePayments();
   const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
+  const toggleSubPaid = useToggleSubscriptionPaid();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [tab, setTab] = useState('all');
 
   const displayExpenses = useMemo(() => 
-    getExpensesForPeriod(expenses, filterStartDate, filterEndDate),
-    [expenses, filterStartDate, filterEndDate]
+    getExpensesForPeriod(expenses, filterStartDate, filterEndDate, expensePayments),
+    [expenses, filterStartDate, filterEndDate, expensePayments]
   );
 
   const fixedExpenses = displayExpenses.filter(e => e.expense_type === 'subscription');
@@ -52,7 +54,16 @@ export function MonthlyCostsPanel({ filterStartDate, filterEndDate, onAddNew }: 
   const handleTogglePaid = async (expense: VirtualExpense) => {
     const originalId = expense.original_id || expense.id;
     try {
-      if (expense.status === 'paid') {
+      if (expense.expense_type === 'subscription' && expense.is_virtual) {
+        const d = parseISO(expense.due_date);
+        await toggleSubPaid.mutateAsync({
+          expense_id: originalId,
+          year: d.getFullYear(),
+          month: d.getMonth(),
+          paid: expense.status !== 'paid',
+        });
+        toast.success(expense.status === 'paid' ? 'Marcado como pendente' : 'Pago!');
+      } else if (expense.status === 'paid') {
         await updateExpense.mutateAsync({ id: originalId, status: 'pending', paid_at: null });
         toast.success('Marcado como pendente');
       } else {
