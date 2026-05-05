@@ -175,23 +175,22 @@ export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, on
   };
 
   const handleTogglePaid = async (expense: VirtualExpense) => {
-    // Get the original expense ID for virtual entries
     const originalId = expense.original_id || expense.id;
-    
     try {
-      if (expense.status === 'paid') {
-        await updateExpense.mutateAsync({
-          id: originalId,
-          status: 'pending',
-          paid_at: null,
+      if (expense.expense_type === 'subscription' && expense.is_virtual) {
+        const d = parseISO(expense.due_date);
+        await toggleSubPaid.mutateAsync({
+          expense_id: originalId,
+          year: d.getFullYear(),
+          month: d.getMonth(),
+          paid: expense.status !== 'paid',
         });
+        toast.success(expense.status === 'paid' ? 'Despesa marcada como pendente' : 'Despesa paga!');
+      } else if (expense.status === 'paid') {
+        await updateExpense.mutateAsync({ id: originalId, status: 'pending', paid_at: null });
         toast.success('Despesa marcada como pendente');
       } else {
-        await updateExpense.mutateAsync({
-          id: originalId,
-          status: 'paid',
-          paid_at: new Date().toISOString(),
-        });
+        await updateExpense.mutateAsync({ id: originalId, status: 'paid', paid_at: new Date().toISOString() });
         toast.success('Despesa paga!');
       }
     } catch (error) {
