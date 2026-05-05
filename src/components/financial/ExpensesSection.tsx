@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Plus, Receipt, Check, Trash2, X, RefreshCw, Pencil } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useExpenses, useAddExpense, useUpdateExpense, useDeleteExpense, Expense, VirtualExpense, getExpensesForPeriod } from '@/hooks/useExpenses';
+import { useExpenses, useAddExpense, useUpdateExpense, useDeleteExpense, useExpensePayments, useToggleSubscriptionPaid, Expense, VirtualExpense, getExpensesForPeriod } from '@/hooks/useExpenses';
 import { toast } from 'sonner';
 import { startOfMonth, endOfMonth } from 'date-fns';
 
@@ -36,9 +36,11 @@ interface ExpensesSectionProps {
 
 export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, onCloseDialog }: ExpensesSectionProps) {
   const { data: expenses = [], isLoading } = useExpenses();
+  const { data: expensePayments = [] } = useExpensePayments();
   const addExpense = useAddExpense();
   const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
+  const toggleSubPaid = useToggleSubscriptionPaid();
   
   const [isOpen, setIsOpen] = useState(false);
 
@@ -174,23 +176,22 @@ export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, on
   };
 
   const handleTogglePaid = async (expense: VirtualExpense) => {
-    // Get the original expense ID for virtual entries
     const originalId = expense.original_id || expense.id;
-    
     try {
-      if (expense.status === 'paid') {
-        await updateExpense.mutateAsync({
-          id: originalId,
-          status: 'pending',
-          paid_at: null,
+      if (expense.expense_type === 'subscription' && expense.is_virtual) {
+        const d = parseISO(expense.due_date);
+        await toggleSubPaid.mutateAsync({
+          expense_id: originalId,
+          year: d.getFullYear(),
+          month: d.getMonth(),
+          paid: expense.status !== 'paid',
         });
+        toast.success(expense.status === 'paid' ? 'Despesa marcada como pendente' : 'Despesa paga!');
+      } else if (expense.status === 'paid') {
+        await updateExpense.mutateAsync({ id: originalId, status: 'pending', paid_at: null });
         toast.success('Despesa marcada como pendente');
       } else {
-        await updateExpense.mutateAsync({
-          id: originalId,
-          status: 'paid',
-          paid_at: new Date().toISOString(),
-        });
+        await updateExpense.mutateAsync({ id: originalId, status: 'paid', paid_at: new Date().toISOString() });
         toast.success('Despesa paga!');
       }
     } catch (error) {
@@ -224,7 +225,7 @@ export function ExpensesSection({ filterStartDate, filterEndDate, dialogOnly, on
   const displayEndDate = filterEndDate || endOfMonth(today);
   
   // Get expenses for the display period (including virtual subscription entries)
-  const displayExpenses = getExpensesForPeriod(expenses, displayStartDate, displayEndDate);
+  const displayExpenses = getExpensesForPeriod(expenses, displayStartDate, displayEndDate, expensePayments);
   
   const pendingExpenses = displayExpenses.filter(e => e.status !== 'paid');
   const totalPending = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);

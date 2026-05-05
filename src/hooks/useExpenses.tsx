@@ -43,6 +43,56 @@ export function useExpenses() {
   });
 }
 
+export interface ExpensePayment {
+  id: string;
+  expense_id: string;
+  period_year: number;
+  period_month: number;
+  paid_at: string;
+}
+
+export function useExpensePayments() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['expense_payments', user?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('expense_payments')
+        .select('*');
+      if (error) throw error;
+      return (data || []) as ExpensePayment[];
+    },
+    enabled: !!user,
+  });
+}
+
+export function useToggleSubscriptionPaid() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ expense_id, year, month, paid }: { expense_id: string; year: number; month: number; paid: boolean }) => {
+      if (!user) throw new Error('Not authenticated');
+      if (paid) {
+        const { error } = await (supabase as any)
+          .from('expense_payments')
+          .insert({ expense_id, user_id: user.id, period_year: year, period_month: month });
+        if (error && !String(error.message).includes('duplicate')) throw error;
+      } else {
+        const { error } = await (supabase as any)
+          .from('expense_payments')
+          .delete()
+          .eq('expense_id', expense_id)
+          .eq('period_year', year)
+          .eq('period_month', month);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expense_payments'] });
+    },
+  });
+}
+
 export type AddExpenseInput = {
   description: string;
   amount: number;
@@ -144,44 +194,47 @@ export function useDeleteExpense() {
 export function getExpensesForPeriod(
   expenses: Expense[],
   startDate: Date,
-  endDate: Date
+  endDate: Date,
+  payments: ExpensePayment[] = []
 ): VirtualExpense[] {
   const result: VirtualExpense[] = [];
+  const paymentMap = new Map<string, ExpensePayment>();
+  for (const p of payments) {
+    paymentMap.set(`${p.expense_id}-${p.period_year}-${p.period_month}`, p);
+  }
 
   for (const expense of expenses) {
     if (expense.expense_type === 'single') {
-      // Single expenses: check if due_date is within range
       const dueDate = parseISO(expense.due_date);
       if (isWithinInterval(dueDate, { start: startDate, end: endDate })) {
         result.push({ ...expense, is_virtual: false });
       }
     } else if (expense.expense_type === 'subscription' && expense.due_day) {
-      // Subscription expenses: generate virtual entries for each month in range
       const startMonth = startOfMonth(startDate);
       const endMonth = endOfMonth(endDate);
-      
+
       let currentMonth = startMonth;
       while (currentMonth <= endMonth) {
         const year = currentMonth.getFullYear();
         const month = currentMonth.getMonth();
-        
-        // Calculate the due date for this month
-        // Handle months with fewer days (e.g., due_day=31 in February)
+
         const lastDayOfMonth = endOfMonth(currentMonth).getDate();
         const actualDueDay = Math.min(expense.due_day, lastDayOfMonth);
         const virtualDueDate = new Date(year, month, actualDueDay);
-        
+
         if (isWithinInterval(virtualDueDate, { start: startDate, end: endDate })) {
+          const payment = paymentMap.get(`${expense.id}-${year}-${month}`);
           result.push({
             ...expense,
             id: `${expense.id}-${year}-${month}`,
             due_date: virtualDueDate.toISOString().split('T')[0],
+            status: payment ? 'paid' : 'pending',
+            paid_at: payment ? payment.paid_at : null,
             is_virtual: true,
             original_id: expense.id,
           });
         }
-        
-        // Move to next month
+
         currentMonth = new Date(year, month + 1, 1);
       }
     }
@@ -190,12 +243,11 @@ export function getExpensesForPeriod(
   return result.sort((a, b) => parseISO(a.due_date).getTime() - parseISO(b.due_date).getTime());
 }
 
-export function getUpcomingExpenses(expenses: Expense[], days: number = 30) {
+export function getUpcomingExpenses(expenses: Expense[], days: number = 30, payments: ExpensePayment[] = []) {
   const today = new Date();
   const endDate = new Date(today);
   endDate.setDate(endDate.getDate() + days);
-  
-  return getExpensesForPeriod(expenses, today, endDate)
+  return getExpensesForPeriod(expenses, today, endDate, payments)
     .filter(expense => expense.status !== 'paid');
 }
 
@@ -204,18 +256,18 @@ export function getOverdueExpenses(expenses: Expense[]) {
   return expenses
     .filter(expense => {
       if (expense.status === 'paid') return false;
-      if (expense.expense_type === 'subscription') return false; // Subscriptions are always "current"
+      if (expense.expense_type === 'subscription') return false;
       const dueDate = parseISO(expense.due_date);
       return dueDate < today;
     })
     .sort((a, b) => parseISO(a.due_date).getTime() - parseISO(b.due_date).getTime());
 }
 
-export function getMonthlyExpenses(expenses: Expense[], year: number, month: number) {
+export function getMonthlyExpenses(expenses: Expense[], year: number, month: number, payments: ExpensePayment[] = []) {
   const monthStart = startOfMonth(new Date(year, month));
   const monthEnd = endOfMonth(new Date(year, month));
 
-  const monthExpenses = getExpensesForPeriod(expenses, monthStart, monthEnd);
+  const monthExpenses = getExpensesForPeriod(expenses, monthStart, monthEnd, payments);
 
   const total = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
   const paid = monthExpenses.filter(e => e.status === 'paid').reduce((sum, e) => sum + e.amount, 0);
