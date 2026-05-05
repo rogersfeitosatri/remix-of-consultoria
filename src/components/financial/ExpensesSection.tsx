@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Plus, Receipt, Check, Trash2, X, RefreshCw, Pencil } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useExpenses, useAddExpense, useUpdateExpense, useDeleteExpense, Expense, VirtualExpense, getExpensesForPeriod } from '@/hooks/useExpenses';
+import { useExpenses, useAddExpense, useUpdateExpense, useDeleteExpense, useExpensePayments, Expense, VirtualExpense, getExpensesForPeriod } from '@/hooks/useExpenses';
 import { toast } from 'sonner';
 import { startOfMonth, endOfMonth } from 'date-fns';
 
