@@ -44,7 +44,9 @@ export function extractRaceFromDynamicResponses(
 
     // Check if this question is about a target race
     if (RACE_QUESTION_KEYWORDS.some(kw => qLower.includes(kw))) {
-      raceName = answerText;
+      if (isPlausibleRaceName(answerText)) {
+        raceName = answerText.trim();
+      }
     }
 
     // Check if this question is about a race date
