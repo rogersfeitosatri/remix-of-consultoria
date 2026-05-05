@@ -168,6 +168,21 @@ export function useUpdateStrategicCall() {
   });
 }
 
+export function useDeleteStrategicCall() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('strategic_calls').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['strategic-calls'] });
+      toast.success('Call excluída!');
+    },
+    onError: (err: any) => toast.error('Erro ao excluir: ' + err.message),
+  });
+}
+
 export function useSaveStrategicCallQuestions() {
   const queryClient = useQueryClient();
   return useMutation({
