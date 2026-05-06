@@ -194,11 +194,18 @@ export default function PublicBookingConsult() {
     const maxDays = settings?.max_advance_days ?? 60;
     const minDay = startOfDay(minBookingMoment);
 
+    const fullDayBlocked = new Set(
+      schedulingBlocks.filter(b => b.block_type === 'full_day').map(b => b.block_date)
+    );
+
     for (let i = 1; i <= maxDays; i++) {
       const date = addDays(today, i);
       // Skip dates before min advance window
       if (isBefore(date, minDay)) continue;
       const dayOfWeek = date.getDay();
+
+      const dateStr = format(date, 'yyyy-MM-dd');
+      if (fullDayBlocked.has(dateStr)) continue;
 
       const hasRule = availabilityRules.some(rule => rule.day_of_week === dayOfWeek);
       if (hasRule) {
