@@ -268,9 +268,16 @@ export default function PublicBookingConsult() {
         const isPast = isSameDay(selectedDate, new Date()) && isBefore(slotDateTime, new Date());
         const isBeforeMinAdvance = isBefore(slotDateTime, minBookingMoment);
 
+        // Check time-range blocks
+        const isInBlockedRange = timeRangeBlocks.some(b => {
+          const bs = (b.start_time || '').substring(0, 5);
+          const be = (b.end_time || '').substring(0, 5);
+          return timeStr >= bs && timeStr < be;
+        });
+
         slots.push({
           time: timeStr,
-          available: !isBooked && !isPast && !isBeforeMinAdvance,
+          available: !isBooked && !isPast && !isBeforeMinAdvance && !isInBlockedRange,
         });
         
         // Use slot step (duration + buffer) for next slot
