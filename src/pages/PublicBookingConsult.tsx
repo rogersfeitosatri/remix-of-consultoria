@@ -58,6 +58,7 @@ export default function PublicBookingConsult() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [existingAppointments, setExistingAppointments] = useState<any[]>([]);
+  const [schedulingBlocks, setSchedulingBlocks] = useState<Array<{ block_date: string; block_type: string; start_time: string | null; end_time: string | null }>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [confirmationData, setConfirmationData] = useState<{ date: string; time: string; meetLink?: string } | null>(null);
