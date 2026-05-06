@@ -58,6 +58,7 @@ export default function PublicBookingConsult() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [existingAppointments, setExistingAppointments] = useState<any[]>([]);
+  const [schedulingBlocks, setSchedulingBlocks] = useState<Array<{ block_date: string; block_type: string; start_time: string | null; end_time: string | null }>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [confirmationData, setConfirmationData] = useState<{ date: string; time: string; meetLink?: string } | null>(null);
@@ -104,6 +105,20 @@ export default function PublicBookingConsult() {
     };
 
     fetchAppointments();
+  }, [adminUserId]);
+
+  // Fetch scheduling blocks (full-day or time-range blocks set by the admin)
+  useEffect(() => {
+    const fetchBlocks = async () => {
+      if (!adminUserId) return;
+      const { data } = await supabase
+        .from('scheduling_blocks')
+        .select('block_date, block_type, start_time, end_time')
+        .eq('user_id', adminUserId)
+        .gte('block_date', format(new Date(), 'yyyy-MM-dd'));
+      setSchedulingBlocks(data || []);
+    };
+    fetchBlocks();
   }, [adminUserId]);
 
   // Handle email verification
@@ -179,11 +194,18 @@ export default function PublicBookingConsult() {
     const maxDays = settings?.max_advance_days ?? 60;
     const minDay = startOfDay(minBookingMoment);
 
+    const fullDayBlocked = new Set(
+      schedulingBlocks.filter(b => b.block_type === 'full_day').map(b => b.block_date)
+    );
+
     for (let i = 1; i <= maxDays; i++) {
       const date = addDays(today, i);
       // Skip dates before min advance window
       if (isBefore(date, minDay)) continue;
       const dayOfWeek = date.getDay();
+
+      const dateStr = format(date, 'yyyy-MM-dd');
+      if (fullDayBlocked.has(dateStr)) continue;
 
       const hasRule = availabilityRules.some(rule => rule.day_of_week === dayOfWeek);
       if (hasRule) {
@@ -192,7 +214,7 @@ export default function PublicBookingConsult() {
     }
 
     return dates;
-  }, [availabilityRules, settings, minBookingMoment]);
+  }, [availabilityRules, settings, minBookingMoment, schedulingBlocks]);
 
   // Calculate available time slots for selected date (with buffer support)
   const availableSlots = useMemo(() => {
@@ -203,7 +225,18 @@ export default function PublicBookingConsult() {
     
     const slots: TimeSlot[] = [];
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    
+
+    // Hard stop: full-day block
+    const isFullDayBlocked = schedulingBlocks.some(
+      b => b.block_date === dateStr && b.block_type === 'full_day'
+    );
+    if (isFullDayBlocked) return [];
+
+    // Time-range blocks for this date
+    const timeRangeBlocks = schedulingBlocks.filter(
+      b => b.block_date === dateStr && b.block_type === 'time_range' && b.start_time && b.end_time
+    );
+
     // Calculate slot step (duration + buffer)
     const slotStep = settings.slot_duration_minutes + settings.buffer_minutes;
     
@@ -235,9 +268,16 @@ export default function PublicBookingConsult() {
         const isPast = isSameDay(selectedDate, new Date()) && isBefore(slotDateTime, new Date());
         const isBeforeMinAdvance = isBefore(slotDateTime, minBookingMoment);
 
+        // Check time-range blocks
+        const isInBlockedRange = timeRangeBlocks.some(b => {
+          const bs = (b.start_time || '').substring(0, 5);
+          const be = (b.end_time || '').substring(0, 5);
+          return timeStr >= bs && timeStr < be;
+        });
+
         slots.push({
           time: timeStr,
-          available: !isBooked && !isPast && !isBeforeMinAdvance,
+          available: !isBooked && !isPast && !isBeforeMinAdvance && !isInBlockedRange,
         });
         
         // Use slot step (duration + buffer) for next slot
@@ -249,7 +289,7 @@ export default function PublicBookingConsult() {
     return slots
       .filter(s => s.available)
       .sort((a, b) => a.time.localeCompare(b.time));
-  }, [selectedDate, availabilityRules, existingAppointments, settings, minBookingMoment]);
+  }, [selectedDate, availabilityRules, existingAppointments, settings, minBookingMoment, schedulingBlocks]);
 
   const handleConfirm = async () => {
     if (!selectedDate || !selectedTime || !bookingContext || !settings) return;
