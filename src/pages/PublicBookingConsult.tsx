@@ -289,7 +289,7 @@ export default function PublicBookingConsult() {
     return slots
       .filter(s => s.available)
       .sort((a, b) => a.time.localeCompare(b.time));
-  }, [selectedDate, availabilityRules, existingAppointments, settings, minBookingMoment]);
+  }, [selectedDate, availabilityRules, existingAppointments, settings, minBookingMoment, schedulingBlocks]);
 
   const handleConfirm = async () => {
     if (!selectedDate || !selectedTime || !bookingContext || !settings) return;
