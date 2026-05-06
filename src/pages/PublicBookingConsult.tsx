@@ -214,7 +214,7 @@ export default function PublicBookingConsult() {
     }
 
     return dates;
-  }, [availabilityRules, settings, minBookingMoment]);
+  }, [availabilityRules, settings, minBookingMoment, schedulingBlocks]);
 
   // Calculate available time slots for selected date (with buffer support)
   const availableSlots = useMemo(() => {
