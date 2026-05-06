@@ -107,6 +107,20 @@ export default function PublicBookingConsult() {
     fetchAppointments();
   }, [adminUserId]);
 
+  // Fetch scheduling blocks (full-day or time-range blocks set by the admin)
+  useEffect(() => {
+    const fetchBlocks = async () => {
+      if (!adminUserId) return;
+      const { data } = await supabase
+        .from('scheduling_blocks')
+        .select('block_date, block_type, start_time, end_time')
+        .eq('user_id', adminUserId)
+        .gte('block_date', format(new Date(), 'yyyy-MM-dd'));
+      setSchedulingBlocks(data || []);
+    };
+    fetchBlocks();
+  }, [adminUserId]);
+
   // Handle email verification
   const handleEmailVerification = async () => {
     if (!emailInput.trim()) {
