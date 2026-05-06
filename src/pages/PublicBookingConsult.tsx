@@ -225,7 +225,18 @@ export default function PublicBookingConsult() {
     
     const slots: TimeSlot[] = [];
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    
+
+    // Hard stop: full-day block
+    const isFullDayBlocked = schedulingBlocks.some(
+      b => b.block_date === dateStr && b.block_type === 'full_day'
+    );
+    if (isFullDayBlocked) return [];
+
+    // Time-range blocks for this date
+    const timeRangeBlocks = schedulingBlocks.filter(
+      b => b.block_date === dateStr && b.block_type === 'time_range' && b.start_time && b.end_time
+    );
+
     // Calculate slot step (duration + buffer)
     const slotStep = settings.slot_duration_minutes + settings.buffer_minutes;
     
