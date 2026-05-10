@@ -282,7 +282,7 @@ export default function PublicStrategicCall() {
         <h1 className="text-3xl sm:text-4xl font-bold text-foreground leading-tight">{call.page_title}</h1>
         {looksLikeHtml ? (
           <div
-            className="prose prose-invert max-w-none text-foreground/80 text-base sm:text-lg leading-relaxed"
+            className="prose prose-invert max-w-none text-foreground/80 text-base sm:text-lg leading-relaxed [&_p]:my-4 [&_p:empty]:min-h-[1em] [&_p:empty]:my-4 [&_br]:block [&_br]:content-['']"
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(pageHtml) }}
           />
         ) : (
