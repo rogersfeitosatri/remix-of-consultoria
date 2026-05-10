@@ -413,16 +413,24 @@ export default function AthleteCheckinPlanning() {
 
             {futureRows.length > 0 && (
               <div className="pt-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Próximos envios projetados pela automação</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                  Próximos envios programados ({futureRows.length}) — sincronizados com a automação
+                </p>
                 <div className="space-y-2">
                   {futureRows.map((f, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-dashed bg-muted/20">
-                      <div className="flex items-center gap-2 text-sm flex-1 min-w-0">
-                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium truncate">{f.formTitle}</span>
-                        <span className="text-muted-foreground truncate">
-                          {format(f.date, "EEEE, dd/MM/yyyy", { locale: ptBR })}
-                        </span>
+                    <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-dashed bg-muted/20">
+                      <div className="flex items-center gap-3 text-sm flex-1 min-w-0">
+                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 font-semibold">
+                          {WEEKDAY_SHORT[f.date.getDay()]}
+                        </Badge>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-medium truncate">
+                            {format(f.date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                          </span>
+                          <span className="text-xs text-muted-foreground truncate">
+                            {f.formTitle} · {f.sendTime} · {format(f.date, "EEEE", { locale: ptBR })}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <Badge variant="outline" className="text-xs">Projetado</Badge>
@@ -430,8 +438,9 @@ export default function AthleteCheckinPlanning() {
                           variant="ghost"
                           size="sm"
                           onClick={() => {
+                            const [hh, mm] = (f.sendTime || '09:00').split(':').map(n => parseInt(n));
                             const d = new Date(f.date);
-                            d.setHours(9, 0, 0, 0);
+                            d.setHours(hh || 9, mm || 0, 0, 0);
                             openAddOverride(d, f.formId, f.scheduleId);
                           }}
                           title="Personalizar este envio"
@@ -442,6 +451,9 @@ export default function AthleteCheckinPlanning() {
                     </div>
                   ))}
                 </div>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Estas datas são geradas automaticamente pela frequência configurada e disparadas no horário definido. Aparecem também no calendário e no painel de check-ins.
+                </p>
               </div>
             )}
           </CardContent>
