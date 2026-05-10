@@ -60,8 +60,12 @@ function shouldSendForFrequency(
   const today = new Date(now.toISOString().split('T')[0] + 'T00:00:00Z');
 
   if (!lastDispatchedAt) {
+    // Para cadências maiores que semanal (quinzenal, mensal, etc.),
+    // o primeiro envio acontece somente no primeiro dia válido (weekly_days)
+    // a partir de start_date + freqWeeks semanas (ex.: mensal = 4 semanas).
     const start = new Date(startDate + 'T00:00:00Z');
-    return today.getTime() >= start.getTime();
+    const firstEligible = new Date(start.getTime() + freqWeeks * 7 * MS_PER_DAY);
+    return today.getTime() >= firstEligible.getTime();
   }
 
   const last = new Date(lastDispatchedAt);
