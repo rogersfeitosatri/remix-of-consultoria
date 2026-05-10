@@ -267,17 +267,24 @@ export default function AthleteCheckinPlanning() {
   const futureRows = useMemo(() => {
     const now = new Date();
     const planEnd = client?.end_date ? parseISO(client.end_date) : null;
-    const items: { date: Date; formTitle: string; formId: string; scheduleId: string }[] = [];
+    const items: { date: Date; formTitle: string; formId: string; scheduleId: string; sendTime: string; frequency: string }[] = [];
     schedules.filter(s => s.is_active).forEach(s => {
-      projectFutureDates(s, now, 12, planEnd).forEach(d => {
+      projectFutureDates(s, now, 16, planEnd).forEach(d => {
         const exists = dispatches.some(disp =>
           disp.checkin_form_id === s.checkin_form_id &&
           format(parseISO(disp.sent_at), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')
         );
-        if (!exists) items.push({ date: d, formTitle: s.checkin_forms?.title || 'Check-in', formId: s.checkin_form_id, scheduleId: s.id });
+        if (!exists) items.push({
+          date: d,
+          formTitle: s.checkin_forms?.title || 'Check-in',
+          formId: s.checkin_form_id,
+          scheduleId: s.id,
+          sendTime: s.send_time?.substring(0, 5) || '09:00',
+          frequency: s.frequency_type,
+        });
       });
     });
-    return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 20);
+    return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 24);
   }, [schedules, dispatches, client?.end_date]);
 
   const openEdit = (d: DispatchRow) => {
