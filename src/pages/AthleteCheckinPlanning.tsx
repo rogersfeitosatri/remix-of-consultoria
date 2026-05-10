@@ -68,7 +68,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   scheduled: { label: 'Programado', cls: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
 };
 
-function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 12, endDate?: Date | null): Date[] {
+function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 16, endDate?: Date | null): Date[] {
   const out: Date[] = [];
   const start = parseISO(schedule.start_date);
   const horizonByWeeks = addWeeks(fromDate, weeksAhead);
@@ -87,29 +87,29 @@ function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 
     }
   })();
 
-  // Cadence guard: if remaining days until plan end is shorter than the cadence interval,
-  // there's no time for another full cycle — do not project anything.
-  if (endDate) {
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const remainingDays = Math.floor((endDate.getTime() - fromDate.getTime()) / msPerDay);
-    const cadenceDays = stepWeeks * 7;
-    if (remainingDays < cadenceDays) return [];
-  }
-
   // Always honor weekly_days when present (defaults to Monday)
   const days = schedule.weekly_days?.length ? schedule.weekly_days : [1];
-  // Anchor cursor to the FIRST configured weekday on/after start_date,
-  // so monthly/bimonthly/quarterly cadences land on the configured day, not on start_date's weekday.
   const startDay = startOfDay(start);
   const firstDow = days[0];
-  const initialOffset = (firstDow - startDay.getDay() + 7) % 7;
-  let cursor = addDays(startDay, initialOffset);
+
+  // SYNC com process-checkin-dispatches: para frequências > semanal, o primeiro
+  // disparo só é elegível APÓS start_date + freqWeeks*7 dias. Para semanal, o
+  // primeiro pode cair na primeira ocorrência do dia da semana >= start_date.
+  const firstEligible = stepWeeks > 1
+    ? addDays(startDay, stepWeeks * 7)
+    : startDay;
+
+  // Ancora cursor no primeiro dia-da-semana configurado >= firstEligible.
+  const initialOffset = (firstDow - firstEligible.getDay() + 7) % 7;
+  let cursor = addDays(firstEligible, initialOffset);
 
   while (isBefore(cursor, horizon)) {
     for (const dow of days) {
       const offset = (dow - cursor.getDay() + 7) % 7;
       const d = addDays(cursor, offset);
-      if (!isBefore(d, fromDate) && isBefore(d, horizon)) out.push(d);
+      // Projeções incluem datas a partir de hoje (não filtra por fromDate exato,
+      // para que datas futuras próximas apareçam mesmo quando geradas hoje cedo).
+      if (!isBefore(d, startOfDay(fromDate)) && isBefore(d, horizon)) out.push(d);
     }
     cursor = addWeeks(cursor, stepWeeks);
   }
@@ -118,6 +118,8 @@ function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 
   out.forEach(d => map.set(d.toISOString().slice(0, 10), d));
   return Array.from(map.values()).sort((a, b) => a.getTime() - b.getTime());
 }
+
+const WEEKDAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export default function AthleteCheckinPlanning() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -265,17 +267,24 @@ export default function AthleteCheckinPlanning() {
   const futureRows = useMemo(() => {
     const now = new Date();
     const planEnd = client?.end_date ? parseISO(client.end_date) : null;
-    const items: { date: Date; formTitle: string; formId: string; scheduleId: string }[] = [];
+    const items: { date: Date; formTitle: string; formId: string; scheduleId: string; sendTime: string; frequency: string }[] = [];
     schedules.filter(s => s.is_active).forEach(s => {
-      projectFutureDates(s, now, 12, planEnd).forEach(d => {
+      projectFutureDates(s, now, 16, planEnd).forEach(d => {
         const exists = dispatches.some(disp =>
           disp.checkin_form_id === s.checkin_form_id &&
           format(parseISO(disp.sent_at), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')
         );
-        if (!exists) items.push({ date: d, formTitle: s.checkin_forms?.title || 'Check-in', formId: s.checkin_form_id, scheduleId: s.id });
+        if (!exists) items.push({
+          date: d,
+          formTitle: s.checkin_forms?.title || 'Check-in',
+          formId: s.checkin_form_id,
+          scheduleId: s.id,
+          sendTime: s.send_time?.substring(0, 5) || '09:00',
+          frequency: s.frequency_type,
+        });
       });
     });
-    return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 20);
+    return items.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 24);
   }, [schedules, dispatches, client?.end_date]);
 
   const openEdit = (d: DispatchRow) => {
@@ -404,16 +413,24 @@ export default function AthleteCheckinPlanning() {
 
             {futureRows.length > 0 && (
               <div className="pt-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Próximos envios projetados pela automação</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                  Próximos envios programados ({futureRows.length}) — sincronizados com a automação
+                </p>
                 <div className="space-y-2">
                   {futureRows.map((f, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-dashed bg-muted/20">
-                      <div className="flex items-center gap-2 text-sm flex-1 min-w-0">
-                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium truncate">{f.formTitle}</span>
-                        <span className="text-muted-foreground truncate">
-                          {format(f.date, "EEEE, dd/MM/yyyy", { locale: ptBR })}
-                        </span>
+                    <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-dashed bg-muted/20">
+                      <div className="flex items-center gap-3 text-sm flex-1 min-w-0">
+                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 font-semibold">
+                          {WEEKDAY_SHORT[f.date.getDay()]}
+                        </Badge>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-medium truncate">
+                            {format(f.date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                          </span>
+                          <span className="text-xs text-muted-foreground truncate">
+                            {f.formTitle} · {f.sendTime} · {format(f.date, "EEEE", { locale: ptBR })}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <Badge variant="outline" className="text-xs">Projetado</Badge>
@@ -421,8 +438,9 @@ export default function AthleteCheckinPlanning() {
                           variant="ghost"
                           size="sm"
                           onClick={() => {
+                            const [hh, mm] = (f.sendTime || '09:00').split(':').map(n => parseInt(n));
                             const d = new Date(f.date);
-                            d.setHours(9, 0, 0, 0);
+                            d.setHours(hh || 9, mm || 0, 0, 0);
                             openAddOverride(d, f.formId, f.scheduleId);
                           }}
                           title="Personalizar este envio"
@@ -433,6 +451,9 @@ export default function AthleteCheckinPlanning() {
                     </div>
                   ))}
                 </div>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Estas datas são geradas automaticamente pela frequência configurada e disparadas no horário definido. Aparecem também no calendário e no painel de check-ins.
+                </p>
               </div>
             )}
           </CardContent>
