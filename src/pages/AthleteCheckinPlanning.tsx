@@ -68,7 +68,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   scheduled: { label: 'Programado', cls: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
 };
 
-function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 12, endDate?: Date | null): Date[] {
+function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 16, endDate?: Date | null): Date[] {
   const out: Date[] = [];
   const start = parseISO(schedule.start_date);
   const horizonByWeeks = addWeeks(fromDate, weeksAhead);
@@ -87,29 +87,29 @@ function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 
     }
   })();
 
-  // Cadence guard: if remaining days until plan end is shorter than the cadence interval,
-  // there's no time for another full cycle — do not project anything.
-  if (endDate) {
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const remainingDays = Math.floor((endDate.getTime() - fromDate.getTime()) / msPerDay);
-    const cadenceDays = stepWeeks * 7;
-    if (remainingDays < cadenceDays) return [];
-  }
-
   // Always honor weekly_days when present (defaults to Monday)
   const days = schedule.weekly_days?.length ? schedule.weekly_days : [1];
-  // Anchor cursor to the FIRST configured weekday on/after start_date,
-  // so monthly/bimonthly/quarterly cadences land on the configured day, not on start_date's weekday.
   const startDay = startOfDay(start);
   const firstDow = days[0];
-  const initialOffset = (firstDow - startDay.getDay() + 7) % 7;
-  let cursor = addDays(startDay, initialOffset);
+
+  // SYNC com process-checkin-dispatches: para frequências > semanal, o primeiro
+  // disparo só é elegível APÓS start_date + freqWeeks*7 dias. Para semanal, o
+  // primeiro pode cair na primeira ocorrência do dia da semana >= start_date.
+  const firstEligible = stepWeeks > 1
+    ? addDays(startDay, stepWeeks * 7)
+    : startDay;
+
+  // Ancora cursor no primeiro dia-da-semana configurado >= firstEligible.
+  const initialOffset = (firstDow - firstEligible.getDay() + 7) % 7;
+  let cursor = addDays(firstEligible, initialOffset);
 
   while (isBefore(cursor, horizon)) {
     for (const dow of days) {
       const offset = (dow - cursor.getDay() + 7) % 7;
       const d = addDays(cursor, offset);
-      if (!isBefore(d, fromDate) && isBefore(d, horizon)) out.push(d);
+      // Projeções incluem datas a partir de hoje (não filtra por fromDate exato,
+      // para que datas futuras próximas apareçam mesmo quando geradas hoje cedo).
+      if (!isBefore(d, startOfDay(fromDate)) && isBefore(d, horizon)) out.push(d);
     }
     cursor = addWeeks(cursor, stepWeeks);
   }
@@ -118,6 +118,8 @@ function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 
   out.forEach(d => map.set(d.toISOString().slice(0, 10), d));
   return Array.from(map.values()).sort((a, b) => a.getTime() - b.getTime());
 }
+
+const WEEKDAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export default function AthleteCheckinPlanning() {
   const { clientId } = useParams<{ clientId: string }>();
