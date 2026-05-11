@@ -390,6 +390,16 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
               )}
               Salvar
             </Button>
+            {alertData?.hasTargetRace && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isSaving}
+                title="Excluir prova alvo"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={handleCancelEdit}
