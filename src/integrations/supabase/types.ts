@@ -6217,6 +6217,16 @@ export type Database = {
           reconciled: number
         }[]
       }
+      resolve_public_checkin_form: {
+        Args: { p_form_id: string }
+        Returns: {
+          description: string
+          id: string
+          is_active: boolean
+          redirected: boolean
+          title: string
+        }[]
+      }
       seed_default_plan_templates: {
         Args: { p_user_id: string }
         Returns: undefined
