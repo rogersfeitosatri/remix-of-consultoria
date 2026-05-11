@@ -6036,6 +6036,12 @@ export type Database = {
         Args: { p_cadence_weeks: number; p_last_appointment_at: string }
         Returns: string
       }
+      cancel_overdue_inactive_scheduled_checkins: {
+        Args: never
+        Returns: {
+          cancelled: number
+        }[]
+      }
       check_booking_send_duplicate: {
         Args: {
           _client_id: string
@@ -6203,6 +6209,12 @@ export type Database = {
           message: Json
           msg_id: number
           read_ct: number
+        }[]
+      }
+      reconcile_scheduled_checkins: {
+        Args: never
+        Returns: {
+          reconciled: number
         }[]
       }
       seed_default_plan_templates: {
