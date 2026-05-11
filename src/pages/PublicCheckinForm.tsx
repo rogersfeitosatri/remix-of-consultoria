@@ -308,6 +308,10 @@ export default function PublicCheckinForm() {
       toast.error('Confirme o telefone antes de iniciar o preenchimento.');
       return;
     }
+    if (questions.length === 0) {
+      toast.error('Este formulário não possui perguntas. Avise seu nutricionista.');
+      return;
+    }
 
     // Validate required questions (only visible ones)
     for (const question of visibleQuestions) {
