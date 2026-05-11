@@ -32,6 +32,7 @@ import { useSchedulingSettings } from '@/hooks/useScheduling';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { supabase } from '@/integrations/supabase/client';
 import { createCheckinDispatchForSend, markDispatchSent, markDispatchFailed } from '@/lib/checkinDispatch';
+import { resolveAthleteCheckinForm } from '@/lib/resolveAthleteCheckinForm';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useState } from 'react';
