@@ -48,6 +48,28 @@ export function AthleteProfileSection({ clientId, clientName }: AthleteProfileSe
     }
   };
 
+  const handleDeleteTargetRace = async () => {
+    if (!confirm('Tem certeza que deseja excluir sua prova alvo?')) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('athlete_profiles')
+        .update({ target_race: null, target_deadline: null })
+        .eq('client_id', clientId);
+
+      if (error) throw error;
+
+      setTargetRace('');
+      toast.success('Prova alvo excluída');
+      queryClient.invalidateQueries({ queryKey: ['athlete_profile', clientId] });
+    } catch (error: any) {
+      console.error('Error deleting target race:', error);
+      toast.error('Erro ao excluir prova alvo');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
