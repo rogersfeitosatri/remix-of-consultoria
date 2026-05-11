@@ -123,23 +123,35 @@ export function AthleteProfileSection({ clientId, clientName }: AthleteProfileSe
               className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
             />
           </div>
-          <Button 
-            onClick={handleSaveTargetRace} 
-            disabled={saving}
-            className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Salvar Prova Alvo
-              </>
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              onClick={handleSaveTargetRace} 
+              disabled={saving}
+              className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar Prova Alvo
+                </>
+              )}
+            </Button>
+            {profile?.target_race && (
+              <Button
+                onClick={handleDeleteTargetRace}
+                disabled={saving}
+                variant="destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </Button>
             )}
-          </Button>
+          </div>
         </CardContent>
       </Card>
 
