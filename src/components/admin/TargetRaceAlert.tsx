@@ -223,6 +223,30 @@ export function TargetRaceAlert({ clientId, clientName }: TargetRaceAlertProps) 
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm('Tem certeza que deseja excluir a prova alvo deste atleta?')) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('athlete_profiles')
+        .update({ target_race: null, target_deadline: null })
+        .eq('client_id', clientId);
+      if (error) throw error;
+      toast.success('Prova alvo excluída');
+      setTargetRace('');
+      setTargetDeadline('');
+      queryClient.invalidateQueries({ queryKey: ['target-race-alert', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['athletes-target-race-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-profile-periodization', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-periodization', clientId] });
+      setIsEditing(false);
+    } catch (error: any) {
+      toast.error('Erro ao excluir: ' + (error.message || 'Tente novamente'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="border-blue-500/30 bg-blue-500/5">
