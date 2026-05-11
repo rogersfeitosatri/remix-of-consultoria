@@ -173,20 +173,33 @@ export default function PublicCheckinForm() {
       if (!formId) return;
 
       try {
-        const { data: formData, error: formError } = await supabase
-          .from('checkin_forms')
-          .select('*')
-          .eq('id', formId)
-          .eq('is_active', true)
-          .single();
+        // Resolve via RPC: returns the requested form OR a fallback active form
+        // for the same nutritionist if the original is inactive/empty.
+        const { data: resolved, error: resolveError } = await supabase
+          .rpc('resolve_public_checkin_form' as any, { p_form_id: formId });
 
-        if (formError) throw formError;
-        setForm(formData);
+        if (resolveError) throw resolveError;
+        const resolvedForm = Array.isArray(resolved) && resolved.length > 0 ? resolved[0] : null;
+        if (!resolvedForm) throw new Error('Form not found');
+
+        // If the link's formId differs from the resolved one, redirect to the new URL
+        // preserving query params (so dispatch tracking continues to work).
+        if (resolvedForm.id !== formId) {
+          navigate(`/form/${resolvedForm.id}${location.search}`, { replace: true });
+          return;
+        }
+
+        setForm({
+          id: resolvedForm.id,
+          title: resolvedForm.title,
+          description: resolvedForm.description,
+          is_active: resolvedForm.is_active,
+        });
 
         const { data: questionsData, error: questionsError } = await supabase
           .from('checkin_questions')
           .select('*')
-          .eq('form_id', formId)
+          .eq('form_id', resolvedForm.id)
           .order('order_index', { ascending: true });
 
         if (questionsError) throw questionsError;
