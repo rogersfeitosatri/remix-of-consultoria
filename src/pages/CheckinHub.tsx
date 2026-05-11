@@ -9,6 +9,7 @@ import { PendingReviewsList } from '@/components/forms/PendingReviewsList';
 import { ScheduledCheckinsSection } from '@/components/forms/ScheduledCheckinsSection';
 import { CheckinAuditTab } from '@/components/forms/CheckinAuditTab';
 import { CheckinAlertsBanner } from '@/components/checkin/CheckinAlertsBanner';
+import { CheckinScheduleAuditBanner } from '@/components/checkin/CheckinScheduleAuditBanner';
 import { CheckinDispatchOverview } from '@/components/checkin/CheckinDispatchOverview';
 
 export default function CheckinHub() {
@@ -37,6 +38,7 @@ export default function CheckinHub() {
         </div>
 
         <CheckinAlertsBanner />
+        <CheckinScheduleAuditBanner />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4 max-w-3xl">
