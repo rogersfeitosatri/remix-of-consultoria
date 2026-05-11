@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { createCheckinDispatchForSend, markDispatchSent, markDispatchFailed } from '@/lib/checkinDispatch';
+import { resolveAthleteCheckinForm } from '@/lib/resolveAthleteCheckinForm';
 import { useAuth } from '@/hooks/useAuth';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { useSchedulingSettings } from '@/hooks/useScheduling';
