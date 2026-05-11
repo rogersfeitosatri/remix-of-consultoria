@@ -17,7 +17,8 @@ import {
   Save,
   X,
   ChevronDown,
-  Search
+  Search,
+  Trash2
 } from 'lucide-react';
 import { useTargetRaceAlert } from '@/hooks/useTargetRaceAlert';
 import { useMarkDietAdjustmentDone } from '@/hooks/useDietAdjustmentAlerts';
