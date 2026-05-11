@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { User, Target, Save, Loader2 } from 'lucide-react';
+import { User, Target, Save, Loader2, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAthleteProfile } from '@/hooks/useUserRole';
@@ -43,6 +43,28 @@ export function AthleteProfileSection({ clientId, clientName }: AthleteProfileSe
     } catch (error: any) {
       console.error('Error saving target race:', error);
       toast.error('Erro ao salvar prova alvo');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteTargetRace = async () => {
+    if (!confirm('Tem certeza que deseja excluir sua prova alvo?')) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('athlete_profiles')
+        .update({ target_race: null, target_deadline: null })
+        .eq('client_id', clientId);
+
+      if (error) throw error;
+
+      setTargetRace('');
+      toast.success('Prova alvo excluída');
+      queryClient.invalidateQueries({ queryKey: ['athlete_profile', clientId] });
+    } catch (error: any) {
+      console.error('Error deleting target race:', error);
+      toast.error('Erro ao excluir prova alvo');
     } finally {
       setSaving(false);
     }
@@ -101,23 +123,35 @@ export function AthleteProfileSection({ clientId, clientName }: AthleteProfileSe
               className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
             />
           </div>
-          <Button 
-            onClick={handleSaveTargetRace} 
-            disabled={saving}
-            className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Salvar Prova Alvo
-              </>
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              onClick={handleSaveTargetRace} 
+              disabled={saving}
+              className="bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Salvar Prova Alvo
+                </>
+              )}
+            </Button>
+            {profile?.target_race && (
+              <Button
+                onClick={handleDeleteTargetRace}
+                disabled={saving}
+                variant="destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </Button>
             )}
-          </Button>
+          </div>
         </CardContent>
       </Card>
 
