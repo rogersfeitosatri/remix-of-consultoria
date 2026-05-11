@@ -151,7 +151,17 @@ export function WhatsAppTemplatesTab({ templates }: WhatsAppTemplatesTabProps) {
                         <Switch
                           id={`active-${template.id}`}
                           checked={data.is_active}
-                          onCheckedChange={(checked) => handleChange(template.id, 'is_active', checked)}
+                          onCheckedChange={(checked) => {
+                            handleChange(template.id, 'is_active', checked);
+                            // Persist immediately so deactivation takes effect right away
+                            // and cancels pending scheduled sends via DB trigger.
+                            saveTemplate.mutate({
+                              id: template.id,
+                              title: data.title,
+                              body: data.body,
+                              is_active: checked,
+                            });
+                          }}
                         />
                         <Label htmlFor={`active-${template.id}`}>
                           {data.is_active ? 'Template ativo' : 'Template desativado'}
