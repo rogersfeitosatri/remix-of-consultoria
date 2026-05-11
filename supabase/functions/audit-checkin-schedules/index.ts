@@ -86,7 +86,22 @@ Deno.serve(async (req) => {
 
       const all = items ?? [];
       const sentItems = all.filter(i => i.status === 'sent' || i.response_id || i.sent_at);
-      const lastSent = sentItems.length ? sentItems[sentItems.length - 1].scheduled_send_date : null;
+      let lastSent = sentItems.length ? sentItems[sentItems.length - 1].scheduled_send_date : null;
+
+      // Also consider checkin_dispatches as source of truth for last actual send
+      const { data: lastDispatch } = await admin
+        .from('checkin_dispatches')
+        .select('sent_at')
+        .eq('client_id', sch.client_id)
+        .eq('status', 'sent')
+        .not('sent_at', 'is', null)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (lastDispatch?.sent_at) {
+        const dispatchDate = String(lastDispatch.sent_at).slice(0, 10);
+        if (!lastSent || dispatchDate > lastSent) lastSent = dispatchDate;
+      }
 
       const futurePending = all.filter(i => i.status === 'pending' && i.scheduled_send_date >= today);
       const nextScheduled = futurePending.length ? futurePending[0].scheduled_send_date : null;
