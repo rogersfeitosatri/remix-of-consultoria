@@ -516,7 +516,25 @@ export default function PublicCheckinForm() {
           </Card>
 
           {/* Questions / Submit */}
-          {verifiedClientId ? (
+          {verifiedClientId && questions.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6 text-center space-y-2">
+                <p className="font-medium">Este formulário ainda não tem perguntas configuradas.</p>
+                <p className="text-sm text-muted-foreground">
+                  Por favor, entre em contato com seu nutricionista — o link enviado precisa ser corrigido.
+                </p>
+                <Button
+                  type="button"
+                  variant="default"
+                  className="mt-2 gap-2"
+                  onClick={() => window.open('https://wa.me/5599984817697', '_blank')}
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Avisar o nutricionista
+                </Button>
+              </CardContent>
+            </Card>
+          ) : verifiedClientId ? (
             <>
               {/* Questions */}
               <div className="space-y-4">
