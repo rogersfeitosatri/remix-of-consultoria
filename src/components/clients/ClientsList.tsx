@@ -106,9 +106,9 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
       return;
     }
 
-    const activeForm = checkinForms.find(f => f.is_active);
+    const activeForm = await resolveAthleteCheckinForm(client.id, user!.id);
     if (!activeForm) {
-      toast.error('Nenhum formulário de check-in ativo');
+      toast.error('Nenhum formulário de check-in válido para este atleta (verifique se o formulário tem perguntas).');
       return;
     }
 
