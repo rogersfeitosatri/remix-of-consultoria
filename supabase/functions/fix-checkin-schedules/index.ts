@@ -163,12 +163,13 @@ Deno.serve(async (req) => {
         const newRows: any[] = [];
         let next = addDays(anchor, interval);
         while (next <= endDate) {
-          if (next >= today) {
+          const snapped = snapToNearestMonday(next);
+          if (snapped >= today && snapped <= endDate) {
             newRows.push({
               client_id: clientId,
               user_id: userId,
               form_id: sch.checkin_form_id,
-              scheduled_send_date: next,
+              scheduled_send_date: snapped,
               scheduled_send_time: sendTime,
               status: 'pending',
             });
