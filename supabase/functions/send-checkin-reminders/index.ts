@@ -40,8 +40,20 @@ Deno.serve(async (req) => {
     const todayStr = saoPauloNow.toISOString().split('T')[0];
     const currentHour = saoPauloNow.getHours();
     const currentMinute = saoPauloNow.getMinutes();
+    const currentDow = saoPauloNow.getUTCDay(); // 0=Sun, 1=Mon, ...
 
-    console.log('[send-checkin-reminders] Processing for:', todayStr, 'current time:', `${currentHour}:${currentMinute}`);
+    console.log('[send-checkin-reminders] Processing for:', todayStr, 'current time:', `${currentHour}:${currentMinute}`, 'dow:', currentDow);
+
+    // HARD GUARD: only Mondays. Check-in links must never be sent on any other day.
+    if (currentDow !== 1) {
+      console.log('[send-checkin-reminders] Skipping run: today is not Monday (dow=' + currentDow + ')');
+      return new Response(JSON.stringify({
+        success: true,
+        skipped: true,
+        reason: 'not_monday',
+        dow: currentDow,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     // Fetch scheduled checkins for today that haven't been sent
     const { data: scheduledCheckins, error: fetchError } = await supabase
