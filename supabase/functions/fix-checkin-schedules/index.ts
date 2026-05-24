@@ -21,6 +21,19 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Snap to the nearest Monday (forward or backward). Ties go forward.
+function snapToNearestMonday(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  const dow = d.getUTCDay(); // 0=Sun..6=Sat
+  if (dow === 1) return dateStr;
+  // Distance to previous Monday
+  const back = (dow + 6) % 7; // Sun->6, Tue->1, Wed->2, ...
+  // Distance to next Monday
+  const fwd = (8 - dow) % 7 || 7;
+  const delta = back < fwd ? -back : fwd;
+  return addDays(dateStr, delta);
+}
+
 interface FixLog {
   client_id: string;
   client_name: string;
@@ -150,12 +163,13 @@ Deno.serve(async (req) => {
         const newRows: any[] = [];
         let next = addDays(anchor, interval);
         while (next <= endDate) {
-          if (next >= today) {
+          const snapped = snapToNearestMonday(next);
+          if (snapped >= today && snapped <= endDate) {
             newRows.push({
               client_id: clientId,
               user_id: userId,
               form_id: sch.checkin_form_id,
-              scheduled_send_date: next,
+              scheduled_send_date: snapped,
               scheduled_send_time: sendTime,
               status: 'pending',
             });
