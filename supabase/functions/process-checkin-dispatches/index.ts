@@ -116,6 +116,25 @@ Deno.serve(async (req) => {
 
     console.log(`[process-checkin-dispatches] Run ${runId} starting. day=${currentDay}, time=${currentTime}, source=${source}`);
 
+    // HARD GUARD: Mondays only for the automatic cron. Manual reprocess (forceReprocess)
+    // is allowed any day so admins can recover from failures.
+    if (currentDay !== 1 && source === 'cron' && !forceReprocess) {
+      console.log('[process-checkin-dispatches] Skipping automatic run: today is not Monday');
+      if (runId) {
+        await supabase.from('checkin_dispatch_runs').update({
+          finished_at: new Date().toISOString(),
+          status: 'success',
+          total_analyzed: 0, total_eligible: 0, total_dispatched: 0,
+          total_failed: 0, total_skipped: 0,
+          details: [{ reason: 'not_monday', dow: currentDay }],
+        }).eq('id', runId);
+      }
+      return new Response(
+        JSON.stringify({ success: true, skipped: true, reason: 'not_monday', dow: currentDay }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { data: schedules, error: sErr } = await supabase
       .from('athlete_checkin_schedules')
       .select(`
