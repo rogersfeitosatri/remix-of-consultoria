@@ -241,6 +241,29 @@ Deno.serve(async (req) => {
           checkin_link: checkinLink,
         });
 
+        // DEDUP GUARD: skip if this client already has a sent check-in dispatch today.
+        // Prevents duplicate WhatsApp messages when the new pipeline
+        // (process-checkin-dispatches) already dispatched today.
+        const { data: alreadySent } = await supabase
+          .from('checkin_dispatches')
+          .select('id')
+          .eq('client_id', checkin.client_id)
+          .eq('status', 'sent')
+          .gte('sent_at', `${todayStr}T00:00:00`)
+          .lte('sent_at', `${todayStr}T23:59:59`)
+          .limit(1)
+          .maybeSingle();
+
+        if (alreadySent) {
+          console.log('[send-checkin-reminders] Dedup: client already received check-in today, skipping:', checkin.client_id);
+          await supabase
+            .from('scheduled_checkins')
+            .update({ status: 'sent', sent_at: new Date().toISOString() })
+            .eq('id', checkin.id);
+          results.push({ checkinId: checkin.id, status: 'skipped', error: 'already_sent_today' });
+          continue;
+        }
+
         // REGRA OBRIGATÓRIA: criar dispatch ANTES de enviar via Z-API
         let dispatchId: string | null = null;
         try {

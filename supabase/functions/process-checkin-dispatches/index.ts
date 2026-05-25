@@ -307,12 +307,13 @@ Deno.serve(async (req) => {
         const scheduleTime = schedule.send_time?.substring(0, 5) || '09:00';
         if (!forceReprocess && currentTime < scheduleTime) { skipped++; continue; }
 
-        // Idempotency
+        // Idempotency: by schedule OR by client (covers legacy pipeline)
         const todayStr = now.toISOString().split('T')[0];
         const { data: existing } = await supabase
           .from('checkin_dispatches')
           .select('id')
-          .eq('schedule_id', schedule.id)
+          .or(`schedule_id.eq.${schedule.id},client_id.eq.${client.id}`)
+          .in('status', ['sent', 'scheduled'])
           .gte('sent_at', `${todayStr}T00:00:00`)
           .lte('sent_at', `${todayStr}T23:59:59`)
           .limit(1);
