@@ -693,17 +693,29 @@ export default function AppointmentDetail() {
                   <DialogHeader>
                     <DialogTitle>Cancelar Consulta</DialogTitle>
                     <DialogDescription>
-                      Esta ação não pode ser desfeita. O atleta será notificado automaticamente.
+                      Esta ação não pode ser desfeita.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="py-4">
-                    <Label>Motivo do cancelamento (opcional)</Label>
-                    <Textarea
-                      value={cancelReason}
-                      onChange={(e) => setCancelReason(e.target.value)}
-                      placeholder="Ex: Reagendamento a pedido do atleta..."
-                      className="mt-2"
-                    />
+                  <div className="py-4 space-y-4">
+                    <div>
+                      <Label>Motivo do cancelamento (opcional)</Label>
+                      <Textarea
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        placeholder="Ex: Reagendamento a pedido do atleta..."
+                        className="mt-2"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="notify-cancel"
+                        checked={notifyOnCancel}
+                        onCheckedChange={(checked) => setNotifyOnCancel(checked === true)}
+                      />
+                      <Label htmlFor="notify-cancel" className="text-sm font-normal cursor-pointer">
+                        Notificar o atleta sobre o cancelamento
+                      </Label>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsCancelOpen(false)}>
