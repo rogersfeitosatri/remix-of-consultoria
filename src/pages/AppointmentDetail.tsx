@@ -11,6 +11,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useRescheduleAppointment, useCancelAppointment } from '@/hooks/useConsultations';
 import { useSchedulingSettings, useSchedulingBlocks, useAppointmentsByDate } from '@/hooks/useScheduling';
@@ -73,10 +74,12 @@ export default function AppointmentDetail() {
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
   const [newDate, setNewDate] = useState<Date | undefined>();
   const [newTime, setNewTime] = useState<string>('');
+  const [notifyOnReschedule, setNotifyOnReschedule] = useState(true);
   
   // Cancel state
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [notifyOnCancel, setNotifyOnCancel] = useState(true);
   
   // Reprocess state
   const [isReprocessing, setIsReprocessing] = useState(false);
@@ -262,7 +265,7 @@ export default function AppointmentDetail() {
         appointmentId,
         newDate: format(newDate, 'yyyy-MM-dd'),
         newTime: formattedTime,
-        notifyClient: true,
+        notifyClient: notifyOnReschedule,
       });
       
       toast.success('Consulta remarcada com sucesso');
@@ -282,7 +285,7 @@ export default function AppointmentDetail() {
     try {
       await cancelAppointment.mutateAsync({
         appointmentId,
-        notifyClient: true,
+        notifyClient: notifyOnCancel,
         reason: cancelReason,
         force: true,
       });
@@ -612,7 +615,7 @@ export default function AppointmentDetail() {
                   <DialogHeader>
                     <DialogTitle>Remarcar Consulta</DialogTitle>
                     <DialogDescription>
-                      Selecione a nova data e horário. O atleta será notificado automaticamente.
+                      Selecione a nova data e horário.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
@@ -649,6 +652,17 @@ export default function AppointmentDetail() {
                         Sem horários disponíveis nesta data
                       </p>
                     )}
+
+                    <div className="flex items-center space-x-2 pt-2 border-t">
+                      <Checkbox
+                        id="notify-reschedule"
+                        checked={notifyOnReschedule}
+                        onCheckedChange={(checked) => setNotifyOnReschedule(checked === true)}
+                      />
+                      <Label htmlFor="notify-reschedule" className="text-sm font-normal cursor-pointer">
+                        Notificar o atleta sobre a remarcação
+                      </Label>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsRescheduleOpen(false)}>
@@ -679,17 +693,29 @@ export default function AppointmentDetail() {
                   <DialogHeader>
                     <DialogTitle>Cancelar Consulta</DialogTitle>
                     <DialogDescription>
-                      Esta ação não pode ser desfeita. O atleta será notificado automaticamente.
+                      Esta ação não pode ser desfeita.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="py-4">
-                    <Label>Motivo do cancelamento (opcional)</Label>
-                    <Textarea
-                      value={cancelReason}
-                      onChange={(e) => setCancelReason(e.target.value)}
-                      placeholder="Ex: Reagendamento a pedido do atleta..."
-                      className="mt-2"
-                    />
+                  <div className="py-4 space-y-4">
+                    <div>
+                      <Label>Motivo do cancelamento (opcional)</Label>
+                      <Textarea
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        placeholder="Ex: Reagendamento a pedido do atleta..."
+                        className="mt-2"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="notify-cancel"
+                        checked={notifyOnCancel}
+                        onCheckedChange={(checked) => setNotifyOnCancel(checked === true)}
+                      />
+                      <Label htmlFor="notify-cancel" className="text-sm font-normal cursor-pointer">
+                        Notificar o atleta sobre o cancelamento
+                      </Label>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsCancelOpen(false)}>
