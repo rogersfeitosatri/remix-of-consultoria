@@ -285,7 +285,7 @@ export default function AppointmentDetail() {
     try {
       await cancelAppointment.mutateAsync({
         appointmentId,
-        notifyClient: true,
+        notifyClient: notifyOnCancel,
         reason: cancelReason,
         force: true,
       });
