@@ -74,10 +74,12 @@ export default function AppointmentDetail() {
   const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
   const [newDate, setNewDate] = useState<Date | undefined>();
   const [newTime, setNewTime] = useState<string>('');
+  const [notifyOnReschedule, setNotifyOnReschedule] = useState(true);
   
   // Cancel state
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [notifyOnCancel, setNotifyOnCancel] = useState(true);
   
   // Reprocess state
   const [isReprocessing, setIsReprocessing] = useState(false);
