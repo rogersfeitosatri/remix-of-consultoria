@@ -615,7 +615,7 @@ export default function AppointmentDetail() {
                   <DialogHeader>
                     <DialogTitle>Remarcar Consulta</DialogTitle>
                     <DialogDescription>
-                      Selecione a nova data e horário. O atleta será notificado automaticamente.
+                      Selecione a nova data e horário.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
