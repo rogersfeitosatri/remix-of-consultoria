@@ -652,6 +652,17 @@ export default function AppointmentDetail() {
                         Sem horários disponíveis nesta data
                       </p>
                     )}
+
+                    <div className="flex items-center space-x-2 pt-2 border-t">
+                      <Checkbox
+                        id="notify-reschedule"
+                        checked={notifyOnReschedule}
+                        onCheckedChange={(checked) => setNotifyOnReschedule(checked === true)}
+                      />
+                      <Label htmlFor="notify-reschedule" className="text-sm font-normal cursor-pointer">
+                        Notificar o atleta sobre a remarcação
+                      </Label>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsRescheduleOpen(false)}>
