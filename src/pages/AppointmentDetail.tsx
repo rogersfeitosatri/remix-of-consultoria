@@ -265,7 +265,7 @@ export default function AppointmentDetail() {
         appointmentId,
         newDate: format(newDate, 'yyyy-MM-dd'),
         newTime: formattedTime,
-        notifyClient: true,
+        notifyClient: notifyOnReschedule,
       });
       
       toast.success('Consulta remarcada com sucesso');
