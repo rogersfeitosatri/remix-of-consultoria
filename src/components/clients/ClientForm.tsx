@@ -17,6 +17,7 @@ import { PlanTypeBadge } from './PlanTypeBadge';
 import { validatePlanFeasibility } from '@/lib/planTypology';
 import { PipelinePreviewDialog } from './PipelinePreviewDialog';
 import { NpRegistrationSection } from './NpRegistrationSection';
+import { DateInputBR } from '@/components/ui/date-input-br';
 
 interface CalculatedWindow {
   windowStart: Date;
