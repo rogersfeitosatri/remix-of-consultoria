@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { format, parseISO, addMonths, addWeeks } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 interface RenewPlanDialogProps {
   open: boolean;
@@ -29,6 +27,7 @@ const PLAN_DURATION_OPTIONS = [
   { value: 'semiannual', label: '6 Meses' },
   { value: 'annual', label: '12 Meses' },
   { value: 'six_weeks', label: '6 Semanas' },
+  { value: 'custom', label: 'Personalizado' },
 ];
 
 const SERVICE_OPTIONS = [
@@ -42,24 +41,82 @@ const PLAN_TYPE_OPTIONS = [
   { value: 'premium', label: 'Premium' },
 ];
 
+const CHECKIN_FREQ_OPTIONS = [
+  { value: 'weekly', label: 'Semanal' },
+  { value: 'biweekly', label: 'Quinzenal' },
+  { value: 'three_weeks', label: 'A cada 3 semanas' },
+  { value: 'monthly', label: 'Mensal' },
+  { value: 'bimonthly', label: 'Bimestral' },
+  { value: 'quarterly', label: 'Trimestral' },
+];
+
+const CONSULT_FREQ_OPTIONS = [
+  { value: 'once', label: 'Única' },
+  { value: 'monthly', label: 'Mensal (4 sem)' },
+  { value: 'six_weeks', label: 'A cada 6 semanas' },
+];
+
+// TZ-safe: add months keeping the local calendar day
+function addMonthsStr(yyyyMmDd: string, months: number): string {
+  if (!yyyyMmDd) return '';
+  const [y, m, d] = yyyyMmDd.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const targetMonth0 = m - 1 + months;
+  const targetYear = y + Math.floor(targetMonth0 / 12);
+  const normalizedMonth0 = ((targetMonth0 % 12) + 12) % 12;
+  const lastDay = new Date(targetYear, normalizedMonth0 + 1, 0).getDate();
+  const day = Math.min(d, lastDay);
+  return `${targetYear}-${String(normalizedMonth0 + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function addDaysStr(yyyyMmDd: string, days: number): string {
+  if (!yyyyMmDd) return '';
+  const [y, m, d] = yyyyMmDd.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function fmtBR(yyyyMmDd: string): string {
+  if (!yyyyMmDd) return '—';
+  const [y, m, d] = yyyyMmDd.split('-');
+  if (!y || !m || !d) return '—';
+  return `${d}/${m}/${y}`;
+}
+
+function diffDays(a: string, b: string): number {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  const da = new Date(ay, am - 1, ad).getTime();
+  const db = new Date(by, bm - 1, bd).getTime();
+  return Math.round((db - da) / (1000 * 60 * 60 * 24));
+}
+
 function calculateEndDate(startDate: string, duration: string): string {
   if (!startDate) return '';
-  try {
-    const start = parseISO(startDate);
-    if (isNaN(start.getTime())) return '';
-    let end: Date;
-    switch (duration) {
-      case 'monthly': end = addMonths(start, 1); break;
-      case 'quarterly': end = addMonths(start, 3); break;
-      case 'semiannual': end = addMonths(start, 6); break;
-      case 'annual': end = addMonths(start, 12); break;
-      case 'six_weeks': end = addWeeks(start, 6); break;
-      default: end = addMonths(start, 1);
-    }
-    return format(end, 'yyyy-MM-dd');
-  } catch {
-    return '';
+  switch (duration) {
+    case 'monthly': return addMonthsStr(startDate, 1);
+    case 'quarterly': return addMonthsStr(startDate, 3);
+    case 'semiannual': return addMonthsStr(startDate, 6);
+    case 'annual': return addMonthsStr(startDate, 12);
+    case 'six_weeks': return addDaysStr(startDate, 42);
+    default: return '';
   }
+}
+
+// Pick the best matching plan_duration based on a custom day-span
+function inferDurationFromDays(days: number): Client['plan_duration'] {
+  if (days <= 32) return 'monthly';
+  if (days <= 50) return 'six_weeks';
+  if (days <= 100) return 'quarterly';
+  if (days <= 200) return 'semiannual';
+  return 'annual';
 }
 
 export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogProps) {
@@ -72,17 +129,44 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
   const [planType, setPlanType] = useState(client.plan_type);
   const [serviceType, setServiceType] = useState(client.service_type);
   const [planDuration, setPlanDuration] = useState<string>(client.plan_duration || 'monthly');
-  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [startDate, setStartDate] = useState(todayStr());
+  const [customEndDate, setCustomEndDate] = useState<string>(client.end_date || '');
   const [monthlyValue, setMonthlyValue] = useState(client.monthly_value);
   const [hasCheckin, setHasCheckin] = useState(client.has_checkin);
+  const [checkinFrequency, setCheckinFrequency] = useState<string>(client.checkin_frequency || 'weekly');
   const [hasConsultations, setHasConsultations] = useState(client.has_consultations);
+  const [consultationFrequency, setConsultationFrequency] = useState<string>(client.consultation_frequency || 'monthly');
 
-  const newEndDate = calculateEndDate(startDate, planDuration);
+  const newEndDate = useMemo(() => {
+    if (planDuration === 'custom') return customEndDate;
+    return calculateEndDate(startDate, planDuration);
+  }, [planDuration, startDate, customEndDate]);
+
+  // Calculate consultation_count from period + frequency
+  const computedConsultationCount = useMemo(() => {
+    if (!hasConsultations) return 0;
+    if (consultationFrequency === 'once') return 1;
+    if (!startDate || !newEndDate) return client.consultation_count || 1;
+    const days = diffDays(startDate, newEndDate);
+    if (days <= 0) return 1;
+    const weeksPerConsult = consultationFrequency === 'six_weeks' ? 6 : 4;
+    return Math.max(1, Math.floor(days / (weeksPerConsult * 7)));
+  }, [hasConsultations, consultationFrequency, startDate, newEndDate, client.consultation_count]);
 
   const handleSaveAndRenew = async () => {
     if (!user) return;
-    if (!startDate || !newEndDate) {
+    if (!startDate) {
       toast.error('Informe uma data de início válida.');
+      return;
+    }
+    if (!newEndDate) {
+      toast.error(planDuration === 'custom'
+        ? 'Informe a data de término para a duração personalizada.'
+        : 'Não foi possível calcular a data de término.');
+      return;
+    }
+    if (diffDays(startDate, newEndDate) <= 0) {
+      toast.error('A data de término deve ser posterior à data de início.');
       return;
     }
     if (!Number.isFinite(monthlyValue) || monthlyValue < 0) {
@@ -115,18 +199,27 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
 
       if (historyError) throw historyError;
 
-      // 2. Update client with new plan data
+      // 2. Resolve persisted plan_duration (custom → infer label or keep 'custom')
+      const persistedDuration: Client['plan_duration'] =
+        planDuration === 'custom'
+          ? (inferDurationFromDays(diffDays(startDate, newEndDate)))
+          : (planDuration as Client['plan_duration']);
+
+      // 3. Update client with new plan data (all cadence cascades from renewal)
       const { error: updateError } = await supabase
         .from('clients')
         .update({
           plan_type: planType,
           service_type: serviceType,
-          plan_duration: planDuration,
+          plan_duration: persistedDuration,
           start_date: startDate,
           end_date: newEndDate,
           monthly_value: monthlyValue,
           has_checkin: hasCheckin,
+          checkin_frequency: hasCheckin ? checkinFrequency : null,
           has_consultations: hasConsultations,
+          consultation_frequency: hasConsultations ? consultationFrequency : null,
+          consultation_count: hasConsultations ? computedConsultationCount : 0,
           is_active: true,
           is_frozen: false,
           frozen_at: null,
@@ -172,8 +265,8 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div><span className="text-muted-foreground">Tipo:</span> <Badge variant="outline">{client.plan_type === 'premium' ? 'Premium' : 'Consultoria'}</Badge></div>
                   <div><span className="text-muted-foreground">Serviço:</span> {client.service_type === 'both' ? 'Ambos' : client.service_type === 'nutrition' ? 'Nutrição' : 'Treino'}</div>
-                  <div><span className="text-muted-foreground">Início:</span> {format(parseISO(client.start_date), 'dd/MM/yyyy')}</div>
-                  <div><span className="text-muted-foreground">Término:</span> {format(parseISO(client.end_date), 'dd/MM/yyyy')}</div>
+                  <div><span className="text-muted-foreground">Início:</span> {fmtBR(client.start_date)}</div>
+                  <div><span className="text-muted-foreground">Término:</span> {fmtBR(client.end_date)}</div>
                   <div><span className="text-muted-foreground">Valor:</span> R$ {client.monthly_value.toFixed(2)}</div>
                 </div>
               </CardContent>
@@ -235,20 +328,55 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
                 <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Data de Término</Label>
-                <Input type="date" value={newEndDate} disabled className="bg-muted" />
+                <Label>Data de Término {planDuration === 'custom' && <span className="text-xs text-muted-foreground">(editável)</span>}</Label>
+                <Input
+                  type="date"
+                  value={planDuration === 'custom' ? customEndDate : newEndDate}
+                  onChange={e => setCustomEndDate(e.target.value)}
+                  disabled={planDuration !== 'custom'}
+                  className={planDuration !== 'custom' ? 'bg-muted' : ''}
+                  min={startDate || undefined}
+                />
               </div>
             </div>
 
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Switch checked={hasCheckin} onCheckedChange={setHasCheckin} />
-                <Label>Check-in</Label>
+            <div className="space-y-3 rounded-md border p-3 bg-muted/30">
+              <p className="text-xs text-muted-foreground">
+                Periodicidade do novo plano — toda a agenda (check-ins e consultas) será regenerada a partir destas regras.
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch checked={hasCheckin} onCheckedChange={setHasCheckin} />
+                  <Label>Check-in</Label>
+                </div>
+                {hasCheckin && (
+                  <Select value={checkinFrequency} onValueChange={setCheckinFrequency}>
+                    <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CHECKIN_FREQ_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={hasConsultations} onCheckedChange={setHasConsultations} />
-                <Label>Consultas</Label>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch checked={hasConsultations} onCheckedChange={setHasConsultations} />
+                  <Label>Consultas</Label>
+                </div>
+                {hasConsultations && (
+                  <Select value={consultationFrequency} onValueChange={setConsultationFrequency}>
+                    <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CONSULT_FREQ_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
+              {hasConsultations && (
+                <p className="text-xs text-muted-foreground">
+                  Consultas previstas no período: <strong>{computedConsultationCount}</strong>
+                </p>
+              )}
             </div>
 
             <DialogFooter className="gap-2">
