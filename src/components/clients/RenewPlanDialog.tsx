@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,55 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+
+// Convert yyyy-mm-dd ↔ dd/mm/yyyy for masked text input
+function toBR(iso: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return '';
+  return `${d}/${m}/${y}`;
+}
+function fromBR(br: string): string {
+  const digits = br.replace(/\D/g, '').slice(0, 8);
+  if (digits.length !== 8) return '';
+  const d = digits.slice(0, 2);
+  const m = digits.slice(2, 4);
+  const y = digits.slice(4, 8);
+  const dn = Number(d), mn = Number(m), yn = Number(y);
+  if (mn < 1 || mn > 12 || dn < 1 || dn > 31 || yn < 1900) return '';
+  return `${y}-${m}-${d}`;
+}
+function maskBR(input: string): string {
+  const digits = input.replace(/\D/g, '').slice(0, 8);
+  let out = digits;
+  if (digits.length > 4) out = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  else if (digits.length > 2) out = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return out;
+}
+
+interface DateInputBRProps {
+  value: string; // yyyy-mm-dd
+  onChange: (iso: string) => void;
+}
+function DateInputBR({ value, onChange }: DateInputBRProps) {
+  const [text, setText] = useState(toBR(value));
+  useEffect(() => { setText(toBR(value)); }, [value]);
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      placeholder="dd/mm/aaaa"
+      value={text}
+      onChange={e => {
+        const masked = maskBR(e.target.value);
+        setText(masked);
+        const iso = fromBR(masked);
+        if (iso) onChange(iso);
+        else if (masked === '') onChange('');
+      }}
+    />
+  );
+}
 
 interface RenewPlanDialogProps {
   open: boolean;
@@ -325,18 +374,15 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
               </div>
               <div className="space-y-2">
                 <Label>Data de Início</Label>
-                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                <DateInputBR value={startDate} onChange={setStartDate} />
               </div>
               <div className="space-y-2">
                 <Label>Data de Término {planDuration === 'custom' && <span className="text-xs text-muted-foreground">(editável)</span>}</Label>
-                <Input
-                  type="date"
-                  value={planDuration === 'custom' ? customEndDate : newEndDate}
-                  onChange={e => setCustomEndDate(e.target.value)}
-                  disabled={planDuration !== 'custom'}
-                  className={planDuration !== 'custom' ? 'bg-muted' : ''}
-                  min={startDate || undefined}
-                />
+                {planDuration === 'custom' ? (
+                  <DateInputBR value={customEndDate} onChange={setCustomEndDate} />
+                ) : (
+                  <Input type="text" value={toBR(newEndDate)} disabled className="bg-muted" />
+                )}
               </div>
             </div>
 
