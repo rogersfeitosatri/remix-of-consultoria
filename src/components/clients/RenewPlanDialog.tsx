@@ -374,18 +374,15 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
               </div>
               <div className="space-y-2">
                 <Label>Data de Início</Label>
-                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                <DateInputBR value={startDate} onChange={setStartDate} />
               </div>
               <div className="space-y-2">
                 <Label>Data de Término {planDuration === 'custom' && <span className="text-xs text-muted-foreground">(editável)</span>}</Label>
-                <Input
-                  type="date"
-                  value={planDuration === 'custom' ? customEndDate : newEndDate}
-                  onChange={e => setCustomEndDate(e.target.value)}
-                  disabled={planDuration !== 'custom'}
-                  className={planDuration !== 'custom' ? 'bg-muted' : ''}
-                  min={startDate || undefined}
-                />
+                {planDuration === 'custom' ? (
+                  <DateInputBR value={customEndDate} onChange={setCustomEndDate} />
+                ) : (
+                  <Input type="text" value={toBR(newEndDate)} disabled className="bg-muted" />
+                )}
               </div>
             </div>
 
