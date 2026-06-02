@@ -300,6 +300,7 @@ export default function ClientDetail() {
   
   return (
     <Layout>
+      <ErrorBoundary fallbackTitle="Erro ao exibir os dados do atleta">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
