@@ -17,6 +17,7 @@ import { PlanTypeBadge } from './PlanTypeBadge';
 import { validatePlanFeasibility } from '@/lib/planTypology';
 import { PipelinePreviewDialog } from './PipelinePreviewDialog';
 import { NpRegistrationSection } from './NpRegistrationSection';
+import { DateInputBR } from '@/components/ui/date-input-br';
 
 interface CalculatedWindow {
   windowStart: Date;
@@ -550,14 +551,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             {formData.plan_duration === 'custom' && (
               <div className="space-y-2">
                 <Label htmlFor="custom_end_date">Data Final do Plano</Label>
-                <Input
+                <DateInputBR
                   id="custom_end_date"
-                  type="date"
                   value={formData.end_date}
-                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                  min={formData.start_date}
+                  onChange={(iso) => setFormData({ ...formData, end_date: iso })}
                   required
                 />
+
                 {formData.start_date && formData.end_date && (
                   <p className="text-xs text-muted-foreground">
                     {(() => {
@@ -680,13 +680,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                           <Label htmlFor="lastConsultationAt">Data da Última Consulta *</Label>
-                          <Input
+                          <DateInputBR
                             id="lastConsultationAt"
-                            type="date"
                             value={formData.last_consultation_at || ''}
-                            onChange={(e) => setFormData({ ...formData, last_consultation_at: e.target.value })}
+                            onChange={(iso) => setFormData({ ...formData, last_consultation_at: iso })}
                             required={formData.onboarding_type === 'continuation'}
                           />
+
                           <p className="text-xs text-muted-foreground">
                             Data em que a última consulta foi realizada
                           </p>
@@ -938,12 +938,12 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="firstConsultation">Data da 1ª Consulta</Label>
-                    <Input
+                    <DateInputBR
                       id="firstConsultation"
-                      type="date"
                       value={formData.first_consultation_date}
-                      onChange={(e) => setFormData({ ...formData, first_consultation_date: e.target.value })}
+                      onChange={(iso) => setFormData({ ...formData, first_consultation_date: iso })}
                     />
+
                   </div>
                 </div>
               )}
@@ -988,16 +988,17 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
 
                 <div className="space-y-2">
                   <Label htmlFor="checkinStartDate">Data de início do check-in</Label>
-                  <Input
+                  <DateInputBR
                     id="checkinStartDate"
-                    type="date"
                     value={formData.checkin_start_date}
-                    onChange={(e) => setFormData({ ...formData, checkin_start_date: e.target.value })}
+                    onChange={(iso) => setFormData({ ...formData, checkin_start_date: iso })}
                   />
                   <p className="text-xs text-muted-foreground">
                     Opcional. Se vazio, usa a data de início do plano como âncora da periodicidade.
+                    Sincronizado com a aba "Planejamento de Check-ins".
                   </p>
                 </div>
+
 
 
                 <div className="space-y-2">
@@ -1030,25 +1031,24 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="startDate">Data de Início</Label>
-              <Input
+              <DateInputBR
                 id="startDate"
-                type="date"
                 value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                onChange={(iso) => setFormData({ ...formData, start_date: iso })}
                 required
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="endDate">Data de Término (editável)</Label>
-              <Input
+              <DateInputBR
                 id="endDate"
-                type="date"
                 value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                onChange={(iso) => setFormData({ ...formData, end_date: iso })}
                 required
               />
             </div>
           </div>
+
 
           {/* Notes */}
           <div className="space-y-2">

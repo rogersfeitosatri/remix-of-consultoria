@@ -14,6 +14,8 @@ import { Plus, Trash2, Clock, CalendarDays, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { DateInputBR } from '@/components/ui/date-input-br';
+import { useQueryClient } from '@tanstack/react-query';
 
 const FREQ_LABELS: Record<string, string> = {
   daily: 'Diário (envio semanal)',
@@ -38,6 +40,7 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
   const { data: forms = [] } = useCheckinForms();
   const saveSchedule = useSaveCheckinSchedule();
   const deleteSchedule = useDeleteCheckinSchedule();
+  const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
 
   const [editId, setEditId] = useState<string | undefined>();
@@ -80,15 +83,31 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
     if (!formId) return;
     const hours = parseInt(dueInHours) || 48;
 
-    // Sincroniza o prazo de resposta no cadastro do atleta
-    // (usado pela tela "Prazo Encerrado" do check-in público)
+    // Sync back to client profile (single source of truth):
+    // checkin_start_date, checkin_frequency, has_checkin and response window.
+    // Keeps the "Cadastro do Atleta" and "Planejamento de Check-ins" tabs aligned.
+    const clientFreqMap: Record<string, string> = {
+      weekly: 'weekly',
+      biweekly: 'biweekly',
+      three_weeks: 'three_weeks',
+      monthly: 'monthly',
+      bimonthly: 'bimonthly',
+      quarterly: 'quarterly',
+    };
+    const mappedFreq = clientFreqMap[freqType];
     try {
       await supabase
         .from('clients')
-        .update({ checkin_response_window_hours: hours })
+        .update({
+          checkin_response_window_hours: hours,
+          ...(isActive ? { has_checkin: true } : {}),
+          ...(mappedFreq ? { checkin_frequency: mappedFreq as any } : {}),
+          checkin_start_date: startDate || null,
+        } as any)
         .eq('id', clientId);
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
     } catch (e) {
-      console.error('Falha ao sincronizar checkin_response_window_hours', e);
+      console.error('Falha ao sincronizar cadastro do atleta', e);
     }
 
     saveSchedule.mutate({
@@ -193,7 +212,7 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Data de Início</Label>
-                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                <DateInputBR value={startDate} onChange={setStartDate} />
               </div>
               <div>
                 <Label>Frequência</Label>
