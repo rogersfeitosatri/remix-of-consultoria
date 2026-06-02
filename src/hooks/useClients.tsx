@@ -18,6 +18,7 @@ export interface Client {
   has_agenda_access: boolean;
   start_date: string;
   end_date: string;
+  checkin_start_date?: string | null;
   monthly_value: number;
   notes: string | null;
   is_active: boolean;
@@ -485,7 +486,7 @@ export function useAddClient() {
         const checkinSchedules = generateCheckinSchedules(
           user.id,
           client.id,
-          client.start_date,
+          (client as any).checkin_start_date || client.start_date,
           client.end_date,
           client.checkin_frequency
         );
@@ -665,7 +666,8 @@ export function useUpdateClient() {
         dbUpdates.start_date !== undefined ||
         dbUpdates.end_date !== undefined ||
         dbUpdates.has_checkin !== undefined ||
-        dbUpdates.checkin_frequency !== undefined;
+        dbUpdates.checkin_frequency !== undefined ||
+        (dbUpdates as any).checkin_start_date !== undefined;
 
       if (consultationFieldsChanged && user) {
         const updatedClient = data as Client;
@@ -839,7 +841,7 @@ export function useUpdateClient() {
           const checkinSchedules = generateCheckinSchedules(
             user.id,
             id,
-            updatedClient.start_date,
+            (updatedClient as any).checkin_start_date || updatedClient.start_date,
             updatedClient.end_date,
             updatedClient.checkin_frequency
           );
