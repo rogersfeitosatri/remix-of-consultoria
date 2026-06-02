@@ -14,6 +14,8 @@ import { Plus, Trash2, Clock, CalendarDays, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { DateInputBR } from '@/components/ui/date-input-br';
+import { useQueryClient } from '@tanstack/react-query';
 
 const FREQ_LABELS: Record<string, string> = {
   daily: 'Diário (envio semanal)',
