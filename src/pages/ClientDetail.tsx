@@ -55,6 +55,7 @@ import { PipelineAuditPanel } from '@/components/admin/PipelineAuditPanel';
 import { useQuery } from '@tanstack/react-query';
 import { useFreezePlan } from '@/hooks/useFreezePlan';
 import { differenceInCalendarDays } from 'date-fns';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const SERVICE_LABELS: Record<string, string> = {
   nutrition: 'Nutrição',
@@ -299,6 +300,7 @@ export default function ClientDetail() {
   
   return (
     <Layout>
+      <ErrorBoundary fallbackTitle="Erro ao exibir os dados do atleta">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -627,6 +629,7 @@ export default function ClientDetail() {
           }}
         />
       )}
+      </ErrorBoundary>
     </Layout>
   );
 }

@@ -43,17 +43,23 @@ const PLAN_TYPE_OPTIONS = [
 ];
 
 function calculateEndDate(startDate: string, duration: string): string {
-  const start = parseISO(startDate);
-  let end: Date;
-  switch (duration) {
-    case 'monthly': end = addMonths(start, 1); break;
-    case 'quarterly': end = addMonths(start, 3); break;
-    case 'semiannual': end = addMonths(start, 6); break;
-    case 'annual': end = addMonths(start, 12); break;
-    case 'six_weeks': end = addWeeks(start, 6); break;
-    default: end = addMonths(start, 1);
+  if (!startDate) return '';
+  try {
+    const start = parseISO(startDate);
+    if (isNaN(start.getTime())) return '';
+    let end: Date;
+    switch (duration) {
+      case 'monthly': end = addMonths(start, 1); break;
+      case 'quarterly': end = addMonths(start, 3); break;
+      case 'semiannual': end = addMonths(start, 6); break;
+      case 'annual': end = addMonths(start, 12); break;
+      case 'six_weeks': end = addWeeks(start, 6); break;
+      default: end = addMonths(start, 1);
+    }
+    return format(end, 'yyyy-MM-dd');
+  } catch {
+    return '';
   }
-  return format(end, 'yyyy-MM-dd');
 }
 
 export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogProps) {
@@ -75,6 +81,14 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
 
   const handleSaveAndRenew = async () => {
     if (!user) return;
+    if (!startDate || !newEndDate) {
+      toast.error('Informe uma data de início válida.');
+      return;
+    }
+    if (!Number.isFinite(monthlyValue) || monthlyValue < 0) {
+      toast.error('Informe um valor mensal válido.');
+      return;
+    }
     setSaving(true);
     try {
       // 1. Save current plan to history
@@ -122,8 +136,9 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
 
       if (updateError) throw updateError;
 
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
-      queryClient.invalidateQueries({ queryKey: ['client-plan-history', client.id] });
+      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      await queryClient.invalidateQueries({ queryKey: ['client-plan-history', client.id] });
+      await queryClient.invalidateQueries({ queryKey: ['athlete-summary', client.id] });
       toast.success('Plano renovado com sucesso! O plano anterior foi salvo no histórico.');
       onOpenChange(false);
     } catch (err: any) {
