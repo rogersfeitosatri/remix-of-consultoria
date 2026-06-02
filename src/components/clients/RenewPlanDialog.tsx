@@ -81,6 +81,14 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
 
   const handleSaveAndRenew = async () => {
     if (!user) return;
+    if (!startDate || !newEndDate) {
+      toast.error('Informe uma data de início válida.');
+      return;
+    }
+    if (!Number.isFinite(monthlyValue) || monthlyValue < 0) {
+      toast.error('Informe um valor mensal válido.');
+      return;
+    }
     setSaving(true);
     try {
       // 1. Save current plan to history
