@@ -83,15 +83,31 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
     if (!formId) return;
     const hours = parseInt(dueInHours) || 48;
 
-    // Sincroniza o prazo de resposta no cadastro do atleta
-    // (usado pela tela "Prazo Encerrado" do check-in público)
+    // Sync back to client profile (single source of truth):
+    // checkin_start_date, checkin_frequency, has_checkin and response window.
+    // Keeps the "Cadastro do Atleta" and "Planejamento de Check-ins" tabs aligned.
+    const clientFreqMap: Record<string, string> = {
+      weekly: 'weekly',
+      biweekly: 'biweekly',
+      three_weeks: 'three_weeks',
+      monthly: 'monthly',
+      bimonthly: 'bimonthly',
+      quarterly: 'quarterly',
+    };
+    const mappedFreq = clientFreqMap[freqType];
     try {
       await supabase
         .from('clients')
-        .update({ checkin_response_window_hours: hours })
+        .update({
+          checkin_response_window_hours: hours,
+          ...(isActive ? { has_checkin: true } : {}),
+          ...(mappedFreq ? { checkin_frequency: mappedFreq as any } : {}),
+          checkin_start_date: startDate || null,
+        } as any)
         .eq('id', clientId);
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
     } catch (e) {
-      console.error('Falha ao sincronizar checkin_response_window_hours', e);
+      console.error('Falha ao sincronizar cadastro do atleta', e);
     }
 
     saveSchedule.mutate({
