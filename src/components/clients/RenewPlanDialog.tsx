@@ -185,6 +185,8 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
   const [checkinFrequency, setCheckinFrequency] = useState<string>(client.checkin_frequency || 'weekly');
   const [hasConsultations, setHasConsultations] = useState(client.has_consultations);
   const [consultationFrequency, setConsultationFrequency] = useState<string>(client.consultation_frequency || 'monthly');
+  const [checkinStartDate, setCheckinStartDate] = useState<string>('');
+  const [firstConsultationDate, setFirstConsultationDate] = useState<string>('');
 
   const newEndDate = useMemo(() => {
     if (planDuration === 'custom') return customEndDate;
@@ -266,14 +268,16 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
           monthly_value: monthlyValue,
           has_checkin: hasCheckin,
           checkin_frequency: hasCheckin ? checkinFrequency : null,
+          checkin_start_date: hasCheckin ? (checkinStartDate || null) : null,
           has_consultations: hasConsultations,
           consultation_frequency: hasConsultations ? consultationFrequency : null,
           consultation_count: hasConsultations ? computedConsultationCount : 0,
+          first_consultation_date: hasConsultations ? (firstConsultationDate || null) : null,
           is_active: true,
           is_frozen: false,
           frozen_at: null,
           total_frozen_days: 0,
-        })
+        } as any)
         .eq('id', client.id);
 
       if (updateError) throw updateError;
@@ -422,6 +426,27 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
                 <p className="text-xs text-muted-foreground">
                   Consultas previstas no período: <strong>{computedConsultationCount}</strong>
                 </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {hasCheckin && (
+                <div className="space-y-2">
+                  <Label>Data de início do check-in</Label>
+                  <DateInputBR value={checkinStartDate} onChange={setCheckinStartDate} />
+                  <p className="text-[11px] text-muted-foreground">
+                    Opcional. Se vazio, usa a data de início do plano.
+                  </p>
+                </div>
+              )}
+              {hasConsultations && (
+                <div className="space-y-2">
+                  <Label>Data da 1ª consulta / 1º envio do link</Label>
+                  <DateInputBR value={firstConsultationDate} onChange={setFirstConsultationDate} />
+                  <p className="text-[11px] text-muted-foreground">
+                    Âncora para a geração das próximas consultas.
+                  </p>
+                </div>
               )}
             </div>
 
