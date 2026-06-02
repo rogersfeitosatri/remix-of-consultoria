@@ -212,7 +212,7 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Data de Início</Label>
-                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                <DateInputBR value={startDate} onChange={setStartDate} />
               </div>
               <div>
                 <Label>Frequência</Label>
