@@ -873,13 +873,16 @@ export function useUpdateClient() {
             .select('id')
             .eq('client_id', id);
 
+          const anchorStart =
+            (updatedClient as any).checkin_start_date || updatedClient.start_date;
+
           if (existingSchedules && existingSchedules.length > 0) {
             // Update existing schedule frequency
             await supabase
               .from('athlete_checkin_schedules')
               .update({ 
                 frequency_type: dispatchFreq,
-                start_date: updatedClient.start_date,
+                start_date: anchorStart,
                 is_active: true,
               })
               .eq('client_id', id);
@@ -899,7 +902,7 @@ export function useUpdateClient() {
                   user_id: user.id,
                   client_id: id,
                   checkin_form_id: activeForms[0].id,
-                  start_date: updatedClient.start_date,
+                  start_date: anchorStart,
                   frequency_type: dispatchFreq,
                   weekly_days: [1],
                   send_time: '07:00:00',
