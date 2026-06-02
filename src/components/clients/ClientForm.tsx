@@ -551,14 +551,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             {formData.plan_duration === 'custom' && (
               <div className="space-y-2">
                 <Label htmlFor="custom_end_date">Data Final do Plano</Label>
-                <Input
+                <DateInputBR
                   id="custom_end_date"
-                  type="date"
                   value={formData.end_date}
-                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                  min={formData.start_date}
+                  onChange={(iso) => setFormData({ ...formData, end_date: iso })}
                   required
                 />
+
                 {formData.start_date && formData.end_date && (
                   <p className="text-xs text-muted-foreground">
                     {(() => {
