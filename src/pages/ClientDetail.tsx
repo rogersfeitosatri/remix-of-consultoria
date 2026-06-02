@@ -629,6 +629,7 @@ export default function ClientDetail() {
           }}
         />
       )}
+      </ErrorBoundary>
     </Layout>
   );
 }
