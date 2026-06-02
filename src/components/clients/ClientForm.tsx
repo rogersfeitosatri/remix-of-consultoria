@@ -680,13 +680,13 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                           <Label htmlFor="lastConsultationAt">Data da Última Consulta *</Label>
-                          <Input
+                          <DateInputBR
                             id="lastConsultationAt"
-                            type="date"
                             value={formData.last_consultation_at || ''}
-                            onChange={(e) => setFormData({ ...formData, last_consultation_at: e.target.value })}
+                            onChange={(iso) => setFormData({ ...formData, last_consultation_at: iso })}
                             required={formData.onboarding_type === 'continuation'}
                           />
+
                           <p className="text-xs text-muted-foreground">
                             Data em que a última consulta foi realizada
                           </p>
