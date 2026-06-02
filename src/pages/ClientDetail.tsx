@@ -55,6 +55,7 @@ import { PipelineAuditPanel } from '@/components/admin/PipelineAuditPanel';
 import { useQuery } from '@tanstack/react-query';
 import { useFreezePlan } from '@/hooks/useFreezePlan';
 import { differenceInCalendarDays } from 'date-fns';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const SERVICE_LABELS: Record<string, string> = {
   nutrition: 'Nutrição',
