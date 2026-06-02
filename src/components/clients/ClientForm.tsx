@@ -101,6 +101,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     has_checkin: client?.has_checkin ?? true,
     has_agenda_access: client?.has_agenda_access ?? false,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly',
+    checkin_start_date: (client as any)?.checkin_start_date || '',
     checkin_response_window_hours: (client as any)?.checkin_response_window_hours ?? null as number | null,
     start_date: client?.start_date || new Date().toISOString().split('T')[0],
     end_date: client?.end_date || '',
@@ -401,6 +402,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
       ...formData,
       athlete_status: athleteStatus,
       first_consultation_date: formData.first_consultation_date || null,
+      checkin_start_date: formData.checkin_start_date || null,
       notes: formData.notes || null,
       payment_date: formData.payment_date || null,
       last_consultation_at: formData.last_consultation_at || null,
@@ -983,6 +985,20 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="checkinStartDate">Data de início do check-in</Label>
+                  <Input
+                    id="checkinStartDate"
+                    type="date"
+                    value={formData.checkin_start_date}
+                    onChange={(e) => setFormData({ ...formData, checkin_start_date: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Opcional. Se vazio, usa a data de início do plano como âncora da periodicidade.
+                  </p>
+                </div>
+
 
                 <div className="space-y-2">
                   <Label htmlFor="checkinWindow">Prazo para responder o check-in (horas)</Label>
