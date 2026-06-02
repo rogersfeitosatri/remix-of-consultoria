@@ -1031,25 +1031,24 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="startDate">Data de Início</Label>
-              <Input
+              <DateInputBR
                 id="startDate"
-                type="date"
                 value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                onChange={(iso) => setFormData({ ...formData, start_date: iso })}
                 required
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="endDate">Data de Término (editável)</Label>
-              <Input
+              <DateInputBR
                 id="endDate"
-                type="date"
                 value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                onChange={(iso) => setFormData({ ...formData, end_date: iso })}
                 required
               />
             </div>
           </div>
+
 
           {/* Notes */}
           <div className="space-y-2">
