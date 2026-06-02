@@ -40,6 +40,7 @@ export function AthleteCheckinSchedules({ clientId }: Props) {
   const { data: forms = [] } = useCheckinForms();
   const saveSchedule = useSaveCheckinSchedule();
   const deleteSchedule = useDeleteCheckinSchedule();
+  const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
 
   const [editId, setEditId] = useState<string | undefined>();
