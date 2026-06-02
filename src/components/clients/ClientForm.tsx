@@ -938,12 +938,12 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="firstConsultation">Data da 1ª Consulta</Label>
-                    <Input
+                    <DateInputBR
                       id="firstConsultation"
-                      type="date"
                       value={formData.first_consultation_date}
-                      onChange={(e) => setFormData({ ...formData, first_consultation_date: e.target.value })}
+                      onChange={(iso) => setFormData({ ...formData, first_consultation_date: iso })}
                     />
+
                   </div>
                 </div>
               )}
