@@ -988,16 +988,17 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
 
                 <div className="space-y-2">
                   <Label htmlFor="checkinStartDate">Data de início do check-in</Label>
-                  <Input
+                  <DateInputBR
                     id="checkinStartDate"
-                    type="date"
                     value={formData.checkin_start_date}
-                    onChange={(e) => setFormData({ ...formData, checkin_start_date: e.target.value })}
+                    onChange={(iso) => setFormData({ ...formData, checkin_start_date: iso })}
                   />
                   <p className="text-xs text-muted-foreground">
                     Opcional. Se vazio, usa a data de início do plano como âncora da periodicidade.
+                    Sincronizado com a aba "Planejamento de Check-ins".
                   </p>
                 </div>
+
 
 
                 <div className="space-y-2">
