@@ -43,17 +43,23 @@ const PLAN_TYPE_OPTIONS = [
 ];
 
 function calculateEndDate(startDate: string, duration: string): string {
-  const start = parseISO(startDate);
-  let end: Date;
-  switch (duration) {
-    case 'monthly': end = addMonths(start, 1); break;
-    case 'quarterly': end = addMonths(start, 3); break;
-    case 'semiannual': end = addMonths(start, 6); break;
-    case 'annual': end = addMonths(start, 12); break;
-    case 'six_weeks': end = addWeeks(start, 6); break;
-    default: end = addMonths(start, 1);
+  if (!startDate) return '';
+  try {
+    const start = parseISO(startDate);
+    if (isNaN(start.getTime())) return '';
+    let end: Date;
+    switch (duration) {
+      case 'monthly': end = addMonths(start, 1); break;
+      case 'quarterly': end = addMonths(start, 3); break;
+      case 'semiannual': end = addMonths(start, 6); break;
+      case 'annual': end = addMonths(start, 12); break;
+      case 'six_weeks': end = addWeeks(start, 6); break;
+      default: end = addMonths(start, 1);
+    }
+    return format(end, 'yyyy-MM-dd');
+  } catch {
+    return '';
   }
-  return format(end, 'yyyy-MM-dd');
 }
 
 export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogProps) {
