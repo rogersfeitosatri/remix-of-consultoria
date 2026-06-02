@@ -136,8 +136,9 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
 
       if (updateError) throw updateError;
 
-      queryClient.invalidateQueries({ queryKey: ['clients'] });
-      queryClient.invalidateQueries({ queryKey: ['client-plan-history', client.id] });
+      await queryClient.invalidateQueries({ queryKey: ['clients'] });
+      await queryClient.invalidateQueries({ queryKey: ['client-plan-history', client.id] });
+      await queryClient.invalidateQueries({ queryKey: ['athlete-summary', client.id] });
       toast.success('Plano renovado com sucesso! O plano anterior foi salvo no histórico.');
       onOpenChange(false);
     } catch (err: any) {
