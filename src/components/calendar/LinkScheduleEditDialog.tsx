@@ -319,7 +319,7 @@ export function LinkScheduleEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-xl w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-primary" />
@@ -337,7 +337,7 @@ export function LinkScheduleEditDialog({
               <p className="text-sm">Nenhum envio de link pendente para este dia</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 pr-3">
               {daySchedules.map((schedule) => {
                 const consultNum = getConsultationNumber(schedule);
                 const client = getClient(schedule.client_id);
@@ -354,14 +354,14 @@ export function LinkScheduleEditDialog({
                     )}
                   >
                     {/* Header row */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <div className="h-8 w-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
                           <User className="h-4 w-4 text-amber-600" />
                         </div>
-                        <div>
-                          <p className="font-medium text-sm">{schedule.client_name}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{schedule.client_name}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             {consultNum && (
                               <Badge variant="outline" className="text-[10px]">
                                 Consulta {consultNum.current}/{consultNum.total}
@@ -377,7 +377,7 @@ export function LinkScheduleEditDialog({
                       </div>
 
                       {!isEditing && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 flex-wrap justify-end shrink-0">
                           {/* Copy booking link */}
                           <Button
                             size="sm"
