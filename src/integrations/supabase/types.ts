@@ -6137,6 +6137,15 @@ export type Database = {
           client_phone: string
         }[]
       }
+      get_public_appointment_slots: {
+        Args: { p_from_date?: string; p_to_date?: string; p_user_id: string }
+        Returns: {
+          appointment_date: string
+          appointment_time: string
+          duration_minutes: number
+          status: string
+        }[]
+      }
       get_public_booking_context: {
         Args: { p_token: string }
         Returns: {
@@ -6145,6 +6154,15 @@ export type Database = {
           client_id: string
           client_name: string
           usage_count: number
+        }[]
+      }
+      get_public_scheduling_blocks: {
+        Args: { p_from_date?: string; p_to_date?: string; p_user_id: string }
+        Returns: {
+          block_date: string
+          block_type: string
+          end_time: string
+          start_time: string
         }[]
       }
       has_role: {

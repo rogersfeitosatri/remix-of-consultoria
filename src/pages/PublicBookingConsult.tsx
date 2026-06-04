@@ -89,34 +89,31 @@ export default function PublicBookingConsult() {
     fetchSettings();
   }, [adminUserId]);
 
-  // Fetch existing appointments to check availability
+  // Fetch existing appointments via secure RPC (minimal columns only)
   useEffect(() => {
     const fetchAppointments = async () => {
       if (!adminUserId) return;
 
-      const { data } = await supabase
-        .from('appointments')
-        .select('appointment_date, appointment_time, duration_minutes, status')
-        .eq('user_id', adminUserId)
-        .in('status', ['scheduled', 'confirmed'])
-        .gte('appointment_date', format(new Date(), 'yyyy-MM-dd'));
+      const { data } = await supabase.rpc('get_public_appointment_slots', {
+        p_user_id: adminUserId,
+        p_from_date: format(new Date(), 'yyyy-MM-dd'),
+      });
 
-      setExistingAppointments(data || []);
+      setExistingAppointments((data as any) || []);
     };
 
     fetchAppointments();
   }, [adminUserId]);
 
-  // Fetch scheduling blocks (full-day or time-range blocks set by the admin)
+  // Fetch scheduling blocks via secure RPC (no internal metadata exposed)
   useEffect(() => {
     const fetchBlocks = async () => {
       if (!adminUserId) return;
-      const { data } = await supabase
-        .from('scheduling_blocks')
-        .select('block_date, block_type, start_time, end_time')
-        .eq('user_id', adminUserId)
-        .gte('block_date', format(new Date(), 'yyyy-MM-dd'));
-      setSchedulingBlocks(data || []);
+      const { data } = await supabase.rpc('get_public_scheduling_blocks', {
+        p_user_id: adminUserId,
+        p_from_date: format(new Date(), 'yyyy-MM-dd'),
+      });
+      setSchedulingBlocks((data as any) || []);
     };
     fetchBlocks();
   }, [adminUserId]);

@@ -7,7 +7,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PersonStanding, CalendarDays, Clock, CheckCircle2, Loader2, AlertCircle, Info, User, Mail, Phone } from 'lucide-react';
-import { useSchedulingSettingsBySlug, useSchedulingBlocks, useAppointmentsByDate, useCreateAppointment } from '@/hooks/useScheduling';
+import { useSchedulingSettingsBySlug, useCreateAppointment } from '@/hooks/useScheduling';
 import { useTimeBlocksBySettingsSlug } from '@/hooks/useTimeBlocks';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addMinutes, isBefore, isSameDay, getDay, addDays, startOfDay } from 'date-fns';
@@ -22,7 +22,19 @@ export default function PublicBooking() {
   const token = searchParams.get('token');
   
   const { data: settings, isLoading: settingsLoading } = useSchedulingSettingsBySlug(slug);
-  const { data: blocks = [] } = useSchedulingBlocks(settings?.user_id);
+  const { data: blocks = [] } = useQuery({
+    queryKey: ['public_scheduling_blocks', settings?.user_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_public_scheduling_blocks', {
+        p_user_id: settings!.user_id,
+        p_from_date: format(new Date(), 'yyyy-MM-dd'),
+      });
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+    enabled: !!settings?.user_id,
+    staleTime: 1000 * 60 * 3,
+  });
   const { data: timeBlocks = [] } = useTimeBlocksBySettingsSlug(slug);
   
   const [selectedDate, setSelectedDate] = useState<Date>();
@@ -57,11 +69,22 @@ export default function PublicBooking() {
     enabled: !!token,
   });
 
-  // Get appointments for selected date
-  const { data: existingAppointments = [] } = useAppointmentsByDate(
-    settings?.user_id || '',
-    selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''
-  );
+  // Get appointments for selected date via secure public RPC (minimal columns)
+  const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+  const { data: existingAppointments = [] } = useQuery({
+    queryKey: ['public_appointments_by_date', settings?.user_id, selectedDateStr],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_public_appointment_slots', {
+        p_user_id: settings!.user_id,
+        p_from_date: selectedDateStr,
+        p_to_date: selectedDateStr,
+      });
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+    enabled: !!settings?.user_id && !!selectedDateStr,
+    staleTime: 1000 * 60 * 2,
+  });
 
   // Buffer minutes from settings
   const bufferMinutes = (settings as any)?.buffer_minutes || 0;
