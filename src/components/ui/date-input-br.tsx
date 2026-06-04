@@ -41,7 +41,7 @@ interface DateInputBRProps {
   placeholder?: string;
 }
 
-/** Masked dd/mm/aaaa text input that stores ISO yyyy-mm-dd. */
+/** Masked dd/mm/yyyy text input that stores ISO yyyy-mm-dd. */
 export function DateInputBR({
   value,
   onChange,
