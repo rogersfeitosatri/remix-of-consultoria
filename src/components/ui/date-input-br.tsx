@@ -49,7 +49,7 @@ export function DateInputBR({
   className,
   required,
   disabled,
-  placeholder = 'dd/mm/aaaa',
+  placeholder = 'dd/mm/yyyy',
 }: DateInputBRProps) {
   const [text, setText] = useState(toBR(value));
   useEffect(() => { setText(toBR(value)); }, [value]);
