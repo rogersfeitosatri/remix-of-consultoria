@@ -359,9 +359,9 @@ export function LinkScheduleEditDialog({
                         <div className="h-8 w-8 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
                           <User className="h-4 w-4 text-amber-600" />
                         </div>
-                        <div>
-                          <p className="font-medium text-sm">{schedule.client_name}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{schedule.client_name}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             {consultNum && (
                               <Badge variant="outline" className="text-[10px]">
                                 Consulta {consultNum.current}/{consultNum.total}
@@ -377,7 +377,7 @@ export function LinkScheduleEditDialog({
                       </div>
 
                       {!isEditing && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 flex-wrap justify-end shrink-0">
                           {/* Copy booking link */}
                           <Button
                             size="sm"
