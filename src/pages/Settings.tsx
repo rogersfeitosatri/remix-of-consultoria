@@ -235,7 +235,7 @@ export default function Settings() {
         { 'Instruções de Preenchimento': 'Frequência Check-in: daily (Diário), weekly (Semanal), biweekly (Quinzenal), monthly (Mensal), bimonthly (Bimestral), quarterly (Trimestral)' },
         { 'Instruções de Preenchimento': 'Periodicidade Consultas: once (1 consulta apenas), monthly (1 a cada mês), six_weeks (1 a cada 6 semanas)' },
         { 'Instruções de Preenchimento': '' },
-        { 'Instruções de Preenchimento': 'FORMATO DE DATAS: dd/mm/aaaa (ex: 15/01/2026)' },
+        { 'Instruções de Preenchimento': 'FORMATO DE DATAS: dd/mm/yyyy (ex: 15/01/2026)' },
         { 'Instruções de Preenchimento': 'CAMPOS SIM/NÃO: Use "sim" ou "não"' },
       ];
       

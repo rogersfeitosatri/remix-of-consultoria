@@ -41,7 +41,7 @@ interface DateInputBRProps {
   placeholder?: string;
 }
 
-/** Masked dd/mm/aaaa text input that stores ISO yyyy-mm-dd. */
+/** Masked dd/mm/yyyy text input that stores ISO yyyy-mm-dd. */
 export function DateInputBR({
   value,
   onChange,
@@ -49,7 +49,7 @@ export function DateInputBR({
   className,
   required,
   disabled,
-  placeholder = 'dd/mm/aaaa',
+  placeholder = 'dd/mm/yyyy',
 }: DateInputBRProps) {
   const [text, setText] = useState(toBR(value));
   useEffect(() => { setText(toBR(value)); }, [value]);
