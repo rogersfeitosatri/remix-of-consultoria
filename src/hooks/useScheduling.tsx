@@ -86,7 +86,7 @@ export function useSchedulingSettingsBySlug(slug: string | undefined) {
         return {
           ...row,
           working_days: Array.isArray(row.working_days) ? row.working_days : JSON.parse(row.working_days as string),
-        } as SchedulingSettings;
+        } as unknown as SchedulingSettings;
       }
       return null;
     },
