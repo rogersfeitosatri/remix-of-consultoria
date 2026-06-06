@@ -75,19 +75,17 @@ export function useSchedulingSettingsBySlug(slug: string | undefined) {
     queryKey: ['scheduling_settings_public', slug],
     queryFn: async () => {
       if (!slug) return null;
-      
+
       const { data, error } = await supabase
-        .from('scheduling_settings')
-        .select('*')
-        .eq('booking_link_slug', slug)
-        .maybeSingle();
+        .rpc('get_public_scheduling_settings_by_slug', { p_slug: slug });
 
       if (error) throw error;
-      
-      if (data) {
+
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row) {
         return {
-          ...data,
-          working_days: Array.isArray(data.working_days) ? data.working_days : JSON.parse(data.working_days as string),
+          ...row,
+          working_days: Array.isArray(row.working_days) ? row.working_days : JSON.parse(row.working_days as string),
         } as SchedulingSettings;
       }
       return null;
