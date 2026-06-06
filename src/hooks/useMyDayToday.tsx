@@ -40,6 +40,28 @@ export interface PendingCheckinItem {
   checkin_frequency: string;
 }
 
+export interface NewCheckinResponse {
+  id: string;
+  client_id: string;
+  client_name: string;
+  submitted_at: string;
+  form_title: string | null;
+}
+
+export interface PeriodicityAlert {
+  client_id: string;
+  client_name: string;
+  status: 'late' | 'attention';
+  days_overdue: number;
+}
+
+export interface BookingLinkToSend {
+  schedule_id: string;
+  client_id: string;
+  client_name: string;
+  send_link_date: string;
+}
+
 export function useMyDayToday() {
   const { user } = useAuth();
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -144,11 +166,68 @@ export function useMyDayToday() {
         days_left: Math.ceil((new Date(c.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
       }));
 
+      // 5. New checkin responses received today
+      const { data: checkinResponses } = await supabase
+        .from('checkin_responses')
+        .select('id, client_id, submitted_at, checkin_forms:form_id(title), clients!inner(name, id)')
+        .gte('submitted_at', today)
+        .order('submitted_at', { ascending: false })
+        .limit(20);
+
+      const newCheckinResponses: NewCheckinResponse[] = (checkinResponses || []).map((r: any) => ({
+        id: r.id,
+        client_id: r.client_id,
+        client_name: r.clients?.name || 'N/A',
+        submitted_at: r.submitted_at,
+        form_title: r.checkin_forms?.title || null,
+      }));
+
+      // 6. Periodicity alerts — clients whose next_invite_date is past
+      const { data: scheduleRules } = await supabase
+        .from('consultation_schedule_rules')
+        .select('client_id, next_invite_date, clients!inner(name, is_active, is_frozen)')
+        .not('next_invite_date', 'is', null)
+        .lt('next_invite_date', today)
+        .order('next_invite_date', { ascending: true })
+        .limit(10);
+
+      const periodicityAlerts: PeriodicityAlert[] = (scheduleRules || [])
+        .filter((r: any) => r.clients?.is_active === true && r.clients?.is_frozen === false)
+        .map((r: any) => {
+          const daysOverdue = Math.floor(
+            (Date.now() - new Date(r.next_invite_date).getTime()) / (1000 * 60 * 60 * 24)
+          );
+          return {
+            client_id: r.client_id,
+            client_name: r.clients?.name || 'N/A',
+            status: daysOverdue > 7 ? ('late' as const) : ('attention' as const),
+            days_overdue: daysOverdue,
+          };
+        });
+
+      // 7. Booking links to send today
+      const { data: bookingSchedules } = await supabase
+        .from('consultation_schedules')
+        .select('id, client_id, send_link_date, clients!inner(name)')
+        .eq('send_link_date', today)
+        .eq('status', 'pending')
+        .limit(10);
+
+      const bookingLinksToSend: BookingLinkToSend[] = (bookingSchedules || []).map((s: any) => ({
+        schedule_id: s.id,
+        client_id: s.client_id,
+        client_name: s.clients?.name || 'N/A',
+        send_link_date: s.send_link_date,
+      }));
+
       return {
         appointments: todayAppointments,
         tasks: todayTasks,
         pendingCheckins,
         urgentAthletes,
+        newCheckinResponses,
+        periodicityAlerts,
+        bookingLinksToSend,
       };
     },
     enabled: !!user?.id,
