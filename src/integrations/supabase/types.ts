@@ -6165,6 +6165,37 @@ export type Database = {
           start_time: string
         }[]
       }
+      get_public_scheduling_settings_by_slug: {
+        Args: { p_slug: string }
+        Returns: {
+          booking_link_slug: string
+          buffer_minutes: number
+          id: string
+          max_advance_days: number
+          min_advance_unit: string
+          min_advance_value: number
+          slot_duration_minutes: number
+          user_id: string
+          working_days: Json
+          working_hours_end: string
+          working_hours_start: string
+        }[]
+      }
+      get_public_scheduling_settings_by_user: {
+        Args: { p_user_id: string }
+        Returns: {
+          buffer_minutes: number
+          id: string
+          max_advance_days: number
+          min_advance_unit: string
+          min_advance_value: number
+          slot_duration_minutes: number
+          user_id: string
+          working_days: Json
+          working_hours_end: string
+          working_hours_start: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
