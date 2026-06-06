@@ -5,6 +5,7 @@ import { ActionCenterPanel } from '@/components/dashboard/ActionCenterPanel';
 import { MonthlyProgressionPanel } from '@/components/dashboard/MonthlyProgressionPanel';
 import { PeriodizationOverview } from '@/components/dashboard/PeriodizationOverview';
 import { WeeklyReportPanel } from '@/components/dashboard/WeeklyReportPanel';
+import { MeuDiaPanel } from '@/components/dashboard/MeuDiaPanel';
 import { useClients, usePayments, getExpiringThisMonth } from '@/hooks/useClients';
 import { getMonthlyIncomeByPaidAt, getDueAmountInPeriod } from '@/hooks/useFinancialData';
 import { Users, DollarSign, AlertTriangle, Loader2, CreditCard } from 'lucide-react';
@@ -25,12 +26,12 @@ export default function Dashboard() {
 
   const activeClients = clients.filter(c => c.is_active);
   const expiringThisMonth = getExpiringThisMonth(clients, currentYear, currentMonth);
-  
-  const monthlyIncome = useMemo(() => 
+
+  const monthlyIncome = useMemo(() =>
     getMonthlyIncomeByPaidAt(payments, monthStart, monthEnd),
     [payments, monthStart, monthEnd]
   );
-  
+
   const monthlyDue = useMemo(() =>
     getDueAmountInPeriod(payments, monthStart, monthEnd),
     [payments, monthStart, monthEnd]
@@ -51,16 +52,10 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-5">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">Visão geral e ações do dia</p>
-          </div>
-          <GoogleOAuthAlert />
-        </div>
+        {/* Meu Dia — hero section */}
+        <MeuDiaPanel />
 
-        {/* Stats */}
+        {/* Stats row */}
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Atletas Ativos"
@@ -69,7 +64,7 @@ export default function Dashboard() {
             icon={<Users className="h-5 w-5 sm:h-6 sm:w-6" />}
             variant="primary"
           />
-          <button 
+          <button
             onClick={() => navigate('/financial')}
             className="text-left transition-transform hover:scale-[1.02]"
           >
@@ -81,7 +76,7 @@ export default function Dashboard() {
               variant="success"
             />
           </button>
-          <button 
+          <button
             onClick={() => navigate('/financial?filter=upcoming')}
             className="text-left transition-transform hover:scale-[1.02]"
           >
@@ -102,10 +97,13 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Action Center — replaces all scattered alerts */}
+        {/* Google OAuth alert */}
+        <GoogleOAuthAlert />
+
+        {/* Action Center */}
         <ActionCenterPanel />
 
-        {/* Evolução Mensal — atletas iniciando novo ciclo ou encerrando plano */}
+        {/* Evolução Mensal */}
         <MonthlyProgressionPanel />
 
         {/* Weekly Report + Periodization */}
