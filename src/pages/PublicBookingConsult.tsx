@@ -68,11 +68,9 @@ export default function PublicBookingConsult() {
     const fetchSettings = async () => {
       if (!adminUserId) return;
       
-      const { data } = await supabase
-        .from('scheduling_settings')
-        .select('id, user_id, slot_duration_minutes, buffer_minutes, working_days, min_advance_value, min_advance_unit, max_advance_days')
-        .eq('user_id', adminUserId)
-        .maybeSingle();
+      const { data: rows } = await supabase
+        .rpc('get_public_scheduling_settings_by_user', { p_user_id: adminUserId });
+      const data = Array.isArray(rows) ? rows[0] : rows;
       
       if (data) {
         setSettings({
