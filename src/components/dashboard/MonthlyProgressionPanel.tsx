@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { CalendarClock, AlertTriangle, ChevronRight, TrendingUp, Trophy } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +27,7 @@ interface AthleteEntry {
   name: string;
   planDurationLabel: string;
   endingThisWeek: boolean;
-  monthNumber: number; // 2, 3, 4... (mês que está iniciando)
+  monthNumber: number;
   daysToEnd: number;
   targetRace?: string | null;
   targetDeadline?: string | null;
@@ -45,6 +45,7 @@ const DURATION_LABELS: Record<string, string> = {
 export function MonthlyProgressionPanel() {
   const { data: clients = [] } = useClients();
   const [durationFilter, setDurationFilter] = useState<DurationFilter>('all');
+  const [open, setOpen] = useState(false);
 
   const { data: targetRaces = [] } = useQuery({
     queryKey: ['monthly-progression-target-races'],
@@ -77,54 +78,38 @@ export function MonthlyProgressionPanel() {
 
     for (const c of clients) {
       if (!c.is_active || c.is_frozen) continue;
-      // Apenas Consultoria Nutrição ou Nutrição+Treino
       if (c.plan_type !== 'consultoria') continue;
       if (c.service_type === 'training') continue;
       if (!c.start_date || !c.end_date) continue;
-
-      // Filtro por duração
       if (durationFilter !== 'all' && c.plan_duration !== durationFilter) continue;
 
       const start = parseISO(c.start_date);
       const end = parseISO(c.end_date);
       const daysToEnd = differenceInCalendarDays(end, today);
-
-      if (daysToEnd < 0) continue; // já encerrou
+      if (daysToEnd < 0) continue;
 
       const planLabel = DURATION_LABELS[c.plan_duration] || c.plan_duration;
-
       const race = racesByClient[c.id];
 
-      // Encerrando nesta semana?
       if (isWithinInterval(end, { start: weekStart, end: weekEnd })) {
         ending.push({
-          id: c.id,
-          name: c.name,
-          planDurationLabel: planLabel,
-          endingThisWeek: true,
-          monthNumber: 0,
-          daysToEnd,
+          id: c.id, name: c.name, planDurationLabel: planLabel,
+          endingThisWeek: true, monthNumber: 0, daysToEnd,
           targetRace: race?.target_race ?? null,
           targetDeadline: race?.target_deadline ?? null,
         });
-        continue; // regra: se está encerrando, não mostrar mês
+        continue;
       }
 
-      // Verifica se inicia novo mês nesta semana
-      // Itera aniversários mensais (mês 2, 3, 4...) e checa se cai na semana atual
       for (let m = 1; m <= 24; m++) {
         const anniversary = addMonths(start, m);
         if (anniversary > end) break;
         if (isWithinInterval(anniversary, { start: weekStart, end: weekEnd })) {
-          const monthNum = m + 1; // iniciando mês m+1
+          const monthNum = m + 1;
           if (!newCycles[monthNum]) newCycles[monthNum] = [];
           newCycles[monthNum].push({
-            id: c.id,
-            name: c.name,
-            planDurationLabel: planLabel,
-            endingThisWeek: false,
-            monthNumber: monthNum,
-            daysToEnd,
+            id: c.id, name: c.name, planDurationLabel: planLabel,
+            endingThisWeek: false, monthNumber: monthNum, daysToEnd,
             targetRace: race?.target_race ?? null,
             targetDeadline: race?.target_deadline ?? null,
           });
@@ -137,7 +122,6 @@ export function MonthlyProgressionPanel() {
       .map(Number)
       .sort((a, b) => a - b)
       .map(month => ({ month, athletes: newCycles[month].sort((a, b) => a.name.localeCompare(b.name)) }));
-
     ending.sort((a, b) => a.daysToEnd - b.daysToEnd);
 
     return { newCycleGroups: groups, endingThisWeek: ending };
@@ -152,81 +136,105 @@ export function MonthlyProgressionPanel() {
   const isEmpty = totalCycles === 0 && endingThisWeek.length === 0;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              Evolução Mensal — Semana atual
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5 capitalize">{weekLabel}</p>
-          </div>
-          <Select value={durationFilter} onValueChange={(v) => setDurationFilter(v as DurationFilter)}>
-            <SelectTrigger className="h-8 w-full sm:w-[180px] text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as durações</SelectItem>
-              <SelectItem value="quarterly">3 meses</SelectItem>
-              <SelectItem value="semiannual">6 meses</SelectItem>
-              <SelectItem value="annual">12 meses</SelectItem>
-              <SelectItem value="custom">Personalizado</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isEmpty && (
-          <div className="text-center py-6 text-sm text-muted-foreground">
-            Nenhum atleta iniciando novo ciclo ou encerrando plano nesta semana.
-          </div>
-        )}
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full text-left transition-transform hover:scale-[1.01]"
+      >
+        <Card className="border-border/50 hover:border-primary/40 transition-colors">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">Evolução Mensal</h3>
+              <span className="text-xs text-muted-foreground ml-auto capitalize">{weekLabel}</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold">{totalCycles + endingThisWeek.length}</span>
+              <span className="text-xs text-muted-foreground">atletas em transição nesta semana</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {totalCycles} iniciando novo ciclo · {endingThisWeek.length} encerrando plano
+            </p>
+          </CardContent>
+        </Card>
+      </button>
 
-        {/* Encerrando — destaque vermelho */}
-        {endingThisWeek.length > 0 && (
-          <div className="rounded-lg border-2 border-destructive/40 bg-destructive/5 p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              <h4 className="text-sm font-bold text-destructive uppercase tracking-wide">
-                Encerrando plano nesta semana
-              </h4>
-              <Badge variant="destructive" className="ml-auto">{endingThisWeek.length}</Badge>
-            </div>
-            <div className="grid gap-1.5 sm:grid-cols-2">
-              {endingThisWeek.map(a => (
-                <AthleteRow key={a.id} athlete={a} highlight />
-              ))}
-            </div>
-          </div>
-        )}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" /> Evolução Mensal — Semana atual
+            </DialogTitle>
+            <DialogDescription className="capitalize">{weekLabel}</DialogDescription>
+          </DialogHeader>
 
-        {/* Grupos por mês */}
-        {newCycleGroups.map(group => (
-          <div key={group.month} className="rounded-lg border bg-card p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <CalendarClock className="h-4 w-4 text-primary" />
-              <h4 className="text-sm font-semibold">
-                Iniciando {group.month}º mês
-              </h4>
-              <Badge variant="secondary" className="ml-auto">{group.athletes.length}</Badge>
-            </div>
-            <div className="grid gap-1.5 sm:grid-cols-2">
-              {group.athletes.map(a => (
-                <AthleteRow key={a.id} athlete={a} />
-              ))}
-            </div>
+          <div className="flex justify-end">
+            <Select value={durationFilter} onValueChange={(v) => setDurationFilter(v as DurationFilter)}>
+              <SelectTrigger className="h-8 w-[200px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as durações</SelectItem>
+                <SelectItem value="quarterly">3 meses</SelectItem>
+                <SelectItem value="semiannual">6 meses</SelectItem>
+                <SelectItem value="annual">12 meses</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        ))}
-      </CardContent>
-    </Card>
+
+          <div className="space-y-4">
+            {isEmpty && (
+              <div className="text-center py-6 text-sm text-muted-foreground">
+                Nenhum atleta iniciando novo ciclo ou encerrando plano nesta semana.
+              </div>
+            )}
+
+            {endingThisWeek.length > 0 && (
+              <div className="rounded-lg border-2 border-destructive/40 bg-destructive/5 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <h4 className="text-sm font-bold text-destructive uppercase tracking-wide">
+                    Encerrando plano nesta semana
+                  </h4>
+                  <Badge variant="destructive" className="ml-auto">{endingThisWeek.length}</Badge>
+                </div>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {endingThisWeek.map(a => (
+                    <AthleteRow key={a.id} athlete={a} highlight onNav={() => setOpen(false)} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {newCycleGroups.map(group => (
+              <div key={group.month} className="rounded-lg border bg-card p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <CalendarClock className="h-4 w-4 text-primary" />
+                  <h4 className="text-sm font-semibold">Iniciando {group.month}º mês</h4>
+                  <Badge variant="secondary" className="ml-auto">{group.athletes.length}</Badge>
+                </div>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {group.athletes.map(a => (
+                    <AthleteRow key={a.id} athlete={a} onNav={() => setOpen(false)} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-function AthleteRow({ athlete, highlight }: { athlete: AthleteEntry; highlight?: boolean }) {
+function AthleteRow({ athlete, highlight, onNav }: { athlete: AthleteEntry; highlight?: boolean; onNav?: () => void }) {
   return (
     <Link
       to={`/clients/${athlete.id}?tab=checkins`}
+      onClick={onNav}
       className={cn(
         'flex items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-sm transition-colors hover:bg-accent',
         highlight && 'border-destructive/30 bg-background'
