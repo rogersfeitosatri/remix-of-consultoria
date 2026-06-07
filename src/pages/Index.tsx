@@ -3,7 +3,6 @@ import { StatCard } from '@/components/dashboard/StatCard';
 import { GoogleOAuthAlert } from '@/components/dashboard/GoogleOAuthAlert';
 import { ActionCenterPanel } from '@/components/dashboard/ActionCenterPanel';
 import { MonthlyProgressionPanel } from '@/components/dashboard/MonthlyProgressionPanel';
-import { PeriodizationOverview } from '@/components/dashboard/PeriodizationOverview';
 import { WeeklyReportPanel } from '@/components/dashboard/WeeklyReportPanel';
 import { MeuDiaPanel } from '@/components/dashboard/MeuDiaPanel';
 import { useClients, usePayments, getExpiringThisMonth } from '@/hooks/useClients';
@@ -52,18 +51,26 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-5">
-        {/* Meu Dia — hero section */}
+        {/* HERO — Meu Dia */}
         <MeuDiaPanel />
 
-        {/* Stats row */}
+        {/* Google OAuth alert (apenas se desconectado) */}
+        <GoogleOAuthAlert />
+
+        {/* GRID DE BLOCOS CLICÁVEIS */}
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Atletas Ativos"
-            value={activeClients.length}
-            subtitle="cadastrados"
-            icon={<Users className="h-5 w-5 sm:h-6 sm:w-6" />}
-            variant="primary"
-          />
+          <button
+            onClick={() => navigate('/clients')}
+            className="text-left transition-transform hover:scale-[1.02]"
+          >
+            <StatCard
+              title="Atletas Ativos"
+              value={activeClients.length}
+              subtitle="cadastrados"
+              icon={<Users className="h-5 w-5 sm:h-6 sm:w-6" />}
+              variant="primary"
+            />
+          </button>
           <button
             onClick={() => navigate('/financial')}
             className="text-left transition-transform hover:scale-[1.02]"
@@ -88,29 +95,28 @@ export default function Dashboard() {
               variant="warning"
             />
           </button>
-          <StatCard
-            title="Planos Vencendo"
-            value={expiringThisMonth.length}
-            subtitle="no mês"
-            icon={<AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />}
-            variant="default"
-          />
+          <button
+            onClick={() => navigate('/clients')}
+            className="text-left transition-transform hover:scale-[1.02]"
+          >
+            <StatCard
+              title="Planos Vencendo"
+              value={expiringThisMonth.length}
+              subtitle="no mês"
+              icon={<AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />}
+              variant="default"
+            />
+          </button>
         </div>
 
-        {/* Google OAuth alert */}
-        <GoogleOAuthAlert />
+        {/* Resumo Semanal (clicável compacto) */}
+        <WeeklyReportPanel />
 
-        {/* Action Center */}
+        {/* Centro de Ações (inline, simplificado) */}
         <ActionCenterPanel />
 
         {/* Evolução Mensal */}
         <MonthlyProgressionPanel />
-
-        {/* Weekly Report + Periodization */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <WeeklyReportPanel />
-          <PeriodizationOverview />
-        </div>
       </div>
     </Layout>
   );
