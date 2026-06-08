@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Save, KeyRound, Info } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Save, KeyRound, Info, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface OnboardingPlan {
@@ -29,13 +30,14 @@ interface PaymentSettings {
   id?: string;
   mp_public_key: string | null;
   reminder_days: number;
+  anamnese_form_id: string | null;
 }
 
 export function OnboardingSettingsSection() {
   const qc = useQueryClient();
   const [userId, setUserId] = useState<string | null>(null);
   const [localPlans, setLocalPlans] = useState<Record<string, { payment_link: string; price: string }>>({});
-  const [settings, setSettings] = useState<PaymentSettings>({ mp_public_key: '', reminder_days: 2 });
+  const [settings, setSettings] = useState<PaymentSettings>({ mp_public_key: '', reminder_days: 2, anamnese_form_id: null });
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -73,9 +75,24 @@ export function OnboardingSettingsSection() {
         id: settingsData.id,
         mp_public_key: settingsData.mp_public_key ?? '',
         reminder_days: settingsData.reminder_days ?? 2,
+        anamnese_form_id: settingsData.anamnese_form_id ?? null,
       });
     }
   }, [settingsData]);
+
+  const { data: anamneseForms = [] } = useQuery({
+    queryKey: ['anamnese_forms_for_onboarding', userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('anamnese_forms')
+        .select('id, title, is_active')
+        .eq('user_id', userId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as { id: string; title: string; is_active: boolean }[];
+    },
+  });
 
   useEffect(() => {
     if (plans.length && Object.keys(localPlans).length === 0) {
@@ -113,6 +130,7 @@ export function OnboardingSettingsSection() {
         user_id: userId,
         mp_public_key: settings.mp_public_key?.trim() || null,
         reminder_days: Number(settings.reminder_days) || 2,
+        anamnese_form_id: settings.anamnese_form_id,
       };
       const { error } = await supabase
         .from('onboarding_payment_settings')
@@ -166,6 +184,51 @@ export function OnboardingSettingsSection() {
                 setSettings((s) => ({ ...s, reminder_days: Number(e.target.value) }))
               }
             />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="anamnese-form">Formulário de anamnese do onboarding</Label>
+            <Select
+              value={settings.anamnese_form_id ?? 'none'}
+              onValueChange={(v) =>
+                setSettings((s) => ({ ...s, anamnese_form_id: v === 'none' ? null : v }))
+              }
+            >
+              <SelectTrigger id="anamnese-form" className="max-w-md">
+                <SelectValue placeholder="Selecione o formulário" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— Não enviar anamnese após onboarding —</SelectItem>
+                {anamneseForms.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.title} {f.is_active ? '' : '(inativo)'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Após escolher o plano, o atleta é convidado a preencher esta anamnese enquanto aguarda
+              a confirmação do pagamento.
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label>Link público de onboarding</Label>
+            <div className="flex gap-2">
+              <Input readOnly value={`${window.location.origin}/onboarding`} />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/onboarding`);
+                  toast.success('Link copiado');
+                }}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Envie este link para novos atletas escolherem o plano e receberem o pagamento no
+              WhatsApp.
+            </p>
           </div>
           <Button onClick={() => saveSettings.mutate()} disabled={saveSettings.isPending}>
             {saveSettings.isPending ? (
