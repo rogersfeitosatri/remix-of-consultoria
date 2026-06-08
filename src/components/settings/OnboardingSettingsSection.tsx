@@ -30,6 +30,7 @@ interface PaymentSettings {
   id?: string;
   mp_public_key: string | null;
   reminder_days: number;
+  anamnese_form_id: string | null;
 }
 
 export function OnboardingSettingsSection() {
