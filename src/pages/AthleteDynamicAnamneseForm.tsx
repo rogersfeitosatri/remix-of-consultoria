@@ -52,6 +52,7 @@ export default function AthleteDynamicAnamneseForm() {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Fetch the active anamnese form for the admin that owns this client
   useEffect(() => {
