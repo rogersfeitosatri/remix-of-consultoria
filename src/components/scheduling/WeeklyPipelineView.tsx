@@ -729,6 +729,35 @@ export function WeeklyPipelineView({
                         </Button>
                       )}
 
+                      {/* Confirm/Cancel buttons for past appointments awaiting confirmation */}
+                      {item.status === 'awaiting_confirmation' && item.appointmentId && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10"
+                            onClick={() => updateAppointmentStatus(item.appointmentId!, 'completed')}
+                            disabled={confirmingId === item.appointmentId}
+                          >
+                            {confirmingId === item.appointmentId
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <CheckCircle className="h-3 w-3" />}
+                            Realizada
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                            onClick={() => updateAppointmentStatus(item.appointmentId!, 'cancelled')}
+                            disabled={confirmingId === item.appointmentId}
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Cancelada
+                          </Button>
+                        </>
+                      )}
+
+
                       {/* Meet link */}
                       {item.meetLink && (
                         <Button size="sm" variant="ghost" className="h-7 text-xs" asChild>
