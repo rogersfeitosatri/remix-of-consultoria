@@ -305,8 +305,7 @@ export function WeeklyPipelineView({
 
         let status: PipelineStatus;
         if (matchingAppointment) {
-          const aptDate = parseISO(matchingAppointment.appointment_date);
-          status = isBefore(aptDate, today) ? 'completed' : 'booked';
+          status = statusFromAppointment(matchingAppointment);
         } else if (schedule.status === 'sent' || (schedule.status as string) === 'link_sent') {
           const daysSince = Math.floor((today.getTime() - sendDate.getTime()) / (1000 * 60 * 60 * 24));
           status = daysSince >= 3 ? 'no_show' : 'link_sent';
