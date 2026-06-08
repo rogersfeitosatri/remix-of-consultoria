@@ -211,6 +211,11 @@ export default function PublicAnamneseForm() {
       return;
     }
 
+    if (!termsAccepted) {
+      toast.error('Você precisa aceitar os Termos e Condições para enviar a anamnese');
+      return;
+    }
+
     for (const question of questions) {
       if (question.is_required) {
         const answer = answers[question.id];
