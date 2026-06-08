@@ -375,7 +375,8 @@ export function WeeklyPipelineView({
     (appointments || [])
       .filter((apt: any) => {
         if (processedClientIds.has(apt.client_id)) return false;
-        if (apt.status !== 'scheduled' && apt.status !== 'confirmed') return false;
+        // Include all non-explicitly-cancelled statuses (scheduled/confirmed/completed past)
+        if (apt.status === 'cancelled' || apt.status === 'no_show') return false;
         const aptDate = parseISO(apt.appointment_date);
         return isWithinInterval(aptDate, { start: currentWeekStart, end: currentWeekEnd });
       })
@@ -385,7 +386,7 @@ export function WeeklyPipelineView({
           clientId: apt.client_id,
           clientName: apt.client?.name || client?.name || 'Cliente',
           client,
-          status: isBefore(parseISO(apt.appointment_date), today) ? 'completed' : 'booked',
+          status: statusFromAppointment(apt),
           appointmentDate: apt.appointment_date,
           appointmentTime: apt.appointment_time,
           appointmentId: apt.id,
@@ -396,14 +397,16 @@ export function WeeklyPipelineView({
         processedClientIds.add(apt.client_id);
       });
 
-    // Sort: overdue first, then pending, then sent, then booked, then completed
+    // Sort: awaiting confirmation first (needs action), then overdue, pending, sent, booked, completed, cancelled
     const statusOrder: Record<PipelineStatus, number> = {
-      no_show: 0,
-      link_pending: 1,
-      link_sent: 2,
-      first_consult: 3,
-      booked: 4,
-      completed: 5,
+      awaiting_confirmation: 0,
+      no_show: 1,
+      link_pending: 2,
+      link_sent: 3,
+      first_consult: 4,
+      booked: 5,
+      completed: 6,
+      cancelled: 7,
     };
 
     return items.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
@@ -421,8 +424,11 @@ export function WeeklyPipelineView({
     sent: pipelineItems.filter(i => i.status === 'link_sent').length,
     overdue: pipelineItems.filter(i => i.status === 'no_show').length,
     booked: pipelineItems.filter(i => i.status === 'booked' || i.status === 'first_consult').length,
+    awaitingConfirmation: pipelineItems.filter(i => i.status === 'awaiting_confirmation').length,
     completed: pipelineItems.filter(i => i.status === 'completed').length,
+    cancelled: pipelineItems.filter(i => i.status === 'cancelled').length,
   }), [pipelineItems]);
+
 
   const isCurrentWeek = weekOffset === 0;
   const weekLabel = format(currentWeekStart, "dd MMM", { locale: ptBR }) +
