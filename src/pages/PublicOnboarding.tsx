@@ -243,7 +243,7 @@ export default function PublicOnboarding() {
                     required
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    O link de pagamento será enviado por aqui.
+                    Usaremos para enviar o link de pagamento após a anamnese.
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 pt-2">
