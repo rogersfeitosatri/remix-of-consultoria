@@ -621,8 +621,9 @@ export function WeeklyPipelineView({
                           <span className={cn(
                             "flex items-center gap-0.5",
                             item.status === 'no_show' ? "text-destructive font-medium" :
+                              item.status === 'cancelled' ? "text-muted-foreground line-through" :
                               item.status === 'link_sent' ? "text-blue-600" :
-                                ['booked', 'completed'].includes(item.status) ? "text-emerald-600" : ""
+                                ['booked', 'completed', 'awaiting_confirmation'].includes(item.status) ? "text-emerald-600" : ""
                           )}>
                             <Calendar className="h-3 w-3" />
                             {item.status === 'no_show' ? `Sem resposta (${item.daysSinceSent}d)` :
@@ -633,15 +634,19 @@ export function WeeklyPipelineView({
                           </span>
 
                           {/* Step 3: Consultation */}
-                          {['booked', 'completed'].includes(item.status) && (
+                          {['booked', 'completed', 'awaiting_confirmation', 'cancelled'].includes(item.status) && (
                             <>
                               <span className="text-muted-foreground/50">→</span>
                               <span className={cn(
                                 "flex items-center gap-0.5",
-                                item.status === 'completed' ? "text-emerald-600 font-medium" : ""
+                                item.status === 'completed' ? "text-emerald-600 font-medium" :
+                                  item.status === 'awaiting_confirmation' ? "text-amber-700 font-medium" :
+                                  item.status === 'cancelled' ? "text-muted-foreground" : ""
                               )}>
                                 <CheckCircle2 className="h-3 w-3" />
-                                {item.status === 'completed' ? 'Realizada' : 'Aguardando'}
+                                {item.status === 'completed' ? 'Realizada' :
+                                  item.status === 'awaiting_confirmation' ? 'Confirmar?' :
+                                  item.status === 'cancelled' ? 'Cancelada' : 'Aguardando'}
                               </span>
                             </>
                           )}
