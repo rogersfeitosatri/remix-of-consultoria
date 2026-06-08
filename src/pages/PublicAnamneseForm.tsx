@@ -545,9 +545,35 @@ export default function PublicAnamneseForm() {
             </Card>
           ))}
 
+          {/* Terms acceptance */}
+          <Card className="mb-6 border-primary/30">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="terms-accept"
+                  checked={termsAccepted}
+                  onCheckedChange={(checked) => setTermsAccepted(checked as boolean)}
+                  className="mt-1"
+                />
+                <Label htmlFor="terms-accept" className="font-normal cursor-pointer leading-relaxed">
+                  Li e aceito os{' '}
+                  <a
+                    href="/termos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline font-medium"
+                  >
+                    Termos e Condições de Serviço
+                  </a>{' '}
+                  do acompanhamento nutricional. <span className="text-red-500">*</span>
+                </Label>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Submit */}
           <div className="mt-8">
-            <Button type="submit" className="w-full gap-2" disabled={submitting}>
+            <Button type="submit" className="w-full gap-2" disabled={submitting || !termsAccepted}>
               {submitting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
