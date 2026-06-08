@@ -147,8 +147,8 @@ export default function PublicOnboarding() {
             <div className="mb-6">
               <h2 className="text-2xl font-bold mb-2">Escolha o seu plano</h2>
               <p className="text-muted-foreground">
-                Selecione o plano que você contratou. Em seguida você vai receber o link de pagamento
-                no WhatsApp.
+                Selecione o plano que você contratou. Em seguida você preenche uma anamnese rápida
+                e o link de pagamento é enviado no seu WhatsApp.
               </p>
             </div>
 
@@ -206,8 +206,8 @@ export default function PublicOnboarding() {
               <Badge className="w-fit mb-2">{selectedPlan.name}</Badge>
               <CardTitle>Quase lá! Confirme seus dados</CardTitle>
               <CardDescription>
-                Vamos enviar o link de pagamento no seu WhatsApp. Após o pagamento confirmado, seu
-                acesso será ativado automaticamente.
+                Após confirmar seus dados, você será levado para a anamnese. Quando enviar, o link
+                de pagamento chega automaticamente no seu WhatsApp.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -243,7 +243,7 @@ export default function PublicOnboarding() {
                     required
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    O link de pagamento será enviado por aqui.
+                    Usaremos para enviar o link de pagamento após a anamnese.
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 pt-2">
@@ -262,7 +262,7 @@ export default function PublicOnboarding() {
                       </>
                     ) : (
                       <>
-                        <MessageCircle className="h-4 w-4 mr-2" /> Receber link de pagamento
+                        <ArrowRight className="h-4 w-4 mr-2" /> Continuar para a anamnese
                       </>
                     )}
                   </Button>
@@ -284,37 +284,38 @@ export default function PublicOnboarding() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {result.whatsapp_sent ? (
-                <Alert>
-                  <MessageCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Acabamos de enviar o <strong>link de pagamento no seu WhatsApp</strong>. Após a
-                    confirmação do pagamento, seu acesso será ativado.
-                  </AlertDescription>
-                </Alert>
+              {result.anamnese_form_id ? (
+                <>
+                  <Alert>
+                    <MessageCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Próximo passo:</strong> preencha sua anamnese agora. Assim que você
+                      enviar, o <strong>link de pagamento</strong> chega no seu WhatsApp
+                      automaticamente.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <h3 className="font-semibold mb-1">Preencher anamnese</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Leva poucos minutos. Sem anamnese, o link de pagamento não é liberado.
+                    </p>
+                    <Button
+                      onClick={() => navigate(`/anamnese-form/${result.anamnese_form_id}`)}
+                      className="w-full"
+                      size="lg"
+                    >
+                      Preencher anamnese agora <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
+                </>
               ) : (
                 <Alert variant="destructive">
                   <AlertDescription>
-                    Não conseguimos enviar o WhatsApp automaticamente. Entraremos em contato com
-                    você o quanto antes para enviar o link de pagamento.
+                    O formulário de anamnese ainda não está configurado. Entraremos em contato com
+                    você o quanto antes.
                   </AlertDescription>
                 </Alert>
-              )}
-
-              {result.anamnese_form_id && (
-                <div className="border rounded-lg p-4 bg-muted/30">
-                  <h3 className="font-semibold mb-1">Enquanto isso, preencha sua anamnese</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Pode adiantar! Assim, no primeiro contato, já temos seu histórico nutricional
-                    completo.
-                  </p>
-                  <Button
-                    onClick={() => navigate(`/anamnese-form/${result.anamnese_form_id}`)}
-                    className="w-full"
-                  >
-                    Preencher anamnese <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </div>
               )}
             </CardContent>
           </Card>
