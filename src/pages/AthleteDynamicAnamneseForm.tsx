@@ -550,8 +550,8 @@ export default function AthleteDynamicAnamneseForm() {
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={submitting}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold"
+              disabled={submitting || !termsAccepted}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold disabled:opacity-50"
             >
               {submitting ? (
                 <>
