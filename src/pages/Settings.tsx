@@ -19,6 +19,7 @@ import { LandingPageSettingsSection } from '@/components/settings/LandingPageSet
 import { LayoutCustomizationSection } from '@/components/settings/LayoutCustomizationSection';
 import { ScanAnamneseTargetRaces } from '@/components/admin/ScanAnamneseTargetRaces';
 import { PlanTemplatesSection } from '@/components/settings/PlanTemplatesSection';
+import { OnboardingSettingsSection } from '@/components/settings/OnboardingSettingsSection';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
