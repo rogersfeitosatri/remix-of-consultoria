@@ -147,8 +147,8 @@ export default function PublicOnboarding() {
             <div className="mb-6">
               <h2 className="text-2xl font-bold mb-2">Escolha o seu plano</h2>
               <p className="text-muted-foreground">
-                Selecione o plano que você contratou. Em seguida você vai receber o link de pagamento
-                no WhatsApp.
+                Selecione o plano que você contratou. Em seguida você preenche uma anamnese rápida
+                e o link de pagamento é enviado no seu WhatsApp.
               </p>
             </div>
 
