@@ -178,6 +178,68 @@ Deno.serve(async (req) => {
       console.warn("Could not update athlete profile anamnese status:", profileUpdateError);
     }
 
+    // 5.1 If athlete came from public onboarding (has selected_plan + awaiting_anamnese),
+    // send the payment link now via WhatsApp.
+    let paymentLinkSent = false;
+    let paymentLinkError: string | null = null;
+    try {
+      const { data: clientRow } = await supabaseAdmin
+        .from("clients")
+        .select("id, name, selected_plan_id, onboarding_status")
+        .eq("id", clientId)
+        .maybeSingle();
+
+      if (
+        clientRow?.selected_plan_id &&
+        (clientRow.onboarding_status === "awaiting_anamnese" ||
+          clientRow.onboarding_status === "pending" ||
+          clientRow.onboarding_status === null)
+      ) {
+        const { data: plan } = await supabaseAdmin
+          .from("onboarding_plans")
+          .select("id, name, payment_link")
+          .eq("id", clientRow.selected_plan_id)
+          .maybeSingle();
+
+        if (plan?.payment_link) {
+          const firstName = (clientRow.name || name).split(" ")[0] || clientRow.name || name;
+          const { data: waResult, error: waError } = await supabaseAdmin.functions.invoke(
+            "send-whatsapp",
+            {
+              body: {
+                clientId,
+                templateKey: "onboarding_payment_link",
+                context: {
+                  nome_atleta: firstName,
+                  plano_nome: plan.name,
+                  link_pagamento: plan.payment_link,
+                },
+              },
+            }
+          );
+          if (waError) {
+            paymentLinkError = String(waError.message || waError);
+          } else if ((waResult as any)?.success === false) {
+            paymentLinkError = (waResult as any)?.reason || "WhatsApp não enviado";
+          } else {
+            paymentLinkSent = true;
+            await supabaseAdmin
+              .from("clients")
+              .update({
+                onboarding_status: "payment_sent",
+                plan_sent_at: new Date().toISOString(),
+              })
+              .eq("id", clientId);
+          }
+        } else {
+          paymentLinkError = "Plano sem link de pagamento configurado";
+        }
+      }
+    } catch (e: any) {
+      paymentLinkError = e?.message || "Falha ao enviar link de pagamento";
+      console.error("Payment link dispatch failed:", e);
+    }
+
     // 6. Notify admin via WhatsApp (Z-API) — non-blocking
     try {
       const adminPhone = "+5599984817697";
@@ -186,9 +248,14 @@ Deno.serve(async (req) => {
       const zapiClientToken = Deno.env.get("ZAPI_CLIENT_TOKEN");
 
       if (zapiInstance && zapiToken && zapiClientToken) {
+        const paymentNote = paymentLinkSent
+          ? `\n💳 Link de pagamento enviado para o atleta.`
+          : paymentLinkError
+          ? `\n⚠️ Link de pagamento NÃO enviado (${paymentLinkError}).`
+          : "";
         const message = clientCreated
-          ? `📋 Nova anamnese recebida\n\n👤 ${name}\n📧 ${email}\n\n⚠️ Atleta criado automaticamente — aguardando configuração de plano.`
-          : `📋 Anamnese recebida\n\n👤 ${name}\n📧 ${email}\n\nVinculada ao atleta existente.`;
+          ? `📋 Nova anamnese recebida\n\n👤 ${name}\n📧 ${email}\n\n⚠️ Atleta criado automaticamente — aguardando configuração de plano.${paymentNote}`
+          : `📋 Anamnese recebida\n\n👤 ${name}\n📧 ${email}\n\nVinculada ao atleta existente.${paymentNote}`;
 
         const zapiUrl = `https://api.z-api.io/instances/${zapiInstance}/token/${zapiToken}/send-text`;
         const phoneDigits = adminPhone.replace(/\D/g, "");
