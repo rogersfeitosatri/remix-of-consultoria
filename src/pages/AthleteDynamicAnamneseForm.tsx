@@ -197,6 +197,10 @@ export default function AthleteDynamicAnamneseForm() {
 
   const handleSubmit = async () => {
     if (!validateCurrentSection()) return;
+    if (!termsAccepted) {
+      toast.error('Você precisa aceitar os Termos e Condições para enviar a anamnese');
+      return;
+    }
     if (!client?.id || !form?.id) {
       toast.error('Erro: cliente ou formulário não encontrado');
       return;
