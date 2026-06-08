@@ -262,7 +262,7 @@ export default function PublicOnboarding() {
                       </>
                     ) : (
                       <>
-                        <MessageCircle className="h-4 w-4 mr-2" /> Receber link de pagamento
+                        <ArrowRight className="h-4 w-4 mr-2" /> Continuar para a anamnese
                       </>
                     )}
                   </Button>
