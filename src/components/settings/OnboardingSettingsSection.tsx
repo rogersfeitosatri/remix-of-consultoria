@@ -75,9 +75,24 @@ export function OnboardingSettingsSection() {
         id: settingsData.id,
         mp_public_key: settingsData.mp_public_key ?? '',
         reminder_days: settingsData.reminder_days ?? 2,
+        anamnese_form_id: settingsData.anamnese_form_id ?? null,
       });
     }
   }, [settingsData]);
+
+  const { data: anamneseForms = [] } = useQuery({
+    queryKey: ['anamnese_forms_for_onboarding', userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('anamnese_forms')
+        .select('id, title, is_active')
+        .eq('user_id', userId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as { id: string; title: string; is_active: boolean }[];
+    },
+  });
 
   useEffect(() => {
     if (plans.length && Object.keys(localPlans).length === 0) {
@@ -115,6 +130,7 @@ export function OnboardingSettingsSection() {
         user_id: userId,
         mp_public_key: settings.mp_public_key?.trim() || null,
         reminder_days: Number(settings.reminder_days) || 2,
+        anamnese_form_id: settings.anamnese_form_id,
       };
       const { error } = await supabase
         .from('onboarding_payment_settings')
