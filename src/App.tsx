@@ -66,6 +66,7 @@ const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const NutriPeriodizaProtocols = lazy(() => import("./pages/NutriPeriodizaProtocols"));
 const PublicNpCheckin = lazy(() => import("./pages/PublicNpCheckin"));
 const Terms = lazy(() => import("./pages/Terms"));
+const PublicOnboarding = lazy(() => import("./pages/PublicOnboarding"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
