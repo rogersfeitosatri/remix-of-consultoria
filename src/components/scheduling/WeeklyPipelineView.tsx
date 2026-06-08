@@ -286,11 +286,12 @@ export function WeeklyPipelineView({
         const client = clientsById.get(schedule.client_id);
         const sendDate = parseISO(schedule.send_link_date);
 
-        // Check if there's a matching appointment in the same week or next 2 weeks
+        // Check if there's a matching appointment in the same week or next 2 weeks (any non-cancelled status)
         const matchingAppointment = (appointments || []).find(
           (apt: any) =>
             apt.client_id === schedule.client_id &&
-            (apt.status === 'scheduled' || apt.status === 'confirmed') &&
+            apt.status !== 'cancelled' &&
+            apt.status !== 'no_show' &&
             parseISO(apt.appointment_date) >= currentWeekStart
         );
 
