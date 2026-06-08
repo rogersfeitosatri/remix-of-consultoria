@@ -29,7 +29,7 @@ interface WeeklyPipelineViewProps {
   isSending?: boolean;
 }
 
-type PipelineStatus = 'link_pending' | 'link_sent' | 'booked' | 'completed' | 'no_show' | 'first_consult';
+type PipelineStatus = 'link_pending' | 'link_sent' | 'booked' | 'awaiting_confirmation' | 'completed' | 'cancelled' | 'no_show' | 'first_consult';
 
 interface PipelineItem {
   clientId: string;
@@ -68,11 +68,23 @@ const STATUS_CONFIG: Record<PipelineStatus, { label: string; icon: any; classNam
     className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
     bgClass: 'bg-emerald-500/5 border-emerald-500/20',
   },
+  awaiting_confirmation: {
+    label: 'Aguardando confirmação',
+    icon: AlertTriangle,
+    className: 'bg-amber-500/15 text-amber-700 border-amber-500/40',
+    bgClass: 'bg-amber-500/10 border-amber-500/30',
+  },
   completed: {
     label: 'Realizada',
     icon: CheckCircle2,
     className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
     bgClass: 'bg-emerald-500/5 border-emerald-500/20',
+  },
+  cancelled: {
+    label: 'Cancelada',
+    icon: XCircle,
+    className: 'bg-muted text-muted-foreground border-border',
+    bgClass: 'bg-muted/30 border-border',
   },
   no_show: {
     label: 'Não Agendou',
