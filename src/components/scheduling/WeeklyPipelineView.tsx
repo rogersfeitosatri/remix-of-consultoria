@@ -555,24 +555,7 @@ export function WeeklyPipelineView({
           </CardContent>
         </Card>
       )}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Alert for overdue */}
-      {stats.overdue > 0 && statusFilter === 'all' && (
-        <Card className="border-destructive/50 bg-destructive/5">
-          <CardContent className="py-3 flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-destructive">
-                {stats.overdue} atleta{stats.overdue > 1 ? 's' : ''} recebeu link mas não agendou (3+ dias)
-              </p>
-              <p className="text-xs text-muted-foreground">Considere reenviar o link ou entrar em contato.</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Pipeline list */}
       {filteredItems.length === 0 ? (
