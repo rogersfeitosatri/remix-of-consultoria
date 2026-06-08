@@ -54,6 +54,7 @@ export default function PublicAnamneseForm() {
   const [athleteEmail, setAthleteEmail] = useState('');
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     const fetchForm = async () => {
