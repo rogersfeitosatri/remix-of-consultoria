@@ -104,20 +104,18 @@ Deno.serve(async (req) => {
 
     if (existing && existing.length > 0) {
       clientId = existing[0].id;
-      // Update with new plan selection
+      // Update with new plan selection — payment link sent only after anamnese
       await admin
         .from("clients")
         .update({
           name,
           phone,
           selected_plan_id: plan.id,
-          onboarding_status: "payment_sent",
-          plan_sent_at: new Date().toISOString(),
+          onboarding_status: "awaiting_anamnese",
           registration_source: "onboarding_self",
         })
         .eq("id", clientId);
     } else {
-      // end_date placeholder = today + duration_months (will be set definitively after payment confirmation)
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + (plan.duration_months || 3));
       const endDateStr = endDate.toISOString().split("T")[0];
@@ -134,13 +132,12 @@ Deno.serve(async (req) => {
           start_date: today,
           end_date: endDateStr,
           monthly_value: 0,
-          is_active: false, // becomes active after payment confirmation
+          is_active: false,
           has_checkin: false,
           athlete_status: "pending_plan",
           registration_source: "onboarding_self",
           selected_plan_id: plan.id,
-          onboarding_status: "payment_sent",
-          plan_sent_at: new Date().toISOString(),
+          onboarding_status: "awaiting_anamnese",
         })
         .select("id")
         .single();
@@ -155,49 +152,20 @@ Deno.serve(async (req) => {
       clientId = created.id;
       clientCreated = true;
 
-      // Create athlete_profile shell
       await admin.from("athlete_profiles").insert({
         client_id: clientId,
         full_name: name,
       });
     }
 
-    // 4) Send WhatsApp with payment link (template onboarding_payment_link)
-    let whatsappSent = false;
-    let whatsappError: string | null = null;
-    try {
-      const { data: waResult, error: waError } = await admin.functions.invoke("send-whatsapp", {
-        body: {
-          clientId,
-          templateKey: "onboarding_payment_link",
-          context: {
-            nome_atleta: name.split(" ")[0] || name,
-            plano_nome: plan.name,
-            link_pagamento: plan.payment_link,
-          },
-        },
-      });
-      if (waError) {
-        whatsappError = String(waError.message || waError);
-        console.error("[start-onboarding] send-whatsapp error:", whatsappError);
-      } else if ((waResult as any)?.success === false) {
-        whatsappError = (waResult as any)?.reason || "WhatsApp não enviado";
-      } else {
-        whatsappSent = true;
-      }
-    } catch (e: any) {
-      whatsappError = e?.message || "Falha ao chamar send-whatsapp";
-      console.error("[start-onboarding] send-whatsapp exception:", whatsappError);
-    }
-
-    // 5) Notify admin (best-effort, direct Z-API like process-anamnese-submission)
+    // Notify admin (best-effort)
     try {
       const adminPhone = "+5599984817697";
       const zapiInstance = Deno.env.get("ZAPI_INSTANCE_ID");
       const zapiToken = Deno.env.get("ZAPI_TOKEN");
       const zapiClientToken = Deno.env.get("ZAPI_CLIENT_TOKEN");
       if (zapiInstance && zapiToken && zapiClientToken) {
-        const msg = `🆕 Novo onboarding\n\n👤 ${name}\n📧 ${email}\n📱 ${phone}\n📋 Plano: ${plan.name}\n\n${clientCreated ? "Atleta criado" : "Atleta existente atualizado"} • Link de pagamento ${whatsappSent ? "enviado" : "FALHOU (" + (whatsappError || "?") + ")"}.`;
+        const msg = `🆕 Novo onboarding\n\n👤 ${name}\n📧 ${email}\n📱 ${phone}\n📋 Plano: ${plan.name}\n\n${clientCreated ? "Atleta criado" : "Atleta existente atualizado"} • Aguardando envio da anamnese para liberar o link de pagamento.`;
         await fetch(
           `https://api.z-api.io/instances/${zapiInstance}/token/${zapiToken}/send-text`,
           {
@@ -216,6 +184,10 @@ Deno.serve(async (req) => {
     } catch (e) {
       console.warn("Admin notify failed:", e);
     }
+
+    const whatsappSent = false;
+    const whatsappError: string | null = null;
+
 
     return new Response(
       JSON.stringify({
