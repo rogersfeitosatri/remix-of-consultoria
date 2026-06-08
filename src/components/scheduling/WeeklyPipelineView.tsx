@@ -254,15 +254,22 @@ export function WeeklyPipelineView({
   const lastCompletedByClient = useMemo(() => {
     const map = new Map<string, string>();
     (appointments || []).forEach((apt: any) => {
+      // Only count appointments explicitly marked as completed (não auto-considerar por data passada)
+      if (apt.status !== 'completed') return;
       const aptDate = parseISO(apt.appointment_date);
-      const isPastConfirmed = (apt.status === 'completed') ||
-        ((apt.status === 'scheduled' || apt.status === 'confirmed') && isBefore(aptDate, today));
-      if (!isPastConfirmed) return;
       const prev = map.get(apt.client_id);
       if (!prev || aptDate > parseISO(prev)) map.set(apt.client_id, apt.appointment_date);
     });
     return map;
-  }, [appointments, today]);
+  }, [appointments]);
+
+  const statusFromAppointment = (apt: any): PipelineStatus => {
+    if (apt.status === 'completed') return 'completed';
+    if (apt.status === 'cancelled' || apt.status === 'no_show') return 'cancelled';
+    const aptDate = parseISO(apt.appointment_date);
+    return isBefore(aptDate, today) ? 'awaiting_confirmation' : 'booked';
+  };
+
 
   // Build pipeline items for the current week
   const pipelineItems = useMemo(() => {
