@@ -1846,14 +1846,17 @@ export type Database = {
           monthly_value: number
           name: string
           notes: string | null
+          onboarding_status: string | null
           onboarding_type: string | null
           payment_date: string | null
           payment_type: string | null
           phone: string | null
           plan_duration: string | null
+          plan_sent_at: string | null
           plan_type: string
           registration_source: string | null
           remaining_consultations: number | null
+          selected_plan_id: string | null
           service_type: string
           start_date: string
           total_frozen_days: number
@@ -1891,14 +1894,17 @@ export type Database = {
           monthly_value: number
           name: string
           notes?: string | null
+          onboarding_status?: string | null
           onboarding_type?: string | null
           payment_date?: string | null
           payment_type?: string | null
           phone?: string | null
           plan_duration?: string | null
+          plan_sent_at?: string | null
           plan_type: string
           registration_source?: string | null
           remaining_consultations?: number | null
+          selected_plan_id?: string | null
           service_type: string
           start_date: string
           total_frozen_days?: number
@@ -1936,21 +1942,32 @@ export type Database = {
           monthly_value?: number
           name?: string
           notes?: string | null
+          onboarding_status?: string | null
           onboarding_type?: string | null
           payment_date?: string | null
           payment_type?: string | null
           phone?: string | null
           plan_duration?: string | null
+          plan_sent_at?: string | null
           plan_type?: string
           registration_source?: string | null
           remaining_consultations?: number | null
+          selected_plan_id?: string | null
           service_type?: string
           start_date?: string
           total_frozen_days?: number
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_selected_plan_id_fkey"
+            columns: ["selected_plan_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       consult_automation_settings: {
         Row: {
@@ -4485,6 +4502,90 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      onboarding_payment_settings: {
+        Row: {
+          created_at: string
+          id: string
+          mp_public_key: string | null
+          reminder_days: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mp_public_key?: string | null
+          reminder_days?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mp_public_key?: string | null
+          reminder_days?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      onboarding_plans: {
+        Row: {
+          category: string
+          checkin_frequency: string | null
+          consultation_interval_weeks: number
+          consultations_count: number
+          created_at: string
+          description: string | null
+          duration_months: number
+          id: string
+          is_active: boolean
+          name: string
+          order_index: number
+          payment_link: string | null
+          periodicity: string
+          price: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          checkin_frequency?: string | null
+          consultation_interval_weeks?: number
+          consultations_count?: number
+          created_at?: string
+          description?: string | null
+          duration_months: number
+          id?: string
+          is_active?: boolean
+          name: string
+          order_index?: number
+          payment_link?: string | null
+          periodicity: string
+          price?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          checkin_frequency?: string | null
+          consultation_interval_weeks?: number
+          consultations_count?: number
+          created_at?: string
+          description?: string | null
+          duration_months?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          order_index?: number
+          payment_link?: string | null
+          periodicity?: string
+          price?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       payments: {
         Row: {

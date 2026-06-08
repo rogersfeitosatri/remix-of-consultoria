@@ -19,6 +19,7 @@ import { LandingPageSettingsSection } from '@/components/settings/LandingPageSet
 import { LayoutCustomizationSection } from '@/components/settings/LayoutCustomizationSection';
 import { ScanAnamneseTargetRaces } from '@/components/admin/ScanAnamneseTargetRaces';
 import { PlanTemplatesSection } from '@/components/settings/PlanTemplatesSection';
+import { OnboardingSettingsSection } from '@/components/settings/OnboardingSettingsSection';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
@@ -1110,6 +1111,24 @@ export default function Settings() {
             </AccordionTrigger>
             <AccordionContent className="pb-4">
               <LandingPageSettingsSection />
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Onboarding · Mercado Pago */}
+          <AccordionItem value="onboarding-mp" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <SettingsIcon className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Onboarding · Mercado Pago</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Planos, links de pagamento e configurações do novo fluxo de novos atletas
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <OnboardingSettingsSection />
             </AccordionContent>
           </AccordionItem>
 
