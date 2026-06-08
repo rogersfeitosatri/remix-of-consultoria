@@ -206,8 +206,8 @@ export default function PublicOnboarding() {
               <Badge className="w-fit mb-2">{selectedPlan.name}</Badge>
               <CardTitle>Quase lá! Confirme seus dados</CardTitle>
               <CardDescription>
-                Vamos enviar o link de pagamento no seu WhatsApp. Após o pagamento confirmado, seu
-                acesso será ativado automaticamente.
+                Após confirmar seus dados, você será levado para a anamnese. Quando enviar, o link
+                de pagamento chega automaticamente no seu WhatsApp.
               </CardDescription>
             </CardHeader>
             <CardContent>
