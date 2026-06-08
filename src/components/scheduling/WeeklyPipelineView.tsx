@@ -350,7 +350,8 @@ export function WeeklyPipelineView({
         const matchingAppointment = (appointments || []).find(
           (apt: any) =>
             apt.client_id === client.id &&
-            (apt.status === 'scheduled' || apt.status === 'confirmed') &&
+            apt.status !== 'cancelled' &&
+            apt.status !== 'no_show' &&
             apt.appointment_date === client.first_consultation_date
         );
 
@@ -358,11 +359,7 @@ export function WeeklyPipelineView({
           clientId: client.id,
           clientName: client.name,
           client,
-          status: matchingAppointment
-            ? isBefore(parseISO(matchingAppointment.appointment_date), today)
-              ? 'completed'
-              : 'booked'
-            : 'first_consult',
+          status: matchingAppointment ? statusFromAppointment(matchingAppointment) : 'first_consult',
           appointmentDate: matchingAppointment?.appointment_date || client.first_consultation_date,
           appointmentTime: matchingAppointment?.appointment_time,
           appointmentId: matchingAppointment?.id,
