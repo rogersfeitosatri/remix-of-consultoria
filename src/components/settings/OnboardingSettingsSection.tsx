@@ -37,7 +37,7 @@ export function OnboardingSettingsSection() {
   const qc = useQueryClient();
   const [userId, setUserId] = useState<string | null>(null);
   const [localPlans, setLocalPlans] = useState<Record<string, { payment_link: string; price: string }>>({});
-  const [settings, setSettings] = useState<PaymentSettings>({ mp_public_key: '', reminder_days: 2 });
+  const [settings, setSettings] = useState<PaymentSettings>({ mp_public_key: '', reminder_days: 2, anamnese_form_id: null });
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
