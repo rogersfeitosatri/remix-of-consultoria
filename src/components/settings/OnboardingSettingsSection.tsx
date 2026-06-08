@@ -185,6 +185,51 @@ export function OnboardingSettingsSection() {
               }
             />
           </div>
+          <div className="grid gap-2">
+            <Label htmlFor="anamnese-form">Formulário de anamnese do onboarding</Label>
+            <Select
+              value={settings.anamnese_form_id ?? 'none'}
+              onValueChange={(v) =>
+                setSettings((s) => ({ ...s, anamnese_form_id: v === 'none' ? null : v }))
+              }
+            >
+              <SelectTrigger id="anamnese-form" className="max-w-md">
+                <SelectValue placeholder="Selecione o formulário" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— Não enviar anamnese após onboarding —</SelectItem>
+                {anamneseForms.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.title} {f.is_active ? '' : '(inativo)'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Após escolher o plano, o atleta é convidado a preencher esta anamnese enquanto aguarda
+              a confirmação do pagamento.
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label>Link público de onboarding</Label>
+            <div className="flex gap-2">
+              <Input readOnly value={`${window.location.origin}/onboarding`} />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/onboarding`);
+                  toast.success('Link copiado');
+                }}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Envie este link para novos atletas escolherem o plano e receberem o pagamento no
+              WhatsApp.
+            </p>
+          </div>
           <Button onClick={() => saveSettings.mutate()} disabled={saveSettings.isPending}>
             {saveSettings.isPending ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
