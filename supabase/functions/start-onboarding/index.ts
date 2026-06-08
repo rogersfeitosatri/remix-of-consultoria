@@ -71,12 +71,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!plan.payment_link) {
-      return new Response(
-        JSON.stringify({ error: "Link de pagamento não configurado para este plano. Contate o administrador." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // payment_link will be sent only AFTER anamnese is completed,
+    // so we just warn in logs if missing (admin will see in notify message).
 
     // 2) Find onboarding settings to get admin user_id + anamnese_form_id
     const { data: settings, error: settingsErr } = await admin
