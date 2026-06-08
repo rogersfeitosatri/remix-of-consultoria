@@ -17,6 +17,8 @@ import { Separator } from '@/components/ui/separator';
 import { PlanTypeBadge } from '@/components/clients/PlanTypeBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { CheckCircle, XCircle } from 'lucide-react';
 
 interface WeeklyPipelineViewProps {
   consultations: (ConsultationSchedule & { client_name: string })[];
