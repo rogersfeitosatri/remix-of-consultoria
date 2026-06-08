@@ -515,6 +515,16 @@ export function WeeklyPipelineView({
               <div className="text-[10px] text-muted-foreground">Agendados</div>
             </button>
             <button
+              onClick={() => setStatusFilter('awaiting_confirmation')}
+              className={cn(
+                "text-center p-2 rounded-lg border transition-colors",
+                statusFilter === 'awaiting_confirmation' ? "border-amber-500 bg-amber-500/10" : "border-border hover:bg-muted/50"
+              )}
+            >
+              <div className={cn("text-lg font-bold", stats.awaitingConfirmation > 0 ? "text-amber-700" : "text-muted-foreground")}>{stats.awaitingConfirmation}</div>
+              <div className="text-[10px] text-muted-foreground">A confirmar</div>
+            </button>
+            <button
               onClick={() => setStatusFilter('completed')}
               className={cn(
                 "text-center p-2 rounded-lg border transition-colors",
@@ -524,6 +534,27 @@ export function WeeklyPipelineView({
               <div className="text-lg font-bold text-emerald-600">{stats.completed}</div>
               <div className="text-[10px] text-muted-foreground">Realizadas</div>
             </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Alert for awaiting confirmation */}
+      {stats.awaitingConfirmation > 0 && statusFilter === 'all' && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="py-3 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-700">
+                {stats.awaitingConfirmation} consulta{stats.awaitingConfirmation > 1 ? 's' : ''} aguardando sua confirmação
+              </p>
+              <p className="text-xs text-muted-foreground">Marque como Realizada ou Cancelada usando os botões abaixo.</p>
+            </div>
+            <Button size="sm" variant="outline" className="text-xs" onClick={() => setStatusFilter('awaiting_confirmation')}>
+              Ver pendentes
+            </Button>
+          </CardContent>
+        </Card>
+      )}
           </div>
         </CardContent>
       </Card>
