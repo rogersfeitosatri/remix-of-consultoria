@@ -496,6 +496,33 @@ export default function AthleteDynamicAnamneseForm() {
             ))}
           </CardContent>
         </Card>
+
+        {currentSectionIndex === sections.length - 1 && (
+          <Card className="mt-6 mb-32 bg-gray-900 border-[hsl(43,74%,49%)]/40">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="terms-accept-athlete"
+                  checked={termsAccepted}
+                  onCheckedChange={(checked) => setTermsAccepted(checked as boolean)}
+                  className="mt-1 border-gray-500"
+                />
+                <Label htmlFor="terms-accept-athlete" className="font-normal cursor-pointer leading-relaxed text-white">
+                  Li e aceito os{' '}
+                  <a
+                    href="/termos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[hsl(43,74%,49%)] underline font-medium"
+                  >
+                    Termos e Condições de Serviço
+                  </a>{' '}
+                  do acompanhamento nutricional. <span className="text-red-500">*</span>
+                </Label>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
 
       {/* Navigation Buttons - Fixed at bottom */}
