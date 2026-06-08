@@ -4505,6 +4505,7 @@ export type Database = {
       }
       onboarding_payment_settings: {
         Row: {
+          anamnese_form_id: string | null
           created_at: string
           id: string
           mp_public_key: string | null
@@ -4513,6 +4514,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          anamnese_form_id?: string | null
           created_at?: string
           id?: string
           mp_public_key?: string | null
@@ -4521,6 +4523,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          anamnese_form_id?: string | null
           created_at?: string
           id?: string
           mp_public_key?: string | null
@@ -4528,7 +4531,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_payment_settings_anamnese_form_id_fkey"
+            columns: ["anamnese_form_id"]
+            isOneToOne: false
+            referencedRelation: "anamnese_forms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       onboarding_plans: {
         Row: {
