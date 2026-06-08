@@ -6151,6 +6151,10 @@ export type Database = {
         Args: { p_cadence_weeks: number; p_last_appointment_at: string }
         Returns: string
       }
+      can_submit_checkin_response: {
+        Args: { _client_id: string; _form_id: string }
+        Returns: boolean
+      }
       cancel_overdue_inactive_scheduled_checkins: {
         Args: never
         Returns: {
