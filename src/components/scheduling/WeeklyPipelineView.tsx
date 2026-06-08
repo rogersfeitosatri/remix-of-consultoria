@@ -111,6 +111,29 @@ export function WeeklyPipelineView({
   const [weekOffset, setWeekOffset] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const updateAppointmentStatus = async (appointmentId: string, newStatus: 'completed' | 'cancelled') => {
+    setConfirmingId(appointmentId);
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', appointmentId);
+      if (error) throw error;
+      toast({
+        title: newStatus === 'completed' ? 'Consulta marcada como realizada' : 'Consulta marcada como cancelada',
+      });
+      queryClient.invalidateQueries({ queryKey: ['consultation-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
 
   const APP_URL = 'https://rogersfeitosa.com.br';
 
