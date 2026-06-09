@@ -1,0 +1,2 @@
+ALTER TABLE public.clients DROP CONSTRAINT check_registration_source;
+ALTER TABLE public.clients ADD CONSTRAINT check_registration_source CHECK (registration_source = ANY (ARRAY['manual'::text, 'kiwify'::text, 'anamnese_auto'::text, 'public_booking'::text, 'onboarding_self'::text]));
