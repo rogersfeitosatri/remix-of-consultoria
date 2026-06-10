@@ -1,0 +1,2 @@
+ALTER TABLE public.whatsapp_message_logs DROP CONSTRAINT IF EXISTS whatsapp_message_logs_appointment_id_fkey;
+ALTER TABLE public.whatsapp_message_logs ADD CONSTRAINT whatsapp_message_logs_appointment_id_fkey FOREIGN KEY (appointment_id) REFERENCES public.appointments(id) ON DELETE SET NULL;
