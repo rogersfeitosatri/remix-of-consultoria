@@ -58,7 +58,7 @@ interface CheckinQuestion {
   question_text: string;
   question_type: string;
   order_index: number;
-  has_comment_field: boolean;
+  has_comment_field?: boolean;
   comment_field_label: string | null;
   is_adjustment_trigger?: boolean;
 }
