@@ -166,8 +166,11 @@ Deno.serve(async (req) => {
         : messageType === 'followup' ? 'booking_followup_v1'
         : 'weekly_booking_link');
 
-    // ===== ELIGIBILITY CHECK (skip for confirmations) =====
-    if (!body.skipEligibility && messageType !== 'confirmation') {
+    // Manual admin sends bypass eligibility and duplicate guards (full admin control)
+    const isManualAdmin = triggeredBy === 'manual_admin';
+
+    // ===== ELIGIBILITY CHECK (skip for confirmations and manual admin sends) =====
+    if (!body.skipEligibility && messageType !== 'confirmation' && !isManualAdmin) {
       const { data: eligData } = await supabase.rpc('is_client_eligible_for_booking', {
         _client_id: resolvedClientId,
       });
@@ -192,8 +195,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ===== DUPLICATE GUARD (skip for confirmations) =====
-    if (messageType !== 'confirmation') {
+    // ===== DUPLICATE GUARD (skip for confirmations and manual admin sends) =====
+    if (messageType !== 'confirmation' && !isManualAdmin) {
       const { data: dupData } = await supabase.rpc('check_booking_send_duplicate', {
         _client_id: resolvedClientId,
         _template_key: templateKey,
