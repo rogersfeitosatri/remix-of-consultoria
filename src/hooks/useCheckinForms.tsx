@@ -20,6 +20,7 @@ export interface CheckinQuestion {
   comment_field_label: string | null;
   comment_field_required: boolean;
   comment_field_type: 'short' | 'medium' | null;
+  is_adjustment_trigger: boolean;
 }
 
 export interface CheckinForm {
