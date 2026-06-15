@@ -703,13 +703,16 @@ export default function CheckinFormBuilder() {
                     <Label htmlFor="required">Pergunta obrigatória</Label>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="is_adjustment_trigger"
-                      checked={newQuestion.is_adjustment_trigger}
-                      onCheckedChange={(checked) => setNewQuestion(prev => ({ ...prev, is_adjustment_trigger: checked }))}
-                    />
-                    <Label htmlFor="is_adjustment_trigger">Gatilho de ajuste</Label>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="is_adjustment_trigger"
+                        checked={newQuestion.is_adjustment_trigger}
+                        onCheckedChange={(checked) => setNewQuestion(prev => ({ ...prev, is_adjustment_trigger: checked }))}
+                      />
+                      <Label htmlFor="is_adjustment_trigger">Gatilho de ajuste de plano</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-9">Marca esta pergunta para destaque na revisão do checkin</p>
                   </div>
 
                   {/* Comment attachment field configuration */}
@@ -876,13 +879,16 @@ export default function CheckinFormBuilder() {
                       <Label htmlFor="edit_required">Pergunta obrigatória</Label>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id="edit_is_adjustment_trigger"
-                        checked={editingQuestion.is_adjustment_trigger}
-                        onCheckedChange={(checked) => setEditingQuestion(prev => prev ? ({ ...prev, is_adjustment_trigger: checked }) : null)}
-                      />
-                      <Label htmlFor="edit_is_adjustment_trigger">Gatilho de ajuste</Label>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="edit_is_adjustment_trigger"
+                          checked={editingQuestion.is_adjustment_trigger}
+                          onCheckedChange={(checked) => setEditingQuestion(prev => prev ? ({ ...prev, is_adjustment_trigger: checked }) : null)}
+                        />
+                        <Label htmlFor="edit_is_adjustment_trigger">Gatilho de ajuste de plano</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground pl-9">Marca esta pergunta para destaque na revisão do checkin</p>
                     </div>
 
                     {['multiple_choice', 'checkbox', 'scale'].includes(editingQuestion.question_type) && (
