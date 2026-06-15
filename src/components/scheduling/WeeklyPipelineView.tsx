@@ -429,6 +429,22 @@ export function WeeklyPipelineView({
     cancelled: pipelineItems.filter(i => i.status === 'cancelled').length,
   }), [pipelineItems]);
 
+  // Past appointments awaiting confirmation (independent of week navigation)
+  const pastAwaitingConfirmation = useMemo(() => {
+    return (appointments || [])
+      .filter((apt: any) => {
+        if (!apt.appointment_date) return false;
+        if (!['scheduled', 'confirmed'].includes(apt.status)) return false;
+        return isBefore(parseISO(apt.appointment_date), today);
+      })
+      .map((apt: any) => ({
+        ...apt,
+        client: clientsById.get(apt.client_id),
+        clientName: apt.client?.name || clientsById.get(apt.client_id)?.name || 'Cliente',
+      }))
+      .sort((a: any, b: any) => parseISO(b.appointment_date).getTime() - parseISO(a.appointment_date).getTime());
+  }, [appointments, today, clientsById]);
+
 
   const isCurrentWeek = weekOffset === 0;
   const weekLabel = format(currentWeekStart, "dd MMM", { locale: ptBR }) +
@@ -436,6 +452,73 @@ export function WeeklyPipelineView({
 
   return (
     <div className="space-y-4">
+      {/* Past appointments awaiting confirmation (any week) */}
+      {pastAwaitingConfirmation.length > 0 && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+              <div>
+                <CardTitle className="text-sm font-semibold text-amber-700">
+                  {pastAwaitingConfirmation.length} consulta{pastAwaitingConfirmation.length > 1 ? 's' : ''} passada{pastAwaitingConfirmation.length > 1 ? 's' : ''} aguardando confirmação
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Marque como Realizada ou Cancelada para liberar a próxima etapa da pipeline.
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2">
+            {pastAwaitingConfirmation.map((apt: any) => (
+              <div
+                key={apt.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-card/50 px-3 py-2 flex-wrap"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Calendar className="h-4 w-4 text-amber-600 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{apt.clientName}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {format(parseISO(apt.appointment_date), "EEE dd/MM/yyyy", { locale: ptBR })}
+                      {apt.appointment_time ? ` às ${apt.appointment_time.substring(0, 5)}` : ''}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10"
+                    onClick={() => updateAppointmentStatus(apt.id, 'completed')}
+                    disabled={confirmingId === apt.id}
+                  >
+                    {confirmingId === apt.id
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <CheckCircle className="h-3 w-3" />}
+                    Realizada
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={() => updateAppointmentStatus(apt.id, 'cancelled')}
+                    disabled={confirmingId === apt.id}
+                  >
+                    <XCircle className="h-3 w-3" />
+                    Cancelada
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" asChild>
+                    <Link to={`/appointments/${apt.id}`}>
+                      <Eye className="h-3 w-3" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Week Navigation + Stats */}
       <Card className="border-border bg-card">
         <CardHeader className="pb-3">
