@@ -414,12 +414,22 @@ export function AthleteSummaryConsultCard({
     try {
       setIsSendingLink(scheduleId);
       toast.loading('Enviando link...');
-      const { error } = await supabase.functions.invoke('send-booking-link', {
-        body: { consultationScheduleId: scheduleId },
+      const { data, error } = await supabase.functions.invoke('send-booking-link', {
+        body: {
+          consultationScheduleId: scheduleId,
+          messageType: 'booking_invite',
+          triggeredBy: 'manual_admin',
+        },
       });
       toast.dismiss();
       if (error) throw error;
-      toast.success('Link de agendamento enviado!');
+      if (data?.blocked) {
+        toast.warning(`Envio bloqueado: ${data.reason || 'desconhecido'}`);
+      } else if (data?.success) {
+        toast.success('Link de agendamento enviado!');
+      } else {
+        toast.error(data?.error || 'Falha ao enviar link');
+      }
       queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
     } catch (err: any) {
