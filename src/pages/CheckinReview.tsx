@@ -60,6 +60,7 @@ interface CheckinQuestion {
   order_index: number;
   has_comment_field: boolean;
   comment_field_label: string | null;
+  is_adjustment_trigger?: boolean;
 }
 
 interface AIAnalysis {
@@ -80,6 +81,7 @@ interface Feedback {
   status: 'pending' | 'approved' | 'sent';
   approved_at: string | null;
   sent_at: string | null;
+  admin_decision?: string | null;
 }
 
 export default function CheckinReview() {
@@ -95,6 +97,10 @@ export default function CheckinReview() {
   const [newTargetDeadline, setNewTargetDeadline] = useState('');
   const [editingWeightQuestionId, setEditingWeightQuestionId] = useState<string | null>(null);
   const [editedWeightValue, setEditedWeightValue] = useState('');
+  const [patternAlertsDismissed, setPatternAlertsDismissed] = useState(false);
+  const [adminDecision, setAdminDecision] = useState('');
+  const [adminDecisionDetails, setAdminDecisionDetails] = useState('');
+  const [adminDecisionInitialized, setAdminDecisionInitialized] = useState(false);
 
   // Fetch check-in response
   const { data: checkinResponse, isLoading: loadingResponse } = useQuery({
@@ -318,6 +324,18 @@ export default function CheckinReview() {
     setFeedbackInitialized(true);
   }
 
+  if (!adminDecisionInitialized && feedback?.admin_decision !== undefined) {
+    if (feedback.admin_decision) {
+      if (feedback.admin_decision.startsWith('Ajuste realizado: ')) {
+        setAdminDecision('Ajuste realizado');
+        setAdminDecisionDetails(feedback.admin_decision.replace('Ajuste realizado: ', ''));
+      } else {
+        setAdminDecision(feedback.admin_decision);
+      }
+    }
+    setAdminDecisionInitialized(true);
+  }
+
   // Mutation to analyze check-in
   const analyzeMutation = useMutation({
     mutationFn: async () => {
@@ -492,7 +510,115 @@ export default function CheckinReview() {
     },
   });
 
+  const saveAdminDecisionMutation = useMutation({
+    mutationFn: async () => {
+      if (!responseId) return;
+      const decisionValue = adminDecision === 'Ajuste realizado' && adminDecisionDetails
+        ? `Ajuste realizado: ${adminDecisionDetails}`
+        : adminDecision;
+      if (!decisionValue) return;
+      if (feedback?.id) {
+        const { error } = await supabase
+          .from('checkin_feedbacks')
+          .update({ admin_decision: decisionValue })
+          .eq('id', feedback.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('checkin_feedbacks')
+          .insert({
+            checkin_response_id: responseId,
+            client_id: checkinResponse?.client_id,
+            admin_decision: decisionValue,
+            status: 'pending',
+          });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
+      toast.success('Decisão nutricional salva!');
+    },
+    onError: () => toast.error('Erro ao salvar decisão'),
+  });
+
   const isLoading = loadingResponse || loadingAnalysis || loadingFeedback;
+
+  const patternAlerts = (() => {
+    if (!checkinResponse || !questions.length) return [];
+    const alerts: { message: string; severity: 'orange' | 'red' }[] = [];
+
+    const answers = checkinResponse.responses || {};
+
+    // Pattern 4: adjustment trigger with "Sim" answer
+    questions.forEach(q => {
+      if ((q as any).is_adjustment_trigger) {
+        const resp = answers[q.id];
+        const ans = resp && typeof resp === 'object' ? resp.answer : resp;
+        if (ans === 'Sim' || ans === 'sim') {
+          alerts.push({ message: `Gatilho de ajuste ativado: "${q.question_text}"`, severity: 'red' });
+        }
+      }
+    });
+
+    // Pattern 5: late response (>48h)
+    if (checkinResponse.submitted_at) {
+      const prevResponse = historicalResponses[0];
+      if (prevResponse?.submitted_at) {
+        const hoursDiff = (new Date(checkinResponse.submitted_at).getTime() - new Date(prevResponse.submitted_at).getTime()) / (1000 * 60 * 60);
+        if (hoursDiff > 24 * 14) {
+          alerts.push({ message: 'Resposta após longo intervalo (>14 dias desde o último check-in)', severity: 'orange' });
+        }
+      }
+    }
+
+    if (allResponses.length >= 2) {
+      const sorted = [...allResponses].sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+      const current = sorted[0];
+      const previous = sorted[1];
+
+      // Pattern 1: weight drop >1kg
+      questions.forEach(q => {
+        if (isWeightQuestion(q.question_text)) {
+          const currResp = current?.responses?.[q.id];
+          const prevResp = previous?.responses?.[q.id];
+          const currVal = parseFloat(String(currResp?.answer ?? currResp ?? ''));
+          const prevVal = parseFloat(String(prevResp?.answer ?? prevResp ?? ''));
+          if (!isNaN(currVal) && !isNaN(prevVal) && prevVal - currVal > 1) {
+            alerts.push({ message: `Queda de peso >1kg detectada (${prevVal}kg → ${currVal}kg)`, severity: 'orange' });
+          }
+        }
+      });
+
+      // Pattern 2: energy <4 for 2+ consecutive
+      questions.forEach(q => {
+        if (q.question_type === 'scale' && q.question_text.toLowerCase().includes('energia')) {
+          const energyScores = sorted.slice(0, 3).map(r => {
+            const resp = r?.responses?.[q.id];
+            return parseFloat(String(resp?.answer ?? resp ?? ''));
+          }).filter(v => !isNaN(v));
+          if (energyScores.length >= 2 && energyScores.slice(0, 2).every(s => s < 4)) {
+            alerts.push({ message: 'Energia baixa (<4) em 2+ check-ins consecutivos', severity: 'red' });
+          }
+        }
+      });
+
+      // Pattern 3: sleep <6h for 3+ consecutive
+      questions.forEach(q => {
+        if (q.question_text.toLowerCase().includes('sono')) {
+          const sleepVals = sorted.slice(0, 4).map(r => {
+            const resp = r?.responses?.[q.id];
+            return parseFloat(String(resp?.answer ?? resp ?? ''));
+          }).filter(v => !isNaN(v));
+          if (sleepVals.length >= 3 && sleepVals.slice(0, 3).every(v => v < 6)) {
+            alerts.push({ message: 'Sono <6h em 3+ check-ins consecutivos', severity: 'red' });
+          }
+        }
+      });
+    }
+
+    return alerts;
+  })();
 
   const getTrendIcon = (trend: string) => {
     const lowerTrend = trend?.toLowerCase() || '';
@@ -648,6 +774,41 @@ export default function CheckinReview() {
           </Card>
         )}
 
+        {/* Pattern Alerts Banner */}
+        {patternAlerts.length > 0 && !patternAlertsDismissed && (
+          <Card className="border-orange-500/30 bg-orange-50/30 dark:bg-orange-950/10">
+            <CardContent className="py-3 px-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-1.5">
+                  <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">Alertas de padrão detectados</p>
+                  <div className="flex flex-wrap gap-2">
+                    {patternAlerts.map((alert, i) => (
+                      <Badge
+                        key={i}
+                        className={alert.severity === 'red'
+                          ? 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30'
+                          : 'bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30'
+                        }
+                      >
+                        {alert.message}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                  onClick={() => setPatternAlertsDismissed(true)}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} key={responseId} className="space-y-4">
           <TabsList className="flex-wrap h-auto">
@@ -675,6 +836,42 @@ export default function CheckinReview() {
 
           {/* Responses Tab */}
           <TabsContent value="responses" className="space-y-4">
+            {/* Adjustment Trigger Questions Highlight */}
+            {questions.some(q => q.is_adjustment_trigger) && (
+              <Card className="border-l-4 border-l-orange-500 border-orange-500/20">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base text-orange-700 dark:text-orange-400">
+                    <span>⚠️</span>
+                    Perguntas de Gatilho de Ajuste
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {questions
+                    .filter(q => q.is_adjustment_trigger)
+                    .map((question) => {
+                      const response = checkinResponse?.responses?.[question.id];
+                      let answer = response;
+                      if (response && typeof response === 'object' && !Array.isArray(response)) {
+                        answer = response.answer ?? response;
+                        if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+                          answer = answer.answer ?? JSON.stringify(answer);
+                        }
+                      }
+                      const displayAnswer = Array.isArray(answer)
+                        ? answer.join(', ')
+                        : (typeof answer === 'string' || typeof answer === 'number' ? String(answer) : 'Não respondido');
+                      return (
+                        <div key={question.id} className="border-l-4 border-l-orange-500 pl-3 py-1">
+                          <p className="font-medium text-sm text-muted-foreground">{question.question_text}</p>
+                          <p className="text-foreground font-semibold">{displayAnswer || 'Não respondido'}</p>
+                        </div>
+                      );
+                    })
+                  }
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -986,6 +1183,65 @@ export default function CheckinReview() {
                     ✓ Feedback enviado em {format(parseISO(feedback.sent_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                   </p>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Decisão Nutricional */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Decisão Nutricional
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  {[
+                    'Mantive plano',
+                    'Ajuste realizado',
+                    'Aguardando mais dados',
+                    'Atleta contactado diretamente',
+                  ].map((option) => (
+                    <label key={option} className="flex items-center gap-3 cursor-pointer p-2 rounded-md hover:bg-muted/50">
+                      <input
+                        type="radio"
+                        name="admin_decision"
+                        value={option}
+                        checked={adminDecision === option}
+                        onChange={() => setAdminDecision(option)}
+                        className="h-4 w-4 accent-primary"
+                      />
+                      <span className="text-sm">{option}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {adminDecision === 'Ajuste realizado' && (
+                  <div className="space-y-2 pl-7">
+                    <Label className="text-sm">Descreva o ajuste realizado</Label>
+                    <Input
+                      value={adminDecisionDetails}
+                      onChange={(e) => setAdminDecisionDetails(e.target.value)}
+                      placeholder="Ex: Reduzi calorias em 200kcal, ajustei CHO pré-treino..."
+                    />
+                  </div>
+                )}
+
+                {feedback?.admin_decision && (
+                  <p className="text-xs text-muted-foreground">
+                    Decisão salva: <span className="font-medium text-foreground">{feedback.admin_decision}</span>
+                  </p>
+                )}
+
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={() => saveAdminDecisionMutation.mutate()}
+                    disabled={!adminDecision || saveAdminDecisionMutation.isPending}
+                  >
+                    {saveAdminDecisionMutation.isPending ? 'Salvando...' : 'Salvar Decisão'}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

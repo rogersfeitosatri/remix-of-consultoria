@@ -193,6 +193,7 @@ export default function CheckinFormBuilder() {
     scale_min: 1,
     scale_max: 10,
     is_required: false,
+    is_adjustment_trigger: false,
     has_comment_field: false,
     comment_field_label: 'Se quiser explicar melhor, comente aqui',
     comment_field_required: false,
@@ -211,6 +212,7 @@ export default function CheckinFormBuilder() {
     scale_min: number;
     scale_max: number;
     is_required: boolean;
+    is_adjustment_trigger: boolean;
     has_comment_field: boolean;
     comment_field_label: string;
     comment_field_required: boolean;
@@ -289,6 +291,7 @@ export default function CheckinFormBuilder() {
       scale_min: newQuestion.scale_min,
       scale_max: newQuestion.scale_max,
       is_required: newQuestion.is_required,
+      is_adjustment_trigger: newQuestion.is_adjustment_trigger,
       order_index: questions.length,
       has_comment_field: ['multiple_choice', 'checkbox', 'scale'].includes(newQuestion.question_type) 
         ? newQuestion.has_comment_field 
@@ -309,6 +312,7 @@ export default function CheckinFormBuilder() {
         scale_min: 1,
         scale_max: 10,
         is_required: false,
+        is_adjustment_trigger: false,
         has_comment_field: false,
         comment_field_label: 'Se quiser explicar melhor, comente aqui',
         comment_field_required: false,
@@ -377,6 +381,7 @@ export default function CheckinFormBuilder() {
       scale_min: question.scale_min || 1,
       scale_max: question.scale_max || 10,
       is_required: question.is_required,
+      is_adjustment_trigger: question.is_adjustment_trigger || false,
       has_comment_field: question.has_comment_field || false,
       comment_field_label: question.comment_field_label || 'Se quiser explicar melhor, comente aqui',
       comment_field_required: question.comment_field_required || false,
@@ -404,6 +409,7 @@ export default function CheckinFormBuilder() {
         scale_min: editingQuestion.scale_min,
         scale_max: editingQuestion.scale_max,
         is_required: editingQuestion.is_required,
+        is_adjustment_trigger: editingQuestion.is_adjustment_trigger,
         has_comment_field: ['multiple_choice', 'checkbox', 'scale'].includes(editingQuestion.question_type) 
           ? editingQuestion.has_comment_field 
           : false,
@@ -697,6 +703,15 @@ export default function CheckinFormBuilder() {
                     <Label htmlFor="required">Pergunta obrigatória</Label>
                   </div>
 
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="is_adjustment_trigger"
+                      checked={newQuestion.is_adjustment_trigger}
+                      onCheckedChange={(checked) => setNewQuestion(prev => ({ ...prev, is_adjustment_trigger: checked }))}
+                    />
+                    <Label htmlFor="is_adjustment_trigger">Gatilho de ajuste</Label>
+                  </div>
+
                   {/* Comment attachment field configuration */}
                   {['multiple_choice', 'checkbox', 'scale'].includes(newQuestion.question_type) && (
                     <div className="space-y-4 border-t pt-4 mt-4">
@@ -859,6 +874,15 @@ export default function CheckinFormBuilder() {
                         onCheckedChange={(checked) => setEditingQuestion(prev => prev ? ({ ...prev, is_required: checked }) : null)}
                       />
                       <Label htmlFor="edit_required">Pergunta obrigatória</Label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="edit_is_adjustment_trigger"
+                        checked={editingQuestion.is_adjustment_trigger}
+                        onCheckedChange={(checked) => setEditingQuestion(prev => prev ? ({ ...prev, is_adjustment_trigger: checked }) : null)}
+                      />
+                      <Label htmlFor="edit_is_adjustment_trigger">Gatilho de ajuste</Label>
                     </div>
 
                     {['multiple_choice', 'checkbox', 'scale'].includes(editingQuestion.question_type) && (
