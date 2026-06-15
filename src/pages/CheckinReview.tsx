@@ -883,90 +883,124 @@ export default function CheckinReview() {
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
-                {questions.map((question, index) => {
-                  const response = checkinResponse?.responses?.[question.id];
-                  // Handle nested object structure - extract answer from object if needed
-                  let answer = response;
-                  let comment = null;
-                  
-                  if (response && typeof response === 'object' && !Array.isArray(response)) {
-                    answer = response.answer ?? response;
-                    comment = response.comment;
-                    // If answer is still an object (edge case), try to stringify it
-                    if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
-                      answer = answer.answer ?? JSON.stringify(answer);
+                {(() => {
+                  const highlightedQuestions: typeof questions = [];
+                  const regularQuestions: typeof questions = [];
+
+                  questions.forEach(q => {
+                    const resp = checkinResponse?.responses?.[q.id];
+                    const comment = resp && typeof resp === 'object' ? resp.comment : null;
+                    const isHighlighted = (q as any).is_adjustment_trigger || (q.has_comment_field && comment);
+                    if (isHighlighted) {
+                      highlightedQuestions.push(q);
+                    } else {
+                      regularQuestions.push(q);
                     }
-                  }
+                  });
 
-                  const displayAnswer = Array.isArray(answer) 
-                    ? answer.join(', ') 
-                    : (typeof answer === 'string' || typeof answer === 'number' ? String(answer) : 'Não respondido');
+                  const renderQuestion = (question: typeof questions[0], index: number, isHighlight: boolean) => {
+                    const response = checkinResponse?.responses?.[question.id];
+                    let answer = response;
+                    let comment = null;
+                    if (response && typeof response === 'object' && !Array.isArray(response)) {
+                      answer = response.answer ?? response;
+                      comment = response.comment;
+                      if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+                        answer = answer.answer ?? JSON.stringify(answer);
+                      }
+                    }
+                    const displayAnswer = Array.isArray(answer)
+                      ? answer.join(', ')
+                      : (typeof answer === 'string' || typeof answer === 'number' ? String(answer) : 'Não respondido');
+                    const isWeight = isWeightQuestion(question.question_text);
+                    const isEditing = editingWeightQuestionId === question.id;
+                    const isAdjTrigger = (question as any).is_adjustment_trigger;
 
-                  const isWeight = isWeightQuestion(question.question_text);
-                  const isEditing = editingWeightQuestionId === question.id;
+                    return (
+                      <div
+                        key={question.id}
+                        className={`border-b border-border/50 pb-4 last:border-0 ${isHighlight ? 'pl-3 border-l-4 ' + (isAdjTrigger ? 'border-l-red-500 bg-red-50/30 dark:bg-red-950/10' : 'border-l-orange-400 bg-orange-50/30 dark:bg-orange-950/10') : ''}`}
+                      >
+                        <p className="font-medium text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                          {isHighlight && isAdjTrigger && <span>⚠️</span>}
+                          {isHighlight && !isAdjTrigger && <span>💬</span>}
+                          {index + 1}. {question.question_text}
+                        </p>
+                        {isEditing ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={editedWeightValue}
+                              onChange={(e) => setEditedWeightValue(e.target.value)}
+                              className="h-8 w-32"
+                              placeholder="Ex: 72.5"
+                            />
+                            <span className="text-sm text-muted-foreground">kg</span>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="h-8 px-3"
+                              onClick={() => updateWeightMutation.mutate({ questionId: question.id, newValue: editedWeightValue })}
+                              disabled={updateWeightMutation.isPending || !editedWeightValue}
+                            >
+                              Salvar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-3"
+                              onClick={() => { setEditingWeightQuestionId(null); setEditedWeightValue(''); }}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <p className="text-foreground">
+                              {displayAnswer || 'Não respondido'}
+                            </p>
+                            {isWeight && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setEditingWeightQuestionId(question.id);
+                                  setEditedWeightValue(String(displayAnswer).replace(/[^\d.,]/g, '').replace(',', '.'));
+                                }}
+                              >
+                                ✏️ Editar
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                        {comment && (
+                          <p className="text-sm text-muted-foreground mt-1 italic">
+                            "{comment}"
+                          </p>
+                        )}
+                      </div>
+                    );
+                  };
 
                   return (
-                    <div key={question.id} className="border-b border-border/50 pb-4 last:border-0">
-                      <p className="font-medium text-sm text-muted-foreground mb-1">
-                        {index + 1}. {question.question_text}
-                      </p>
-                      {isEditing ? (
-                        <div className="flex items-center gap-2 mt-1">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={editedWeightValue}
-                            onChange={(e) => setEditedWeightValue(e.target.value)}
-                            className="h-8 w-32"
-                            placeholder="Ex: 72.5"
-                          />
-                          <span className="text-sm text-muted-foreground">kg</span>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="h-8 px-3"
-                            onClick={() => updateWeightMutation.mutate({ questionId: question.id, newValue: editedWeightValue })}
-                            disabled={updateWeightMutation.isPending || !editedWeightValue}
-                          >
-                            Salvar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 px-3"
-                            onClick={() => { setEditingWeightQuestionId(null); setEditedWeightValue(''); }}
-                          >
-                            Cancelar
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <p className="text-foreground">
-                            {displayAnswer || 'Não respondido'}
-                          </p>
-                          {isWeight && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                              onClick={() => {
-                                setEditingWeightQuestionId(question.id);
-                                setEditedWeightValue(String(displayAnswer).replace(/[^\d.,]/g, '').replace(',', '.'));
-                              }}
-                            >
-                              ✏️ Editar
-                            </Button>
-                          )}
+                    <>
+                      {highlightedQuestions.length > 0 && (
+                        <div className="space-y-3 mb-4">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Destaques</p>
+                          {highlightedQuestions.map((q) => renderQuestion(q, questions.indexOf(q), true))}
                         </div>
                       )}
-                      {comment && (
-                        <p className="text-sm text-muted-foreground mt-1 italic">
-                          "{comment}"
-                        </p>
+                      {highlightedQuestions.length > 0 && regularQuestions.length > 0 && (
+                        <Separator />
                       )}
-                    </div>
+                      <div className="space-y-0">
+                        {regularQuestions.map((q) => renderQuestion(q, questions.indexOf(q), false))}
+                      </div>
+                    </>
                   );
-                })}
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1183,6 +1217,55 @@ export default function CheckinReview() {
                     ✓ Feedback enviado em {format(parseISO(feedback.sent_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                   </p>
                 )}
+
+                <Separator />
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold">Decisão Nutricional</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Mantive plano', 'Ajuste realizado', 'Aguardando mais dados', 'Atleta contactado diretamente'].map(option => (
+                      <Button
+                        key={option}
+                        variant={adminDecision === option ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setAdminDecision(prev => prev === option ? '' : option)}
+                        className="text-xs"
+                      >
+                        {option}
+                      </Button>
+                    ))}
+                  </div>
+                  {adminDecision === 'Ajuste realizado' && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Descreva o ajuste realizado</Label>
+                      <Input
+                        placeholder="Ex: Aumentei carboidratos no pré-treino..."
+                        value={adminDecisionDetails}
+                        onChange={e => setAdminDecisionDetails(e.target.value)}
+                        className="text-sm"
+                      />
+                    </div>
+                  )}
+                  {adminDecision && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => saveAdminDecisionMutation.mutate()}
+                      disabled={saveAdminDecisionMutation.isPending || (adminDecision === 'Ajuste realizado' && !adminDecisionDetails.trim())}
+                      className="gap-2"
+                    >
+                      {saveAdminDecisionMutation.isPending ? (
+                        <><RefreshCw className="h-3 w-3 animate-spin" />Salvando...</>
+                      ) : (
+                        'Salvar Decisão'
+                      )}
+                    </Button>
+                  )}
+                  {feedback?.admin_decision && (
+                    <p className="text-xs text-muted-foreground">
+                      Decisão registrada: <span className="font-medium text-foreground">{feedback.admin_decision}</span>
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
