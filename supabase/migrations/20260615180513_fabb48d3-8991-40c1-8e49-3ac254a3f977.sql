@@ -1,0 +1,1 @@
+ALTER TABLE public.checkin_feedbacks ADD COLUMN IF NOT EXISTS admin_decision text;

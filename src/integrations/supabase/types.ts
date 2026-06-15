@@ -1541,6 +1541,7 @@ export type Database = {
       }
       checkin_feedbacks: {
         Row: {
+          admin_decision: string | null
           ai_analysis_id: string | null
           approved_at: string | null
           approved_by: string | null
@@ -1556,6 +1557,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_decision?: string | null
           ai_analysis_id?: string | null
           approved_at?: string | null
           approved_by?: string | null
@@ -1571,6 +1573,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_decision?: string | null
           ai_analysis_id?: string | null
           approved_at?: string | null
           approved_by?: string | null
