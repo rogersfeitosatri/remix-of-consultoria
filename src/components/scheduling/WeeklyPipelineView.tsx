@@ -429,6 +429,22 @@ export function WeeklyPipelineView({
     cancelled: pipelineItems.filter(i => i.status === 'cancelled').length,
   }), [pipelineItems]);
 
+  // Past appointments awaiting confirmation (independent of week navigation)
+  const pastAwaitingConfirmation = useMemo(() => {
+    return (appointments || [])
+      .filter((apt: any) => {
+        if (!apt.appointment_date) return false;
+        if (!['scheduled', 'confirmed'].includes(apt.status)) return false;
+        return isBefore(parseISO(apt.appointment_date), today);
+      })
+      .map((apt: any) => ({
+        ...apt,
+        client: clientsById.get(apt.client_id),
+        clientName: apt.client?.name || clientsById.get(apt.client_id)?.name || 'Cliente',
+      }))
+      .sort((a: any, b: any) => parseISO(b.appointment_date).getTime() - parseISO(a.appointment_date).getTime());
+  }, [appointments, today, clientsById]);
+
 
   const isCurrentWeek = weekOffset === 0;
   const weekLabel = format(currentWeekStart, "dd MMM", { locale: ptBR }) +
