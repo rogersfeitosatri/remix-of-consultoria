@@ -8,9 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { useClients, usePayments, type Client, type Payment } from '@/hooks/useClients';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import {
   parseISO, differenceInMonths, differenceInDays, format,
-  subMonths, startOfMonth, endOfMonth, isWithinInterval, addMonths
+  subMonths, startOfMonth, endOfMonth, isWithinInterval, addMonths, min as dateMin, max as dateMax,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
