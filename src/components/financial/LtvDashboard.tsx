@@ -539,35 +539,84 @@ export function LtvDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Glossário simples */}
+      <Collapsible>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <button type="button" className="w-full">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors rounded-t-lg">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  O que significa cada indicador? (clique para abrir)
+                </CardTitle>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="text-xs space-y-2 text-muted-foreground">
+              <p><span className="text-foreground font-medium">LTV (Lifetime Value):</span> quanto cada paciente já te pagou desde que entrou. Soma de TODOS os pagamentos confirmados dele.</p>
+              <p><span className="text-foreground font-medium">LTV médio:</span> média de LTV entre todos os pacientes que já pagaram pelo menos uma vez.</p>
+              <p><span className="text-foreground font-medium">Ticket médio:</span> receita total ÷ número de planos vendidos (planos atuais + renovações). Diz quanto, em média, cada venda valeu.</p>
+              <p><span className="text-foreground font-medium">Ticket (30d):</span> mesmo cálculo, mas só com planos novos ou renovados nos últimos 30 dias.</p>
+              <p><span className="text-foreground font-medium">MRR (Monthly Recurring Revenue):</span> receita mensal equivalente dos planos ativos. Pega o valor total do plano e divide pela duração em meses.</p>
+              <p><span className="text-foreground font-medium">Receita / ativo:</span> quanto cada paciente ativo gerou de receita nos últimos 12 meses, em média.</p>
+              <p><span className="text-foreground font-medium">Taxa de renovação:</span> dos pacientes que já terminaram (ou renovaram) o primeiro plano, quantos voltaram pelo menos uma vez.</p>
+              <p><span className="text-foreground font-medium">Taxa de cancelamento (churn):</span> % de pacientes que estão inativos hoje (não renovaram).</p>
+              <p><span className="text-foreground font-medium">Permanência média:</span> quantos meses, em média, cada paciente fica com você.</p>
+              <p><span className="text-foreground font-medium">Cohort:</span> tabela que mostra, para cada mês de entrada, quantos % dos pacientes ainda estavam ativos 1, 2, 3, 6 e 12 meses depois. Verde = boa retenção; vermelho = perdeu rápido.</p>
+              <p><span className="text-foreground font-medium">Previsão de receita:</span> projeção dos próximos 12 meses em 3 cenários (conservador, provável, otimista) com base no MRR atual e na sua taxa de cancelamento.</p>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
       {/* KPIs */}
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground mb-2">Receita e LTV</h3>
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <KpiCard title="LTV médio" value={brl(kpis.avgLtv)} icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} subtitle="receita ÷ planos vendidos" icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} subtitle="planos novos/renovados" icon={<TrendingUp className="h-4 w-4" />} />
-          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="receita mensal equivalente (total ÷ meses)" icon={<Repeat className="h-4 w-4" />} />
-          <KpiCard title="Receita total" value={brl(kpis.totalRevenue)} subtitle="histórico completo" icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Receita / ativo" value={brl(kpis.revenuePerActive)} subtitle="últimos 12m" icon={<Users className="h-4 w-4" />} />
+          <KpiCard title="LTV médio" value={brl(kpis.avgLtv)} icon={<DollarSign className="h-4 w-4" />}
+            help="Soma de tudo que cada paciente pagou (LTV), dividido pelo número de pacientes que já pagaram alguma vez." />
+          <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} subtitle="receita ÷ planos vendidos" icon={<DollarSign className="h-4 w-4" />}
+            help="Receita total dividida pelo número de planos vendidos (plano atual + cada renovação conta como 1 venda). Mostra quanto, em média, cada venda valeu." />
+          <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} subtitle="planos novos/renovados" icon={<TrendingUp className="h-4 w-4" />}
+            help="Mesmo cálculo do ticket médio, mas considerando apenas planos iniciados ou renovados nos últimos 30 dias." />
+          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="receita mensal equivalente" icon={<Repeat className="h-4 w-4" />}
+            help="Receita Mensal Recorrente. Para cada plano ativo, pegamos o valor TOTAL e dividimos pela duração em meses, depois somamos tudo. É quanto você 'fatura por mês', em média." />
+          <KpiCard title="Receita total" value={brl(kpis.totalRevenue)} subtitle="histórico completo" icon={<DollarSign className="h-4 w-4" />}
+            help="Soma de todos os pagamentos confirmados desde o início." />
+          <KpiCard title="Receita / ativo" value={brl(kpis.revenuePerActive)} subtitle="últimos 12m" icon={<Users className="h-4 w-4" />}
+            help="Receita dos últimos 12 meses dividida pelo número de pacientes ativos hoje. Indica quanto cada paciente ativo 'rende' por ano." />
         </div>
       </div>
 
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground mb-2">Retenção</h3>
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <KpiCard title="Taxa de renovação" value={pct(kpis.renewalRate)} subtitle={`${kpis.renewedCount}/${kpis.eligibleForRenewalCount} elegíveis`} icon={<Repeat className="h-4 w-4" />} />
-          <KpiCard title="Taxa de cancelamento" value={pct(kpis.churnRate)} icon={<TrendingDown className="h-4 w-4" />} />
-          <KpiCard title="Permanência média" value={`${kpis.avgTenure.toFixed(1)} meses`} icon={<Calendar className="h-4 w-4" />} />
-          <KpiCard title="Renovações / paciente" value={kpis.avgRenewals.toFixed(2)} icon={<Repeat className="h-4 w-4" />} />
-          <KpiCard title="Pacientes ativos" value={String(kpis.activeCount)} icon={<Users className="h-4 w-4" />} />
-          <KpiCard title="Já renovaram" value={String(kpis.renewedCount)} subtitle="ao menos 1x" icon={<Trophy className="h-4 w-4" />} />
+          <KpiCard title="Taxa de renovação" value={pct(kpis.renewalRate)} subtitle={`${kpis.renewedCount}/${kpis.eligibleForRenewalCount} elegíveis`} icon={<Repeat className="h-4 w-4" />}
+            help="Dos pacientes cujo primeiro plano já encerrou (ou renovou), quantos % renovaram pelo menos uma vez." />
+          <KpiCard title="Taxa de cancelamento" value={pct(kpis.churnRate)} icon={<TrendingDown className="h-4 w-4" />}
+            help="% de pacientes que já pagaram alguma vez e hoje estão inativos. Quanto menor, melhor." />
+          <KpiCard title="Permanência média" value={`${kpis.avgTenure.toFixed(1)} meses`} icon={<Calendar className="h-4 w-4" />}
+            help="Tempo médio entre o início do primeiro plano e o término (ou hoje, se ainda ativo)." />
+          <KpiCard title="Renovações / paciente" value={kpis.avgRenewals.toFixed(2)} icon={<Repeat className="h-4 w-4" />}
+            help="Média de quantas vezes cada paciente renovou. 0 = ninguém voltou; 1 = em média renovaram uma vez." />
+          <KpiCard title="Pacientes ativos" value={String(kpis.activeCount)} icon={<Users className="h-4 w-4" />}
+            help="Pacientes com plano ativo agora (não inativos e não congelados)." />
+          <KpiCard title="Já renovaram" value={String(kpis.renewedCount)} subtitle="ao menos 1x" icon={<Trophy className="h-4 w-4" />}
+            help="Quantos pacientes renovaram pelo menos uma vez ao longo da história." />
         </div>
       </div>
 
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Evolução do LTV (mensal)</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Evolução do LTV (mensal)
+              <ChartHelp text="Para cada mês, calcula a receita ÷ número de pacientes únicos que pagaram naquele mês. Mostra a tendência de valor por paciente ao longo do tempo." />
+            </CardTitle>
+          </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={monthly}>
@@ -582,7 +631,12 @@ export function LtvDashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Ticket médio mensal</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Ticket médio mensal
+              <ChartHelp text="Receita do mês ÷ número de pagamentos do mês. Se cair, geralmente é porque entraram pagamentos de planos mais baratos (mudança de mix) ou o valor de algum plano diminuiu." />
+            </CardTitle>
+          </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthly}>
@@ -597,7 +651,12 @@ export function LtvDashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Curva de retenção (%)</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Curva de retenção (%)
+              <ChartHelp text="% de pacientes ativos no mês que JÁ tinham renovado pelo menos uma vez. Sobe quando sua base é mais 'fiel'." />
+            </CardTitle>
+          </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={monthly}>
@@ -610,6 +669,7 @@ export function LtvDashboard() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
 
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Previsão de receita (12 meses)</CardTitle></CardHeader>
