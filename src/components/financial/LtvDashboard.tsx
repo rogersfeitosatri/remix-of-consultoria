@@ -85,10 +85,11 @@ const ChartTooltip = ({ active, payload, label, currency = true }: any) => {
 };
 
 function KpiCard({
-  title, value, subtitle, icon, trend,
+  title, value, subtitle, icon, trend, help,
 }: {
   title: string; value: string; subtitle?: string;
   icon: React.ReactNode; trend?: { value: number; positive: boolean };
+  help?: string;
 }) {
   return (
     <Card>
@@ -102,11 +103,40 @@ function KpiCard({
             </Badge>
           )}
         </div>
-        <p className="text-xs text-muted-foreground mt-2">{title}</p>
+        <div className="flex items-center gap-1 mt-2">
+          <p className="text-xs text-muted-foreground">{title}</p>
+          {help && (
+            <TooltipProvider delayDuration={100}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground/70 hover:text-foreground">
+                    <HelpCircle className="h-3 w-3" />
+                  </button>
+                </TooltipTrigger>
+                <UITooltipContent className="max-w-[260px] text-xs leading-relaxed">{help}</UITooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+          )}
+        </div>
         <p className="text-xl font-bold text-foreground mt-0.5">{value}</p>
         {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
       </CardContent>
     </Card>
+  );
+}
+
+function ChartHelp({ text }: { text: string }) {
+  return (
+    <TooltipProvider delayDuration={100}>
+      <UITooltip>
+        <TooltipTrigger asChild>
+          <button type="button" className="text-muted-foreground/70 hover:text-foreground">
+            <HelpCircle className="h-3.5 w-3.5" />
+          </button>
+        </TooltipTrigger>
+        <UITooltipContent className="max-w-[280px] text-xs leading-relaxed">{text}</UITooltipContent>
+      </UITooltip>
+    </TooltipProvider>
   );
 }
 
