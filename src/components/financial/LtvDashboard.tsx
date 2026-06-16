@@ -34,11 +34,39 @@ type EnrichedClient = Client & {
   client_name?: string;
   payments: Payment[];
   ltv: number;
-  renewals: number;
+  planPeriods: number;     // 1 (atual) + nº de planos arquivados em history
+  renewals: number;        // = history rows (renovações reais, não parcelas)
   monthsActive: number;
+  firstStartDate: Date | null;
   lastPaymentDate: string | null;
   isChurned: boolean;
 };
+
+type PlanHistoryRow = {
+  id: string;
+  client_id: string;
+  start_date: string | null;
+  end_date: string | null;
+  monthly_value: number | null;
+  plan_type: string | null;
+  renewed_at: string | null;
+};
+
+function usePlanHistory() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['client_plan_history', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('client_plan_history')
+        .select('id, client_id, start_date, end_date, monthly_value, plan_type, renewed_at');
+      if (error) throw error;
+      return (data || []) as PlanHistoryRow[];
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 const ChartTooltip = ({ active, payload, label, currency = true }: any) => {
   if (!active || !payload?.length) return null;
