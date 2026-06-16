@@ -36,14 +36,20 @@ import { toast } from 'sonner';
 
 export default function Financial() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter = searchParams.get('filter') || 'all';
   const initialTab = searchParams.get('tab') || 'gestao';
+  const startDateParam = searchParams.get('startDate');
+  const endDateParam = searchParams.get('endDate');
   
   const today = new Date();
   
-  const [filterStartDate, setFilterStartDate] = useState<Date>(startOfMonth(today));
-  const [filterEndDate, setFilterEndDate] = useState<Date>(endOfMonth(today));
+  const [filterStartDate, setFilterStartDate] = useState<Date>(
+    startDateParam ? new Date(startDateParam) : startOfMonth(today)
+  );
+  const [filterEndDate, setFilterEndDate] = useState<Date>(
+    endDateParam ? new Date(endDateParam) : endOfMonth(today)
+  );
   const [filter, setFilter] = useState<'all' | 'overdue' | 'upcoming'>(initialFilter as any);
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [showReceiptScan, setShowReceiptScan] = useState(false);
