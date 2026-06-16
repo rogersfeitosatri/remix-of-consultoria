@@ -22,8 +22,10 @@ import {
 } from 'recharts';
 import {
   DollarSign, TrendingUp, TrendingDown, Users, Repeat, Calendar,
-  Trophy, Target, Sparkles, ArrowUpRight, ArrowDownRight
+  Trophy, Target, Sparkles, ArrowUpRight, ArrowDownRight, HelpCircle, BookOpen, ChevronDown
 } from 'lucide-react';
+import { Tooltip as UITooltip, TooltipContent as UITooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const brl = (n: number) =>
   `R$ ${(Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -83,10 +85,11 @@ const ChartTooltip = ({ active, payload, label, currency = true }: any) => {
 };
 
 function KpiCard({
-  title, value, subtitle, icon, trend,
+  title, value, subtitle, icon, trend, help,
 }: {
   title: string; value: string; subtitle?: string;
   icon: React.ReactNode; trend?: { value: number; positive: boolean };
+  help?: string;
 }) {
   return (
     <Card>
@@ -100,11 +103,40 @@ function KpiCard({
             </Badge>
           )}
         </div>
-        <p className="text-xs text-muted-foreground mt-2">{title}</p>
+        <div className="flex items-center gap-1 mt-2">
+          <p className="text-xs text-muted-foreground">{title}</p>
+          {help && (
+            <TooltipProvider delayDuration={100}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground/70 hover:text-foreground">
+                    <HelpCircle className="h-3 w-3" />
+                  </button>
+                </TooltipTrigger>
+                <UITooltipContent className="max-w-[260px] text-xs leading-relaxed">{help}</UITooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+          )}
+        </div>
         <p className="text-xl font-bold text-foreground mt-0.5">{value}</p>
         {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
       </CardContent>
     </Card>
+  );
+}
+
+function ChartHelp({ text }: { text: string }) {
+  return (
+    <TooltipProvider delayDuration={100}>
+      <UITooltip>
+        <TooltipTrigger asChild>
+          <button type="button" className="text-muted-foreground/70 hover:text-foreground">
+            <HelpCircle className="h-3.5 w-3.5" />
+          </button>
+        </TooltipTrigger>
+        <UITooltipContent className="max-w-[280px] text-xs leading-relaxed">{text}</UITooltipContent>
+      </UITooltip>
+    </TooltipProvider>
   );
 }
 
@@ -265,6 +297,16 @@ export function LtvDashboard() {
       const uniqueClients = new Set(monthPayments.map((p) => p.client_id));
       const ltv = uniqueClients.size ? revenue / uniqueClients.size : 0;
 
+      // mix por plano no mês (baseado no plan_type do cliente que pagou)
+      const planMix: Record<string, { count: number; sum: number }> = {};
+      monthPayments.forEach((p) => {
+        const c = enriched.find((x) => x.id === p.client_id);
+        const key = c?.plan_type || 'sem_plano';
+        if (!planMix[key]) planMix[key] = { count: 0, sum: 0 };
+        planMix[key].count += 1;
+        planMix[key].sum += Number(p.amount);
+      });
+
       // retention: clients active during this month
       const activeInMonth = enriched.filter((c) => {
         const start = c.start_date ? parseISO(c.start_date) : null;
@@ -283,29 +325,87 @@ export function LtvDashboard() {
         month: m.label, key: m.key,
         ltv: Math.round(ltv), ticket: Math.round(ticket), revenue: Math.round(revenue),
         retention: Math.round(retention),
+        payments: monthPayments.length,
+        planMix,
       };
     });
   }, [payments, enriched]);
 
-  // Insights
+  // Insights diagnósticos: explica POR QUE os números se moveram
   const insights = useMemo(() => {
     const out: { type: 'positive' | 'warning' | 'info'; text: string }[] = [];
 
-    const last3 = monthly.slice(-3);
-    const prev3 = monthly.slice(-6, -3);
-    const avg = (arr: { ticket: number }[]) => arr.length ? arr.reduce((s, x) => s + x.ticket, 0) / arr.length : 0;
-    const a = avg(last3), b = avg(prev3);
-    if (b > 0) {
-      const delta = ((a - b) / b) * 100;
-      if (Math.abs(delta) > 3) {
-        out.push({
-          type: delta > 0 ? 'positive' : 'warning',
-          text: `O ticket médio ${delta > 0 ? 'aumentou' : 'caiu'} ${Math.abs(delta).toFixed(1)}% nos últimos 90 dias.`,
-        });
+    // 1) Variação do ticket: último mês cheio vs mês anterior, com diagnóstico do mix
+    const filled = monthly.filter((m) => m.payments > 0);
+    if (filled.length >= 2) {
+      const cur = filled[filled.length - 1];
+      const prev = filled[filled.length - 2];
+      if (prev.ticket > 0) {
+        const delta = ((cur.ticket - prev.ticket) / prev.ticket) * 100;
+        if (Math.abs(delta) > 3) {
+          out.push({
+            type: delta > 0 ? 'positive' : 'warning',
+            text: `Ticket médio em ${cur.month} foi ${brl(cur.ticket)} — ${delta > 0 ? 'subiu' : 'caiu'} ${Math.abs(delta).toFixed(1)}% vs ${prev.month} (${brl(prev.ticket)}).`,
+          });
+
+          // Diagnóstico: o que mudou no mix?
+          const allPlans = new Set([...Object.keys(cur.planMix), ...Object.keys(prev.planMix)]);
+          const diffs: { plan: string; shareDelta: number; priceCur: number; pricePrev: number; countCur: number; countPrev: number }[] = [];
+          allPlans.forEach((plan) => {
+            const c = cur.planMix[plan] || { count: 0, sum: 0 };
+            const p = prev.planMix[plan] || { count: 0, sum: 0 };
+            const shareCur = cur.payments ? c.count / cur.payments : 0;
+            const sharePrev = prev.payments ? p.count / prev.payments : 0;
+            diffs.push({
+              plan,
+              shareDelta: (shareCur - sharePrev) * 100,
+              priceCur: c.count ? c.sum / c.count : 0,
+              pricePrev: p.count ? p.sum / p.count : 0,
+              countCur: c.count,
+              countPrev: p.count,
+            });
+          });
+
+          // Mudança de mix mais relevante
+          const mixShift = [...diffs].sort((a, b) => Math.abs(b.shareDelta) - Math.abs(a.shareDelta))[0];
+          if (mixShift && Math.abs(mixShift.shareDelta) >= 10) {
+            out.push({
+              type: 'info',
+              text: `Motivo provável: a participação do plano "${mixShift.plan}" ${mixShift.shareDelta > 0 ? 'cresceu' : 'caiu'} ${Math.abs(mixShift.shareDelta).toFixed(0)} pontos percentuais (${mixShift.countPrev}→${mixShift.countCur} pagamentos). Quando entram mais pagamentos de planos de valor menor, o ticket médio cai mesmo sem mudança de preço.`,
+            });
+          }
+
+          // Mudança de preço dentro do mesmo plano
+          const priceShift = diffs
+            .filter((d) => d.countCur >= 1 && d.countPrev >= 1 && d.pricePrev > 0)
+            .map((d) => ({ ...d, priceDeltaPct: ((d.priceCur - d.pricePrev) / d.pricePrev) * 100 }))
+            .sort((a, b) => Math.abs(b.priceDeltaPct) - Math.abs(a.priceDeltaPct))[0];
+          if (priceShift && Math.abs(priceShift.priceDeltaPct) >= 10) {
+            out.push({
+              type: 'info',
+              text: `O valor médio do plano "${priceShift.plan}" passou de ${brl(priceShift.pricePrev)} para ${brl(priceShift.priceCur)} (${priceShift.priceDeltaPct > 0 ? '+' : ''}${priceShift.priceDeltaPct.toFixed(1)}%).`,
+            });
+          }
+        }
       }
     }
 
-    // LTV por plano
+    // 2) Variação da receita mês a mês
+    if (filled.length >= 2) {
+      const cur = filled[filled.length - 1];
+      const prev = filled[filled.length - 2];
+      if (prev.revenue > 0) {
+        const delta = ((cur.revenue - prev.revenue) / prev.revenue) * 100;
+        if (Math.abs(delta) > 10) {
+          out.push({
+            type: delta > 0 ? 'positive' : 'warning',
+            text: `Receita de ${cur.month}: ${brl(cur.revenue)} (${delta > 0 ? '+' : ''}${delta.toFixed(1)}% vs ${prev.month}). Foram ${cur.payments} pagamentos vs ${prev.payments} no mês anterior.`,
+          });
+        }
+      }
+    }
+
+    // 3) LTV por plano
     const groups: Record<string, number[]> = {};
     enriched.filter((c) => c.payments.length).forEach((c) => {
       const k = c.plan_type || 'sem_plano';
@@ -313,31 +413,31 @@ export function LtvDashboard() {
       groups[k].push(c.ltv);
     });
     const avgs = Object.entries(groups).map(([k, vs]) => ({
-      plan: k, avg: vs.reduce((s, x) => s + x, 0) / vs.length,
+      plan: k, avg: vs.reduce((s, x) => s + x, 0) / vs.length, n: vs.length,
     })).sort((x, y) => y.avg - x.avg);
     if (avgs.length >= 2 && avgs[1].avg > 0) {
       const ratio = avgs[0].avg / avgs[1].avg;
       if (ratio > 1.2) {
         out.push({
           type: 'info',
-          text: `Pacientes do plano ${avgs[0].plan} têm LTV ${ratio.toFixed(1)}x maior que o plano ${avgs[1].plan}.`,
+          text: `Cada paciente do plano "${avgs[0].plan}" gera, em média, ${ratio.toFixed(1)}x mais receita ao longo do tempo do que o plano "${avgs[1].plan}" (${brl(avgs[0].avg)} vs ${brl(avgs[1].avg)}).`,
         });
       }
     }
 
-    // retention by tenure
+    // 4) Retenção em pacientes com mais tempo
     const longTenure = enriched.filter((c) => c.monthsActive >= 3 && c.payments.length);
     const longRenewed = longTenure.filter((c) => c.renewals >= 1);
     if (longTenure.length) {
       const r = (longRenewed.length / longTenure.length) * 100;
       out.push({
         type: 'info',
-        text: `Pacientes com mais de 90 dias têm taxa de renovação de ${r.toFixed(0)}%.`,
+        text: `Dos pacientes com mais de 3 meses na carteira, ${r.toFixed(0)}% renovaram pelo menos uma vez (${longRenewed.length} de ${longTenure.length}).`,
       });
     }
 
     if (kpis.churnRate > 30) {
-      out.push({ type: 'warning', text: `Taxa de cancelamento alta (${kpis.churnRate.toFixed(1)}%). Considere ações de retenção.` });
+      out.push({ type: 'warning', text: `Taxa de cancelamento alta (${kpis.churnRate.toFixed(1)}%) — para cada 10 pacientes, ${Math.round(kpis.churnRate / 10)} não voltaram. Vale revisar onboarding e check-ins.` });
     }
     return out;
   }, [monthly, enriched, kpis]);
@@ -439,35 +539,84 @@ export function LtvDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Glossário simples */}
+      <Collapsible>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <button type="button" className="w-full">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors rounded-t-lg">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  O que significa cada indicador? (clique para abrir)
+                </CardTitle>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="text-xs space-y-2 text-muted-foreground">
+              <p><span className="text-foreground font-medium">LTV (Lifetime Value):</span> quanto cada paciente já te pagou desde que entrou. Soma de TODOS os pagamentos confirmados dele.</p>
+              <p><span className="text-foreground font-medium">LTV médio:</span> média de LTV entre todos os pacientes que já pagaram pelo menos uma vez.</p>
+              <p><span className="text-foreground font-medium">Ticket médio:</span> receita total ÷ número de planos vendidos (planos atuais + renovações). Diz quanto, em média, cada venda valeu.</p>
+              <p><span className="text-foreground font-medium">Ticket (30d):</span> mesmo cálculo, mas só com planos novos ou renovados nos últimos 30 dias.</p>
+              <p><span className="text-foreground font-medium">MRR (Monthly Recurring Revenue):</span> receita mensal equivalente dos planos ativos. Pega o valor total do plano e divide pela duração em meses.</p>
+              <p><span className="text-foreground font-medium">Receita / ativo:</span> quanto cada paciente ativo gerou de receita nos últimos 12 meses, em média.</p>
+              <p><span className="text-foreground font-medium">Taxa de renovação:</span> dos pacientes que já terminaram (ou renovaram) o primeiro plano, quantos voltaram pelo menos uma vez.</p>
+              <p><span className="text-foreground font-medium">Taxa de cancelamento (churn):</span> % de pacientes que estão inativos hoje (não renovaram).</p>
+              <p><span className="text-foreground font-medium">Permanência média:</span> quantos meses, em média, cada paciente fica com você.</p>
+              <p><span className="text-foreground font-medium">Cohort:</span> tabela que mostra, para cada mês de entrada, quantos % dos pacientes ainda estavam ativos 1, 2, 3, 6 e 12 meses depois. Verde = boa retenção; vermelho = perdeu rápido.</p>
+              <p><span className="text-foreground font-medium">Previsão de receita:</span> projeção dos próximos 12 meses em 3 cenários (conservador, provável, otimista) com base no MRR atual e na sua taxa de cancelamento.</p>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
       {/* KPIs */}
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground mb-2">Receita e LTV</h3>
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <KpiCard title="LTV médio" value={brl(kpis.avgLtv)} icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} subtitle="receita ÷ planos vendidos" icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} subtitle="planos novos/renovados" icon={<TrendingUp className="h-4 w-4" />} />
-          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="receita mensal equivalente (total ÷ meses)" icon={<Repeat className="h-4 w-4" />} />
-          <KpiCard title="Receita total" value={brl(kpis.totalRevenue)} subtitle="histórico completo" icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Receita / ativo" value={brl(kpis.revenuePerActive)} subtitle="últimos 12m" icon={<Users className="h-4 w-4" />} />
+          <KpiCard title="LTV médio" value={brl(kpis.avgLtv)} icon={<DollarSign className="h-4 w-4" />}
+            help="Soma de tudo que cada paciente pagou (LTV), dividido pelo número de pacientes que já pagaram alguma vez." />
+          <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} subtitle="receita ÷ planos vendidos" icon={<DollarSign className="h-4 w-4" />}
+            help="Receita total dividida pelo número de planos vendidos (plano atual + cada renovação conta como 1 venda). Mostra quanto, em média, cada venda valeu." />
+          <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} subtitle="planos novos/renovados" icon={<TrendingUp className="h-4 w-4" />}
+            help="Mesmo cálculo do ticket médio, mas considerando apenas planos iniciados ou renovados nos últimos 30 dias." />
+          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="receita mensal equivalente" icon={<Repeat className="h-4 w-4" />}
+            help="Receita Mensal Recorrente. Para cada plano ativo, pegamos o valor TOTAL e dividimos pela duração em meses, depois somamos tudo. É quanto você 'fatura por mês', em média." />
+          <KpiCard title="Receita total" value={brl(kpis.totalRevenue)} subtitle="histórico completo" icon={<DollarSign className="h-4 w-4" />}
+            help="Soma de todos os pagamentos confirmados desde o início." />
+          <KpiCard title="Receita / ativo" value={brl(kpis.revenuePerActive)} subtitle="últimos 12m" icon={<Users className="h-4 w-4" />}
+            help="Receita dos últimos 12 meses dividida pelo número de pacientes ativos hoje. Indica quanto cada paciente ativo 'rende' por ano." />
         </div>
       </div>
 
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground mb-2">Retenção</h3>
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <KpiCard title="Taxa de renovação" value={pct(kpis.renewalRate)} subtitle={`${kpis.renewedCount}/${kpis.eligibleForRenewalCount} elegíveis`} icon={<Repeat className="h-4 w-4" />} />
-          <KpiCard title="Taxa de cancelamento" value={pct(kpis.churnRate)} icon={<TrendingDown className="h-4 w-4" />} />
-          <KpiCard title="Permanência média" value={`${kpis.avgTenure.toFixed(1)} meses`} icon={<Calendar className="h-4 w-4" />} />
-          <KpiCard title="Renovações / paciente" value={kpis.avgRenewals.toFixed(2)} icon={<Repeat className="h-4 w-4" />} />
-          <KpiCard title="Pacientes ativos" value={String(kpis.activeCount)} icon={<Users className="h-4 w-4" />} />
-          <KpiCard title="Já renovaram" value={String(kpis.renewedCount)} subtitle="ao menos 1x" icon={<Trophy className="h-4 w-4" />} />
+          <KpiCard title="Taxa de renovação" value={pct(kpis.renewalRate)} subtitle={`${kpis.renewedCount}/${kpis.eligibleForRenewalCount} elegíveis`} icon={<Repeat className="h-4 w-4" />}
+            help="Dos pacientes cujo primeiro plano já encerrou (ou renovou), quantos % renovaram pelo menos uma vez." />
+          <KpiCard title="Taxa de cancelamento" value={pct(kpis.churnRate)} icon={<TrendingDown className="h-4 w-4" />}
+            help="% de pacientes que já pagaram alguma vez e hoje estão inativos. Quanto menor, melhor." />
+          <KpiCard title="Permanência média" value={`${kpis.avgTenure.toFixed(1)} meses`} icon={<Calendar className="h-4 w-4" />}
+            help="Tempo médio entre o início do primeiro plano e o término (ou hoje, se ainda ativo)." />
+          <KpiCard title="Renovações / paciente" value={kpis.avgRenewals.toFixed(2)} icon={<Repeat className="h-4 w-4" />}
+            help="Média de quantas vezes cada paciente renovou. 0 = ninguém voltou; 1 = em média renovaram uma vez." />
+          <KpiCard title="Pacientes ativos" value={String(kpis.activeCount)} icon={<Users className="h-4 w-4" />}
+            help="Pacientes com plano ativo agora (não inativos e não congelados)." />
+          <KpiCard title="Já renovaram" value={String(kpis.renewedCount)} subtitle="ao menos 1x" icon={<Trophy className="h-4 w-4" />}
+            help="Quantos pacientes renovaram pelo menos uma vez ao longo da história." />
         </div>
       </div>
 
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Evolução do LTV (mensal)</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Evolução do LTV (mensal)
+              <ChartHelp text="Para cada mês, calcula a receita ÷ número de pacientes únicos que pagaram naquele mês. Mostra a tendência de valor por paciente ao longo do tempo." />
+            </CardTitle>
+          </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={monthly}>
@@ -482,7 +631,12 @@ export function LtvDashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Ticket médio mensal</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Ticket médio mensal
+              <ChartHelp text="Receita do mês ÷ número de pagamentos do mês. Se cair, geralmente é porque entraram pagamentos de planos mais baratos (mudança de mix) ou o valor de algum plano diminuiu." />
+            </CardTitle>
+          </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthly}>
@@ -497,7 +651,12 @@ export function LtvDashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Curva de retenção (%)</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Curva de retenção (%)
+              <ChartHelp text="% de pacientes ativos no mês que JÁ tinham renovado pelo menos uma vez. Sobe quando sua base é mais 'fiel'." />
+            </CardTitle>
+          </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={monthly}>
@@ -511,8 +670,14 @@ export function LtvDashboard() {
           </CardContent>
         </Card>
 
+
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Previsão de receita (12 meses)</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Previsão de receita (12 meses)
+              <ChartHelp text="Projeção do MRR atual para os próximos 12 meses. Conservador: assume mais cancelamentos. Provável: mantém o churn atual + crescimento leve. Otimista: menos cancelamentos + crescimento maior." />
+            </CardTitle>
+          </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={forecast}>
@@ -534,9 +699,11 @@ export function LtvDashboard() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" /> Insights automáticos
+            <Sparkles className="h-4 w-4 text-primary" /> Diagnóstico automático
+            <ChartHelp text="O sistema compara mês a mês e tenta explicar POR QUE os números mudaram — se foi por mudança no mix de planos vendidos, mudança de preço, ou queda de volume." />
           </CardTitle>
         </CardHeader>
+
         <CardContent className="space-y-2">
           {insights.length === 0 && (
             <p className="text-xs text-muted-foreground">Sem dados suficientes para gerar insights.</p>
