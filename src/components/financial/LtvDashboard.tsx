@@ -22,8 +22,10 @@ import {
 } from 'recharts';
 import {
   DollarSign, TrendingUp, TrendingDown, Users, Repeat, Calendar,
-  Trophy, Target, Sparkles, ArrowUpRight, ArrowDownRight
+  Trophy, Target, Sparkles, ArrowUpRight, ArrowDownRight, HelpCircle, BookOpen, ChevronDown
 } from 'lucide-react';
+import { Tooltip as UITooltip, TooltipContent as UITooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const brl = (n: number) =>
   `R$ ${(Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
