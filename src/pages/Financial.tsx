@@ -17,6 +17,7 @@ import { FinancialInsightsPanel } from '@/components/financial/FinancialInsights
 import { TransactionsList } from '@/components/financial/TransactionsList';
 import { DebtsList } from '@/components/financial/DebtsList';
 import { MonthlyCostsPanel } from '@/components/financial/MonthlyCostsPanel';
+import { LtvDashboard } from '@/components/financial/LtvDashboard';
 import { Button } from '@/components/ui/button';
 import { useClients, usePayments, getOverduePayments, useAddPayment } from '@/hooks/useClients';
 import { 
@@ -29,7 +30,7 @@ import {
   getExpiringPlansInPeriod,
   getExpiringPlansTotal
 } from '@/hooks/useFinancialData';
-import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet, Camera } from 'lucide-react';
+import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet, Camera, TrendingUp } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -165,6 +166,10 @@ export default function Financial() {
               <Users className="h-4 w-4" />
               Atletas
             </TabsTrigger>
+            <TabsTrigger value="ltv" className="gap-2">
+              <TrendingUp className="h-4 w-4" />
+              LTV
+            </TabsTrigger>
           </TabsList>
 
           {/* Gestão Financeira Tab */}
@@ -247,6 +252,11 @@ export default function Financial() {
               <IncomeList payments={incomePayments} title="Entradas Confirmadas" />
               <ExpiringPlansList clients={expiringPlans} title="Planos Expirando" />
             </div>
+          </TabsContent>
+
+          {/* LTV Tab */}
+          <TabsContent value="ltv" className="space-y-6 mt-4">
+            <LtvDashboard />
           </TabsContent>
         </Tabs>
       </div>
