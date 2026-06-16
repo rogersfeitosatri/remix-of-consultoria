@@ -352,7 +352,7 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Valor Mensal (R$)</Label>
+                <Label>Valor Total (R$)</Label>
                 <Input
                   type="number"
                   value={monthlyValue}
