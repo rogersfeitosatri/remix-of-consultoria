@@ -438,18 +438,18 @@ export function LtvDashboard() {
         <h3 className="text-sm font-semibold text-muted-foreground mb-2">Receita e LTV</h3>
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <KpiCard title="LTV médio" value={brl(kpis.avgLtv)} icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} icon={<TrendingUp className="h-4 w-4" />} />
-          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="receita recorrente" icon={<Repeat className="h-4 w-4" />} />
-          <KpiCard title="Receita total" value={brl(kpis.totalRevenue)} icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Receita / ativo" value={brl(kpis.revenuePerActive)} icon={<Users className="h-4 w-4" />} />
+          <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} subtitle="receita ÷ planos vendidos" icon={<DollarSign className="h-4 w-4" />} />
+          <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} subtitle="planos novos/renovados" icon={<TrendingUp className="h-4 w-4" />} />
+          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="soma mensalidade ativos" icon={<Repeat className="h-4 w-4" />} />
+          <KpiCard title="Receita total" value={brl(kpis.totalRevenue)} subtitle="histórico completo" icon={<DollarSign className="h-4 w-4" />} />
+          <KpiCard title="Receita / ativo" value={brl(kpis.revenuePerActive)} subtitle="últimos 12m" icon={<Users className="h-4 w-4" />} />
         </div>
       </div>
 
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground mb-2">Retenção</h3>
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <KpiCard title="Taxa de renovação" value={pct(kpis.renewalRate)} icon={<Repeat className="h-4 w-4" />} />
+          <KpiCard title="Taxa de renovação" value={pct(kpis.renewalRate)} subtitle={`${kpis.renewedCount}/${kpis.eligibleForRenewalCount} elegíveis`} icon={<Repeat className="h-4 w-4" />} />
           <KpiCard title="Taxa de cancelamento" value={pct(kpis.churnRate)} icon={<TrendingDown className="h-4 w-4" />} />
           <KpiCard title="Permanência média" value={`${kpis.avgTenure.toFixed(1)} meses`} icon={<Calendar className="h-4 w-4" />} />
           <KpiCard title="Renovações / paciente" value={kpis.avgRenewals.toFixed(2)} icon={<Repeat className="h-4 w-4" />} />
