@@ -68,6 +68,8 @@ export function PendingReviewsList() {
   const queryClient = useQueryClient();
   const [frequencyFilter, setFrequencyFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const { data: pendingResponses = [], isLoading } = useQuery({
     queryKey: ['pending_checkin_reviews', user?.id],
