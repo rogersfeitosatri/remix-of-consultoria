@@ -331,25 +331,81 @@ export function LtvDashboard() {
     });
   }, [payments, enriched]);
 
-  // Insights
+  // Insights diagnósticos: explica POR QUE os números se moveram
   const insights = useMemo(() => {
     const out: { type: 'positive' | 'warning' | 'info'; text: string }[] = [];
 
-    const last3 = monthly.slice(-3);
-    const prev3 = monthly.slice(-6, -3);
-    const avg = (arr: { ticket: number }[]) => arr.length ? arr.reduce((s, x) => s + x.ticket, 0) / arr.length : 0;
-    const a = avg(last3), b = avg(prev3);
-    if (b > 0) {
-      const delta = ((a - b) / b) * 100;
-      if (Math.abs(delta) > 3) {
-        out.push({
-          type: delta > 0 ? 'positive' : 'warning',
-          text: `O ticket médio ${delta > 0 ? 'aumentou' : 'caiu'} ${Math.abs(delta).toFixed(1)}% nos últimos 90 dias.`,
-        });
+    // 1) Variação do ticket: último mês cheio vs mês anterior, com diagnóstico do mix
+    const filled = monthly.filter((m) => m.payments > 0);
+    if (filled.length >= 2) {
+      const cur = filled[filled.length - 1];
+      const prev = filled[filled.length - 2];
+      if (prev.ticket > 0) {
+        const delta = ((cur.ticket - prev.ticket) / prev.ticket) * 100;
+        if (Math.abs(delta) > 3) {
+          out.push({
+            type: delta > 0 ? 'positive' : 'warning',
+            text: `Ticket médio em ${cur.month} foi ${brl(cur.ticket)} — ${delta > 0 ? 'subiu' : 'caiu'} ${Math.abs(delta).toFixed(1)}% vs ${prev.month} (${brl(prev.ticket)}).`,
+          });
+
+          // Diagnóstico: o que mudou no mix?
+          const allPlans = new Set([...Object.keys(cur.planMix), ...Object.keys(prev.planMix)]);
+          const diffs: { plan: string; shareDelta: number; priceCur: number; pricePrev: number; countCur: number; countPrev: number }[] = [];
+          allPlans.forEach((plan) => {
+            const c = cur.planMix[plan] || { count: 0, sum: 0 };
+            const p = prev.planMix[plan] || { count: 0, sum: 0 };
+            const shareCur = cur.payments ? c.count / cur.payments : 0;
+            const sharePrev = prev.payments ? p.count / prev.payments : 0;
+            diffs.push({
+              plan,
+              shareDelta: (shareCur - sharePrev) * 100,
+              priceCur: c.count ? c.sum / c.count : 0,
+              pricePrev: p.count ? p.sum / p.count : 0,
+              countCur: c.count,
+              countPrev: p.count,
+            });
+          });
+
+          // Mudança de mix mais relevante
+          const mixShift = [...diffs].sort((a, b) => Math.abs(b.shareDelta) - Math.abs(a.shareDelta))[0];
+          if (mixShift && Math.abs(mixShift.shareDelta) >= 10) {
+            out.push({
+              type: 'info',
+              text: `Motivo provável: a participação do plano "${mixShift.plan}" ${mixShift.shareDelta > 0 ? 'cresceu' : 'caiu'} ${Math.abs(mixShift.shareDelta).toFixed(0)} pontos percentuais (${mixShift.countPrev}→${mixShift.countCur} pagamentos). Quando entram mais pagamentos de planos de valor menor, o ticket médio cai mesmo sem mudança de preço.`,
+            });
+          }
+
+          // Mudança de preço dentro do mesmo plano
+          const priceShift = diffs
+            .filter((d) => d.countCur >= 1 && d.countPrev >= 1 && d.pricePrev > 0)
+            .map((d) => ({ ...d, priceDeltaPct: ((d.priceCur - d.pricePrev) / d.pricePrev) * 100 }))
+            .sort((a, b) => Math.abs(b.priceDeltaPct) - Math.abs(a.priceDeltaPct))[0];
+          if (priceShift && Math.abs(priceShift.priceDeltaPct) >= 10) {
+            out.push({
+              type: 'info',
+              text: `O valor médio do plano "${priceShift.plan}" passou de ${brl(priceShift.pricePrev)} para ${brl(priceShift.priceCur)} (${priceShift.priceDeltaPct > 0 ? '+' : ''}${priceShift.priceDeltaPct.toFixed(1)}%).`,
+            });
+          }
+        }
       }
     }
 
-    // LTV por plano
+    // 2) Variação da receita mês a mês
+    if (filled.length >= 2) {
+      const cur = filled[filled.length - 1];
+      const prev = filled[filled.length - 2];
+      if (prev.revenue > 0) {
+        const delta = ((cur.revenue - prev.revenue) / prev.revenue) * 100;
+        if (Math.abs(delta) > 10) {
+          out.push({
+            type: delta > 0 ? 'positive' : 'warning',
+            text: `Receita de ${cur.month}: ${brl(cur.revenue)} (${delta > 0 ? '+' : ''}${delta.toFixed(1)}% vs ${prev.month}). Foram ${cur.payments} pagamentos vs ${prev.payments} no mês anterior.`,
+          });
+        }
+      }
+    }
+
+    // 3) LTV por plano
     const groups: Record<string, number[]> = {};
     enriched.filter((c) => c.payments.length).forEach((c) => {
       const k = c.plan_type || 'sem_plano';
@@ -357,31 +413,31 @@ export function LtvDashboard() {
       groups[k].push(c.ltv);
     });
     const avgs = Object.entries(groups).map(([k, vs]) => ({
-      plan: k, avg: vs.reduce((s, x) => s + x, 0) / vs.length,
+      plan: k, avg: vs.reduce((s, x) => s + x, 0) / vs.length, n: vs.length,
     })).sort((x, y) => y.avg - x.avg);
     if (avgs.length >= 2 && avgs[1].avg > 0) {
       const ratio = avgs[0].avg / avgs[1].avg;
       if (ratio > 1.2) {
         out.push({
           type: 'info',
-          text: `Pacientes do plano ${avgs[0].plan} têm LTV ${ratio.toFixed(1)}x maior que o plano ${avgs[1].plan}.`,
+          text: `Cada paciente do plano "${avgs[0].plan}" gera, em média, ${ratio.toFixed(1)}x mais receita ao longo do tempo do que o plano "${avgs[1].plan}" (${brl(avgs[0].avg)} vs ${brl(avgs[1].avg)}).`,
         });
       }
     }
 
-    // retention by tenure
+    // 4) Retenção em pacientes com mais tempo
     const longTenure = enriched.filter((c) => c.monthsActive >= 3 && c.payments.length);
     const longRenewed = longTenure.filter((c) => c.renewals >= 1);
     if (longTenure.length) {
       const r = (longRenewed.length / longTenure.length) * 100;
       out.push({
         type: 'info',
-        text: `Pacientes com mais de 90 dias têm taxa de renovação de ${r.toFixed(0)}%.`,
+        text: `Dos pacientes com mais de 3 meses na carteira, ${r.toFixed(0)}% renovaram pelo menos uma vez (${longRenewed.length} de ${longTenure.length}).`,
       });
     }
 
     if (kpis.churnRate > 30) {
-      out.push({ type: 'warning', text: `Taxa de cancelamento alta (${kpis.churnRate.toFixed(1)}%). Considere ações de retenção.` });
+      out.push({ type: 'warning', text: `Taxa de cancelamento alta (${kpis.churnRate.toFixed(1)}%) — para cada 10 pacientes, ${Math.round(kpis.churnRate / 10)} não voltaram. Vale revisar onboarding e check-ins.` });
     }
     return out;
   }, [monthly, enriched, kpis]);
