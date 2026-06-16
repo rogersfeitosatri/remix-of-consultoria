@@ -68,6 +68,8 @@ export function PendingReviewsList() {
   const queryClient = useQueryClient();
   const [frequencyFilter, setFrequencyFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const { data: pendingResponses = [], isLoading } = useQuery({
     queryKey: ['pending_checkin_reviews', user?.id],
@@ -166,9 +168,12 @@ export function PendingReviewsList() {
     return pendingResponses.filter(r => {
       if (frequencyFilter !== 'all' && r.clients?.checkin_frequency !== frequencyFilter) return false;
       if (searchQuery && !(r.clients?.name || '').toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      const submittedDate = format(parseISO(r.submitted_at), 'yyyy-MM-dd');
+      if (dateFrom && submittedDate < dateFrom) return false;
+      if (dateTo && submittedDate > dateTo) return false;
       return true;
     });
-  }, [pendingResponses, frequencyFilter, searchQuery]);
+  }, [pendingResponses, frequencyFilter, searchQuery, dateFrom, dateTo]);
 
   // Split into urgency groups
   const { urgent, recent } = useMemo(() => {
@@ -321,7 +326,7 @@ export function PendingReviewsList() {
           <CardDescription className="text-xs">
             Check-ins enviados aguardando análise/feedback
           </CardDescription>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
@@ -331,16 +336,32 @@ export function PendingReviewsList() {
                 className="pl-8 h-9 text-sm"
               />
             </div>
-            <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
-              <SelectTrigger className="w-[120px] h-9 text-xs">
-                <SelectValue placeholder="Freq." />
-              </SelectTrigger>
-              <SelectContent>
-                {FREQUENCY_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                placeholder="De"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-9 text-xs w-[130px]"
+              />
+              <Input
+                type="date"
+                placeholder="Até"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-9 text-xs w-[130px]"
+              />
+              <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
+                <SelectTrigger className="w-[110px] h-9 text-xs">
+                  <SelectValue placeholder="Freq." />
+                </SelectTrigger>
+                <SelectContent>
+                  {FREQUENCY_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </CardHeader>
