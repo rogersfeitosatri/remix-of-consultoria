@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -31,7 +31,7 @@ import {
   getExpiringPlansTotal
 } from '@/hooks/useFinancialData';
 import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet, Camera, TrendingUp } from 'lucide-react';
-import { startOfMonth, endOfMonth } from 'date-fns';
+import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { toast } from 'sonner';
 
 export default function Financial() {
