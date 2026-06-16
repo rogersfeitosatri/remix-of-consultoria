@@ -175,7 +175,7 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
       return;
     }
     if (!Number.isFinite(monthlyValue) || monthlyValue < 0) {
-      toast.error('Informe um valor mensal válido.');
+      toast.error('Informe um valor total válido.');
       return;
     }
     setSaving(true);
