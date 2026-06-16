@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -31,19 +31,25 @@ import {
   getExpiringPlansTotal
 } from '@/hooks/useFinancialData';
 import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet, Camera, TrendingUp } from 'lucide-react';
-import { startOfMonth, endOfMonth } from 'date-fns';
+import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { toast } from 'sonner';
 
 export default function Financial() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter = searchParams.get('filter') || 'all';
   const initialTab = searchParams.get('tab') || 'gestao';
+  const startDateParam = searchParams.get('startDate');
+  const endDateParam = searchParams.get('endDate');
   
   const today = new Date();
   
-  const [filterStartDate, setFilterStartDate] = useState<Date>(startOfMonth(today));
-  const [filterEndDate, setFilterEndDate] = useState<Date>(endOfMonth(today));
+  const [filterStartDate, setFilterStartDate] = useState<Date>(
+    startDateParam ? new Date(startDateParam) : startOfMonth(today)
+  );
+  const [filterEndDate, setFilterEndDate] = useState<Date>(
+    endDateParam ? new Date(endDateParam) : endOfMonth(today)
+  );
   const [filter, setFilter] = useState<'all' | 'overdue' | 'upcoming'>(initialFilter as any);
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [showReceiptScan, setShowReceiptScan] = useState(false);
@@ -99,13 +105,20 @@ export default function Financial() {
   const handleDateChange = (start: Date, end: Date) => {
     setFilterStartDate(start);
     setFilterEndDate(end);
+    const params = new URLSearchParams(searchParams);
+    params.set('startDate', format(start, 'yyyy-MM-dd'));
+    params.set('endDate', format(end, 'yyyy-MM-dd'));
+    setSearchParams(params, { replace: true });
   };
 
   const isLoading = clientsLoading || paymentsLoading;
 
   const handleFilterClick = (newFilter: 'overdue' | 'upcoming') => {
     setFilter(newFilter);
-    navigate(`/financial?filter=${newFilter}&tab=atletas`);
+    const params = new URLSearchParams(searchParams);
+    params.set('filter', newFilter);
+    params.set('tab', 'atletas');
+    navigate(`/financial?${params.toString()}`);
   };
 
   const handleAddPayment = async (data: {

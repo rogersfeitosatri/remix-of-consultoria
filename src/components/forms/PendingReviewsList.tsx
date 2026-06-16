@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ClipboardCheck, ChevronRight, CheckCircle, AlertCircle, Target, Clock, Search, CalendarIcon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -67,12 +67,13 @@ function getWaitingLabel(submittedAt: string): { text: string; urgent: boolean }
 
 export function PendingReviewsList() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [frequencyFilter, setFrequencyFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(searchParams.get('checkinFrom') || '');
+  const [dateTo, setDateTo] = useState(searchParams.get('checkinTo') || '');
 
   const { data: pendingResponses = [], isLoading } = useQuery({
     queryKey: ['pending_checkin_reviews', user?.id],
@@ -358,7 +359,14 @@ export function PendingReviewsList() {
                   <Calendar
                     mode="single"
                     selected={dateFrom ? parseISO(dateFrom) : undefined}
-                    onSelect={(date) => setDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
+                    onSelect={(date) => {
+                      const val = date ? format(date, 'yyyy-MM-dd') : '';
+                      setDateFrom(val);
+                      const params = new URLSearchParams(searchParams);
+                      if (val) params.set('checkinFrom', val);
+                      else params.delete('checkinFrom');
+                      setSearchParams(params, { replace: true });
+                    }}
                     initialFocus
                     className="p-3 pointer-events-auto"
                   />
@@ -383,7 +391,14 @@ export function PendingReviewsList() {
                   <Calendar
                     mode="single"
                     selected={dateTo ? parseISO(dateTo) : undefined}
-                    onSelect={(date) => setDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
+                    onSelect={(date) => {
+                      const val = date ? format(date, 'yyyy-MM-dd') : '';
+                      setDateTo(val);
+                      const params = new URLSearchParams(searchParams);
+                      if (val) params.set('checkinTo', val);
+                      else params.delete('checkinTo');
+                      setSearchParams(params, { replace: true });
+                    }}
                     initialFocus
                     className="p-3 pointer-events-auto"
                   />
