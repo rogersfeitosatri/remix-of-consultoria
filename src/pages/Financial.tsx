@@ -17,6 +17,7 @@ import { FinancialInsightsPanel } from '@/components/financial/FinancialInsights
 import { TransactionsList } from '@/components/financial/TransactionsList';
 import { DebtsList } from '@/components/financial/DebtsList';
 import { MonthlyCostsPanel } from '@/components/financial/MonthlyCostsPanel';
+import { LtvDashboard } from '@/components/financial/LtvDashboard';
 import { Button } from '@/components/ui/button';
 import { useClients, usePayments, getOverduePayments, useAddPayment } from '@/hooks/useClients';
 import { 
