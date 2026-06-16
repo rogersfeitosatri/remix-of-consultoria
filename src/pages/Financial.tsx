@@ -29,7 +29,8 @@ import {
   getExpiringPlansInPeriod,
   getExpiringPlansTotal
 } from '@/hooks/useFinancialData';
-import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet, Camera } from 'lucide-react';
+import { LTVTab } from '@/components/financial/LTVTab';
+import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet, Camera, TrendingUp } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -165,6 +166,10 @@ export default function Financial() {
               <Users className="h-4 w-4" />
               Atletas
             </TabsTrigger>
+            <TabsTrigger value="ltv" className="gap-2">
+              <TrendingUp className="h-4 w-4" />
+              LTV
+            </TabsTrigger>
           </TabsList>
 
           {/* Gestão Financeira Tab */}
@@ -194,6 +199,11 @@ export default function Financial() {
               <TransactionsList filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
               <DebtsList />
             </div>
+          </TabsContent>
+
+          {/* LTV Tab */}
+          <TabsContent value="ltv" className="mt-4">
+            <LTVTab />
           </TabsContent>
 
           {/* Atletas Tab */}
