@@ -111,43 +111,66 @@ function KpiCard({
 export function LtvDashboard() {
   const { data: clients = [] } = useClients();
   const { data: payments = [] } = usePayments();
+  const { data: planHistory = [] } = usePlanHistory();
 
   const [search, setSearch] = useState('');
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'ltv' | 'name' | 'renewals' | 'time'>('ltv');
 
-  // Build per-client enrichment
+  // Build per-client enrichment using real renewals (client_plan_history)
   const enriched: EnrichedClient[] = useMemo(() => {
-    const byClient = new Map<string, Payment[]>();
+    const paysByClient = new Map<string, Payment[]>();
     for (const p of payments) {
       if (p.status !== 'paid' || !p.paid_at) continue;
-      const arr = byClient.get(p.client_id) || [];
+      const arr = paysByClient.get(p.client_id) || [];
       arr.push(p);
-      byClient.set(p.client_id, arr);
+      paysByClient.set(p.client_id, arr);
     }
+    const historyByClient = new Map<string, PlanHistoryRow[]>();
+    for (const h of planHistory) {
+      const arr = historyByClient.get(h.client_id) || [];
+      arr.push(h);
+      historyByClient.set(h.client_id, arr);
+    }
+
     return clients.map((c) => {
-      const cp = (byClient.get(c.id) || []).sort(
+      const cp = (paysByClient.get(c.id) || []).sort(
         (a, b) => +parseISO(a.paid_at!) - +parseISO(b.paid_at!),
       );
+      const ch = historyByClient.get(c.id) || [];
+
       const ltv = cp.reduce((s, p) => s + Number(p.amount || 0), 0);
-      const renewals = Math.max(0, cp.length - 1);
+      const renewals = ch.length;                  // cada history row = 1 renovação
+      const planPeriods = renewals + 1;            // + plano atual
       const lastPaymentDate = cp.length ? cp[cp.length - 1].paid_at : null;
-      const startRef = c.start_date ? parseISO(c.start_date) : (cp[0] ? parseISO(cp[0].paid_at!) : null);
+
+      // primeira data de plano: menor entre history.start_date e client.start_date
+      const candidates: Date[] = [];
+      if (c.start_date) candidates.push(parseISO(c.start_date));
+      for (const h of ch) if (h.start_date) candidates.push(parseISO(h.start_date));
+      const firstStartDate = candidates.length ? dateMin(candidates) : null;
+
       const endRef = c.is_active
         ? new Date()
-        : (lastPaymentDate ? parseISO(lastPaymentDate) : (c.end_date ? parseISO(c.end_date) : new Date()));
-      const monthsActive = startRef ? Math.max(0, differenceInMonths(endRef, startRef)) : 0;
+        : (c.end_date ? parseISO(c.end_date)
+            : (lastPaymentDate ? parseISO(lastPaymentDate) : new Date()));
+      const monthsActive = firstStartDate
+        ? Math.max(0, differenceInMonths(endRef, firstStartDate))
+        : 0;
+
       return {
         ...c,
         payments: cp,
         ltv,
+        planPeriods,
         renewals,
         monthsActive,
+        firstStartDate,
         lastPaymentDate,
         isChurned: !c.is_active,
-      };
+      } as EnrichedClient;
     });
-  }, [clients, payments]);
+  }, [clients, payments, planHistory]);
 
   // Aggregate KPIs
   const kpis = useMemo(() => {
@@ -157,19 +180,49 @@ export function LtvDashboard() {
 
     const paidPayments = payments.filter((p) => p.status === 'paid' && p.paid_at);
     const totalRevenue = paidPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
-    const ticketMedio = paidPayments.length ? totalRevenue / paidPayments.length : 0;
 
+    // Ticket médio = receita ÷ nº de vendas (planos vendidos), não parcelas
+    const totalSales = withPay.reduce((s, c) => s + c.planPeriods, 0);
+    const ticketMedio = totalSales ? totalRevenue / totalSales : 0;
+
+    // Ticket dos últimos 30 dias: receita ÷ nº de planos iniciados/renovados no período
     const cutoff30 = subMonths(new Date(), 1);
-    const last30 = paidPayments.filter((p) => parseISO(p.paid_at!) >= cutoff30);
-    const ticket30 = last30.length ? last30.reduce((s, p) => s + Number(p.amount), 0) / last30.length : 0;
+    const last30Revenue = paidPayments
+      .filter((p) => parseISO(p.paid_at!) >= cutoff30)
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const salesLast30 = new Set<string>();
+    enriched.forEach((c) => {
+      if (c.start_date && parseISO(c.start_date) >= cutoff30) salesLast30.add(`${c.id}-current`);
+      const ch = planHistory.filter((h) => h.client_id === c.id);
+      ch.forEach((h) => {
+        if (h.renewed_at && parseISO(h.renewed_at) >= cutoff30) salesLast30.add(h.id);
+      });
+    });
+    const ticket30 = salesLast30.size ? last30Revenue / salesLast30.size : 0;
 
     const activeClients = enriched.filter((c) => c.is_active && !c.is_frozen);
     const mrr = activeClients.reduce((s, c) => s + Number(c.monthly_value || 0), 0);
-    const revenuePerActive = activeClients.length ? totalRevenue / activeClients.length : 0;
+
+    // Receita por paciente ativo: receita do período (últimos 12m) ÷ ativos
+    const cutoff12 = subMonths(new Date(), 12);
+    const revenue12m = paidPayments
+      .filter((p) => parseISO(p.paid_at!) >= cutoff12)
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const revenuePerActive = activeClients.length ? revenue12m / activeClients.length : 0;
 
     const renewedClients = enriched.filter((c) => c.renewals >= 1);
     const churned = enriched.filter((c) => c.isChurned && c.payments.length > 0);
-    const renewalRate = withPay.length ? (renewedClients.length / withPay.length) * 100 : 0;
+
+    // Taxa de renovação: dentre os clientes cujo 1º plano já encerrou (ou renovou),
+    // quantos renovaram pelo menos uma vez
+    const eligibleForRenewal = withPay.filter((c) =>
+      c.renewals >= 1 ||
+      (c.end_date && parseISO(c.end_date) < new Date()) ||
+      c.isChurned,
+    );
+    const renewalRate = eligibleForRenewal.length
+      ? (renewedClients.length / eligibleForRenewal.length) * 100
+      : 0;
     const churnRate = withPay.length ? (churned.length / withPay.length) * 100 : 0;
     const avgTenure = withPay.length ? withPay.reduce((s, c) => s + c.monthsActive, 0) / withPay.length : 0;
     const avgRenewals = withPay.length ? withPay.reduce((s, c) => s + c.renewals, 0) / withPay.length : 0;
@@ -179,8 +232,9 @@ export function LtvDashboard() {
       renewalRate, churnRate, avgTenure, avgRenewals,
       activeCount: activeClients.length, renewedCount: renewedClients.length,
       churnedCount: churned.length,
+      eligibleForRenewalCount: eligibleForRenewal.length,
     };
-  }, [enriched, payments]);
+  }, [enriched, payments, planHistory]);
 
   // Time series: last 12 months
   const monthly = useMemo(() => {
