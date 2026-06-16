@@ -166,6 +166,10 @@ export default function Financial() {
               <Users className="h-4 w-4" />
               Atletas
             </TabsTrigger>
+            <TabsTrigger value="ltv" className="gap-2">
+              <TrendingUp className="h-4 w-4" />
+              LTV
+            </TabsTrigger>
           </TabsList>
 
           {/* Gestão Financeira Tab */}
