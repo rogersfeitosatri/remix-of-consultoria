@@ -340,20 +340,55 @@ export function PendingReviewsList() {
               />
             </div>
             <div className="flex gap-2">
-              <Input
-                type="date"
-                placeholder="De"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="h-9 text-xs w-[130px]"
-              />
-              <Input
-                type="date"
-                placeholder="Até"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="h-9 text-xs w-[130px]"
-              />
+              {/* Date From */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-9 w-[130px] justify-start text-left font-normal text-xs",
+                      !dateFrom && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                    {dateFrom ? format(parseISO(dateFrom), "dd/MM/yy") : <span>De</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFrom ? parseISO(dateFrom) : undefined}
+                    onSelect={(date) => setDateFrom(date ? format(date, 'yyyy-MM-dd') : '')}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {/* Date To */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-9 w-[130px] justify-start text-left font-normal text-xs",
+                      !dateTo && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                    {dateTo ? format(parseISO(dateTo), "dd/MM/yy") : <span>Até</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateTo ? parseISO(dateTo) : undefined}
+                    onSelect={(date) => setDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
               <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
                 <SelectTrigger className="w-[110px] h-9 text-xs">
                   <SelectValue placeholder="Freq." />
