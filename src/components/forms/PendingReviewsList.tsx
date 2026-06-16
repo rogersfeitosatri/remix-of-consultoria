@@ -4,7 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { ClipboardCheck, ChevronRight, CheckCircle, AlertCircle, Target, Clock, Search } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ClipboardCheck, ChevronRight, CheckCircle, AlertCircle, Target, Clock, Search, CalendarIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +16,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { CHECKIN_LABELS, type CheckinFrequency } from '@/types/client';
 import { classifyPlan, type PlanTypology } from '@/lib/planTypology';
+import { cn } from '@/lib/utils';
 
 interface PendingCheckinResponse {
   id: string;
