@@ -201,7 +201,13 @@ export function LtvDashboard() {
     const ticket30 = salesLast30.size ? last30Revenue / salesLast30.size : 0;
 
     const activeClients = enriched.filter((c) => c.is_active && !c.is_frozen);
-    const mrr = activeClients.reduce((s, c) => s + Number(c.monthly_value || 0), 0);
+    // MRR real: valor TOTAL do plano ÷ duração em meses (monthly_value armazena o total do plano)
+    const mrr = activeClients.reduce((s, c) => {
+      const total = Number(c.monthly_value || 0);
+      if (!total || !c.start_date || !c.end_date) return s;
+      const months = Math.max(1, differenceInMonths(parseISO(c.end_date), parseISO(c.start_date)) || 1);
+      return s + (total / months);
+    }, 0);
 
     // Receita por paciente ativo: receita do período (últimos 12m) ÷ ativos
     const cutoff12 = subMonths(new Date(), 12);
@@ -440,7 +446,7 @@ export function LtvDashboard() {
           <KpiCard title="LTV médio" value={brl(kpis.avgLtv)} icon={<DollarSign className="h-4 w-4" />} />
           <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} subtitle="receita ÷ planos vendidos" icon={<DollarSign className="h-4 w-4" />} />
           <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} subtitle="planos novos/renovados" icon={<TrendingUp className="h-4 w-4" />} />
-          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="soma mensalidade ativos" icon={<Repeat className="h-4 w-4" />} />
+          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="receita mensal equivalente (total ÷ meses)" icon={<Repeat className="h-4 w-4" />} />
           <KpiCard title="Receita total" value={brl(kpis.totalRevenue)} subtitle="histórico completo" icon={<DollarSign className="h-4 w-4" />} />
           <KpiCard title="Receita / ativo" value={brl(kpis.revenuePerActive)} subtitle="últimos 12m" icon={<Users className="h-4 w-4" />} />
         </div>
@@ -712,7 +718,7 @@ export function LtvDashboard() {
                   <TableHead>Paciente</TableHead>
                   <TableHead>Entrada</TableHead>
                   <TableHead>Plano</TableHead>
-                  <TableHead className="text-right">Mensal</TableHead>
+                  <TableHead className="text-right">Total Plano</TableHead>
                   <TableHead className="text-right">Renov.</TableHead>
                   <TableHead className="text-right">Meses</TableHead>
                   <TableHead className="text-right">LTV</TableHead>

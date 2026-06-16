@@ -136,7 +136,7 @@ export function ActionCenterPanel() {
   // Helper to detect missing fields for pending registrations
   const getMissingFields = (c: any): string[] => {
     const missing: string[] = [];
-    if (!c.monthly_value || Number(c.monthly_value) <= 0) missing.push('Valor mensal');
+    if (!c.monthly_value || Number(c.monthly_value) <= 0) missing.push('Valor total');
     if (!c.phone) missing.push('Telefone');
     if (!c.plan_type) missing.push('Tipo de plano');
     if (!c.service_type) missing.push('Tipo de serviço');

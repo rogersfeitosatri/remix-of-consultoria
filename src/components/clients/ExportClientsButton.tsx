@@ -114,7 +114,7 @@ export function ExportClientsButton({ clients, targetRaceAlerts = [], filename =
         'Telefone': client.phone || '',
         'Plano': PLAN_LABELS[client.plan_type] || client.plan_type,
         'Serviço': SERVICE_LABELS[client.service_type] || client.service_type,
-        'Valor Mensal': `R$ ${client.monthly_value.toFixed(2)}`,
+        'Valor Total': `R$ ${client.monthly_value.toFixed(2)}`,
         'Início': format(new Date(client.start_date), 'dd/MM/yyyy', { locale: ptBR }),
         'Término': format(new Date(client.end_date), 'dd/MM/yyyy', { locale: ptBR }),
         'Check-in': client.has_checkin ? (CHECKIN_LABELS[client.checkin_frequency || ''] || 'Sim') : 'Não',

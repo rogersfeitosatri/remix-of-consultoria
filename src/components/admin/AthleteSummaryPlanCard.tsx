@@ -113,7 +113,7 @@ export function AthleteSummaryPlanCard({ client, onRenewPlan }: AthleteSummaryPl
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground flex items-center gap-1">
             <DollarSign className="h-3 w-3" />
-            Mensal
+            Total
           </span>
           <span className="font-semibold text-primary">
             R$ {client.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
