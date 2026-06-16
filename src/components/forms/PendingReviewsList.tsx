@@ -67,12 +67,13 @@ function getWaitingLabel(submittedAt: string): { text: string; urgent: boolean }
 
 export function PendingReviewsList() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [frequencyFilter, setFrequencyFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(searchParams.get('checkinFrom') || '');
+  const [dateTo, setDateTo] = useState(searchParams.get('checkinTo') || '');
 
   const { data: pendingResponses = [], isLoading } = useQuery({
     queryKey: ['pending_checkin_reviews', user?.id],
