@@ -8,9 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { useClients, usePayments, type Client, type Payment } from '@/hooks/useClients';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import {
   parseISO, differenceInMonths, differenceInDays, format,
-  subMonths, startOfMonth, endOfMonth, isWithinInterval, addMonths
+  subMonths, startOfMonth, endOfMonth, isWithinInterval, addMonths, min as dateMin, max as dateMax,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -31,11 +34,39 @@ type EnrichedClient = Client & {
   client_name?: string;
   payments: Payment[];
   ltv: number;
-  renewals: number;
+  planPeriods: number;     // 1 (atual) + nº de planos arquivados em history
+  renewals: number;        // = history rows (renovações reais, não parcelas)
   monthsActive: number;
+  firstStartDate: Date | null;
   lastPaymentDate: string | null;
   isChurned: boolean;
 };
+
+type PlanHistoryRow = {
+  id: string;
+  client_id: string;
+  start_date: string | null;
+  end_date: string | null;
+  monthly_value: number | null;
+  plan_type: string | null;
+  renewed_at: string | null;
+};
+
+function usePlanHistory() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['client_plan_history', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('client_plan_history')
+        .select('id, client_id, start_date, end_date, monthly_value, plan_type, renewed_at');
+      if (error) throw error;
+      return (data || []) as PlanHistoryRow[];
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 const ChartTooltip = ({ active, payload, label, currency = true }: any) => {
   if (!active || !payload?.length) return null;
@@ -80,43 +111,66 @@ function KpiCard({
 export function LtvDashboard() {
   const { data: clients = [] } = useClients();
   const { data: payments = [] } = usePayments();
+  const { data: planHistory = [] } = usePlanHistory();
 
   const [search, setSearch] = useState('');
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'ltv' | 'name' | 'renewals' | 'time'>('ltv');
 
-  // Build per-client enrichment
+  // Build per-client enrichment using real renewals (client_plan_history)
   const enriched: EnrichedClient[] = useMemo(() => {
-    const byClient = new Map<string, Payment[]>();
+    const paysByClient = new Map<string, Payment[]>();
     for (const p of payments) {
       if (p.status !== 'paid' || !p.paid_at) continue;
-      const arr = byClient.get(p.client_id) || [];
+      const arr = paysByClient.get(p.client_id) || [];
       arr.push(p);
-      byClient.set(p.client_id, arr);
+      paysByClient.set(p.client_id, arr);
     }
+    const historyByClient = new Map<string, PlanHistoryRow[]>();
+    for (const h of planHistory) {
+      const arr = historyByClient.get(h.client_id) || [];
+      arr.push(h);
+      historyByClient.set(h.client_id, arr);
+    }
+
     return clients.map((c) => {
-      const cp = (byClient.get(c.id) || []).sort(
+      const cp = (paysByClient.get(c.id) || []).sort(
         (a, b) => +parseISO(a.paid_at!) - +parseISO(b.paid_at!),
       );
+      const ch = historyByClient.get(c.id) || [];
+
       const ltv = cp.reduce((s, p) => s + Number(p.amount || 0), 0);
-      const renewals = Math.max(0, cp.length - 1);
+      const renewals = ch.length;                  // cada history row = 1 renovação
+      const planPeriods = renewals + 1;            // + plano atual
       const lastPaymentDate = cp.length ? cp[cp.length - 1].paid_at : null;
-      const startRef = c.start_date ? parseISO(c.start_date) : (cp[0] ? parseISO(cp[0].paid_at!) : null);
+
+      // primeira data de plano: menor entre history.start_date e client.start_date
+      const candidates: Date[] = [];
+      if (c.start_date) candidates.push(parseISO(c.start_date));
+      for (const h of ch) if (h.start_date) candidates.push(parseISO(h.start_date));
+      const firstStartDate = candidates.length ? dateMin(candidates) : null;
+
       const endRef = c.is_active
         ? new Date()
-        : (lastPaymentDate ? parseISO(lastPaymentDate) : (c.end_date ? parseISO(c.end_date) : new Date()));
-      const monthsActive = startRef ? Math.max(0, differenceInMonths(endRef, startRef)) : 0;
+        : (c.end_date ? parseISO(c.end_date)
+            : (lastPaymentDate ? parseISO(lastPaymentDate) : new Date()));
+      const monthsActive = firstStartDate
+        ? Math.max(0, differenceInMonths(endRef, firstStartDate))
+        : 0;
+
       return {
         ...c,
         payments: cp,
         ltv,
+        planPeriods,
         renewals,
         monthsActive,
+        firstStartDate,
         lastPaymentDate,
         isChurned: !c.is_active,
-      };
+      } as EnrichedClient;
     });
-  }, [clients, payments]);
+  }, [clients, payments, planHistory]);
 
   // Aggregate KPIs
   const kpis = useMemo(() => {
@@ -126,19 +180,49 @@ export function LtvDashboard() {
 
     const paidPayments = payments.filter((p) => p.status === 'paid' && p.paid_at);
     const totalRevenue = paidPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
-    const ticketMedio = paidPayments.length ? totalRevenue / paidPayments.length : 0;
 
+    // Ticket médio = receita ÷ nº de vendas (planos vendidos), não parcelas
+    const totalSales = withPay.reduce((s, c) => s + c.planPeriods, 0);
+    const ticketMedio = totalSales ? totalRevenue / totalSales : 0;
+
+    // Ticket dos últimos 30 dias: receita ÷ nº de planos iniciados/renovados no período
     const cutoff30 = subMonths(new Date(), 1);
-    const last30 = paidPayments.filter((p) => parseISO(p.paid_at!) >= cutoff30);
-    const ticket30 = last30.length ? last30.reduce((s, p) => s + Number(p.amount), 0) / last30.length : 0;
+    const last30Revenue = paidPayments
+      .filter((p) => parseISO(p.paid_at!) >= cutoff30)
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const salesLast30 = new Set<string>();
+    enriched.forEach((c) => {
+      if (c.start_date && parseISO(c.start_date) >= cutoff30) salesLast30.add(`${c.id}-current`);
+      const ch = planHistory.filter((h) => h.client_id === c.id);
+      ch.forEach((h) => {
+        if (h.renewed_at && parseISO(h.renewed_at) >= cutoff30) salesLast30.add(h.id);
+      });
+    });
+    const ticket30 = salesLast30.size ? last30Revenue / salesLast30.size : 0;
 
     const activeClients = enriched.filter((c) => c.is_active && !c.is_frozen);
     const mrr = activeClients.reduce((s, c) => s + Number(c.monthly_value || 0), 0);
-    const revenuePerActive = activeClients.length ? totalRevenue / activeClients.length : 0;
+
+    // Receita por paciente ativo: receita do período (últimos 12m) ÷ ativos
+    const cutoff12 = subMonths(new Date(), 12);
+    const revenue12m = paidPayments
+      .filter((p) => parseISO(p.paid_at!) >= cutoff12)
+      .reduce((s, p) => s + Number(p.amount), 0);
+    const revenuePerActive = activeClients.length ? revenue12m / activeClients.length : 0;
 
     const renewedClients = enriched.filter((c) => c.renewals >= 1);
     const churned = enriched.filter((c) => c.isChurned && c.payments.length > 0);
-    const renewalRate = withPay.length ? (renewedClients.length / withPay.length) * 100 : 0;
+
+    // Taxa de renovação: dentre os clientes cujo 1º plano já encerrou (ou renovou),
+    // quantos renovaram pelo menos uma vez
+    const eligibleForRenewal = withPay.filter((c) =>
+      c.renewals >= 1 ||
+      (c.end_date && parseISO(c.end_date) < new Date()) ||
+      c.isChurned,
+    );
+    const renewalRate = eligibleForRenewal.length
+      ? (renewedClients.length / eligibleForRenewal.length) * 100
+      : 0;
     const churnRate = withPay.length ? (churned.length / withPay.length) * 100 : 0;
     const avgTenure = withPay.length ? withPay.reduce((s, c) => s + c.monthsActive, 0) / withPay.length : 0;
     const avgRenewals = withPay.length ? withPay.reduce((s, c) => s + c.renewals, 0) / withPay.length : 0;
@@ -148,8 +232,9 @@ export function LtvDashboard() {
       renewalRate, churnRate, avgTenure, avgRenewals,
       activeCount: activeClients.length, renewedCount: renewedClients.length,
       churnedCount: churned.length,
+      eligibleForRenewalCount: eligibleForRenewal.length,
     };
-  }, [enriched, payments]);
+  }, [enriched, payments, planHistory]);
 
   // Time series: last 12 months
   const monthly = useMemo(() => {
@@ -353,18 +438,18 @@ export function LtvDashboard() {
         <h3 className="text-sm font-semibold text-muted-foreground mb-2">Receita e LTV</h3>
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <KpiCard title="LTV médio" value={brl(kpis.avgLtv)} icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} icon={<TrendingUp className="h-4 w-4" />} />
-          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="receita recorrente" icon={<Repeat className="h-4 w-4" />} />
-          <KpiCard title="Receita total" value={brl(kpis.totalRevenue)} icon={<DollarSign className="h-4 w-4" />} />
-          <KpiCard title="Receita / ativo" value={brl(kpis.revenuePerActive)} icon={<Users className="h-4 w-4" />} />
+          <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} subtitle="receita ÷ planos vendidos" icon={<DollarSign className="h-4 w-4" />} />
+          <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} subtitle="planos novos/renovados" icon={<TrendingUp className="h-4 w-4" />} />
+          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="soma mensalidade ativos" icon={<Repeat className="h-4 w-4" />} />
+          <KpiCard title="Receita total" value={brl(kpis.totalRevenue)} subtitle="histórico completo" icon={<DollarSign className="h-4 w-4" />} />
+          <KpiCard title="Receita / ativo" value={brl(kpis.revenuePerActive)} subtitle="últimos 12m" icon={<Users className="h-4 w-4" />} />
         </div>
       </div>
 
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground mb-2">Retenção</h3>
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <KpiCard title="Taxa de renovação" value={pct(kpis.renewalRate)} icon={<Repeat className="h-4 w-4" />} />
+          <KpiCard title="Taxa de renovação" value={pct(kpis.renewalRate)} subtitle={`${kpis.renewedCount}/${kpis.eligibleForRenewalCount} elegíveis`} icon={<Repeat className="h-4 w-4" />} />
           <KpiCard title="Taxa de cancelamento" value={pct(kpis.churnRate)} icon={<TrendingDown className="h-4 w-4" />} />
           <KpiCard title="Permanência média" value={`${kpis.avgTenure.toFixed(1)} meses`} icon={<Calendar className="h-4 w-4" />} />
           <KpiCard title="Renovações / paciente" value={kpis.avgRenewals.toFixed(2)} icon={<Repeat className="h-4 w-4" />} />
