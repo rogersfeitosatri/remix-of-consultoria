@@ -297,6 +297,16 @@ export function LtvDashboard() {
       const uniqueClients = new Set(monthPayments.map((p) => p.client_id));
       const ltv = uniqueClients.size ? revenue / uniqueClients.size : 0;
 
+      // mix por plano no mês (baseado no plan_type do cliente que pagou)
+      const planMix: Record<string, { count: number; sum: number }> = {};
+      monthPayments.forEach((p) => {
+        const c = enriched.find((x) => x.id === p.client_id);
+        const key = c?.plan_type || 'sem_plano';
+        if (!planMix[key]) planMix[key] = { count: 0, sum: 0 };
+        planMix[key].count += 1;
+        planMix[key].sum += Number(p.amount);
+      });
+
       // retention: clients active during this month
       const activeInMonth = enriched.filter((c) => {
         const start = c.start_date ? parseISO(c.start_date) : null;
@@ -315,6 +325,8 @@ export function LtvDashboard() {
         month: m.label, key: m.key,
         ltv: Math.round(ltv), ticket: Math.round(ticket), revenue: Math.round(revenue),
         retention: Math.round(retention),
+        payments: monthPayments.length,
+        planMix,
       };
     });
   }, [payments, enriched]);
