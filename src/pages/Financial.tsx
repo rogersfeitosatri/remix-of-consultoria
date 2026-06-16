@@ -105,13 +105,20 @@ export default function Financial() {
   const handleDateChange = (start: Date, end: Date) => {
     setFilterStartDate(start);
     setFilterEndDate(end);
+    const params = new URLSearchParams(searchParams);
+    params.set('startDate', format(start, 'yyyy-MM-dd'));
+    params.set('endDate', format(end, 'yyyy-MM-dd'));
+    setSearchParams(params, { replace: true });
   };
 
   const isLoading = clientsLoading || paymentsLoading;
 
   const handleFilterClick = (newFilter: 'overdue' | 'upcoming') => {
     setFilter(newFilter);
-    navigate(`/financial?filter=${newFilter}&tab=atletas`);
+    const params = new URLSearchParams(searchParams);
+    params.set('filter', newFilter);
+    params.set('tab', 'atletas');
+    navigate(`/financial?${params.toString()}`);
   };
 
   const handleAddPayment = async (data: {
