@@ -446,7 +446,7 @@ export function LtvDashboard() {
           <KpiCard title="LTV médio" value={brl(kpis.avgLtv)} icon={<DollarSign className="h-4 w-4" />} />
           <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} subtitle="receita ÷ planos vendidos" icon={<DollarSign className="h-4 w-4" />} />
           <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} subtitle="planos novos/renovados" icon={<TrendingUp className="h-4 w-4" />} />
-          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="soma mensalidade ativos" icon={<Repeat className="h-4 w-4" />} />
+          <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="receita mensal equivalente (total ÷ meses)" icon={<Repeat className="h-4 w-4" />} />
           <KpiCard title="Receita total" value={brl(kpis.totalRevenue)} subtitle="histórico completo" icon={<DollarSign className="h-4 w-4" />} />
           <KpiCard title="Receita / ativo" value={brl(kpis.revenuePerActive)} subtitle="últimos 12m" icon={<Users className="h-4 w-4" />} />
         </div>
