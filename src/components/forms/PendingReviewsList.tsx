@@ -391,7 +391,14 @@ export function PendingReviewsList() {
                   <Calendar
                     mode="single"
                     selected={dateTo ? parseISO(dateTo) : undefined}
-                    onSelect={(date) => setDateTo(date ? format(date, 'yyyy-MM-dd') : '')}
+                    onSelect={(date) => {
+                      const val = date ? format(date, 'yyyy-MM-dd') : '';
+                      setDateTo(val);
+                      const params = new URLSearchParams(searchParams);
+                      if (val) params.set('checkinTo', val);
+                      else params.delete('checkinTo');
+                      setSearchParams(params, { replace: true });
+                    }}
                     initialFocus
                     className="p-3 pointer-events-auto"
                   />
