@@ -201,7 +201,13 @@ export function LtvDashboard() {
     const ticket30 = salesLast30.size ? last30Revenue / salesLast30.size : 0;
 
     const activeClients = enriched.filter((c) => c.is_active && !c.is_frozen);
-    const mrr = activeClients.reduce((s, c) => s + Number(c.monthly_value || 0), 0);
+    // MRR real: valor TOTAL do plano ÷ duração em meses (monthly_value armazena o total do plano)
+    const mrr = activeClients.reduce((s, c) => {
+      const total = Number(c.monthly_value || 0);
+      if (!total || !c.start_date || !c.end_date) return s;
+      const months = Math.max(1, differenceInMonths(parseISO(c.end_date), parseISO(c.start_date)) || 1);
+      return s + (total / months);
+    }, 0);
 
     // Receita por paciente ativo: receita do período (últimos 12m) ÷ ativos
     const cutoff12 = subMonths(new Date(), 12);
