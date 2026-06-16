@@ -168,9 +168,12 @@ export function PendingReviewsList() {
     return pendingResponses.filter(r => {
       if (frequencyFilter !== 'all' && r.clients?.checkin_frequency !== frequencyFilter) return false;
       if (searchQuery && !(r.clients?.name || '').toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      const submittedDate = format(parseISO(r.submitted_at), 'yyyy-MM-dd');
+      if (dateFrom && submittedDate < dateFrom) return false;
+      if (dateTo && submittedDate > dateTo) return false;
       return true;
     });
-  }, [pendingResponses, frequencyFilter, searchQuery]);
+  }, [pendingResponses, frequencyFilter, searchQuery, dateFrom, dateTo]);
 
   // Split into urgency groups
   const { urgent, recent } = useMemo(() => {
