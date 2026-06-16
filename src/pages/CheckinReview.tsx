@@ -888,9 +888,7 @@ export default function CheckinReview() {
                   const regularQuestions: typeof questions = [];
 
                   questions.forEach(q => {
-                    const resp = checkinResponse?.responses?.[q.id];
-                    const comment = resp && typeof resp === 'object' ? resp.comment : null;
-                    const isHighlighted = (q as any).is_adjustment_trigger || (q.has_comment_field && comment);
+                    const isHighlighted = q.order_index === 12 || q.order_index === 14;
                     if (isHighlighted) {
                       highlightedQuestions.push(q);
                     } else {
