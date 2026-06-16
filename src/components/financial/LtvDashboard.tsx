@@ -672,7 +672,12 @@ export function LtvDashboard() {
 
 
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Previsão de receita (12 meses)</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              Previsão de receita (12 meses)
+              <ChartHelp text="Projeção do MRR atual para os próximos 12 meses. Conservador: assume mais cancelamentos. Provável: mantém o churn atual + crescimento leve. Otimista: menos cancelamentos + crescimento maior." />
+            </CardTitle>
+          </CardHeader>
           <CardContent className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={forecast}>
@@ -694,9 +699,11 @@ export function LtvDashboard() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" /> Insights automáticos
+            <Sparkles className="h-4 w-4 text-primary" /> Diagnóstico automático
+            <ChartHelp text="O sistema compara mês a mês e tenta explicar POR QUE os números mudaram — se foi por mudança no mix de planos vendidos, mudança de preço, ou queda de volume." />
           </CardTitle>
         </CardHeader>
+
         <CardContent className="space-y-2">
           {insights.length === 0 && (
             <p className="text-xs text-muted-foreground">Sem dados suficientes para gerar insights.</p>
