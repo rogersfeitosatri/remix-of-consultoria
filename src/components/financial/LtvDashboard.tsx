@@ -712,7 +712,7 @@ export function LtvDashboard() {
                   <TableHead>Paciente</TableHead>
                   <TableHead>Entrada</TableHead>
                   <TableHead>Plano</TableHead>
-                  <TableHead className="text-right">Mensal</TableHead>
+                  <TableHead className="text-right">Total Plano</TableHead>
                   <TableHead className="text-right">Renov.</TableHead>
                   <TableHead className="text-right">Meses</TableHead>
                   <TableHead className="text-right">LTV</TableHead>
