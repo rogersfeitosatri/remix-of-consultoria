@@ -246,7 +246,7 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Valor Mensal (R$)</Label>
+              <Label className="text-xs">Valor Total (R$)</Label>
               <Input
                 type="number"
                 min="0"
