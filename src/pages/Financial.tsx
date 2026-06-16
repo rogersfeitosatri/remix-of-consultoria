@@ -253,6 +253,11 @@ export default function Financial() {
               <ExpiringPlansList clients={expiringPlans} title="Planos Expirando" />
             </div>
           </TabsContent>
+
+          {/* LTV Tab */}
+          <TabsContent value="ltv" className="space-y-6 mt-4">
+            <LtvDashboard />
+          </TabsContent>
         </Tabs>
       </div>
 
