@@ -30,7 +30,7 @@ import {
   getExpiringPlansInPeriod,
   getExpiringPlansTotal
 } from '@/hooks/useFinancialData';
-import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet, Camera } from 'lucide-react';
+import { DollarSign, CreditCard, AlertCircle, Loader2, Plus, Users, Wallet, Camera, TrendingUp } from 'lucide-react';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { toast } from 'sonner';
 
