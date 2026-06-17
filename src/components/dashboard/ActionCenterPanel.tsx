@@ -796,7 +796,7 @@ export function ActionCenterPanel() {
                   Foque em contato diário para aumentar as chances de renovação
                 </p>
                 <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-                  {retentionAthletes.map((a: any) => (
+                  {visibleRetention.map((a: any) => (
                     <div
                       key={a.id}
                       className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm border bg-background/80 border-border/50 hover:bg-muted/50 transition-colors"
