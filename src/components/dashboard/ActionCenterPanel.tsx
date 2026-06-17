@@ -6,8 +6,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   AlertTriangle, Clock, CheckCircle, ChevronRight, Video, ExternalLink,
   ListTodo, MessageSquare, UtensilsCrossed, UserX, Zap, CalendarCheck,
-  Target, Users, Phone, UserPlus, Send, Loader2
+  Target, Users, Phone, UserPlus, Send, Loader2, Check
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNavigate } from 'react-router-dom';
 import { useMyDayToday } from '@/hooks/useMyDayToday';
 import { useInactivityAlerts } from '@/hooks/useInactivityAlerts';
