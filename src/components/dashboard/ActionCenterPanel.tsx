@@ -6,8 +6,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   AlertTriangle, Clock, CheckCircle, ChevronRight, Video, ExternalLink,
   ListTodo, MessageSquare, UtensilsCrossed, UserX, Zap, CalendarCheck,
-  Target, Users, Phone, UserPlus, Send, Loader2
+  Target, Users, Phone, UserPlus, Send, Loader2, Check
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNavigate } from 'react-router-dom';
 import { useMyDayToday } from '@/hooks/useMyDayToday';
 import { useInactivityAlerts } from '@/hooks/useInactivityAlerts';
@@ -44,6 +45,52 @@ export function ActionCenterPanel() {
   const { data: pendingPlans = [] } = usePendingMealPlans();
   const { data: unlinkedAnamnese = [] } = useUnlinkedAnamneseForMealPlan();
   const markAsSent = useMarkMealPlanSent();
+
+  // ─── Dispensar ações ─────────────────────────────────────────────
+  // Marca uma ação como "feita/dispensada" localmente por 24h.
+  // Some da lista imediatamente; reaparece se o dado de fato continuar pendente após 24h.
+  const DISMISS_KEY = 'action-center-dismissed-v1';
+  const DISMISS_TTL = 24 * 60 * 60 * 1000;
+  const [dismissed, setDismissed] = useState<Record<string, number>>(() => {
+    try {
+      const raw = localStorage.getItem(DISMISS_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      const now = Date.now();
+      const valid: Record<string, number> = {};
+      for (const [k, ts] of Object.entries(parsed)) {
+        if (now - ts < DISMISS_TTL) valid[k] = ts;
+      }
+      return valid;
+    } catch { return {}; }
+  });
+  const isDismissed = (key: string) => key in dismissed;
+  const dismiss = (key: string) => {
+    setDismissed(prev => {
+      const next = { ...prev, [key]: Date.now() };
+      try { localStorage.setItem(DISMISS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    toast.success('Ação concluída');
+  };
+
+  const DismissBtn = ({ k }: { k: string }) => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+            onClick={(e) => { e.stopPropagation(); dismiss(k); }}
+          >
+            <Check className="h-3.5 w-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top"><p className="text-xs">Dar check e remover da lista</p></TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 
   // Complete task mutation
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
@@ -255,19 +302,27 @@ export function ActionCenterPanel() {
     }
   };
 
-  const appointments = dayData?.appointments || [];
-  const overdueTasks = dayData?.tasks.filter(t => t.is_overdue) || [];
-  const todayTasks = dayData?.tasks.filter(t => !t.is_overdue) || [];
-  const pendingCheckins = dayData?.pendingCheckins || [];
-  const urgentAthletes = dayData?.urgentAthletes || [];
+  const appointments = (dayData?.appointments || []).filter(a => !isDismissed(`apt:${a.id}`));
+  const overdueTasks = (dayData?.tasks.filter(t => t.is_overdue) || []).filter(t => !isDismissed(`tsk:${t.id}`));
+  const todayTasks = (dayData?.tasks.filter(t => !t.is_overdue) || []).filter(t => !isDismissed(`tsk:${t.id}`));
+  const pendingCheckins = (dayData?.pendingCheckins || []).filter(c => !isDismissed(`pck:${c.client_id}`));
+  const urgentAthletes = (dayData?.urgentAthletes || []).filter(a => !isDismissed(`urg:${a.id}`));
+  const visibleUnresponsive = unresponsiveAthletes.filter((a: any) => !isDismissed(`unr:${a.clientId}`));
+  const visiblePendingPlans = pendingPlans.filter((p: any) => !isDismissed(`mpl:${p.id}`));
+  const visibleUnlinkedAnamnese = unlinkedAnamnese.filter((a: any) => !isDismissed(`mpu:${a.id}`));
+  const visibleFeedbacks = pendingCheckinFeedbacks.filter((f: any) => !isDismissed(`pcf:${f.id}`));
+  const visibleInactive = inactiveAthletes.filter((a: any) => !isDismissed(`ina:${a.id}`));
+  const visibleRetention = retentionAthletes.filter((a: any) => !isDismissed(`ret:${a.id}`));
+  const visibleRegistrations = pendingRegistrations.filter((a: any) => !isDismissed(`reg:${a.id}`));
+  const visibleSendQueue = sendQueue.filter((s: any) => !isDismissed(`que:${s.id}`));
 
   // Count items per tab
-  const urgentCount = overdueTasks.length + unresponsiveAthletes.length + urgentAthletes.length;
+  const urgentCount = overdueTasks.length + visibleUnresponsive.length + urgentAthletes.length;
   const todayCount = appointments.length + todayTasks.length + pendingCheckins.length;
-  const pendingCount = pendingPlans.length + unlinkedAnamnese.length + pendingCheckinFeedbacks.length + inactiveAthletes.length;
-  const retentionCount = retentionAthletes.length;
-  const registrationCount = pendingRegistrations.length;
-  const queueCount = sendQueue.length;
+  const pendingCount = visiblePendingPlans.length + visibleUnlinkedAnamnese.length + visibleFeedbacks.length + visibleInactive.length;
+  const retentionCount = visibleRetention.length;
+  const registrationCount = visibleRegistrations.length;
+  const queueCount = visibleSendQueue.length;
 
   const totalCount = urgentCount + todayCount + pendingCount + retentionCount + registrationCount + queueCount;
 
@@ -325,9 +380,12 @@ export function ActionCenterPanel() {
         <span className="truncate text-xs font-medium">{task.title}</span>
         {task.client_name && <span className="text-[10px] text-muted-foreground shrink-0">{task.client_name}</span>}
       </div>
-      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs shrink-0" onClick={() => navigate('/tasks')}>
-        <ChevronRight className="h-3 w-3" />
-      </Button>
+      <div className="flex items-center gap-0.5 shrink-0">
+        <DismissBtn k={`tsk:${task.id}`} />
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => navigate('/tasks')}>
+          <ChevronRight className="h-3 w-3" />
+        </Button>
+      </div>
     </div>
   );
 
@@ -440,7 +498,7 @@ export function ActionCenterPanel() {
                   Atletas que enviaram a anamnese e precisam ter o cadastro finalizado (plano, financeiro, etc.)
                 </p>
                 <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-                  {pendingRegistrations.map((a: any) => (
+                  {visibleRegistrations.map((a: any) => (
                     <div
                       key={a.id}
                       className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm border bg-background/80 border-border/50 hover:bg-muted/50 transition-colors"
@@ -490,6 +548,7 @@ export function ActionCenterPanel() {
                         >
                           Concluir cadastro
                         </Button>
+                        <DismissBtn k={`reg:${a.id}`} />
                       </div>
                     </div>
                   ))}
@@ -525,7 +584,7 @@ export function ActionCenterPanel() {
                     <p className="text-xs font-medium text-destructive flex items-center gap-1">
                       <MessageSquare className="h-3 w-3" /> Sem resposta ({unresponsiveAthletes.length})
                     </p>
-                    {unresponsiveAthletes.slice(0, 5).map(a => (
+                    {visibleUnresponsive.slice(0, 5).map(a => (
                       <ActionRow
                         key={a.clientId}
                         icon={<MessageSquare className="h-3.5 w-3.5 text-destructive" />}
@@ -534,6 +593,7 @@ export function ActionCenterPanel() {
                         variant="destructive"
                         onClick={() => navigate(`/clients/${a.clientId}`)}
                         whatsApp={a.phone ? () => openWhatsApp(a.phone!, `Olá! Percebi que faz um tempo que não nos falamos. Como está indo? 💪`) : undefined}
+                        onDismiss={() => dismiss(`unr:${a.clientId}`)}
                       />
                     ))}
                   </div>
@@ -553,6 +613,7 @@ export function ActionCenterPanel() {
                         variant="destructive"
                         onClick={() => navigate(`/clients/${a.id}`)}
                         whatsApp={a.phone ? () => openWhatsApp(a.phone!) : undefined}
+                        onDismiss={() => dismiss(`urg:${a.id}`)}
                       />
                     ))}
                   </div>
@@ -592,6 +653,7 @@ export function ActionCenterPanel() {
                           <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => navigate(`/clients/${a.client_id}`)}>
                             Ver
                           </Button>
+                          <DismissBtn k={`apt:${a.id}`} />
                         </div>
                       </div>
                     ))}
@@ -622,6 +684,7 @@ export function ActionCenterPanel() {
                         subtitle={`há ${c.days_waiting}d`}
                         variant="warning"
                         onClick={() => navigate(`/clients/${c.client_id}`)}
+                        onDismiss={() => dismiss(`pck:${c.client_id}`)}
                       />
                     ))}
                   </div>
@@ -636,12 +699,12 @@ export function ActionCenterPanel() {
               <p className="text-sm text-muted-foreground text-center py-4">Nenhuma pendência ✓</p>
             ) : (
               <>
-                {(pendingPlans.length > 0 || unlinkedAnamnese.length > 0) && (
+                {(visiblePendingPlans.length > 0 || visibleUnlinkedAnamnese.length > 0) && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-orange-500 flex items-center gap-1">
-                      <UtensilsCrossed className="h-3 w-3" /> Planos alimentares ({pendingPlans.length + unlinkedAnamnese.length})
+                      <UtensilsCrossed className="h-3 w-3" /> Planos alimentares ({visiblePendingPlans.length + visibleUnlinkedAnamnese.length})
                     </p>
-                    {pendingPlans.slice(0, 5).map(plan => {
+                    {visiblePendingPlans.slice(0, 5).map(plan => {
                       const refDate = plan.anamnese_submitted_at ? parseISO(plan.anamnese_submitted_at) : parseISO(plan.created_at);
                       const elapsed = businessDaysSince(refDate);
                       const remaining = 4 - elapsed;
@@ -663,41 +726,45 @@ export function ActionCenterPanel() {
                               <Badge variant="secondary" className="text-[10px] px-1 py-0">{remaining}d</Badge>
                             )}
                           </div>
-                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => {
-                            if (plan.anamnese_response_id) navigate(`/anamnese-response/${plan.anamnese_response_id}`);
-                            else navigate(`/clients/${plan.client_id}`);
-                          }}>
-                            <ChevronRight className="h-3 w-3" />
-                          </Button>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <DismissBtn k={`mpl:${plan.id}`} />
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => {
+                              if (plan.anamnese_response_id) navigate(`/anamnese-response/${plan.anamnese_response_id}`);
+                              else navigate(`/clients/${plan.client_id}`);
+                            }}>
+                              <ChevronRight className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
                   </div>
                 )}
 
-                {pendingCheckinFeedbacks.length > 0 && (
+                {visibleFeedbacks.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-orange-500 flex items-center gap-1">
-                      <MessageSquare className="h-3 w-3" /> Check-ins p/ revisar ({pendingCheckinFeedbacks.length})
+                      <MessageSquare className="h-3 w-3" /> Check-ins p/ revisar ({visibleFeedbacks.length})
                     </p>
-                    {pendingCheckinFeedbacks.slice(0, 5).map((f: any) => (
+                    {visibleFeedbacks.slice(0, 5).map((f: any) => (
                       <ActionRow
                         key={f.id}
                         icon={<MessageSquare className="h-3.5 w-3.5 text-orange-500" />}
                         title={f.clients?.name || 'N/A'}
                         subtitle={f.status === 'approved' ? 'Pronto p/ envio' : 'Pendente'}
                         onClick={() => navigate(`/checkin-review/${f.checkin_response_id}`)}
+                        onDismiss={() => dismiss(`pcf:${f.id}`)}
                       />
                     ))}
                   </div>
                 )}
 
-                {inactiveAthletes.length > 0 && (
+                {visibleInactive.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                      <UserX className="h-3 w-3" /> Sem interação +14d ({inactiveAthletes.length})
+                      <UserX className="h-3 w-3" /> Sem interação +14d ({visibleInactive.length})
                     </p>
-                    {inactiveAthletes.slice(0, 5).map(a => (
+                    {visibleInactive.slice(0, 5).map((a: any) => (
                       <ActionRow
                         key={a.id}
                         icon={<UserX className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -705,6 +772,7 @@ export function ActionCenterPanel() {
                         subtitle={`${a.daysSinceLastInteraction}d`}
                         onClick={() => navigate(`/clients/${a.id}`)}
                         whatsApp={a.phone ? () => openWhatsApp(a.phone!) : undefined}
+                        onDismiss={() => dismiss(`ina:${a.id}`)}
                       />
                     ))}
                   </div>
@@ -728,7 +796,7 @@ export function ActionCenterPanel() {
                   Foque em contato diário para aumentar as chances de renovação
                 </p>
                 <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-                  {retentionAthletes.map((a: any) => (
+                  {visibleRetention.map((a: any) => (
                     <div
                       key={a.id}
                       className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm border bg-background/80 border-border/50 hover:bg-muted/50 transition-colors"
@@ -759,6 +827,7 @@ export function ActionCenterPanel() {
                             <Phone className="h-3 w-3" />
                           </Button>
                         )}
+                        <DismissBtn k={`ret:${a.id}`} />
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => navigate(`/clients/${a.id}`)}>
                           <ChevronRight className="h-3 w-3" />
                         </Button>
@@ -785,7 +854,7 @@ export function ActionCenterPanel() {
                   Links de agendamento programados pelo cron diário. Reenvie manualmente se necessário.
                 </p>
                 <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
-                  {sendQueue.map((s: any) => {
+                  {visibleSendQueue.map((s: any) => {
                     const sendDate = parseISO(s.send_link_date);
                     const consultDate = parseISO(s.scheduled_date);
                     const isSent = s.status === 'sent' || s.status === 'link_sent' || !!s.link_sent_at;
@@ -832,6 +901,7 @@ export function ActionCenterPanel() {
                               </>
                             )}
                           </Button>
+                          <DismissBtn k={`que:${s.id}`} />
                           <Button
                             size="sm"
                             variant="ghost"
@@ -856,7 +926,7 @@ export function ActionCenterPanel() {
 
 // Reusable action row
 function ActionRow({
-  icon, title, subtitle, badge, variant, onClick, whatsApp,
+  icon, title, subtitle, badge, variant, onClick, whatsApp, onDismiss,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -865,6 +935,7 @@ function ActionRow({
   variant?: 'destructive' | 'warning';
   onClick: () => void;
   whatsApp?: () => void;
+  onDismiss?: () => void;
 }) {
   return (
     <div
@@ -887,6 +958,17 @@ function ActionRow({
         {whatsApp && (
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-success" onClick={(e) => { e.stopPropagation(); whatsApp(); }}>
             <Zap className="h-3 w-3" />
+          </Button>
+        )}
+        {onDismiss && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+            title="Dar check e remover da lista"
+            onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+          >
+            <Check className="h-3.5 w-3.5" />
           </Button>
         )}
         <ChevronRight className="h-3 w-3 text-muted-foreground" />
