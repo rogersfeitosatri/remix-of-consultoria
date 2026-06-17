@@ -726,12 +726,15 @@ export function ActionCenterPanel() {
                               <Badge variant="secondary" className="text-[10px] px-1 py-0">{remaining}d</Badge>
                             )}
                           </div>
-                          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => {
-                            if (plan.anamnese_response_id) navigate(`/anamnese-response/${plan.anamnese_response_id}`);
-                            else navigate(`/clients/${plan.client_id}`);
-                          }}>
-                            <ChevronRight className="h-3 w-3" />
-                          </Button>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <DismissBtn k={`mpl:${plan.id}`} />
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => {
+                              if (plan.anamnese_response_id) navigate(`/anamnese-response/${plan.anamnese_response_id}`);
+                              else navigate(`/clients/${plan.client_id}`);
+                            }}>
+                              <ChevronRight className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       );
                     })}
