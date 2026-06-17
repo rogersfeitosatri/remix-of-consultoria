@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useClients, usePayments, useAddClient, Client } from '@/hooks/useClients';
-import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, CalendarCheck, Users, Lock, ExternalLink, Palette, Flag } from 'lucide-react';
+import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, Users, Lock, ExternalLink, Palette, Flag, PhoneCall, Link as LinkIcon, Activity, Network, CalendarPlus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ScheduledCheckinsOverview } from '@/components/admin/ScheduledCheckinsOverview';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAdminSettings, useSaveAdminSettings } from '@/hooks/useAdminSettings';
@@ -42,6 +42,7 @@ const PAYMENT_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function Settings() {
+  const navigate = useNavigate();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
   const { data: adminSettings } = useAdminSettings();
@@ -879,24 +880,6 @@ export default function Settings() {
             </AccordionContent>
           </AccordionItem>
 
-          {/* Scheduled Checkins Overview */}
-          <AccordionItem value="checkins" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <CalendarCheck className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Check-ins Agendados</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Visualize os check-ins agendados e pendentes dos atletas
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <ScheduledCheckinsOverview />
-            </AccordionContent>
-          </AccordionItem>
-
           {/* Scan Anamnese Target Races */}
           <AccordionItem value="scan-races" className="border border-border rounded-lg bg-card px-4">
             <AccordionTrigger className="hover:no-underline py-4">
@@ -1128,6 +1111,95 @@ export default function Settings() {
             </AccordionTrigger>
             <AccordionContent className="pb-4">
               <ChangePasswordForm />
+            </AccordionContent>
+          </AccordionItem>
+          {/* Strategic Calls */}
+          <AccordionItem value="calls" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <PhoneCall className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Calls Estratégicas</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Gerencie formulários de call e links de agendamento
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={() => navigate('/calls')} variant="outline" className="gap-2">
+                  <PhoneCall className="h-4 w-4" />
+                  Formulários de Call
+                </Button>
+                <Button onClick={() => navigate('/scheduling-links')} variant="outline" className="gap-2">
+                  <CalendarPlus className="h-4 w-4" />
+                  Agendamento de Call
+                </Button>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Link da Bio */}
+          <AccordionItem value="link-bio" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <LinkIcon className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Link da Bio</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Configure sua página de links públicos
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <Button onClick={() => navigate('/link-bio')} variant="outline" className="gap-2">
+                <LinkIcon className="h-4 w-4" />
+                Gerenciar Link da Bio
+              </Button>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Periodização */}
+          <AccordionItem value="periodization" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <Activity className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Periodização Nutricional</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Planejamento e controle de periodização dos atletas
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <Button onClick={() => navigate('/periodization')} variant="outline" className="gap-2">
+                <Activity className="h-4 w-4" />
+                Acessar Periodização
+              </Button>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Interconexão Metabólica */}
+          <AccordionItem value="metabolic" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <Network className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Interconexão Metabólica</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Análise de interconexão metabólica dos atletas
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <Button onClick={() => navigate('/metabolic-web')} variant="outline" className="gap-2">
+                <Network className="h-4 w-4" />
+                Acessar Interconexão Metabólica
+              </Button>
             </AccordionContent>
           </AccordionItem>
         </Accordion>

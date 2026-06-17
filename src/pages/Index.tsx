@@ -1,116 +1,47 @@
 import { Layout } from '@/components/layout/Layout';
-import { StatCard } from '@/components/dashboard/StatCard';
 import { GoogleOAuthAlert } from '@/components/dashboard/GoogleOAuthAlert';
 import { ActionCenterPanel } from '@/components/dashboard/ActionCenterPanel';
 import { MonthlyProgressionPanel } from '@/components/dashboard/MonthlyProgressionPanel';
-import { PeriodizationOverview } from '@/components/dashboard/PeriodizationOverview';
-import { WeeklyReportPanel } from '@/components/dashboard/WeeklyReportPanel';
-import { MeuDiaPanel } from '@/components/dashboard/MeuDiaPanel';
-import { useClients, usePayments, getExpiringThisMonth } from '@/hooks/useClients';
-import { getMonthlyIncomeByPaidAt, getDueAmountInPeriod } from '@/hooks/useFinancialData';
-import { Users, DollarSign, AlertTriangle, Loader2, CreditCard } from 'lucide-react';
-import { startOfMonth, endOfMonth } from 'date-fns';
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { BlocoSaudeFinanceira } from '@/components/dashboard/BlocoSaudeFinanceira';
+import { BlocoTemperatura } from '@/components/dashboard/BlocoTemperatura';
+import { Separator } from '@/components/ui/separator';
+import { ListTodo, DollarSign, Thermometer } from 'lucide-react';
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const { data: clients = [], isLoading: clientsLoading } = useClients();
-  const { data: payments = [], isLoading: paymentsLoading } = usePayments();
-
-  const today = new Date();
-  const currentYear = today.getFullYear();
-  const currentMonth = today.getMonth();
-  const monthStart = startOfMonth(today);
-  const monthEnd = endOfMonth(today);
-
-  const activeClients = clients.filter(c => c.is_active);
-  const expiringThisMonth = getExpiringThisMonth(clients, currentYear, currentMonth);
-
-  const monthlyIncome = useMemo(() =>
-    getMonthlyIncomeByPaidAt(payments, monthStart, monthEnd),
-    [payments, monthStart, monthEnd]
-  );
-
-  const monthlyDue = useMemo(() =>
-    getDueAmountInPeriod(payments, monthStart, monthEnd),
-    [payments, monthStart, monthEnd]
-  );
-
-  const isLoading = clientsLoading || paymentsLoading;
-
-  if (isLoading) {
-    return (
-      <Layout>
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
-      <div className="space-y-4 sm:space-y-5">
-        {/* Meu Dia — hero section */}
-        <MeuDiaPanel />
-
-        {/* Stats row */}
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Atletas Ativos"
-            value={activeClients.length}
-            subtitle="cadastrados"
-            icon={<Users className="h-5 w-5 sm:h-6 sm:w-6" />}
-            variant="primary"
-          />
-          <button
-            onClick={() => navigate('/financial')}
-            className="text-left transition-transform hover:scale-[1.02]"
-          >
-            <StatCard
-              title="Entradas do Mês"
-              value={`R$ ${monthlyIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              subtitle="recebido"
-              icon={<DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />}
-              variant="success"
-            />
-          </button>
-          <button
-            onClick={() => navigate('/financial?filter=upcoming')}
-            className="text-left transition-transform hover:scale-[1.02]"
-          >
-            <StatCard
-              title="Vencimentos"
-              value={`R$ ${monthlyDue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-              subtitle="pendentes"
-              icon={<CreditCard className="h-5 w-5 sm:h-6 sm:w-6" />}
-              variant="warning"
-            />
-          </button>
-          <StatCard
-            title="Planos Vencendo"
-            value={expiringThisMonth.length}
-            subtitle="no mês"
-            icon={<AlertTriangle className="h-5 w-5 sm:h-6 sm:w-6" />}
-            variant="default"
-          />
-        </div>
-
-        {/* Google OAuth alert */}
+      <div className="space-y-8">
+        {/* OAuth alert — aparece quando necessário */}
         <GoogleOAuthAlert />
 
-        {/* Action Center */}
-        <ActionCenterPanel />
+        {/* ── BLOCO 1: Fila de ação do dia ─────────────────────────────── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <ListTodo className="h-4 w-4 text-primary" />
+            <h2 className="text-base font-semibold text-foreground">Fila de ação do dia</h2>
+            <span className="text-xs text-muted-foreground">— o que precisa de atenção agora</span>
+          </div>
+          <ActionCenterPanel />
+        </section>
 
-        {/* Evolução Mensal */}
-        <MonthlyProgressionPanel />
+        <Separator />
 
-        {/* Weekly Report + Periodization */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <WeeklyReportPanel />
-          <PeriodizationOverview />
-        </div>
+        {/* ── BLOCO 2: Saúde financeira ─────────────────────────────────── */}
+        <section>
+          <BlocoSaudeFinanceira />
+        </section>
+
+        <Separator />
+
+        {/* ── BLOCO 3: Temperatura + Jornada ────────────────────────────── */}
+        <section>
+          <div className="grid gap-8 grid-cols-1 xl:grid-cols-2">
+            <BlocoTemperatura />
+            <div>
+              <MonthlyProgressionPanel />
+            </div>
+          </div>
+        </section>
       </div>
     </Layout>
   );

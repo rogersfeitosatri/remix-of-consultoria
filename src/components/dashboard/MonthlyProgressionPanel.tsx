@@ -4,8 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CalendarClock, AlertTriangle, ChevronRight, TrendingUp, Trophy } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
+import { useTemperaturaPacientes, Temperatura } from '@/hooks/useTemperaturaPacientes';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import {
@@ -27,11 +29,17 @@ interface AthleteEntry {
   name: string;
   planDurationLabel: string;
   endingThisWeek: boolean;
-  monthNumber: number; // 2, 3, 4... (mês que está iniciando)
+  monthNumber: number;
   daysToEnd: number;
   targetRace?: string | null;
   targetDeadline?: string | null;
 }
+
+const TEMP_DOT: Record<Temperatura, string> = {
+  frio:   'bg-red-500',
+  morno:  'bg-yellow-400',
+  quente: 'bg-green-500',
+};
 
 const DURATION_LABELS: Record<string, string> = {
   monthly: '1 mês',
@@ -44,7 +52,14 @@ const DURATION_LABELS: Record<string, string> = {
 
 export function MonthlyProgressionPanel() {
   const { data: clients = [] } = useClients();
+  const { data: temperaturas = [] } = useTemperaturaPacientes();
   const [durationFilter, setDurationFilter] = useState<DurationFilter>('all');
+
+  const tempByClient = useMemo(() => {
+    const map: Record<string, { temperatura: Temperatura; motivo: string }> = {};
+    temperaturas.forEach(p => { map[p.client_id] = { temperatura: p.temperatura, motivo: p.motivo }; });
+    return map;
+  }, [temperaturas]);
 
   const { data: targetRaces = [] } = useQuery({
     queryKey: ['monthly-progression-target-races'],
@@ -195,7 +210,7 @@ export function MonthlyProgressionPanel() {
             </div>
             <div className="grid gap-1.5 sm:grid-cols-2">
               {endingThisWeek.map(a => (
-                <AthleteRow key={a.id} athlete={a} highlight />
+                <AthleteRow key={a.id} athlete={a} highlight temp={tempByClient[a.id]} />
               ))}
             </div>
           </div>
@@ -213,7 +228,7 @@ export function MonthlyProgressionPanel() {
             </div>
             <div className="grid gap-1.5 sm:grid-cols-2">
               {group.athletes.map(a => (
-                <AthleteRow key={a.id} athlete={a} />
+                <AthleteRow key={a.id} athlete={a} temp={tempByClient[a.id]} />
               ))}
             </div>
           </div>
@@ -223,17 +238,38 @@ export function MonthlyProgressionPanel() {
   );
 }
 
-function AthleteRow({ athlete, highlight }: { athlete: AthleteEntry; highlight?: boolean }) {
+function AthleteRow({
+  athlete,
+  highlight,
+  temp,
+}: {
+  athlete: AthleteEntry;
+  highlight?: boolean;
+  temp?: { temperatura: Temperatura; motivo: string };
+}) {
   return (
-    <Link
-      to={`/clients/${athlete.id}?tab=checkins`}
-      className={cn(
-        'flex items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-sm transition-colors hover:bg-accent',
-        highlight && 'border-destructive/30 bg-background'
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="font-medium truncate">{athlete.name}</div>
+    <TooltipProvider>
+      <Link
+        to={`/clients/${athlete.id}?tab=checkins`}
+        className={cn(
+          'flex items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-sm transition-colors hover:bg-accent',
+          highlight && 'border-destructive/30 bg-background'
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            {temp && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className={`h-2 w-2 rounded-full flex-shrink-0 ${TEMP_DOT[temp.temperatura]}`} />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{temp.motivo}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <span className="font-medium truncate">{athlete.name}</span>
+          </div>
         <div className="text-[11px] text-muted-foreground">
           Plano: {athlete.planDurationLabel}
           {athlete.endingThisWeek && ` · encerra em ${athlete.daysToEnd}d`}
@@ -250,7 +286,8 @@ function AthleteRow({ athlete, highlight }: { athlete: AthleteEntry; highlight?:
           </div>
         )}
       </div>
-      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-    </Link>
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      </Link>
+    </TooltipProvider>
   );
 }
