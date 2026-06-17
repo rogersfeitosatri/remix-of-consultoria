@@ -380,9 +380,12 @@ export function ActionCenterPanel() {
         <span className="truncate text-xs font-medium">{task.title}</span>
         {task.client_name && <span className="text-[10px] text-muted-foreground shrink-0">{task.client_name}</span>}
       </div>
-      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs shrink-0" onClick={() => navigate('/tasks')}>
-        <ChevronRight className="h-3 w-3" />
-      </Button>
+      <div className="flex items-center gap-0.5 shrink-0">
+        <DismissBtn k={`tsk:${task.id}`} />
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => navigate('/tasks')}>
+          <ChevronRight className="h-3 w-3" />
+        </Button>
+      </div>
     </div>
   );
 
