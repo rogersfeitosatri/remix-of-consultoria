@@ -3,9 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { CalendarClock, AlertTriangle, ChevronRight, TrendingUp, Trophy } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
+import { useTemperaturaPacientes, Temperatura } from '@/hooks/useTemperaturaPacientes';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import {
@@ -33,6 +35,12 @@ interface AthleteEntry {
   targetDeadline?: string | null;
 }
 
+const TEMP_DOT: Record<Temperatura, string> = {
+  frio:   'bg-red-500',
+  morno:  'bg-yellow-400',
+  quente: 'bg-green-500',
+};
+
 const DURATION_LABELS: Record<string, string> = {
   monthly: '1 mês',
   quarterly: '3 meses',
@@ -44,8 +52,15 @@ const DURATION_LABELS: Record<string, string> = {
 
 export function MonthlyProgressionPanel() {
   const { data: clients = [] } = useClients();
+  const { data: temperaturas = [] } = useTemperaturaPacientes();
   const [durationFilter, setDurationFilter] = useState<DurationFilter>('all');
   const [open, setOpen] = useState(false);
+
+  const tempByClient = useMemo(() => {
+    const map: Record<string, { temperatura: Temperatura; motivo: string }> = {};
+    temperaturas.forEach(p => { map[p.client_id] = { temperatura: p.temperatura, motivo: p.motivo }; });
+    return map;
+  }, [temperaturas]);
 
   const { data: targetRaces = [] } = useQuery({
     queryKey: ['monthly-progression-target-races'],
@@ -203,7 +218,7 @@ export function MonthlyProgressionPanel() {
                 </div>
                 <div className="grid gap-1.5 sm:grid-cols-2">
                   {endingThisWeek.map(a => (
-                    <AthleteRow key={a.id} athlete={a} highlight onNav={() => setOpen(false)} />
+                    <AthleteRow key={a.id} athlete={a} highlight onNav={() => setOpen(false)} temp={tempByClient[a.id]} />
                   ))}
                 </div>
               </div>
@@ -218,7 +233,7 @@ export function MonthlyProgressionPanel() {
                 </div>
                 <div className="grid gap-1.5 sm:grid-cols-2">
                   {group.athletes.map(a => (
-                    <AthleteRow key={a.id} athlete={a} onNav={() => setOpen(false)} />
+                    <AthleteRow key={a.id} athlete={a} onNav={() => setOpen(false)} temp={tempByClient[a.id]} />
                   ))}
                 </div>
               </div>
@@ -230,35 +245,59 @@ export function MonthlyProgressionPanel() {
   );
 }
 
-function AthleteRow({ athlete, highlight, onNav }: { athlete: AthleteEntry; highlight?: boolean; onNav?: () => void }) {
+function AthleteRow({
+  athlete,
+  highlight,
+  onNav,
+  temp,
+}: {
+  athlete: AthleteEntry;
+  highlight?: boolean;
+  onNav?: () => void;
+  temp?: { temperatura: Temperatura; motivo: string };
+}) {
   return (
-    <Link
-      to={`/clients/${athlete.id}?tab=checkins`}
-      onClick={onNav}
-      className={cn(
-        'flex items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-sm transition-colors hover:bg-accent',
-        highlight && 'border-destructive/30 bg-background'
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="font-medium truncate">{athlete.name}</div>
-        <div className="text-[11px] text-muted-foreground">
-          Plano: {athlete.planDurationLabel}
-          {athlete.endingThisWeek && ` · encerra em ${athlete.daysToEnd}d`}
-        </div>
-        {athlete.targetRace && (
-          <div className="mt-1 flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
-            <Trophy className="h-3 w-3 shrink-0" />
-            <span className="truncate font-medium">{athlete.targetRace}</span>
-            {athlete.targetDeadline && (
-              <span className="text-muted-foreground">
-                · {format(parseISO(athlete.targetDeadline), "dd/MM/yyyy")}
-              </span>
-            )}
-          </div>
+    <TooltipProvider>
+      <Link
+        to={`/clients/${athlete.id}?tab=checkins`}
+        onClick={onNav}
+        className={cn(
+          'flex items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-sm transition-colors hover:bg-accent',
+          highlight && 'border-destructive/30 bg-background'
         )}
-      </div>
-      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-    </Link>
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            {temp && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className={`h-2 w-2 rounded-full flex-shrink-0 ${TEMP_DOT[temp.temperatura]}`} />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p className="text-xs">{temp.motivo}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <span className="font-medium truncate">{athlete.name}</span>
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            Plano: {athlete.planDurationLabel}
+            {athlete.endingThisWeek && ` · encerra em ${athlete.daysToEnd}d`}
+          </div>
+          {athlete.targetRace && (
+            <div className="mt-1 flex items-center gap-1 text-[11px] text-amber-700 dark:text-amber-400">
+              <Trophy className="h-3 w-3 shrink-0" />
+              <span className="truncate font-medium">{athlete.targetRace}</span>
+              {athlete.targetDeadline && (
+                <span className="text-muted-foreground">
+                  · {format(parseISO(athlete.targetDeadline), "dd/MM/yyyy")}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      </Link>
+    </TooltipProvider>
   );
 }

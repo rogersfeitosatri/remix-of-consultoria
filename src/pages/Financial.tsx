@@ -214,6 +214,11 @@ export default function Financial() {
             </div>
           </TabsContent>
 
+          {/* LTV Tab */}
+          <TabsContent value="ltv" className="mt-4">
+            <LTVTab />
+          </TabsContent>
+
           {/* Atletas Tab */}
           <TabsContent value="atletas" className="space-y-6 mt-4">
             <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">

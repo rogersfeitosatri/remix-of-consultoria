@@ -550,13 +550,15 @@ export default function CheckinReview() {
 
     const answers = checkinResponse.responses || {};
 
-    // Pattern 4: adjustment trigger with "Sim" answer
-    questions.forEach(q => {
-      if ((q as any).is_adjustment_trigger) {
+    // Pattern 4: questions 13 and 15 answered with "Sim"
+    const sortedQs = [...questions].sort((a, b) => a.order_index - b.order_index);
+    [12, 14].forEach(idx => {
+      const q = sortedQs[idx];
+      if (q) {
         const resp = answers[q.id];
         const ans = resp && typeof resp === 'object' ? resp.answer : resp;
         if (ans === 'Sim' || ans === 'sim') {
-          alerts.push({ message: `Gatilho de ajuste ativado: "${q.question_text}"`, severity: 'red' });
+          alerts.push({ message: `Pergunta ${idx + 1} com solicitação de ajuste: "${q.question_text}"`, severity: 'red' });
         }
       }
     });
@@ -836,18 +838,21 @@ export default function CheckinReview() {
 
           {/* Responses Tab */}
           <TabsContent value="responses" className="space-y-4">
-            {/* Adjustment Trigger Questions Highlight */}
-            {questions.some(q => q.is_adjustment_trigger) && (
+            {/* Questions 13 and 15 highlight */}
+            {(() => {
+              const sortedForHighlight = [...questions].sort((a, b) => a.order_index - b.order_index);
+              const triggerQs = [sortedForHighlight[12], sortedForHighlight[14]].filter(Boolean);
+              if (!triggerQs.length) return null;
+              return (
               <Card className="border-l-4 border-l-orange-500 border-orange-500/20">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-base text-orange-700 dark:text-orange-400">
                     <span>⚠️</span>
-                    Perguntas de Gatilho de Ajuste
+                    Perguntas de Ajuste (13 e 15)
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {questions
-                    .filter(q => q.is_adjustment_trigger)
+                  {triggerQs
                     .map((question) => {
                       const response = checkinResponse?.responses?.[question.id];
                       let answer = response;
@@ -870,7 +875,8 @@ export default function CheckinReview() {
                   }
                 </CardContent>
               </Card>
-            )}
+              );
+            })()}
 
             <Card>
               <CardHeader>
@@ -886,6 +892,9 @@ export default function CheckinReview() {
                 {(() => {
                   const highlightedQuestions: typeof questions = [];
                   const regularQuestions: typeof questions = [];
+
+                  const sortedAll = [...questions].sort((a, b) => a.order_index - b.order_index);
+                  const triggerIds = new Set([sortedAll[12]?.id, sortedAll[14]?.id].filter(Boolean));
 
                   questions.forEach(q => {
                     const isHighlighted = q.order_index === 12 || q.order_index === 14;
@@ -912,7 +921,7 @@ export default function CheckinReview() {
                       : (typeof answer === 'string' || typeof answer === 'number' ? String(answer) : 'Não respondido');
                     const isWeight = isWeightQuestion(question.question_text);
                     const isEditing = editingWeightQuestionId === question.id;
-                    const isAdjTrigger = (question as any).is_adjustment_trigger;
+                    const isAdjTrigger = triggerIds.has(question.id);
 
                     return (
                       <div
