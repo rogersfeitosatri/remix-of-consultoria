@@ -741,18 +741,19 @@ export function ActionCenterPanel() {
                   </div>
                 )}
 
-                {pendingCheckinFeedbacks.length > 0 && (
+                {visibleFeedbacks.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-orange-500 flex items-center gap-1">
-                      <MessageSquare className="h-3 w-3" /> Check-ins p/ revisar ({pendingCheckinFeedbacks.length})
+                      <MessageSquare className="h-3 w-3" /> Check-ins p/ revisar ({visibleFeedbacks.length})
                     </p>
-                    {pendingCheckinFeedbacks.slice(0, 5).map((f: any) => (
+                    {visibleFeedbacks.slice(0, 5).map((f: any) => (
                       <ActionRow
                         key={f.id}
                         icon={<MessageSquare className="h-3.5 w-3.5 text-orange-500" />}
                         title={f.clients?.name || 'N/A'}
                         subtitle={f.status === 'approved' ? 'Pronto p/ envio' : 'Pendente'}
                         onClick={() => navigate(`/checkin-review/${f.checkin_response_id}`)}
+                        onDismiss={() => dismiss(`pcf:${f.id}`)}
                       />
                     ))}
                   </div>
