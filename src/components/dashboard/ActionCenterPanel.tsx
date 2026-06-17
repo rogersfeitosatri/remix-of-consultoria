@@ -684,6 +684,7 @@ export function ActionCenterPanel() {
                         subtitle={`há ${c.days_waiting}d`}
                         variant="warning"
                         onClick={() => navigate(`/clients/${c.client_id}`)}
+                        onDismiss={() => dismiss(`pck:${c.client_id}`)}
                       />
                     ))}
                   </div>
