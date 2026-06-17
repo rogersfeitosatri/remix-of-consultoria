@@ -827,6 +827,7 @@ export function ActionCenterPanel() {
                             <Phone className="h-3 w-3" />
                           </Button>
                         )}
+                        <DismissBtn k={`ret:${a.id}`} />
                         <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => navigate(`/clients/${a.id}`)}>
                           <ChevronRight className="h-3 w-3" />
                         </Button>
