@@ -548,6 +548,7 @@ export function ActionCenterPanel() {
                         >
                           Concluir cadastro
                         </Button>
+                        <DismissBtn k={`reg:${a.id}`} />
                       </div>
                     </div>
                   ))}
