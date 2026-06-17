@@ -699,12 +699,12 @@ export function ActionCenterPanel() {
               <p className="text-sm text-muted-foreground text-center py-4">Nenhuma pendência ✓</p>
             ) : (
               <>
-                {(pendingPlans.length > 0 || unlinkedAnamnese.length > 0) && (
+                {(visiblePendingPlans.length > 0 || visibleUnlinkedAnamnese.length > 0) && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-orange-500 flex items-center gap-1">
-                      <UtensilsCrossed className="h-3 w-3" /> Planos alimentares ({pendingPlans.length + unlinkedAnamnese.length})
+                      <UtensilsCrossed className="h-3 w-3" /> Planos alimentares ({visiblePendingPlans.length + visibleUnlinkedAnamnese.length})
                     </p>
-                    {pendingPlans.slice(0, 5).map(plan => {
+                    {visiblePendingPlans.slice(0, 5).map(plan => {
                       const refDate = plan.anamnese_submitted_at ? parseISO(plan.anamnese_submitted_at) : parseISO(plan.created_at);
                       const elapsed = businessDaysSince(refDate);
                       const remaining = 4 - elapsed;
