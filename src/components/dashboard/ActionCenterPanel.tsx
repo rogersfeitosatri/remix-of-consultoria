@@ -46,6 +46,52 @@ export function ActionCenterPanel() {
   const { data: unlinkedAnamnese = [] } = useUnlinkedAnamneseForMealPlan();
   const markAsSent = useMarkMealPlanSent();
 
+  // ─── Dispensar ações ─────────────────────────────────────────────
+  // Marca uma ação como "feita/dispensada" localmente por 24h.
+  // Some da lista imediatamente; reaparece se o dado de fato continuar pendente após 24h.
+  const DISMISS_KEY = 'action-center-dismissed-v1';
+  const DISMISS_TTL = 24 * 60 * 60 * 1000;
+  const [dismissed, setDismissed] = useState<Record<string, number>>(() => {
+    try {
+      const raw = localStorage.getItem(DISMISS_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      const now = Date.now();
+      const valid: Record<string, number> = {};
+      for (const [k, ts] of Object.entries(parsed)) {
+        if (now - ts < DISMISS_TTL) valid[k] = ts;
+      }
+      return valid;
+    } catch { return {}; }
+  });
+  const isDismissed = (key: string) => key in dismissed;
+  const dismiss = (key: string) => {
+    setDismissed(prev => {
+      const next = { ...prev, [key]: Date.now() };
+      try { localStorage.setItem(DISMISS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    toast.success('Ação concluída');
+  };
+
+  const DismissBtn = ({ k }: { k: string }) => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+            onClick={(e) => { e.stopPropagation(); dismiss(k); }}
+          >
+            <Check className="h-3.5 w-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top"><p className="text-xs">Dar check e remover da lista</p></TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+
   // Complete task mutation
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const completeTask = async (taskId: string) => {
