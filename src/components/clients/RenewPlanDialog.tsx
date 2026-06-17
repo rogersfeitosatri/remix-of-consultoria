@@ -175,7 +175,7 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
       return;
     }
     if (!Number.isFinite(monthlyValue) || monthlyValue < 0) {
-      toast.error('Informe um valor mensal válido.');
+      toast.error('Informe um valor total válido.');
       return;
     }
     setSaving(true);
@@ -236,10 +236,39 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
 
       if (updateError) throw updateError;
 
+      // 4. Reset consultation pipeline — clear future (non-completed) schedules
+      //    so the next consultations are only generated after the athlete books
+      //    (via link) or the admin schedules manually.
+      const { error: clearSchedulesError } = await supabase
+        .from('consultation_schedules')
+        .delete()
+        .eq('client_id', client.id)
+        .not('status', 'in', '(completed)');
+      if (clearSchedulesError) {
+        console.warn('[RenewPlan] failed to clear future schedules:', clearSchedulesError);
+      }
+
+      // 5. Reset the schedule rule trigger so the cron does not pre-fire a link
+      //    before the athlete actually books the first consultation of the new plan.
+      const { error: clearRuleError } = await supabase
+        .from('consultation_schedule_rules')
+        .update({
+          next_link_send_date: null,
+          last_link_sent_at: null,
+          consultations_completed: 0,
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('client_id', client.id);
+      if (clearRuleError) {
+        console.warn('[RenewPlan] failed to reset schedule rule:', clearRuleError);
+      }
+
       await queryClient.invalidateQueries({ queryKey: ['clients'] });
       await queryClient.invalidateQueries({ queryKey: ['client-plan-history', client.id] });
       await queryClient.invalidateQueries({ queryKey: ['athlete-summary', client.id] });
-      toast.success('Plano renovado com sucesso! O plano anterior foi salvo no histórico.');
+      await queryClient.invalidateQueries({ queryKey: ['consultation-schedules', client.id] });
+      await queryClient.invalidateQueries({ queryKey: ['consultations'] });
+      toast.success('Plano renovado! Pipeline zerada — aguardando agendamento da próxima consulta.');
       onOpenChange(false);
     } catch (err: any) {
       toast.error('Erro ao renovar plano: ' + (err.message || 'Tente novamente'));
@@ -323,7 +352,7 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Valor Mensal (R$)</Label>
+                <Label>Valor Total (R$)</Label>
                 <Input
                   type="number"
                   value={monthlyValue}

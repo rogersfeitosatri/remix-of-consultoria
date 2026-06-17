@@ -4,8 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { ClipboardCheck, ChevronRight, CheckCircle, AlertCircle, Target, Clock, Search } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ClipboardCheck, ChevronRight, CheckCircle, AlertCircle, Target, Clock, Search, CalendarIcon } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,6 +16,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { CHECKIN_LABELS, type CheckinFrequency } from '@/types/client';
 import { classifyPlan, type PlanTypology } from '@/lib/planTypology';
+import { cn } from '@/lib/utils';
 
 interface PendingCheckinResponse {
   id: string;
@@ -64,10 +67,13 @@ function getWaitingLabel(submittedAt: string): { text: string; urgent: boolean }
 
 export function PendingReviewsList() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [frequencyFilter, setFrequencyFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useState(searchParams.get('checkinFrom') || '');
+  const [dateTo, setDateTo] = useState(searchParams.get('checkinTo') || '');
 
   const { data: pendingResponses = [], isLoading } = useQuery({
     queryKey: ['pending_checkin_reviews', user?.id],
@@ -166,9 +172,12 @@ export function PendingReviewsList() {
     return pendingResponses.filter(r => {
       if (frequencyFilter !== 'all' && r.clients?.checkin_frequency !== frequencyFilter) return false;
       if (searchQuery && !(r.clients?.name || '').toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      const submittedDate = format(parseISO(r.submitted_at), 'yyyy-MM-dd');
+      if (dateFrom && submittedDate < dateFrom) return false;
+      if (dateTo && submittedDate > dateTo) return false;
       return true;
     });
-  }, [pendingResponses, frequencyFilter, searchQuery]);
+  }, [pendingResponses, frequencyFilter, searchQuery, dateFrom, dateTo]);
 
   // Split into urgency groups
   const { urgent, recent } = useMemo(() => {
@@ -321,7 +330,7 @@ export function PendingReviewsList() {
           <CardDescription className="text-xs">
             Check-ins enviados aguardando análise/feedback
           </CardDescription>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
@@ -331,16 +340,81 @@ export function PendingReviewsList() {
                 className="pl-8 h-9 text-sm"
               />
             </div>
-            <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
-              <SelectTrigger className="w-[120px] h-9 text-xs">
-                <SelectValue placeholder="Freq." />
-              </SelectTrigger>
-              <SelectContent>
-                {FREQUENCY_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              {/* Date From */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-9 w-[130px] justify-start text-left font-normal text-xs",
+                      !dateFrom && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                    {dateFrom ? format(parseISO(dateFrom), "dd/MM/yy") : <span>De</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateFrom ? parseISO(dateFrom) : undefined}
+                    onSelect={(date) => {
+                      const val = date ? format(date, 'yyyy-MM-dd') : '';
+                      setDateFrom(val);
+                      const params = new URLSearchParams(searchParams);
+                      if (val) params.set('checkinFrom', val);
+                      else params.delete('checkinFrom');
+                      setSearchParams(params, { replace: true });
+                    }}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {/* Date To */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-9 w-[130px] justify-start text-left font-normal text-xs",
+                      !dateTo && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-1 h-3.5 w-3.5" />
+                    {dateTo ? format(parseISO(dateTo), "dd/MM/yy") : <span>Até</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateTo ? parseISO(dateTo) : undefined}
+                    onSelect={(date) => {
+                      const val = date ? format(date, 'yyyy-MM-dd') : '';
+                      setDateTo(val);
+                      const params = new URLSearchParams(searchParams);
+                      if (val) params.set('checkinTo', val);
+                      else params.delete('checkinTo');
+                      setSearchParams(params, { replace: true });
+                    }}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              <Select value={frequencyFilter} onValueChange={setFrequencyFilter}>
+                <SelectTrigger className="w-[110px] h-9 text-xs">
+                  <SelectValue placeholder="Freq." />
+                </SelectTrigger>
+                <SelectContent>
+                  {FREQUENCY_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </CardHeader>

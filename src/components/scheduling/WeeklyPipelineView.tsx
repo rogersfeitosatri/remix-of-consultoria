@@ -17,6 +17,8 @@ import { Separator } from '@/components/ui/separator';
 import { PlanTypeBadge } from '@/components/clients/PlanTypeBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { CheckCircle, XCircle } from 'lucide-react';
 
 interface WeeklyPipelineViewProps {
   consultations: (ConsultationSchedule & { client_name: string })[];
@@ -27,7 +29,7 @@ interface WeeklyPipelineViewProps {
   isSending?: boolean;
 }
 
-type PipelineStatus = 'link_pending' | 'link_sent' | 'booked' | 'completed' | 'no_show' | 'first_consult';
+type PipelineStatus = 'link_pending' | 'link_sent' | 'booked' | 'awaiting_confirmation' | 'completed' | 'cancelled' | 'no_show' | 'first_consult';
 
 interface PipelineItem {
   clientId: string;
@@ -66,11 +68,23 @@ const STATUS_CONFIG: Record<PipelineStatus, { label: string; icon: any; classNam
     className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
     bgClass: 'bg-emerald-500/5 border-emerald-500/20',
   },
+  awaiting_confirmation: {
+    label: 'Aguardando confirmação',
+    icon: AlertTriangle,
+    className: 'bg-amber-500/15 text-amber-700 border-amber-500/40',
+    bgClass: 'bg-amber-500/10 border-amber-500/30',
+  },
   completed: {
     label: 'Realizada',
     icon: CheckCircle2,
     className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
     bgClass: 'bg-emerald-500/5 border-emerald-500/20',
+  },
+  cancelled: {
+    label: 'Cancelada',
+    icon: XCircle,
+    className: 'bg-muted text-muted-foreground border-border',
+    bgClass: 'bg-muted/30 border-border',
   },
   no_show: {
     label: 'Não Agendou',
@@ -97,6 +111,29 @@ export function WeeklyPipelineView({
   const [weekOffset, setWeekOffset] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const updateAppointmentStatus = async (appointmentId: string, newStatus: 'completed' | 'cancelled') => {
+    setConfirmingId(appointmentId);
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', appointmentId);
+      if (error) throw error;
+      toast({
+        title: newStatus === 'completed' ? 'Consulta marcada como realizada' : 'Consulta marcada como cancelada',
+      });
+      queryClient.invalidateQueries({ queryKey: ['consultation-appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
 
   const APP_URL = 'https://rogersfeitosa.com.br';
 
@@ -217,15 +254,22 @@ export function WeeklyPipelineView({
   const lastCompletedByClient = useMemo(() => {
     const map = new Map<string, string>();
     (appointments || []).forEach((apt: any) => {
+      // Only count appointments explicitly marked as completed (não auto-considerar por data passada)
+      if (apt.status !== 'completed') return;
       const aptDate = parseISO(apt.appointment_date);
-      const isPastConfirmed = (apt.status === 'completed') ||
-        ((apt.status === 'scheduled' || apt.status === 'confirmed') && isBefore(aptDate, today));
-      if (!isPastConfirmed) return;
       const prev = map.get(apt.client_id);
       if (!prev || aptDate > parseISO(prev)) map.set(apt.client_id, apt.appointment_date);
     });
     return map;
-  }, [appointments, today]);
+  }, [appointments]);
+
+  const statusFromAppointment = (apt: any): PipelineStatus => {
+    if (apt.status === 'completed') return 'completed';
+    if (apt.status === 'cancelled' || apt.status === 'no_show') return 'cancelled';
+    const aptDate = parseISO(apt.appointment_date);
+    return isBefore(aptDate, today) ? 'awaiting_confirmation' : 'booked';
+  };
+
 
   // Build pipeline items for the current week
   const pipelineItems = useMemo(() => {
@@ -242,11 +286,12 @@ export function WeeklyPipelineView({
         const client = clientsById.get(schedule.client_id);
         const sendDate = parseISO(schedule.send_link_date);
 
-        // Check if there's a matching appointment in the same week or next 2 weeks
+        // Check if there's a matching appointment in the same week or next 2 weeks (any non-cancelled status)
         const matchingAppointment = (appointments || []).find(
           (apt: any) =>
             apt.client_id === schedule.client_id &&
-            (apt.status === 'scheduled' || apt.status === 'confirmed') &&
+            apt.status !== 'cancelled' &&
+            apt.status !== 'no_show' &&
             parseISO(apt.appointment_date) >= currentWeekStart
         );
 
@@ -260,8 +305,7 @@ export function WeeklyPipelineView({
 
         let status: PipelineStatus;
         if (matchingAppointment) {
-          const aptDate = parseISO(matchingAppointment.appointment_date);
-          status = isBefore(aptDate, today) ? 'completed' : 'booked';
+          status = statusFromAppointment(matchingAppointment);
         } else if (schedule.status === 'sent' || (schedule.status as string) === 'link_sent') {
           const daysSince = Math.floor((today.getTime() - sendDate.getTime()) / (1000 * 60 * 60 * 24));
           status = daysSince >= 3 ? 'no_show' : 'link_sent';
@@ -306,7 +350,8 @@ export function WeeklyPipelineView({
         const matchingAppointment = (appointments || []).find(
           (apt: any) =>
             apt.client_id === client.id &&
-            (apt.status === 'scheduled' || apt.status === 'confirmed') &&
+            apt.status !== 'cancelled' &&
+            apt.status !== 'no_show' &&
             apt.appointment_date === client.first_consultation_date
         );
 
@@ -314,11 +359,7 @@ export function WeeklyPipelineView({
           clientId: client.id,
           clientName: client.name,
           client,
-          status: matchingAppointment
-            ? isBefore(parseISO(matchingAppointment.appointment_date), today)
-              ? 'completed'
-              : 'booked'
-            : 'first_consult',
+          status: matchingAppointment ? statusFromAppointment(matchingAppointment) : 'first_consult',
           appointmentDate: matchingAppointment?.appointment_date || client.first_consultation_date,
           appointmentTime: matchingAppointment?.appointment_time,
           appointmentId: matchingAppointment?.id,
@@ -334,7 +375,8 @@ export function WeeklyPipelineView({
     (appointments || [])
       .filter((apt: any) => {
         if (processedClientIds.has(apt.client_id)) return false;
-        if (apt.status !== 'scheduled' && apt.status !== 'confirmed') return false;
+        // Include all non-explicitly-cancelled statuses (scheduled/confirmed/completed past)
+        if (apt.status === 'cancelled' || apt.status === 'no_show') return false;
         const aptDate = parseISO(apt.appointment_date);
         return isWithinInterval(aptDate, { start: currentWeekStart, end: currentWeekEnd });
       })
@@ -344,7 +386,7 @@ export function WeeklyPipelineView({
           clientId: apt.client_id,
           clientName: apt.client?.name || client?.name || 'Cliente',
           client,
-          status: isBefore(parseISO(apt.appointment_date), today) ? 'completed' : 'booked',
+          status: statusFromAppointment(apt),
           appointmentDate: apt.appointment_date,
           appointmentTime: apt.appointment_time,
           appointmentId: apt.id,
@@ -355,14 +397,16 @@ export function WeeklyPipelineView({
         processedClientIds.add(apt.client_id);
       });
 
-    // Sort: overdue first, then pending, then sent, then booked, then completed
+    // Sort: awaiting confirmation first (needs action), then overdue, pending, sent, booked, completed, cancelled
     const statusOrder: Record<PipelineStatus, number> = {
-      no_show: 0,
-      link_pending: 1,
-      link_sent: 2,
-      first_consult: 3,
-      booked: 4,
-      completed: 5,
+      awaiting_confirmation: 0,
+      no_show: 1,
+      link_pending: 2,
+      link_sent: 3,
+      first_consult: 4,
+      booked: 5,
+      completed: 6,
+      cancelled: 7,
     };
 
     return items.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
@@ -380,8 +424,27 @@ export function WeeklyPipelineView({
     sent: pipelineItems.filter(i => i.status === 'link_sent').length,
     overdue: pipelineItems.filter(i => i.status === 'no_show').length,
     booked: pipelineItems.filter(i => i.status === 'booked' || i.status === 'first_consult').length,
+    awaitingConfirmation: pipelineItems.filter(i => i.status === 'awaiting_confirmation').length,
     completed: pipelineItems.filter(i => i.status === 'completed').length,
+    cancelled: pipelineItems.filter(i => i.status === 'cancelled').length,
   }), [pipelineItems]);
+
+  // Past appointments awaiting confirmation (independent of week navigation)
+  const pastAwaitingConfirmation = useMemo(() => {
+    return (appointments || [])
+      .filter((apt: any) => {
+        if (!apt.appointment_date) return false;
+        if (!['scheduled', 'confirmed'].includes(apt.status)) return false;
+        return isBefore(parseISO(apt.appointment_date), today);
+      })
+      .map((apt: any) => ({
+        ...apt,
+        client: clientsById.get(apt.client_id),
+        clientName: apt.client?.name || clientsById.get(apt.client_id)?.name || 'Cliente',
+      }))
+      .sort((a: any, b: any) => parseISO(b.appointment_date).getTime() - parseISO(a.appointment_date).getTime());
+  }, [appointments, today, clientsById]);
+
 
   const isCurrentWeek = weekOffset === 0;
   const weekLabel = format(currentWeekStart, "dd MMM", { locale: ptBR }) +
@@ -389,6 +452,73 @@ export function WeeklyPipelineView({
 
   return (
     <div className="space-y-4">
+      {/* Past appointments awaiting confirmation (any week) */}
+      {pastAwaitingConfirmation.length > 0 && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+              <div>
+                <CardTitle className="text-sm font-semibold text-amber-700">
+                  {pastAwaitingConfirmation.length} consulta{pastAwaitingConfirmation.length > 1 ? 's' : ''} passada{pastAwaitingConfirmation.length > 1 ? 's' : ''} aguardando confirmação
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Marque como Realizada ou Cancelada para liberar a próxima etapa da pipeline.
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2">
+            {pastAwaitingConfirmation.map((apt: any) => (
+              <div
+                key={apt.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-card/50 px-3 py-2 flex-wrap"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Calendar className="h-4 w-4 text-amber-600 shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{apt.clientName}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {format(parseISO(apt.appointment_date), "EEE dd/MM/yyyy", { locale: ptBR })}
+                      {apt.appointment_time ? ` às ${apt.appointment_time.substring(0, 5)}` : ''}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10"
+                    onClick={() => updateAppointmentStatus(apt.id, 'completed')}
+                    disabled={confirmingId === apt.id}
+                  >
+                    {confirmingId === apt.id
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <CheckCircle className="h-3 w-3" />}
+                    Realizada
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={() => updateAppointmentStatus(apt.id, 'cancelled')}
+                    disabled={confirmingId === apt.id}
+                  >
+                    <XCircle className="h-3 w-3" />
+                    Cancelada
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" asChild>
+                    <Link to={`/appointments/${apt.id}`}>
+                      <Eye className="h-3 w-3" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Week Navigation + Stats */}
       <Card className="border-border bg-card">
         <CardHeader className="pb-3">
@@ -468,6 +598,16 @@ export function WeeklyPipelineView({
               <div className="text-[10px] text-muted-foreground">Agendados</div>
             </button>
             <button
+              onClick={() => setStatusFilter('awaiting_confirmation')}
+              className={cn(
+                "text-center p-2 rounded-lg border transition-colors",
+                statusFilter === 'awaiting_confirmation' ? "border-amber-500 bg-amber-500/10" : "border-border hover:bg-muted/50"
+              )}
+            >
+              <div className={cn("text-lg font-bold", stats.awaitingConfirmation > 0 ? "text-amber-700" : "text-muted-foreground")}>{stats.awaitingConfirmation}</div>
+              <div className="text-[10px] text-muted-foreground">A confirmar</div>
+            </button>
+            <button
               onClick={() => setStatusFilter('completed')}
               className={cn(
                 "text-center p-2 rounded-lg border transition-colors",
@@ -481,20 +621,24 @@ export function WeeklyPipelineView({
         </CardContent>
       </Card>
 
-      {/* Alert for overdue */}
-      {stats.overdue > 0 && statusFilter === 'all' && (
-        <Card className="border-destructive/50 bg-destructive/5">
+      {/* Alert for awaiting confirmation */}
+      {stats.awaitingConfirmation > 0 && statusFilter === 'all' && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
           <CardContent className="py-3 flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-destructive">
-                {stats.overdue} atleta{stats.overdue > 1 ? 's' : ''} recebeu link mas não agendou (3+ dias)
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-700">
+                {stats.awaitingConfirmation} consulta{stats.awaitingConfirmation > 1 ? 's' : ''} aguardando sua confirmação
               </p>
-              <p className="text-xs text-muted-foreground">Considere reenviar o link ou entrar em contato.</p>
+              <p className="text-xs text-muted-foreground">Marque como Realizada ou Cancelada usando os botões abaixo.</p>
             </div>
+            <Button size="sm" variant="outline" className="text-xs" onClick={() => setStatusFilter('awaiting_confirmation')}>
+              Ver pendentes
+            </Button>
           </CardContent>
         </Card>
       )}
+
 
       {/* Pipeline list */}
       {filteredItems.length === 0 ? (
@@ -560,8 +704,9 @@ export function WeeklyPipelineView({
                           <span className={cn(
                             "flex items-center gap-0.5",
                             item.status === 'no_show' ? "text-destructive font-medium" :
+                              item.status === 'cancelled' ? "text-muted-foreground line-through" :
                               item.status === 'link_sent' ? "text-blue-600" :
-                                ['booked', 'completed'].includes(item.status) ? "text-emerald-600" : ""
+                                ['booked', 'completed', 'awaiting_confirmation'].includes(item.status) ? "text-emerald-600" : ""
                           )}>
                             <Calendar className="h-3 w-3" />
                             {item.status === 'no_show' ? `Sem resposta (${item.daysSinceSent}d)` :
@@ -572,15 +717,19 @@ export function WeeklyPipelineView({
                           </span>
 
                           {/* Step 3: Consultation */}
-                          {['booked', 'completed'].includes(item.status) && (
+                          {['booked', 'completed', 'awaiting_confirmation', 'cancelled'].includes(item.status) && (
                             <>
                               <span className="text-muted-foreground/50">→</span>
                               <span className={cn(
                                 "flex items-center gap-0.5",
-                                item.status === 'completed' ? "text-emerald-600 font-medium" : ""
+                                item.status === 'completed' ? "text-emerald-600 font-medium" :
+                                  item.status === 'awaiting_confirmation' ? "text-amber-700 font-medium" :
+                                  item.status === 'cancelled' ? "text-muted-foreground" : ""
                               )}>
                                 <CheckCircle2 className="h-3 w-3" />
-                                {item.status === 'completed' ? 'Realizada' : 'Aguardando'}
+                                {item.status === 'completed' ? 'Realizada' :
+                                  item.status === 'awaiting_confirmation' ? 'Confirmar?' :
+                                  item.status === 'cancelled' ? 'Cancelada' : 'Aguardando'}
                               </span>
                             </>
                           )}
@@ -667,6 +816,35 @@ export function WeeklyPipelineView({
                           Reenviar
                         </Button>
                       )}
+
+                      {/* Confirm/Cancel buttons for past appointments awaiting confirmation */}
+                      {item.status === 'awaiting_confirmation' && item.appointmentId && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1 border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10"
+                            onClick={() => updateAppointmentStatus(item.appointmentId!, 'completed')}
+                            disabled={confirmingId === item.appointmentId}
+                          >
+                            {confirmingId === item.appointmentId
+                              ? <Loader2 className="h-3 w-3 animate-spin" />
+                              : <CheckCircle className="h-3 w-3" />}
+                            Realizada
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"
+                            onClick={() => updateAppointmentStatus(item.appointmentId!, 'cancelled')}
+                            disabled={confirmingId === item.appointmentId}
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Cancelada
+                          </Button>
+                        </>
+                      )}
+
 
                       {/* Meet link */}
                       {item.meetLink && (

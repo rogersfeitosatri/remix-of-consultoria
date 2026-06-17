@@ -105,11 +105,14 @@ Deno.serve(async (req) => {
     const athleteName = client?.name || 'Atleta';
     const athletePhone = client?.phone ?? null;
 
-    const { data: questions } = await supabase
+    const { data: allQuestions } = await supabase
       .from('checkin_questions')
       .select('id, question_text, question_type, scale_min, scale_max, order_index')
       .eq('form_id', formId)
       .order('order_index', { ascending: true });
+
+    // Filter to only show questions 13 and 15 (order_index 12 and 14) in admin notification
+    const questions = (allQuestions || []).filter(q => q.order_index === 12 || q.order_index === 14);
 
     let checkinResponseId: string | null = providedResponseId ?? null;
     if (!checkinResponseId) {

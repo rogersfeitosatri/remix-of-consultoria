@@ -5,16 +5,15 @@ import { MonthlyProgressionPanel } from '@/components/dashboard/MonthlyProgressi
 import { BlocoSaudeFinanceira } from '@/components/dashboard/BlocoSaudeFinanceira';
 import { BlocoTemperatura } from '@/components/dashboard/BlocoTemperatura';
 import { Separator } from '@/components/ui/separator';
-import { ListTodo, DollarSign, Thermometer } from 'lucide-react';
+import { ListTodo } from 'lucide-react';
 
 export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-8">
-        {/* OAuth alert — aparece quando necessário */}
         <GoogleOAuthAlert />
 
-        {/* ── BLOCO 1: Fila de ação do dia ─────────────────────────────── */}
+        {/* ── BLOCO 1: Fila de ação do dia ──────────────────────────────── */}
         <section>
           <div className="flex items-center gap-2 mb-4">
             <ListTodo className="h-4 w-4 text-primary" />

@@ -122,7 +122,7 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
     if (!user) return;
     const value = parseFloat(monthlyValue);
     if (!value || value <= 0) {
-      toast.error('Informe o valor mensal');
+      toast.error('Informe o valor total');
       return;
     }
     if (!endDate) {
@@ -246,7 +246,7 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Valor Mensal (R$)</Label>
+              <Label className="text-xs">Valor Total (R$)</Label>
               <Input
                 type="number"
                 min="0"

@@ -321,14 +321,14 @@ export function useAvailabilityRulesByAdmin(adminUserId: string | undefined) {
     queryFn: async () => {
       if (!adminUserId) return [];
 
-      // First try to get from scheduling_time_blocks (new system)
-      const { data: settings } = await supabase
-        .from('scheduling_settings')
-        .select('id, slot_duration_minutes')
-        .eq('user_id', adminUserId)
-        .maybeSingle();
+      // First try scheduling_time_blocks (source of truth) via public RPC for settings
+      const { data: settingsRows } = await supabase.rpc(
+        'get_public_scheduling_settings_by_user',
+        { p_user_id: adminUserId }
+      );
+      const settings: any = Array.isArray(settingsRows) ? settingsRows[0] : settingsRows;
 
-      if (settings) {
+      if (settings?.id) {
         const { data: timeBlocks, error: blocksError } = await supabase
           .from('scheduling_time_blocks')
           .select('*')
@@ -349,6 +349,7 @@ export function useAvailabilityRulesByAdmin(adminUserId: string | undefined) {
           })) as AvailabilityRule[];
         }
       }
+
 
       // Fallback to old availability_rules table
       const { data, error } = await supabase

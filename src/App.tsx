@@ -65,6 +65,8 @@ const SchedulingAudit = lazy(() => import("./pages/SchedulingAudit"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const NutriPeriodizaProtocols = lazy(() => import("./pages/NutriPeriodizaProtocols"));
 const PublicNpCheckin = lazy(() => import("./pages/PublicNpCheckin"));
+const Terms = lazy(() => import("./pages/Terms"));
+const PublicOnboarding = lazy(() => import("./pages/PublicOnboarding"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -147,6 +149,8 @@ function AppRoutes() {
         <Route path="/call/:slug" element={<PublicStrategicCall />} />
         <Route path="/unsubscribe" element={<Unsubscribe />} />
         <Route path="/np-checkin/:token" element={<PublicNpCheckin />} />
+        <Route path="/termos" element={<Terms />} />
+        <Route path="/onboarding" element={<PublicOnboarding />} />
         <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
         <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />

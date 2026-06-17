@@ -65,7 +65,7 @@ export function PlanHistorySection({ clientId }: { clientId: string }) {
               <div className="grid grid-cols-3 gap-2 text-muted-foreground">
                 <span>Início: {format(parseISO(h.start_date), 'dd/MM/yyyy')}</span>
                 <span>Término: {format(parseISO(h.end_date), 'dd/MM/yyyy')}</span>
-                <span>R$ {Number(h.monthly_value).toFixed(2)}/mês</span>
+                <span>Total: R$ {Number(h.monthly_value).toFixed(2)}</span>
               </div>
             </div>
           ))}

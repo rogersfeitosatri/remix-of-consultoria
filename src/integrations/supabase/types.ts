@@ -1541,6 +1541,7 @@ export type Database = {
       }
       checkin_feedbacks: {
         Row: {
+          admin_decision: string | null
           ai_analysis_id: string | null
           approved_at: string | null
           approved_by: string | null
@@ -1556,6 +1557,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_decision?: string | null
           ai_analysis_id?: string | null
           approved_at?: string | null
           approved_by?: string | null
@@ -1571,6 +1573,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_decision?: string | null
           ai_analysis_id?: string | null
           approved_at?: string | null
           approved_by?: string | null
@@ -1846,14 +1849,17 @@ export type Database = {
           monthly_value: number
           name: string
           notes: string | null
+          onboarding_status: string | null
           onboarding_type: string | null
           payment_date: string | null
           payment_type: string | null
           phone: string | null
           plan_duration: string | null
+          plan_sent_at: string | null
           plan_type: string
           registration_source: string | null
           remaining_consultations: number | null
+          selected_plan_id: string | null
           service_type: string
           start_date: string
           total_frozen_days: number
@@ -1891,14 +1897,17 @@ export type Database = {
           monthly_value: number
           name: string
           notes?: string | null
+          onboarding_status?: string | null
           onboarding_type?: string | null
           payment_date?: string | null
           payment_type?: string | null
           phone?: string | null
           plan_duration?: string | null
+          plan_sent_at?: string | null
           plan_type: string
           registration_source?: string | null
           remaining_consultations?: number | null
+          selected_plan_id?: string | null
           service_type: string
           start_date: string
           total_frozen_days?: number
@@ -1936,21 +1945,32 @@ export type Database = {
           monthly_value?: number
           name?: string
           notes?: string | null
+          onboarding_status?: string | null
           onboarding_type?: string | null
           payment_date?: string | null
           payment_type?: string | null
           phone?: string | null
           plan_duration?: string | null
+          plan_sent_at?: string | null
           plan_type?: string
           registration_source?: string | null
           remaining_consultations?: number | null
+          selected_plan_id?: string | null
           service_type?: string
           start_date?: string
           total_frozen_days?: number
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_selected_plan_id_fkey"
+            columns: ["selected_plan_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       consult_automation_settings: {
         Row: {
@@ -4486,6 +4506,101 @@ export type Database = {
           },
         ]
       }
+      onboarding_payment_settings: {
+        Row: {
+          anamnese_form_id: string | null
+          created_at: string
+          id: string
+          mp_public_key: string | null
+          reminder_days: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          anamnese_form_id?: string | null
+          created_at?: string
+          id?: string
+          mp_public_key?: string | null
+          reminder_days?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          anamnese_form_id?: string | null
+          created_at?: string
+          id?: string
+          mp_public_key?: string | null
+          reminder_days?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_payment_settings_anamnese_form_id_fkey"
+            columns: ["anamnese_form_id"]
+            isOneToOne: false
+            referencedRelation: "anamnese_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_plans: {
+        Row: {
+          category: string
+          checkin_frequency: string | null
+          consultation_interval_weeks: number
+          consultations_count: number
+          created_at: string
+          description: string | null
+          duration_months: number
+          id: string
+          is_active: boolean
+          name: string
+          order_index: number
+          payment_link: string | null
+          periodicity: string
+          price: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          checkin_frequency?: string | null
+          consultation_interval_weeks?: number
+          consultations_count?: number
+          created_at?: string
+          description?: string | null
+          duration_months: number
+          id?: string
+          is_active?: boolean
+          name: string
+          order_index?: number
+          payment_link?: string | null
+          periodicity: string
+          price?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          checkin_frequency?: string | null
+          consultation_interval_weeks?: number
+          consultations_count?: number
+          created_at?: string
+          description?: string | null
+          duration_months?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          order_index?: number
+          payment_link?: string | null
+          periodicity?: string
+          price?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -6039,10 +6154,20 @@ export type Database = {
         Args: { p_cadence_weeks: number; p_last_appointment_at: string }
         Returns: string
       }
+      can_submit_checkin_response: {
+        Args: { _client_id: string; _form_id: string }
+        Returns: boolean
+      }
       cancel_overdue_inactive_scheduled_checkins: {
         Args: never
         Returns: {
           cancelled: number
+        }[]
+      }
+      cancel_public_booking_as_completed: {
+        Args: { p_appointment_id: string; p_token: string }
+        Returns: {
+          appointment_id: string
         }[]
       }
       check_booking_send_duplicate: {
@@ -6156,6 +6281,18 @@ export type Database = {
           usage_count: number
         }[]
       }
+      get_public_client_upcoming_appointments: {
+        Args: { p_token: string }
+        Returns: {
+          appointment_date: string
+          appointment_id: string
+          appointment_time: string
+          duration_minutes: number
+          google_meet_link: string
+          hours_until: number
+          status: string
+        }[]
+      }
       get_public_scheduling_blocks: {
         Args: { p_from_date?: string; p_to_date?: string; p_user_id: string }
         Returns: {
@@ -6163,6 +6300,37 @@ export type Database = {
           block_type: string
           end_time: string
           start_time: string
+        }[]
+      }
+      get_public_scheduling_settings_by_slug: {
+        Args: { p_slug: string }
+        Returns: {
+          booking_link_slug: string
+          buffer_minutes: number
+          id: string
+          max_advance_days: number
+          min_advance_unit: string
+          min_advance_value: number
+          slot_duration_minutes: number
+          user_id: string
+          working_days: Json
+          working_hours_end: string
+          working_hours_start: string
+        }[]
+      }
+      get_public_scheduling_settings_by_user: {
+        Args: { p_user_id: string }
+        Returns: {
+          buffer_minutes: number
+          id: string
+          max_advance_days: number
+          min_advance_unit: string
+          min_advance_value: number
+          slot_duration_minutes: number
+          user_id: string
+          working_days: Json
+          working_hours_end: string
+          working_hours_start: string
         }[]
       }
       has_role: {
@@ -6236,6 +6404,17 @@ export type Database = {
         Args: never
         Returns: {
           reconciled: number
+        }[]
+      }
+      reschedule_public_booking_appointment: {
+        Args: {
+          p_appointment_id: string
+          p_date: string
+          p_time: string
+          p_token: string
+        }
+        Returns: {
+          appointment_id: string
         }[]
       }
       resolve_public_checkin_form: {
