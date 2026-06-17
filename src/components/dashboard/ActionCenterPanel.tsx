@@ -584,7 +584,7 @@ export function ActionCenterPanel() {
                     <p className="text-xs font-medium text-destructive flex items-center gap-1">
                       <MessageSquare className="h-3 w-3" /> Sem resposta ({unresponsiveAthletes.length})
                     </p>
-                    {unresponsiveAthletes.slice(0, 5).map(a => (
+                    {visibleUnresponsive.slice(0, 5).map(a => (
                       <ActionRow
                         key={a.clientId}
                         icon={<MessageSquare className="h-3.5 w-3.5 text-destructive" />}
@@ -593,6 +593,7 @@ export function ActionCenterPanel() {
                         variant="destructive"
                         onClick={() => navigate(`/clients/${a.clientId}`)}
                         whatsApp={a.phone ? () => openWhatsApp(a.phone!, `Olá! Percebi que faz um tempo que não nos falamos. Como está indo? 💪`) : undefined}
+                        onDismiss={() => dismiss(`unr:${a.clientId}`)}
                       />
                     ))}
                   </div>
