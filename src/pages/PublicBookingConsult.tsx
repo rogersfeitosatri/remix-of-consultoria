@@ -596,6 +596,146 @@ export default function PublicBookingConsult() {
     );
   }
 
+  // Show upcoming appointments list (mode list, has appointments)
+  if (mode === 'list' && (loadingUpcoming || upcomingAppointments.length > 0)) {
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <header className="border-b border-gray-800 bg-black">
+          <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full overflow-hidden border border-[hsl(43,74%,49%)]">
+              <img src={rogersProfile} alt="Rogers Feitosa" className="w-full h-[200%] object-cover object-[center_15%]" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-[hsl(43,74%,49%)]">ROGERS FEITOSA</h1>
+              <p className="text-xs text-gray-400">Nutrição e Treinamento</p>
+            </div>
+          </div>
+        </header>
+
+        <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1">Sua consulta agendada</h2>
+            <p className="text-gray-400">
+              Olá, <span className="text-[hsl(43,74%,49%)]">{bookingContext?.client_name}</span>! Veja sua consulta abaixo.
+            </p>
+          </div>
+
+          {loadingUpcoming ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-[hsl(43,74%,49%)]" />
+            </div>
+          ) : (
+            upcomingAppointments.map((appt) => {
+              const apptDate = parse(appt.appointment_date, 'yyyy-MM-dd', new Date());
+              const apptTime = appt.appointment_time.substring(0, 5);
+              const canReschedule = appt.hours_until > 6;
+              return (
+                <Card key={appt.appointment_id} className="bg-gray-900 border-[hsl(43,74%,49%)]/30 border-2">
+                  <CardContent className="py-6 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <CalendarIcon className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                      <span className="text-white text-lg capitalize">
+                        {format(apptDate, "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Clock className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                      <span className="text-white text-lg">{apptTime} ({appt.duration_minutes} min)</span>
+                    </div>
+                    {appt.google_meet_link && (
+                      <div className="pt-3 border-t border-gray-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Video className="h-4 w-4 text-blue-400" />
+                          <span className="text-sm text-gray-400">Link da videochamada</span>
+                        </div>
+                        <a
+                          href={appt.google_meet_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white text-sm font-medium transition-colors"
+                        >
+                          Abrir Google Meet
+                        </a>
+                      </div>
+                    )}
+
+                    {!canReschedule && (
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                        <AlertCircle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-amber-200">
+                          Faltam menos de 6 horas para a consulta. Não é possível remarcar.
+                          Caso não possa comparecer, marque a consulta como realizada — ela será contabilizada normalmente.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                      <Button
+                        onClick={() => {
+                          setReschedulingId(appt.appointment_id);
+                          setMode('reschedule');
+                          setSelectedDate(undefined);
+                          setSelectedTime(null);
+                        }}
+                        disabled={!canReschedule}
+                        className="flex-1 bg-[hsl(43,74%,49%)] hover:bg-[hsl(43,74%,40%)] text-primary-foreground font-bold"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Remarcar consulta
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setCancellingId(appt.appointment_id)}
+                        className="flex-1 border-red-500/40 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Não poderei comparecer
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+
+          <div className="text-center pt-2">
+            <Button
+              variant="ghost"
+              onClick={() => { setMode('book'); setReschedulingId(null); }}
+              className="text-gray-400 hover:text-white"
+            >
+              Agendar uma nova consulta adicional
+            </Button>
+          </div>
+        </main>
+
+        <AlertDialog open={!!cancellingId} onOpenChange={(open) => !open && setCancellingId(null)}>
+          <AlertDialogContent className="bg-gray-900 border-gray-800 text-white">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">Não poderá comparecer?</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-400">
+                Ao confirmar, a consulta será marcada como <strong className="text-white">realizada</strong> e contabilizada
+                no seu plano. Esta ação não pode ser desfeita pelo link público.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700">
+                Voltar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleCancelAsCompleted}
+                disabled={isCancelling}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmar'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
+
   // Booking form
   return (
     <div className="min-h-screen bg-black text-white">
