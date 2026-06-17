@@ -25,16 +25,11 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItemConfig[] = [
   { key: '/tasks', label: 'Tarefas', visible: true },
   { key: '/clients', label: 'Atletas', visible: true },
   { key: '/checkin-hub', label: 'Check-ins', visible: true },
-  { key: '/periodization', label: 'Periodização', visible: true },
-  { key: '/metabolic-web', label: 'Interconexão Metabólica', visible: true },
   { key: '/financial', label: 'Financeiro', visible: true },
   { key: '/calendar', label: 'Calendário', visible: true },
   { key: '/scheduling', label: 'Agendamento', visible: true },
   { key: '/content', label: 'Conteúdo Atleta', visible: true },
-  { key: '/link-bio', label: 'Link da Bio', visible: true },
   { key: '/forms', label: 'Formulários', visible: true },
-  { key: '/calls', label: 'Call', visible: true },
-  { key: '/scheduling-links', label: 'Agendamento Calls', visible: true },
   { key: '/settings', label: 'Configurações', visible: true },
 ];
 
@@ -64,11 +59,15 @@ export function useLayoutSettings() {
     logo_url: settings?.logo_url || null,
     avatar_url: settings?.avatar_url || null,
     sidebar_items: (() => {
+      // Routes moved into Settings — never show in sidebar
+      const HIDDEN_ROUTES = new Set(['/calls', '/scheduling-links', '/link-bio', '/periodization', '/metabolic-web']);
       const saved = (settings?.sidebar_items || []) as unknown as SidebarItemConfig[];
-      if (saved.length === 0) return DEFAULT_SIDEBAR_ITEMS;
-      const savedKeys = new Set(saved.map(s => s.key));
-      const newItems = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedKeys.has(d.key));
-      return [...saved, ...newItems];
+      const base = saved.length === 0 ? DEFAULT_SIDEBAR_ITEMS : (() => {
+        const savedKeys = new Set(saved.map(s => s.key));
+        const newItems = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedKeys.has(d.key));
+        return [...saved, ...newItems];
+      })();
+      return base.filter(item => !HIDDEN_ROUTES.has(item.key));
     })(),
   }), [settings]);
 
