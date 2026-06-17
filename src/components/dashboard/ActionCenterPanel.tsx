@@ -653,6 +653,7 @@ export function ActionCenterPanel() {
                           <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => navigate(`/clients/${a.client_id}`)}>
                             Ver
                           </Button>
+                          <DismissBtn k={`apt:${a.id}`} />
                         </div>
                       </div>
                     ))}
