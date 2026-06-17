@@ -753,10 +753,25 @@ export default function PublicBookingConsult() {
 
       <main className="max-w-2xl mx-auto px-4 py-6">
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-white mb-1">Agendar Consulta</h2>
+          <h2 className="text-2xl font-bold text-white mb-1">
+            {mode === 'reschedule' ? 'Remarcar Consulta' : 'Agendar Consulta'}
+          </h2>
           <p className="text-gray-400">
-            Olá, <span className="text-[hsl(43,74%,49%)]">{bookingContext?.client_name}</span>! Escolha o melhor horário para sua consulta.
+            Olá, <span className="text-[hsl(43,74%,49%)]">{bookingContext?.client_name}</span>!{' '}
+            {mode === 'reschedule'
+              ? 'Escolha a nova data e horário para sua consulta.'
+              : 'Escolha o melhor horário para sua consulta.'}
           </p>
+          {(mode === 'reschedule' || upcomingAppointments.length > 0) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setMode('list'); setReschedulingId(null); setSelectedDate(undefined); setSelectedTime(null); }}
+              className="mt-2 text-gray-400 hover:text-white px-0"
+            >
+              ← Voltar
+            </Button>
+          )}
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
