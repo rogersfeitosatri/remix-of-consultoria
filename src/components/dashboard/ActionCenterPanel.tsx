@@ -901,6 +901,7 @@ export function ActionCenterPanel() {
                               </>
                             )}
                           </Button>
+                          <DismissBtn k={`que:${s.id}`} />
                           <Button
                             size="sm"
                             variant="ghost"
