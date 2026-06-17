@@ -854,7 +854,7 @@ export function ActionCenterPanel() {
                   Links de agendamento programados pelo cron diário. Reenvie manualmente se necessário.
                 </p>
                 <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
-                  {sendQueue.map((s: any) => {
+                  {visibleSendQueue.map((s: any) => {
                     const sendDate = parseISO(s.send_link_date);
                     const consultDate = parseISO(s.scheduled_date);
                     const isSent = s.status === 'sent' || s.status === 'link_sent' || !!s.link_sent_at;
