@@ -6164,6 +6164,12 @@ export type Database = {
           cancelled: number
         }[]
       }
+      cancel_public_booking_as_completed: {
+        Args: { p_appointment_id: string; p_token: string }
+        Returns: {
+          appointment_id: string
+        }[]
+      }
       check_booking_send_duplicate: {
         Args: {
           _client_id: string
@@ -6273,6 +6279,18 @@ export type Database = {
           client_id: string
           client_name: string
           usage_count: number
+        }[]
+      }
+      get_public_client_upcoming_appointments: {
+        Args: { p_token: string }
+        Returns: {
+          appointment_date: string
+          appointment_id: string
+          appointment_time: string
+          duration_minutes: number
+          google_meet_link: string
+          hours_until: number
+          status: string
         }[]
       }
       get_public_scheduling_blocks: {
@@ -6386,6 +6404,17 @@ export type Database = {
         Args: never
         Returns: {
           reconciled: number
+        }[]
+      }
+      reschedule_public_booking_appointment: {
+        Args: {
+          p_appointment_id: string
+          p_date: string
+          p_time: string
+          p_token: string
+        }
+        Returns: {
+          appointment_id: string
         }[]
       }
       resolve_public_checkin_form: {
