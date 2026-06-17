@@ -613,6 +613,7 @@ export function ActionCenterPanel() {
                         variant="destructive"
                         onClick={() => navigate(`/clients/${a.id}`)}
                         whatsApp={a.phone ? () => openWhatsApp(a.phone!) : undefined}
+                        onDismiss={() => dismiss(`urg:${a.id}`)}
                       />
                     ))}
                   </div>
