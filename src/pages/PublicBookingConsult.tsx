@@ -336,29 +336,38 @@ export default function PublicBookingConsult() {
 
   const handleConfirm = async () => {
     if (!selectedDate || !selectedTime || !bookingContext || !settings) return;
-    
+
     setIsSubmitting(true);
-    
+    const isReschedule = mode === 'reschedule' && reschedulingId;
+
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      
-      // Create appointment via secure RPC
-      const { data: appointmentData, error: appointmentError } = await supabase
-        .rpc('create_public_booking_appointment', {
+      let appointmentId: string;
+
+      if (isReschedule) {
+        const { data, error } = await supabase.rpc('reschedule_public_booking_appointment', {
+          p_token: token,
+          p_appointment_id: reschedulingId,
+          p_date: dateStr,
+          p_time: selectedTime,
+        });
+        if (error) throw error;
+        appointmentId = (data as any)?.[0]?.appointment_id || reschedulingId;
+      } else {
+        const { data, error } = await supabase.rpc('create_public_booking_appointment', {
           p_token: token,
           p_date: dateStr,
           p_time: selectedTime,
         });
-
-      if (appointmentError) throw appointmentError;
-      
-      const appointment = { id: appointmentData?.[0]?.appointment_id || appointmentData };
+        if (error) throw error;
+        appointmentId = (data as any)?.[0]?.appointment_id || (data as any);
+      }
 
       // Try to create Google Calendar event
       let meetLink = null;
       try {
         const { data: calendarData } = await supabase.functions.invoke('create-calendar-event', {
-          body: { appointmentId: appointment.id },
+          body: { appointmentId },
         });
         meetLink = calendarData?.google_meet_link;
       } catch (calendarError) {
@@ -368,37 +377,35 @@ export default function PublicBookingConsult() {
       // Send WhatsApp confirmation
       try {
         const formattedDate = format(selectedDate, "dd 'de' MMMM", { locale: ptBR });
-        let message = `✅ Consulta confirmada!\n\n📅 Data: ${formattedDate}\n⏰ Horário: ${selectedTime}`;
+        const header = isReschedule ? '🔄 Consulta remarcada!' : '✅ Consulta confirmada!';
+        let message = `${header}\n\n📅 Data: ${formattedDate}\n⏰ Horário: ${selectedTime}`;
         if (meetLink) {
           message += `\n\n🎥 Link da videochamada:\n${meetLink}`;
         }
         message += '\n\nAté lá!';
 
         await supabase.functions.invoke('send-whatsapp', {
-          body: {
-            clientId: bookingContext.client_id,
-            message,
-          },
+          body: { clientId: bookingContext.client_id, message },
         });
       } catch (whatsappError) {
         console.error('WhatsApp send failed:', whatsappError);
       }
 
-      // Log the confirmation
       await supabase.from('consult_invite_logs').insert({
         client_id: bookingContext.client_id,
         channel: 'system',
         status: 'confirmed',
-        message_type: 'booking_confirmation',
+        message_type: isReschedule ? 'booking_rescheduled' : 'booking_confirmation',
       });
 
       setConfirmationData({
         date: format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR }),
         time: selectedTime,
         meetLink,
+        rescheduled: !!isReschedule,
       });
       setIsConfirmed(true);
-      toast.success('Consulta agendada com sucesso!');
+      toast.success(isReschedule ? 'Consulta remarcada com sucesso!' : 'Consulta agendada com sucesso!');
 
     } catch (error: any) {
       console.error('Booking error:', error);
@@ -407,6 +414,28 @@ export default function PublicBookingConsult() {
       setIsSubmitting(false);
     }
   };
+
+  const handleCancelAsCompleted = async () => {
+    if (!cancellingId) return;
+    setIsCancelling(true);
+    try {
+      const { error } = await supabase.rpc('cancel_public_booking_as_completed', {
+        p_token: token,
+        p_appointment_id: cancellingId,
+      });
+      if (error) throw error;
+      toast.success('Consulta marcada como realizada.');
+      setConfirmationData({ date: '', time: '', cancelled: true });
+      setIsConfirmed(true);
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao processar.');
+    } finally {
+      setIsCancelling(false);
+      setCancellingId(null);
+    }
+  };
+
+
 
   // Not verified yet - show email gate
   if (!isVerified) {
