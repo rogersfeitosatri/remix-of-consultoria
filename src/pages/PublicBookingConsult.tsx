@@ -537,8 +537,16 @@ export default function PublicBookingConsult() {
             <CheckCircle2 className="h-16 w-16 text-green-500" />
           </div>
           
-          <h2 className="text-2xl font-bold text-white mb-2">Consulta Agendada!</h2>
-          <p className="text-gray-400 mb-8">Sua consulta foi confirmada com sucesso.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">
+            {confirmationData.cancelled ? 'Consulta finalizada' : confirmationData.rescheduled ? 'Consulta Remarcada!' : 'Consulta Agendada!'}
+          </h2>
+          <p className="text-gray-400 mb-8">
+            {confirmationData.cancelled
+              ? 'Sua consulta foi marcada como realizada.'
+              : confirmationData.rescheduled
+                ? 'Sua consulta foi remarcada com sucesso.'
+                : 'Sua consulta foi confirmada com sucesso.'}
+          </p>
 
           <Card className="bg-gray-900 border-gray-800 mb-6">
             <CardContent className="py-6 space-y-4">
