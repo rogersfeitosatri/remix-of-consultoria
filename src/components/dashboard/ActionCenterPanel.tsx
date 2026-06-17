@@ -914,7 +914,7 @@ export function ActionCenterPanel() {
 
 // Reusable action row
 function ActionRow({
-  icon, title, subtitle, badge, variant, onClick, whatsApp,
+  icon, title, subtitle, badge, variant, onClick, whatsApp, onDismiss,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -923,6 +923,7 @@ function ActionRow({
   variant?: 'destructive' | 'warning';
   onClick: () => void;
   whatsApp?: () => void;
+  onDismiss?: () => void;
 }) {
   return (
     <div
@@ -945,6 +946,17 @@ function ActionRow({
         {whatsApp && (
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-success" onClick={(e) => { e.stopPropagation(); whatsApp(); }}>
             <Zap className="h-3 w-3" />
+          </Button>
+        )}
+        {onDismiss && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+            title="Dar check e remover da lista"
+            onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+          >
+            <Check className="h-3.5 w-3.5" />
           </Button>
         )}
         <ChevronRight className="h-3 w-3 text-muted-foreground" />
