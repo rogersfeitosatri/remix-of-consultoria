@@ -302,19 +302,27 @@ export function ActionCenterPanel() {
     }
   };
 
-  const appointments = dayData?.appointments || [];
-  const overdueTasks = dayData?.tasks.filter(t => t.is_overdue) || [];
-  const todayTasks = dayData?.tasks.filter(t => !t.is_overdue) || [];
-  const pendingCheckins = dayData?.pendingCheckins || [];
-  const urgentAthletes = dayData?.urgentAthletes || [];
+  const appointments = (dayData?.appointments || []).filter(a => !isDismissed(`apt:${a.id}`));
+  const overdueTasks = (dayData?.tasks.filter(t => t.is_overdue) || []).filter(t => !isDismissed(`tsk:${t.id}`));
+  const todayTasks = (dayData?.tasks.filter(t => !t.is_overdue) || []).filter(t => !isDismissed(`tsk:${t.id}`));
+  const pendingCheckins = (dayData?.pendingCheckins || []).filter(c => !isDismissed(`pck:${c.client_id}`));
+  const urgentAthletes = (dayData?.urgentAthletes || []).filter(a => !isDismissed(`urg:${a.id}`));
+  const visibleUnresponsive = unresponsiveAthletes.filter((a: any) => !isDismissed(`unr:${a.clientId}`));
+  const visiblePendingPlans = pendingPlans.filter((p: any) => !isDismissed(`mpl:${p.id}`));
+  const visibleUnlinkedAnamnese = unlinkedAnamnese.filter((a: any) => !isDismissed(`mpu:${a.id}`));
+  const visibleFeedbacks = pendingCheckinFeedbacks.filter((f: any) => !isDismissed(`pcf:${f.id}`));
+  const visibleInactive = inactiveAthletes.filter((a: any) => !isDismissed(`ina:${a.id}`));
+  const visibleRetention = retentionAthletes.filter((a: any) => !isDismissed(`ret:${a.id}`));
+  const visibleRegistrations = pendingRegistrations.filter((a: any) => !isDismissed(`reg:${a.id}`));
+  const visibleSendQueue = sendQueue.filter((s: any) => !isDismissed(`que:${s.id}`));
 
   // Count items per tab
-  const urgentCount = overdueTasks.length + unresponsiveAthletes.length + urgentAthletes.length;
+  const urgentCount = overdueTasks.length + visibleUnresponsive.length + urgentAthletes.length;
   const todayCount = appointments.length + todayTasks.length + pendingCheckins.length;
-  const pendingCount = pendingPlans.length + unlinkedAnamnese.length + pendingCheckinFeedbacks.length + inactiveAthletes.length;
-  const retentionCount = retentionAthletes.length;
-  const registrationCount = pendingRegistrations.length;
-  const queueCount = sendQueue.length;
+  const pendingCount = visiblePendingPlans.length + visibleUnlinkedAnamnese.length + visibleFeedbacks.length + visibleInactive.length;
+  const retentionCount = visibleRetention.length;
+  const registrationCount = visibleRegistrations.length;
+  const queueCount = visibleSendQueue.length;
 
   const totalCount = urgentCount + todayCount + pendingCount + retentionCount + registrationCount + queueCount;
 
