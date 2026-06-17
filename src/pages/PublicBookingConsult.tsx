@@ -71,7 +71,45 @@ export default function PublicBookingConsult() {
   const [schedulingBlocks, setSchedulingBlocks] = useState<Array<{ block_date: string; block_type: string; start_time: string | null; end_time: string | null }>>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
-  const [confirmationData, setConfirmationData] = useState<{ date: string; time: string; meetLink?: string } | null>(null);
+  const [confirmationData, setConfirmationData] = useState<{ date: string; time: string; meetLink?: string; rescheduled?: boolean; cancelled?: boolean } | null>(null);
+
+  // Existing appointments
+  const [upcomingAppointments, setUpcomingAppointments] = useState<Array<{
+    appointment_id: string;
+    appointment_date: string;
+    appointment_time: string;
+    duration_minutes: number;
+    status: string;
+    google_meet_link: string | null;
+    hours_until: number;
+  }>>([]);
+  const [loadingUpcoming, setLoadingUpcoming] = useState(false);
+  const [mode, setMode] = useState<'list' | 'book' | 'reschedule'>('list');
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Load upcoming appointments after verification
+  const fetchUpcoming = async () => {
+    if (!token) return;
+    setLoadingUpcoming(true);
+    try {
+      const { data, error } = await supabase.rpc('get_public_client_upcoming_appointments', { p_token: token });
+      if (error) throw error;
+      setUpcomingAppointments((data as any) || []);
+    } catch (e) {
+      console.error('upcoming fetch error', e);
+    } finally {
+      setLoadingUpcoming(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isVerified) {
+      fetchUpcoming();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVerified]);
 
   // Fetch scheduling settings when we have admin user id
   useEffect(() => {
