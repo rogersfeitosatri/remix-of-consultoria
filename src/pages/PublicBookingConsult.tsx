@@ -548,37 +548,41 @@ export default function PublicBookingConsult() {
                 : 'Sua consulta foi confirmada com sucesso.'}
           </p>
 
-          <Card className="bg-gray-900 border-gray-800 mb-6">
-            <CardContent className="py-6 space-y-4">
-              <div className="flex items-center justify-center gap-3">
-                <CalendarIcon className="h-5 w-5 text-[hsl(43,74%,49%)]" />
-                <span className="text-white text-lg capitalize">{confirmationData.date}</span>
-              </div>
-              <div className="flex items-center justify-center gap-3">
-                <Clock className="h-5 w-5 text-[hsl(43,74%,49%)]" />
-                <span className="text-white text-lg">{confirmationData.time}</span>
-              </div>
-              {confirmationData.meetLink && (
-                <div className="pt-4 border-t border-gray-800">
-                  <div className="flex items-center justify-center gap-2 mb-3">
-                    <Video className="h-5 w-5 text-blue-400" />
-                    <span className="text-gray-400">Link da videochamada</span>
-                  </div>
-                  <a
-                    href={confirmationData.meetLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium transition-colors"
-                  >
-                    Abrir Google Meet
-                  </a>
+          {!confirmationData.cancelled && (
+            <Card className="bg-gray-900 border-gray-800 mb-6">
+              <CardContent className="py-6 space-y-4">
+                <div className="flex items-center justify-center gap-3">
+                  <CalendarIcon className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                  <span className="text-white text-lg capitalize">{confirmationData.date}</span>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <div className="flex items-center justify-center gap-3">
+                  <Clock className="h-5 w-5 text-[hsl(43,74%,49%)]" />
+                  <span className="text-white text-lg">{confirmationData.time}</span>
+                </div>
+                {confirmationData.meetLink && (
+                  <div className="pt-4 border-t border-gray-800">
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <Video className="h-5 w-5 text-blue-400" />
+                      <span className="text-gray-400">Link da videochamada</span>
+                    </div>
+                    <a
+                      href={confirmationData.meetLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium transition-colors"
+                    >
+                      Abrir Google Meet
+                    </a>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <p className="text-sm text-gray-500 mb-6">
-            Você receberá uma confirmação por WhatsApp com todos os detalhes.
+            {confirmationData.cancelled
+              ? 'Você pode entrar em contato com a equipe para reagendar quando puder.'
+              : 'Você receberá uma confirmação por WhatsApp com todos os detalhes.'}
           </p>
 
           <Button
