@@ -759,12 +759,12 @@ export function ActionCenterPanel() {
                   </div>
                 )}
 
-                {inactiveAthletes.length > 0 && (
+                {visibleInactive.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                      <UserX className="h-3 w-3" /> Sem interação +14d ({inactiveAthletes.length})
+                      <UserX className="h-3 w-3" /> Sem interação +14d ({visibleInactive.length})
                     </p>
-                    {inactiveAthletes.slice(0, 5).map(a => (
+                    {visibleInactive.slice(0, 5).map((a: any) => (
                       <ActionRow
                         key={a.id}
                         icon={<UserX className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -772,6 +772,7 @@ export function ActionCenterPanel() {
                         subtitle={`${a.daysSinceLastInteraction}d`}
                         onClick={() => navigate(`/clients/${a.id}`)}
                         whatsApp={a.phone ? () => openWhatsApp(a.phone!) : undefined}
+                        onDismiss={() => dismiss(`ina:${a.id}`)}
                       />
                     ))}
                   </div>
