@@ -6348,6 +6348,10 @@ export type Database = {
           reason: string
         }[]
       }
+      is_trainer_of_current_athlete: {
+        Args: { _trainer_id: string }
+        Returns: boolean
+      }
       mark_pending_reminders: {
         Args: never
         Returns: {
