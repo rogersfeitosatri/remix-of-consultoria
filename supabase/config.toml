@@ -3,6 +3,9 @@ project_id = "vhzxnatgwravidvbehwi"
 [functions.kiwify-webhook]
 verify_jwt = false
 
+[functions.whatsapp-webhook]
+verify_jwt = false
+
 [functions.analyze-athlete]
 verify_jwt = false
 
