@@ -16,6 +16,7 @@ export interface Client {
   checkin_frequency: 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly' | null;
   has_checkin: boolean;
   has_agenda_access: boolean;
+  ai_whatsapp_enabled?: boolean;
   start_date: string;
   end_date: string;
   checkin_start_date?: string | null;

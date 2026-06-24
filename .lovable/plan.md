@@ -1,64 +1,56 @@
-## Visão geral
+## Objetivo
+Atletas conversam pelo WhatsApp e recebem respostas de uma IA (Lovable AI / GPT-5) baseadas 100% no plano deles — anamnese, plano alimentar atual e check-ins recentes. Casos sensíveis viram alerta no Centro de Ações e notificação no seu WhatsApp.
 
-Novo fluxo de onboarding **isolado** para novos atletas: escolha do plano → registro como `pending` → link de pagamento via WhatsApp → webhook Mercado Pago confirma → ativação automática (consultoria) ou pipeline de consultas (consultas). **Atletas existentes não são afetados.**
+## O que você precisa fazer (fora da Lovable)
 
-Vou usar nomes/tabelas novas (prefixo `onboarding_`) para não conflitar com `plan_templates`, `payments` e `financial_transactions` já existentes.
+1. **Criar app na Meta for Developers** (business.facebook.com → Apps → WhatsApp).
+2. **Número dedicado** ligado à conta WhatsApp Business (não pode ser o mesmo que você usa no Z-API hoje).
+3. Obter e me passar (via add_secret quando eu pedir):
+   - `WHATSAPP_PHONE_NUMBER_ID`
+   - `WHATSAPP_ACCESS_TOKEN` (token permanente do System User)
+   - `WHATSAPP_VERIFY_TOKEN` (string aleatória que você inventa — usada no webhook)
+   - `WHATSAPP_APP_SECRET` (para validar assinatura dos webhooks)
+4. **Configurar webhook** no painel Meta apontando para a Edge Function que eu vou criar (vou te passar a URL exata).
+5. **Aprovar 1 template** "boas-vindas / opt-in" na Meta (obrigatório para iniciar conversa fora da janela de 24h).
 
----
+## O que eu implemento aqui
 
-## FASE 1 — Fundação (esta entrega)
+### Backend
+- Tabela `ai_chat_conversations` (1 por atleta) + `ai_chat_messages` (histórico role/content/tokens) com RLS escopada por `user_id` do treinador.
+- Tabela `ai_chat_settings` (system prompt editável, modelo, on/off por atleta, palavras-gatilho de escalonamento).
+- Edge Function `whatsapp-webhook` (verify_jwt=false, valida assinatura Meta):
+  - GET → handshake `hub.challenge`.
+  - POST → recebe mensagem, identifica atleta pelo telefone E.164, carrega contexto (anamnese + plano + últimos 3 check-ins), monta prompt e chama Lovable AI (`openai/gpt-5-mini` por padrão).
+  - Detecta gatilhos sensíveis (sintomas clínicos, pedido de mudança de plano, palavras como "dor", "passando mal", "trocar plano") → cria registro em `ai_chat_escalations` (vira card no Centro de Ações) e dispara WhatsApp para o admin via Z-API existente.
+  - Responde ao atleta via Meta Cloud API.
+- Edge Function `whatsapp-send` (envio ativo Cloud API, usada se você quiser iniciar conversa).
+- Janela 24h respeitada: fora dela, usa template aprovado.
 
-**Banco:**
-- `onboarding_plans` — 6 linhas fixas (slug, categoria, periodicidade, duração, consultas, frequência check-in, **payment_link**, **price**). Seed com seus valores: 497 / 797 / 1497 / 997 / 1697 / 2997.
-- `onboarding_payment_settings` — `mp_public_key`, `reminder_days`, `webhook_secret`. (Access Token vai como secret `MP_ACCESS_TOKEN`.)
-- `clients` (alter): adicionar `selected_plan_id`, `onboarding_status` (`pending|payment_sent|confirmed|active`), `plan_sent_at`. Sem alterar nada nas linhas existentes.
-- 3 templates novos em `whatsapp_templates` (slugs `onboarding_payment_link`, `onboarding_confirmation_consultoria`, `onboarding_confirmation_consultas`, `onboarding_payment_reminder`).
+### Frontend
+- Página **IA Assistente WhatsApp** em Configurações:
+  - Toggle on/off global.
+  - System prompt editável (tom, escopo, "fale sempre como nutricionista do Rogers", etc.).
+  - Lista de palavras-gatilho de escalonamento (editável).
+  - Logs de conversas por atleta (busca + visualização do thread).
+- Em cada **ficha de atleta**: toggle "Habilitar IA WhatsApp para este atleta" + ver histórico da conversa.
+- Novo card no **Centro de Ações**: "Mensagens IA pendentes de revisão" com link pro thread.
 
-**Admin UI:** Nova página `/configuracoes/onboarding` com 3 seções: Mercado Pago (public key + botão pedir secret do access token), Planos (tabela editável dos 6 planos: link MP + valor), Lembrete (dias).
+### Escopo do contexto enviado à IA (por mensagem)
+- Nome, idade, objetivo (da anamnese).
+- Plano alimentar atual (texto do último plano).
+- Últimos 3 check-ins (peso, sensações, aderência).
+- Pergunta atual + últimas 10 trocas da conversa.
 
-**Pergunta importante:** o atleta **não vê valores** na anamnese — só o nome do plano (conforme você pediu).
+### Limites
+- IA **nunca** altera plano — só orienta com base no que está escrito.
+- Se atleta pedir mudança → resposta padrão "vou avisar o Rogers" + escalonamento.
+- Custo controlado: GPT-5-mini por padrão, ~poucos centavos por resposta.
 
----
-
-## FASE 2 — Pergunta 0 + envio do link
-
-- Nova rota pública `/onboarding/plano/:slug?` (ou via link da anamnese) com tela dedicada de seleção de plano (6 cards, **sem valores**).
-- Após escolher, segue para a anamnese pública já existente carregando o `selected_plan_id` em estado.
-- Ao enviar a anamnese: edge function cria o `client` com `onboarding_status='pending'` + `selected_plan_id`, envia WhatsApp com template `onboarding_payment_link` (variáveis: `{nome_atleta}`, `{plano_nome}`, `{link_pagamento}`), seta status para `payment_sent`.
-
----
-
-## FASE 3 — Webhook MP + ativação
-
-- Edge function pública `mp-webhook` (sem JWT): valida assinatura, busca o pagamento via API do MP com o `MP_ACCESS_TOKEN`, idempotência por `mp_payment_id`.
-- Identifica o cliente pelo `external_reference` (preferencial) ou e-mail/telefone do pagador.
-- Cria registro em `financial_transactions` (categoria "Plano", método retornado pelo MP) e em `payments`.
-- Atualiza `client`: `onboarding_status='confirmed'`, `start_date`, `end_date` (start + duração do plano).
-- Dispara WhatsApp:
-  - Consultoria → template `onboarding_confirmation_consultoria` (aguarda admin marcar plano enviado → check-ins mensais a partir de `plan_sent_at + 1 mês`).
-  - Consultas → template `onboarding_confirmation_consultas` com link de agendamento da 1ª consulta (usa fluxo existente). Check-ins quinzenais só são gerados quando a 1ª consulta for confirmada (segunda mais próxima após `data_1a_consulta + 7 dias`).
-
----
-
-## FASE 4 — Lembrete + alerta de renovação
-
-- Cron diário: para `clients` com `onboarding_status='payment_sent'` há ≥ `reminder_days`, envia template `onboarding_payment_reminder`.
-- Webhook detecta pagamento de atleta já ativo → cria entrada em `renewal_alerts` e mostra card no dashboard admin com botões "Atualizar automaticamente" / "Manter manual".
-
----
-
-## Detalhes técnicos
-
-- Cálculo "4 dias úteis" via função SQL `add_business_days(date, int)` excluindo sáb/dom (feriados em uma tabela `holidays_br` simples).
-- Timezone `America/Fortaleza` (memory rule).
-- Idempotência: `UNIQUE(mp_payment_id)` em `payments` (nova coluna).
-- Segurança: webhook valida `x-signature` do MP. RLS: tudo só admin; `onboarding_plans.SELECT` público (sem expor `payment_link` para anônimos — apenas `slug`, `name`, `description`).
-- Templates em `whatsapp_templates` com `is_active` (cumprindo memory "All Automatic Messages in Central").
-
----
-
-## O que vou entregar agora
-
-**Apenas Fase 1**: migration + página admin de configurações + seed dos planos + 4 templates novos + pedido do secret `MP_ACCESS_TOKEN`. Ao final você confirma os 6 links do Mercado Pago e aprovo a Fase 2.
+## Ordem de execução
+1. Você confirma o plano.
+2. Eu crio as tabelas + Edge Functions + UI.
+3. Eu te peço os 4 secrets via add_secret.
+4. Você cria o app Meta, cola a URL do webhook que eu te passar, e aprova o template.
+5. Testamos com 1 atleta piloto.
 
 Posso seguir?

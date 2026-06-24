@@ -101,6 +101,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     plan_duration: client?.plan_duration || 'monthly' as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'custom',
     has_checkin: client?.has_checkin ?? true,
     has_agenda_access: client?.has_agenda_access ?? false,
+    ai_whatsapp_enabled: (client as any)?.ai_whatsapp_enabled ?? false,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly',
     checkin_start_date: (client as any)?.checkin_start_date || '',
     checkin_response_window_hours: (client as any)?.checkin_response_window_hours ?? null as number | null,
@@ -949,6 +950,19 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               )}
             </div>
           )}
+
+          {/* IA WhatsApp */}
+          <div className="flex items-center gap-4">
+            <Switch
+              id="aiWhatsapp"
+              checked={formData.ai_whatsapp_enabled}
+              onCheckedChange={(v) => setFormData({ ...formData, ai_whatsapp_enabled: v })}
+            />
+            <Label htmlFor="aiWhatsapp">
+              Habilitar IA WhatsApp para este atleta
+              <span className="ml-2 text-xs text-muted-foreground">(responde dúvidas via WhatsApp com base no plano)</span>
+            </Label>
+          </div>
 
           {/* Check-in */}
           <div className="space-y-4">
