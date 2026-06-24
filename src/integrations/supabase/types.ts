@@ -137,6 +137,188 @@ export type Database = {
           },
         ]
       }
+      ai_chat_conversations: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          last_message_at: string | null
+          message_count: number
+          phone_e164: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          message_count?: number
+          phone_e164: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          message_count?: number
+          phone_e164?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_chat_escalations: {
+        Row: {
+          client_id: string
+          conversation_id: string
+          created_at: string
+          excerpt: string
+          id: string
+          message_id: string | null
+          resolved_at: string | null
+          status: string
+          trigger: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          conversation_id: string
+          created_at?: string
+          excerpt: string
+          id?: string
+          message_id?: string | null
+          resolved_at?: string | null
+          status?: string
+          trigger: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          conversation_id?: string
+          created_at?: string
+          excerpt?: string
+          id?: string
+          message_id?: string | null
+          resolved_at?: string | null
+          status?: string
+          trigger?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_escalations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_chat_escalations_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_chat_escalations_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_chat_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          escalated: boolean
+          id: string
+          model: string | null
+          role: string
+          tokens_in: number | null
+          tokens_out: number | null
+          user_id: string
+          wa_message_id: string | null
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          escalated?: boolean
+          id?: string
+          model?: string | null
+          role: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          user_id: string
+          wa_message_id?: string | null
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          escalated?: boolean
+          id?: string
+          model?: string | null
+          role?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          user_id?: string
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_chat_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          escalation_keywords: string[]
+          model: string
+          system_prompt: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          escalation_keywords?: string[]
+          model?: string
+          system_prompt?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          escalation_keywords?: string[]
+          model?: string
+          system_prompt?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       anamnese_forms: {
         Row: {
           created_at: string
@@ -1823,6 +2005,7 @@ export type Database = {
           admin_next_focus: string | null
           admin_notes_short: string | null
           admin_summary: string | null
+          ai_whatsapp_enabled: boolean
           athlete_status: string | null
           athlete_user_id: string | null
           checkin_frequency: string | null
@@ -1871,6 +2054,7 @@ export type Database = {
           admin_next_focus?: string | null
           admin_notes_short?: string | null
           admin_summary?: string | null
+          ai_whatsapp_enabled?: boolean
           athlete_status?: string | null
           athlete_user_id?: string | null
           checkin_frequency?: string | null
@@ -1919,6 +2103,7 @@ export type Database = {
           admin_next_focus?: string | null
           admin_notes_short?: string | null
           admin_summary?: string | null
+          ai_whatsapp_enabled?: boolean
           athlete_status?: string | null
           athlete_user_id?: string | null
           checkin_frequency?: string | null
