@@ -951,6 +951,19 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
             </div>
           )}
 
+          {/* IA WhatsApp */}
+          <div className="flex items-center gap-4">
+            <Switch
+              id="aiWhatsapp"
+              checked={formData.ai_whatsapp_enabled}
+              onCheckedChange={(v) => setFormData({ ...formData, ai_whatsapp_enabled: v })}
+            />
+            <Label htmlFor="aiWhatsapp">
+              Habilitar IA WhatsApp para este atleta
+              <span className="ml-2 text-xs text-muted-foreground">(responde dúvidas via WhatsApp com base no plano)</span>
+            </Label>
+          </div>
+
           {/* Check-in */}
           <div className="space-y-4">
             <div className="flex items-center gap-4">
