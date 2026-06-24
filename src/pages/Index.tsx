@@ -1,6 +1,7 @@
 import { Layout } from '@/components/layout/Layout';
 import { GoogleOAuthAlert } from '@/components/dashboard/GoogleOAuthAlert';
 import { ActionCenterPanel } from '@/components/dashboard/ActionCenterPanel';
+import { AiChatEscalationsCard } from '@/components/dashboard/AiChatEscalationsCard';
 import { MonthlyProgressionPanel } from '@/components/dashboard/MonthlyProgressionPanel';
 import { BlocoSaudeFinanceira } from '@/components/dashboard/BlocoSaudeFinanceira';
 import { BlocoTemperatura } from '@/components/dashboard/BlocoTemperatura';
