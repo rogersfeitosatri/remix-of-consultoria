@@ -20,6 +20,8 @@ import { LayoutCustomizationSection } from '@/components/settings/LayoutCustomiz
 import { ScanAnamneseTargetRaces } from '@/components/admin/ScanAnamneseTargetRaces';
 import { PlanTemplatesSection } from '@/components/settings/PlanTemplatesSection';
 import { OnboardingSettingsSection } from '@/components/settings/OnboardingSettingsSection';
+import { AiWhatsAppAssistantSection } from '@/components/settings/AiWhatsAppAssistantSection';
+import { Bot } from 'lucide-react';
 
 const CHECKIN_LABELS: Record<string, string> = {
   daily: 'Diário',
