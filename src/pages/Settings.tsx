@@ -600,6 +600,24 @@ export default function Settings() {
             </AccordionContent>
           </AccordionItem>
 
+          {/* IA WhatsApp Assistente */}
+          <AccordionItem value="ai-whatsapp" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <Bot className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">IA Assistente WhatsApp</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Atendimento automático aos atletas via WhatsApp com base no plano deles
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <AiWhatsAppAssistantSection />
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Export Card */}
           <AccordionItem value="export" className="border border-border rounded-lg bg-card px-4">
             <AccordionTrigger className="hover:no-underline py-4">
