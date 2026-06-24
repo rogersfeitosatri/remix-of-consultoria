@@ -101,6 +101,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     plan_duration: client?.plan_duration || 'monthly' as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'custom',
     has_checkin: client?.has_checkin ?? true,
     has_agenda_access: client?.has_agenda_access ?? false,
+    ai_whatsapp_enabled: (client as any)?.ai_whatsapp_enabled ?? false,
     checkin_frequency: client?.checkin_frequency || 'weekly' as 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly',
     checkin_start_date: (client as any)?.checkin_start_date || '',
     checkin_response_window_hours: (client as any)?.checkin_response_window_hours ?? null as number | null,
