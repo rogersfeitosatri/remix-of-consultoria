@@ -22,6 +22,7 @@ export default function Dashboard() {
             <span className="text-xs text-muted-foreground">— o que precisa de atenção agora</span>
           </div>
           <ActionCenterPanel />
+          <div className="mt-4"><AiChatEscalationsCard /></div>
         </section>
 
         <Separator />
