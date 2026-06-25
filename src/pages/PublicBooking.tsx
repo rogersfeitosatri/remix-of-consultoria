@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PersonStanding, CalendarDays, Clock, CheckCircle2, Loader2, AlertCircle, Info, User, Mail, Phone } from 'lucide-react';
 import { useSchedulingSettingsBySlug, useCreateAppointment } from '@/hooks/useScheduling';
-import { useTimeBlocksBySettingsSlug } from '@/hooks/useTimeBlocks';
+import { useAvailabilityRulesByAdmin } from '@/hooks/useConsultations';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addMinutes, isBefore, isSameDay, getDay, addDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
