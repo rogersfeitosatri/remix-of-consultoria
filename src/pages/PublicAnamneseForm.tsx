@@ -447,14 +447,26 @@ export default function PublicAnamneseForm() {
                 <CardTitle className="text-lg capitalize">{section.replace(/_/g, ' ')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {questionsBySection[section].map((question, index) => (
-                  <div key={question.id} className="space-y-4">
+                {questionsBySection[section].map((question, index) => {
+                  const isMissing = missingIds.has(question.id);
+                  return (
+                  <div
+                    key={question.id}
+                    id={`q-${question.id}`}
+                    className={cn(
+                      "space-y-4 rounded-md transition-colors",
+                      isMissing && "ring-2 ring-destructive/60 bg-destructive/5 p-3 -m-3"
+                    )}
+                  >
                     <div className="flex items-start gap-2">
                       <span className="text-muted-foreground font-medium">{index + 1}.</span>
                       <div className="flex-1">
                         <Label className={cn(question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
                           {question.question_text}
                         </Label>
+                        {isMissing && (
+                          <p className="text-xs text-destructive mt-1">Esta pergunta é obrigatória.</p>
+                        )}
                       </div>
                     </div>
 
