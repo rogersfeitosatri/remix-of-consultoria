@@ -188,7 +188,7 @@ export function useAddCheckinQuestion() {
     mutationFn: async (questionData: Omit<CheckinQuestion, 'id' | 'created_at'>) => {
       const { data, error } = await supabase
         .from('checkin_questions')
-        .insert(questionData)
+        .insert(questionData as any)
         .select()
         .single();
 
