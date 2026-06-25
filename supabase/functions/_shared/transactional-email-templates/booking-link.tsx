@@ -49,7 +49,7 @@ export const template = {
   displayName: 'Booking link',
   previewData: {
     name: 'Claudia',
-    link: 'https://rogersfeitosa.com.br/booking/example',
+    link: 'https://rogersfeitosa.com.br/agendar/agendarf?bt=example',
     isFollowup: false,
   },
 } satisfies TemplateEntry
