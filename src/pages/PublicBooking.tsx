@@ -19,8 +19,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 export default function PublicBooking() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
+  // Athlete consult-schedule flow (legacy)
   const token = searchParams.get('token');
-  
+  // Unified athlete booking flow: ?bt={booking_links.token}
+  const bookingToken = searchParams.get('bt');
+
   const { data: settings, isLoading: settingsLoading } = useSchedulingSettingsBySlug(slug);
   const { data: blocks = [] } = useQuery({
     queryKey: ['public_scheduling_blocks', settings?.user_id],
@@ -35,14 +38,16 @@ export default function PublicBooking() {
     enabled: !!settings?.user_id,
     staleTime: 1000 * 60 * 3,
   });
-  const { data: timeBlocks = [] } = useTimeBlocksBySettingsSlug(slug);
-  
+  // Availability rules (same source as the WhatsApp booking flow). Falls back
+  // to scheduling_time_blocks internally when availability_rules is empty.
+  const { data: availabilityRules = [] } = useAvailabilityRulesByAdmin(settings?.user_id);
+
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>();
   const [booking, setBooking] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
-  // Public lead form state (used when no token)
+  // Public lead form state (used when no token / bt)
   const [leadName, setLeadName] = useState('');
   const [leadEmail, setLeadEmail] = useState('');
   const [leadPhone, setLeadPhone] = useState('');
