@@ -1011,7 +1011,7 @@ export function useUpdatePayment() {
 
       const { data, error } = await supabase
         .from('payments')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
         .single();
@@ -1059,7 +1059,7 @@ export function useUpdateConsultationSchedule() {
       
       const { data, error } = await supabase
         .from('consultation_schedules')
-        .update(finalUpdates)
+        .update(finalUpdates as any)
         .eq('id', id)
         .select()
         .single();

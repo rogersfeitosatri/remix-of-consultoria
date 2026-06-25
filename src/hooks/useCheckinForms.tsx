@@ -148,7 +148,7 @@ export function useUpdateCheckinForm() {
     mutationFn: async ({ id, ...updates }: Partial<CheckinForm> & { id: string }) => {
       const { data, error } = await supabase
         .from('checkin_forms')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id)
         .select()
         .single();
@@ -208,7 +208,7 @@ export function useUpdateCheckinQuestion() {
     mutationFn: async ({ id, form_id, ...updates }: Partial<CheckinQuestion> & { id: string; form_id: string }) => {
       const { data, error } = await supabase
         .from('checkin_questions')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id)
         .select()
         .single();

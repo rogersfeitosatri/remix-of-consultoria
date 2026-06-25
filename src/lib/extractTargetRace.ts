@@ -130,7 +130,7 @@ export async function autoFillTargetRace(
     if (profile) {
       const { error } = await supabase
         .from('athlete_profiles')
-        .update(updateData)
+        .update(updateData as any)
         .eq('client_id', clientId);
       if (error) throw error;
     } else {
