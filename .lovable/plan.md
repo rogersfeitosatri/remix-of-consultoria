@@ -1,56 +1,63 @@
 ## Objetivo
-Atletas conversam pelo WhatsApp e recebem respostas de uma IA (Lovable AI / GPT-5) baseadas 100% no plano deles — anamnese, plano alimentar atual e check-ins recentes. Casos sensíveis viram alerta no Centro de Ações e notificação no seu WhatsApp.
+Ter **um único link público** — `https://rogersfeitosa.com.br/agendar/{slug}` (ex.: `/agendar/agendarf`) — usado em Settings, landing, WhatsApp e e-mails. Ele mostra **exatamente** os mesmos dias/horários do link atual que funciona, e diferencia atleta x lead pelo e-mail informado.
 
-## O que você precisa fazer (fora da Lovable)
+## Situação atual (causa do problema)
 
-1. **Criar app na Meta for Developers** (business.facebook.com → Apps → WhatsApp).
-2. **Número dedicado** ligado à conta WhatsApp Business (não pode ser o mesmo que você usa no Z-API hoje).
-3. Obter e me passar (via add_secret quando eu pedir):
-   - `WHATSAPP_PHONE_NUMBER_ID`
-   - `WHATSAPP_ACCESS_TOKEN` (token permanente do System User)
-   - `WHATSAPP_VERIFY_TOKEN` (string aleatória que você inventa — usada no webhook)
-   - `WHATSAPP_APP_SECRET` (para validar assinatura dos webhooks)
-4. **Configurar webhook** no painel Meta apontando para a Edge Function que eu vou criar (vou te passar a URL exata).
-5. **Aprovar 1 template** "boas-vindas / opt-in" na Meta (obrigatório para iniciar conversa fora da janela de 24h).
+Existem duas rotas com fontes de dados distintas:
 
-## O que eu implemento aqui
+| Rota | Página | Fonte dos horários |
+|---|---|---|
+| `/agendar/{slug}` (Settings) | `PublicBooking.tsx` | `scheduling_time_blocks` (blocos manuais — vazios) |
+| `/booking/{token}` (WhatsApp) | `PublicBookingConsult.tsx` | `availability_rules` + `scheduling_blocks` + `appointments` (funciona) |
 
-### Backend
-- Tabela `ai_chat_conversations` (1 por atleta) + `ai_chat_messages` (histórico role/content/tokens) com RLS escopada por `user_id` do treinador.
-- Tabela `ai_chat_settings` (system prompt editável, modelo, on/off por atleta, palavras-gatilho de escalonamento).
-- Edge Function `whatsapp-webhook` (verify_jwt=false, valida assinatura Meta):
-  - GET → handshake `hub.challenge`.
-  - POST → recebe mensagem, identifica atleta pelo telefone E.164, carrega contexto (anamnese + plano + últimos 3 check-ins), monta prompt e chama Lovable AI (`openai/gpt-5-mini` por padrão).
-  - Detecta gatilhos sensíveis (sintomas clínicos, pedido de mudança de plano, palavras como "dor", "passando mal", "trocar plano") → cria registro em `ai_chat_escalations` (vira card no Centro de Ações) e dispara WhatsApp para o admin via Z-API existente.
-  - Responde ao atleta via Meta Cloud API.
-- Edge Function `whatsapp-send` (envio ativo Cloud API, usada se você quiser iniciar conversa).
-- Janela 24h respeitada: fora dela, usa template aprovado.
+Resultado: o link do Settings parece "sem horários" porque está olhando a tabela errada.
 
-### Frontend
-- Página **IA Assistente WhatsApp** em Configurações:
-  - Toggle on/off global.
-  - System prompt editável (tom, escopo, "fale sempre como nutricionista do Rogers", etc.).
-  - Lista de palavras-gatilho de escalonamento (editável).
-  - Logs de conversas por atleta (busca + visualização do thread).
-- Em cada **ficha de atleta**: toggle "Habilitar IA WhatsApp para este atleta" + ver histórico da conversa.
-- Novo card no **Centro de Ações**: "Mensagens IA pendentes de revisão" com link pro thread.
+## Solução
 
-### Escopo do contexto enviado à IA (por mensagem)
-- Nome, idade, objetivo (da anamnese).
-- Plano alimentar atual (texto do último plano).
-- Últimos 3 check-ins (peso, sensações, aderência).
-- Pergunta atual + últimas 10 trocas da conversa.
+**Refatorar `PublicBooking` (`/agendar/{slug}`) para usar a mesma lógica de disponibilidade do `PublicBookingConsult`**, e transformá-lo no único link oficial — usado por todos os fluxos.
 
-### Limites
-- IA **nunca** altera plano — só orienta com base no que está escrito.
-- Se atleta pedir mudança → resposta padrão "vou avisar o Rogers" + escalonamento.
-- Custo controlado: GPT-5-mini por padrão, ~poucos centavos por resposta.
+### 1. Unificar fonte de horários em `/agendar/{slug}`
 
-## Ordem de execução
-1. Você confirma o plano.
-2. Eu crio as tabelas + Edge Functions + UI.
-3. Eu te peço os 4 secrets via add_secret.
-4. Você cria o app Meta, cola a URL do webhook que eu te passar, e aprova o template.
-5. Testamos com 1 atleta piloto.
+Em `src/pages/PublicBooking.tsx`:
+- Trocar a leitura de `scheduling_time_blocks` por `get_public_scheduling_settings_by_user` + `availability_rules` + `get_public_scheduling_blocks` + `get_public_appointment_slots` (mesmas RPCs já usadas pelo `PublicBookingConsult`).
+- Manter `availableDates` / `availableSlots` calculados a partir de `availability_rules` (regra semanal), respeitando `min_advance_hours`, `max_advance_days` e buffers de `scheduling_settings`.
 
-Posso seguir?
+### 2. Identificação por e-mail (atleta x lead)
+
+Fluxo na tela:
+1. Tela inicial pede e-mail (e telefone opcional).
+2. Ao avançar, chama `validate_booking_email_v2` com o e-mail:
+   - **Atleta ativo encontrado** → segue como atleta: ao confirmar, cria registro em `appointments` via `create_public_booking_appointment` (mesma RPC do fluxo atual do WhatsApp), com toda a validação de elegibilidade já existente (ativo, não congelado, dentro da janela).
+   - **Não encontrado / não elegível** → segue como lead: pede nome completo, cria registro em `consultation_schedules` via `create_public_lead_appointment`.
+3. Mensagens claras quando o atleta está inativo/congelado/expirado ("Sua conta não está elegível para agendamento — fale com o nutricionista").
+
+### 3. Aposentar a rota `/booking/{token}` (com retrocompatibilidade)
+
+- Manter a rota `/booking/:token` viva por enquanto, mas convertê-la em **redirecionamento 302/Navigate** para `/agendar/{slug}` (preservando `?email={email_do_atleta}` extraído do `booking_links.token` para pular o passo do e-mail).
+- Isso garante que qualquer link `/booking/...` já entregue continue funcionando.
+
+### 4. Todos os envios passam a usar o link único
+
+Atualizar para gerar `${appUrl}/agendar/{slug}?email={email_url_encoded}`:
+- `supabase/functions/send-booking-link/index.ts` (linhas 266 e 393)
+- `supabase/functions/process-scheduled-booking-links/index.ts` (linha 228)
+- `supabase/functions/_shared/transactional-email-templates/booking-link.tsx` (exemplo do template)
+- Qualquer outra função que monte `/booking/${token}` (varrer e ajustar).
+
+O parâmetro `?email=` apenas pré-preenche e pula a etapa de identificação — a validação real continua server-side via RPC.
+
+### 5. Settings
+
+Manter exatamente como está no print (`/agendar/{slug}`). Adicionar uma nota curta abaixo do campo: "Este é o link usado em todos os envios automáticos (WhatsApp e e-mail)."
+
+## Detalhes técnicos
+
+- Nenhuma alteração de schema necessária. Todas as RPCs já existem (`get_public_scheduling_settings_by_user`, `get_public_scheduling_blocks`, `get_public_appointment_slots`, `validate_booking_email_v2`, `create_public_booking_appointment`, `create_public_lead_appointment`).
+- `booking_links.token` continua sendo gerado/armazenado (para auditoria e para extrair o e-mail no redirect), mas deixa de aparecer em mensagens.
+- Tabela `scheduling_time_blocks` permanece, mas deixa de ser fonte do link público — pode ser revisada/removida em iteração futura.
+- Testes pós-deploy: (a) abrir `/agendar/agendarf` anônimo → ver dias/horários reais; (b) informar e-mail de atleta ativo → criar `appointments`; (c) informar e-mail novo → criar lead em `consultation_schedules`; (d) abrir `/booking/{token}` antigo → redireciona para `/agendar/agendarf?email=...` e mostra slots; (e) disparar `send-booking-link` para um atleta e conferir que a URL no WhatsApp aponta para `/agendar/...`.
+
+## Fora do escopo
+- Não alterar o fluxo de Strategic Call (`/agendar-call/{slug}`) — segue independente.
+- Não mexer no NutriPeriodiza nem em check-ins.
+- Não alterar regras de elegibilidade existentes (Booking Validation V2 permanece).
