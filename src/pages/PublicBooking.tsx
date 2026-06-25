@@ -427,7 +427,7 @@ export default function PublicBooking() {
     };
   }, [showDebug, settings, configuredDays, availabilityRules, bufferMinutes, blocks]);
 
-  if (settingsLoading) {
+  if (settingsLoading || (settings?.user_id && (rulesLoading || rulesFetching))) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
