@@ -415,10 +415,7 @@ export default function PublicAnamneseForm() {
                   id="email"
                   type="email"
                   value={athleteEmail}
-                  onChange={(e) => {
-                    setAthleteEmail(e.target.value);
-                    setPreviousLoaded(false);
-                  }}
+                  onChange={(e) => setAthleteEmail(e.target.value)}
                   onBlur={handleEmailBlur}
                   placeholder="Use o email cadastrado pelo seu assessor"
                   required
