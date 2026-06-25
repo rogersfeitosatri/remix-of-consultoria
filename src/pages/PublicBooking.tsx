@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PersonStanding, CalendarDays, Clock, CheckCircle2, Loader2, AlertCircle, Info, User, Mail, Phone } from 'lucide-react';
 import { useSchedulingSettingsBySlug, useCreateAppointment } from '@/hooks/useScheduling';
-import { useTimeBlocksBySettingsSlug } from '@/hooks/useTimeBlocks';
+import { useAvailabilityRulesByAdmin } from '@/hooks/useConsultations';
 import { supabase } from '@/integrations/supabase/client';
 import { format, addMinutes, isBefore, isSameDay, getDay, addDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -19,8 +19,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 export default function PublicBooking() {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
+  // Athlete consult-schedule flow (legacy)
   const token = searchParams.get('token');
-  
+  // Unified athlete booking flow: ?bt={booking_links.token}
+  const bookingToken = searchParams.get('bt');
+
   const { data: settings, isLoading: settingsLoading } = useSchedulingSettingsBySlug(slug);
   const { data: blocks = [] } = useQuery({
     queryKey: ['public_scheduling_blocks', settings?.user_id],
@@ -35,21 +38,23 @@ export default function PublicBooking() {
     enabled: !!settings?.user_id,
     staleTime: 1000 * 60 * 3,
   });
-  const { data: timeBlocks = [] } = useTimeBlocksBySettingsSlug(slug);
-  
+  // Availability rules (same source as the WhatsApp booking flow). Falls back
+  // to scheduling_time_blocks internally when availability_rules is empty.
+  const { data: availabilityRules = [] } = useAvailabilityRulesByAdmin(settings?.user_id);
+
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>();
   const [booking, setBooking] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
-  // Public lead form state (used when no token)
+  // Public lead form state (used when no token / bt)
   const [leadName, setLeadName] = useState('');
   const [leadEmail, setLeadEmail] = useState('');
   const [leadPhone, setLeadPhone] = useState('');
 
   const createAppointment = useCreateAppointment();
 
-  // Fetch consultation schedule by token
+  // Fetch consultation schedule by token (legacy /agendar/:slug?token=...)
   const { data: consultationSchedule } = useQuery({
     queryKey: ['consultation_schedule_by_token', token],
     queryFn: async () => {
@@ -62,7 +67,7 @@ export default function PublicBooking() {
         `)
         .eq('booking_token', token)
         .maybeSingle();
-      
+
       if (error) throw error;
       return data;
     },
@@ -108,59 +113,51 @@ export default function PublicBooking() {
     return startOfDay(addDays(new Date(), maxAdvanceDays));
   }, [maxAdvanceDays]);
 
-  // Get days that have time blocks configured (source of truth)
+  // Days where the admin has availability rules configured (source of truth)
   const configuredDays = useMemo(() => {
-    if (!timeBlocks || timeBlocks.length === 0) {
-      // Fallback to working_days from settings only if no time blocks exist
+    if (!availabilityRules || availabilityRules.length === 0) {
       return settings?.working_days || [];
     }
-    // Extract unique days from time blocks - THIS is the source of truth
-    return [...new Set(timeBlocks.map(tb => tb.day_of_week))];
-  }, [timeBlocks, settings?.working_days]);
+    return [...new Set(availabilityRules.map((r: any) => r.day_of_week))];
+  }, [availabilityRules, settings?.working_days]);
 
-  // Check if any availability is configured
-  const hasConfiguredAvailability = timeBlocks && timeBlocks.length > 0;
+  const hasConfiguredAvailability = availabilityRules && availabilityRules.length > 0;
 
-  // Generate available time slots - ONLY from time blocks (source of truth)
+  // Generate available time slots from availability_rules (same source as
+  // the WhatsApp athlete flow). This guarantees a single source of truth.
   const availableSlots = useMemo(() => {
     if (!settings || !selectedDate) return [];
 
     const slots: string[] = [];
     const dayOfWeek = getDay(selectedDate);
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    
-    // Check for full day blocks first
+
+    // Full-day block guard
     const fullDayBlock = blocks.find(
       b => b.block_date === dateStr && b.block_type === 'full_day'
     );
     if (fullDayBlock) return [];
 
-    // Get time blocks for this day - ONLY USE TIME BLOCKS, no fallback to working_hours
-    const dayTimeBlocks = timeBlocks.filter(tb => tb.day_of_week === dayOfWeek);
-    
-    // If no time blocks for this day, no slots available
-    if (dayTimeBlocks.length === 0) {
-      return [];
-    }
+    const rulesForDay = availabilityRules.filter((r: any) => r.day_of_week === dayOfWeek);
+    if (rulesForDay.length === 0) return [];
 
-    // Calculate slot step with buffer
+    // Slot step = duration + buffer
     const slotStep = settings.slot_duration_minutes + bufferMinutes;
 
-    // Generate slots ONLY from configured time blocks
-    dayTimeBlocks.forEach(tb => {
-      const [startHour, startMin] = tb.start_time.substring(0, 5).split(':').map(Number);
-      const [endHour, endMin] = tb.end_time.substring(0, 5).split(':').map(Number);
-      
+    rulesForDay.forEach((rule: any) => {
+      const [startHour, startMin] = String(rule.start_time).substring(0, 5).split(':').map(Number);
+      const [endHour, endMin] = String(rule.end_time).substring(0, 5).split(':').map(Number);
+
       let currentTime = new Date(selectedDate);
       currentTime.setHours(startHour, startMin, 0, 0);
-      
+
       const endTime = new Date(selectedDate);
       endTime.setHours(endHour, endMin, 0, 0);
 
       while (isBefore(currentTime, endTime)) {
         const timeStr = format(currentTime, 'HH:mm');
-        
-        // Check if slot is blocked by time range
+
+        // Time-range block guard
         const isBlocked = blocks.some(b => {
           if (b.block_date !== dateStr || b.block_type !== 'time_range') return false;
           const blockStart = b.start_time?.substring(0, 5);
@@ -168,31 +165,28 @@ export default function PublicBooking() {
           return timeStr >= blockStart! && timeStr < blockEnd!;
         });
 
-        // Check if slot conflicts with existing appointments (considering duration + buffer)
+        // Conflict with existing appointment (considering duration + buffer)
         const isBooked = existingAppointments.some(a => {
           if (!a.appointment_time) return false;
+          if (a.appointment_date && a.appointment_date !== dateStr) return false;
           const aptTime = a.appointment_time.substring(0, 5);
           const [aptHour, aptMin] = aptTime.split(':').map(Number);
-          
-          // Create appointment start and end times with buffer
+
           const aptStart = new Date(selectedDate);
           aptStart.setHours(aptHour, aptMin, 0, 0);
-          
-          // Block from (aptStart - buffer) to (aptEnd + buffer)
+
           const aptDuration = a.duration_minutes || settings.slot_duration_minutes;
           const blockStart = addMinutes(aptStart, -bufferMinutes);
           const blockEnd = addMinutes(aptStart, aptDuration + bufferMinutes);
-          
-          // Check if this slot falls within the blocked range
+
           const slotStart = new Date(selectedDate);
           slotStart.setHours(parseInt(timeStr.split(':')[0]), parseInt(timeStr.split(':')[1]), 0, 0);
           const slotEnd = addMinutes(slotStart, settings.slot_duration_minutes);
-          
-          // Slot conflicts if it overlaps with blocked range
+
           return slotStart < blockEnd && slotEnd > blockStart;
         });
 
-        // Check if slot is in the past (for today) OR before min advance window
+        // Past or before min-advance window
         const isPast = isSameDay(selectedDate, new Date()) && isBefore(currentTime, new Date());
         const isBeforeMinAdvance = isBefore(currentTime, minBookableDateTime);
 
@@ -200,14 +194,13 @@ export default function PublicBooking() {
           slots.push(timeStr);
         }
 
-        // Use slot step (duration + buffer) for next slot
         currentTime = addMinutes(currentTime, slotStep);
       }
     });
 
-    // Sort and remove duplicates
     return [...new Set(slots)].sort();
-  }, [settings, selectedDate, blocks, existingAppointments, timeBlocks, bufferMinutes, minBookableDateTime]);
+  }, [settings, selectedDate, blocks, existingAppointments, availabilityRules, bufferMinutes, minBookableDateTime]);
+
   
 
   const handleConfirmBooking = async () => {
@@ -276,6 +269,45 @@ export default function PublicBooking() {
         }
       } catch (calendarErr) {
         console.error('Calendar creation error:', calendarErr);
+      }
+
+      setConfirmed(true);
+      toast.success('Consulta agendada com sucesso!');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao agendar');
+    } finally {
+      setBooking(false);
+    }
+  };
+
+  // Unified athlete-token flow (?bt={booking_links.token})
+  // Uses the SAME RPC as the legacy /booking/{token} page so behavior matches.
+  const handleBookingTokenBooking = async () => {
+    if (!selectedDate || !selectedTime || !bookingToken) {
+      toast.error('Selecione data e horário');
+      return;
+    }
+
+    setBooking(true);
+    try {
+      const { data, error } = await supabase.rpc('create_public_booking_appointment', {
+        p_token: bookingToken,
+        p_date: format(selectedDate, 'yyyy-MM-dd'),
+        p_time: selectedTime + ':00',
+      });
+      if (error) throw error;
+
+      const result = Array.isArray(data) ? data[0] : data;
+      const appointmentId = result?.appointment_id || result;
+
+      if (appointmentId) {
+        try {
+          await supabase.functions.invoke('create-calendar-event', {
+            body: { appointmentId },
+          });
+        } catch (calErr) {
+          console.error('Calendar creation error:', calErr);
+        }
       }
 
       setConfirmed(true);
@@ -376,24 +408,24 @@ export default function PublicBooking() {
     const daysLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const configuredDaysLabels = configuredDays.map(d => daysLabels[d]).join(', ');
     
-    const timeBlocksByDay: Record<number, string[]> = {};
-    timeBlocks.forEach(tb => {
-      if (!timeBlocksByDay[tb.day_of_week]) {
-        timeBlocksByDay[tb.day_of_week] = [];
-      }
-      timeBlocksByDay[tb.day_of_week].push(`${tb.start_time.substring(0, 5)}-${tb.end_time.substring(0, 5)}`);
+    const blocksByDay: Record<number, string[]> = {};
+    availabilityRules.forEach((r: any) => {
+      if (!blocksByDay[r.day_of_week]) blocksByDay[r.day_of_week] = [];
+      blocksByDay[r.day_of_week].push(
+        `${String(r.start_time).substring(0, 5)}-${String(r.end_time).substring(0, 5)}`
+      );
     });
-    
+
     return {
       configuredDays: configuredDaysLabels,
-      timeBlocksByDay,
+      timeBlocksByDay: blocksByDay,
       slotDuration: settings.slot_duration_minutes,
       buffer: bufferMinutes,
       timezone: 'America/Sao_Paulo',
-      hasTimeBlocks: timeBlocks.length > 0,
+      hasTimeBlocks: availabilityRules.length > 0,
       blocksCount: blocks.length,
     };
-  }, [showDebug, settings, configuredDays, timeBlocks, bufferMinutes, blocks]);
+  }, [showDebug, settings, configuredDays, availabilityRules, bufferMinutes, blocks]);
 
   if (settingsLoading) {
     return (
@@ -428,8 +460,8 @@ export default function PublicBooking() {
     );
   }
 
-  // Only block when a token was provided but didn't resolve to a schedule.
-  // Without token, we offer the public lead booking flow.
+  // Only block when the legacy ?token= was provided but didn't resolve.
+  // (The new ?bt= path does its validation server-side via the RPC.)
   if (token && !consultationSchedule) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -442,7 +474,13 @@ export default function PublicBooking() {
     );
   }
 
-  const isPublicLeadFlow = !token;
+  // Three modes:
+  // - token       → legacy consultation_schedule flow
+  // - bookingToken → unified athlete-token flow (?bt=)
+  // - neither     → public lead flow
+  const isAthleteTokenFlow = !!bookingToken;
+  const isLegacyTokenFlow = !!token && !!consultationSchedule;
+  const isPublicLeadFlow = !isAthleteTokenFlow && !isLegacyTokenFlow;
 
   if (confirmed) {
     return (
@@ -488,12 +526,12 @@ export default function PublicBooking() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>
-              {isPublicLeadFlow ? 'Agende sua consulta' : `Olá, ${consultationSchedule!.clients.name}!`}
+              {isLegacyTokenFlow ? `Olá, ${consultationSchedule!.clients.name}!` : 'Agende sua consulta'}
             </CardTitle>
             <CardDescription>
               {isPublicLeadFlow
                 ? 'Escolha o melhor dia e horário e preencha seus dados para confirmar.'
-                : 'Escolha o melhor dia e horário para sua consulta'}
+                : 'Escolha o melhor dia e horário para sua consulta.'}
             </CardDescription>
           </CardHeader>
         </Card>
@@ -651,7 +689,13 @@ export default function PublicBooking() {
 
               <div className="flex justify-end pt-2">
                 <Button
-                  onClick={isPublicLeadFlow ? handlePublicLeadBooking : handleConfirmBooking}
+                  onClick={
+                    isAthleteTokenFlow
+                      ? handleBookingTokenBooking
+                      : isPublicLeadFlow
+                        ? handlePublicLeadBooking
+                        : handleConfirmBooking
+                  }
                   disabled={booking}
                   size="lg"
                   className="w-full sm:w-auto"

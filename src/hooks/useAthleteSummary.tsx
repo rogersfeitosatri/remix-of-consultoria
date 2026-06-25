@@ -76,7 +76,7 @@ export function useUpdateAthleteSummary() {
       // Atualizar o campo
       const { error: updateError } = await supabase
         .from('clients')
-        .update({ [field]: value })
+        .update({ [field]: value } as any)
         .eq('id', clientId);
       
       if (updateError) throw updateError;

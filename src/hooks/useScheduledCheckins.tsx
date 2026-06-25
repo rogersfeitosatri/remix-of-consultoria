@@ -169,7 +169,7 @@ export function useUpdateScheduledCheckin() {
     mutationFn: async ({ id, ...updates }: Partial<ScheduledCheckin> & { id: string }) => {
       const { data, error } = await supabase
         .from('scheduled_checkins')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id)
         .select()
         .single();
