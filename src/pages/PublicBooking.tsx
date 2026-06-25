@@ -408,24 +408,24 @@ export default function PublicBooking() {
     const daysLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     const configuredDaysLabels = configuredDays.map(d => daysLabels[d]).join(', ');
     
-    const timeBlocksByDay: Record<number, string[]> = {};
-    timeBlocks.forEach(tb => {
-      if (!timeBlocksByDay[tb.day_of_week]) {
-        timeBlocksByDay[tb.day_of_week] = [];
-      }
-      timeBlocksByDay[tb.day_of_week].push(`${tb.start_time.substring(0, 5)}-${tb.end_time.substring(0, 5)}`);
+    const blocksByDay: Record<number, string[]> = {};
+    availabilityRules.forEach((r: any) => {
+      if (!blocksByDay[r.day_of_week]) blocksByDay[r.day_of_week] = [];
+      blocksByDay[r.day_of_week].push(
+        `${String(r.start_time).substring(0, 5)}-${String(r.end_time).substring(0, 5)}`
+      );
     });
-    
+
     return {
       configuredDays: configuredDaysLabels,
-      timeBlocksByDay,
+      timeBlocksByDay: blocksByDay,
       slotDuration: settings.slot_duration_minutes,
       buffer: bufferMinutes,
       timezone: 'America/Sao_Paulo',
-      hasTimeBlocks: timeBlocks.length > 0,
+      hasTimeBlocks: availabilityRules.length > 0,
       blocksCount: blocks.length,
     };
-  }, [showDebug, settings, configuredDays, timeBlocks, bufferMinutes, blocks]);
+  }, [showDebug, settings, configuredDays, availabilityRules, bufferMinutes, blocks]);
 
   if (settingsLoading) {
     return (
