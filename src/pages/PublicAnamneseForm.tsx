@@ -136,41 +136,50 @@ export default function PublicAnamneseForm() {
           setAthleteName(prev.respondent_name);
         }
 
-        // Pre-fill answers from previous responses
-        const prevResponses = prev.responses as Record<string, any>;
-        const filledAnswers: Record<string, any> = {};
-        const filledComments: Record<string, string> = {};
+        // Merge previous responses non-destructively:
+        // only fill fields the user hasn't typed/selected yet — never overwrite in-progress input.
+        const prevResponses = (prev.responses || {}) as Record<string, any>;
+        const isEmptyAnswer = (v: any) => {
+          if (v === undefined || v === null) return true;
+          if (Array.isArray(v)) return v.length === 0;
+          if (typeof v === 'string') return v.trim() === '';
+          return false;
+        };
 
-        questions.forEach((q) => {
-          const prevResponse = prevResponses[q.id];
-          if (prevResponse !== undefined) {
-            if (typeof prevResponse === 'object' && prevResponse?.answer !== undefined) {
-              filledAnswers[q.id] = prevResponse.answer;
-              if (q.has_comment_field && prevResponse.comment) {
-                filledComments[q.id] = prevResponse.comment;
-              }
-            } else {
-              filledAnswers[q.id] = prevResponse;
+        setAnswers((current) => {
+          const next = { ...current };
+          questions.forEach((q) => {
+            const prevResponse = prevResponses[q.id];
+            if (prevResponse === undefined) return;
+            const value =
+              typeof prevResponse === 'object' && prevResponse?.answer !== undefined
+                ? prevResponse.answer
+                : prevResponse;
+            // Only fill if user hasn't answered yet (and skip 'scale', which has a default mid value).
+            if (q.question_type !== 'scale' && isEmptyAnswer(next[q.id])) {
+              next[q.id] = value;
             }
-          } else {
-            if (q.question_type === 'checkbox' || q.question_type === 'multiselect') {
-              filledAnswers[q.id] = [];
-            } else if (q.question_type === 'scale') {
-              filledAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
-            } else {
-              filledAnswers[q.id] = '';
-            }
-          }
-          if (q.has_comment_field && !filledComments[q.id]) {
-            filledComments[q.id] = '';
-          }
+          });
+          return next;
         });
 
-        setAnswers(filledAnswers);
-        setComments(filledComments);
+        setComments((current) => {
+          const next = { ...current };
+          questions.forEach((q) => {
+            if (!q.has_comment_field) return;
+            const prevResponse = prevResponses[q.id];
+            const prevComment =
+              typeof prevResponse === 'object' && prevResponse?.comment ? prevResponse.comment : null;
+            if (prevComment && (!next[q.id] || !next[q.id].trim())) {
+              next[q.id] = prevComment;
+            }
+          });
+          return next;
+        });
+
         setIsEditMode(true);
         setPreviousLoaded(true);
-        toast.info('Respostas anteriores carregadas. Edite o que precisar e envie novamente.');
+        toast.info('Respostas anteriores carregadas nos campos ainda em branco. Revise e envie.');
       }
     } catch (error) {
       console.error('Error loading previous responses:', error);
