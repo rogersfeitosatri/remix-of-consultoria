@@ -49,6 +49,7 @@ export default function PublicAnamneseForm() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [loadingPrevious, setLoadingPrevious] = useState(false);
   const [previousLoaded, setPreviousLoaded] = useState(false);
+  const [missingIds, setMissingIds] = useState<Set<string>>(new Set());
 
   const [athleteName, setAthleteName] = useState('');
   const [athleteEmail, setAthleteEmail] = useState('');
