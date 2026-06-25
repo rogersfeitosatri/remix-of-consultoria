@@ -49,6 +49,7 @@ export default function PublicAnamneseForm() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [loadingPrevious, setLoadingPrevious] = useState(false);
   const [previousLoaded, setPreviousLoaded] = useState(false);
+  const [missingIds, setMissingIds] = useState<Set<string>>(new Set());
 
   const [athleteName, setAthleteName] = useState('');
   const [athleteEmail, setAthleteEmail] = useState('');
@@ -135,41 +136,50 @@ export default function PublicAnamneseForm() {
           setAthleteName(prev.respondent_name);
         }
 
-        // Pre-fill answers from previous responses
-        const prevResponses = prev.responses as Record<string, any>;
-        const filledAnswers: Record<string, any> = {};
-        const filledComments: Record<string, string> = {};
+        // Merge previous responses non-destructively:
+        // only fill fields the user hasn't typed/selected yet — never overwrite in-progress input.
+        const prevResponses = (prev.responses || {}) as Record<string, any>;
+        const isEmptyAnswer = (v: any) => {
+          if (v === undefined || v === null) return true;
+          if (Array.isArray(v)) return v.length === 0;
+          if (typeof v === 'string') return v.trim() === '';
+          return false;
+        };
 
-        questions.forEach((q) => {
-          const prevResponse = prevResponses[q.id];
-          if (prevResponse !== undefined) {
-            if (typeof prevResponse === 'object' && prevResponse?.answer !== undefined) {
-              filledAnswers[q.id] = prevResponse.answer;
-              if (q.has_comment_field && prevResponse.comment) {
-                filledComments[q.id] = prevResponse.comment;
-              }
-            } else {
-              filledAnswers[q.id] = prevResponse;
+        setAnswers((current) => {
+          const next = { ...current };
+          questions.forEach((q) => {
+            const prevResponse = prevResponses[q.id];
+            if (prevResponse === undefined) return;
+            const value =
+              typeof prevResponse === 'object' && prevResponse?.answer !== undefined
+                ? prevResponse.answer
+                : prevResponse;
+            // Only fill if user hasn't answered yet (and skip 'scale', which has a default mid value).
+            if (q.question_type !== 'scale' && isEmptyAnswer(next[q.id])) {
+              next[q.id] = value;
             }
-          } else {
-            if (q.question_type === 'checkbox' || q.question_type === 'multiselect') {
-              filledAnswers[q.id] = [];
-            } else if (q.question_type === 'scale') {
-              filledAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
-            } else {
-              filledAnswers[q.id] = '';
-            }
-          }
-          if (q.has_comment_field && !filledComments[q.id]) {
-            filledComments[q.id] = '';
-          }
+          });
+          return next;
         });
 
-        setAnswers(filledAnswers);
-        setComments(filledComments);
+        setComments((current) => {
+          const next = { ...current };
+          questions.forEach((q) => {
+            if (!q.has_comment_field) return;
+            const prevResponse = prevResponses[q.id];
+            const prevComment =
+              typeof prevResponse === 'object' && prevResponse?.comment ? prevResponse.comment : null;
+            if (prevComment && (!next[q.id] || !next[q.id].trim())) {
+              next[q.id] = prevComment;
+            }
+          });
+          return next;
+        });
+
         setIsEditMode(true);
         setPreviousLoaded(true);
-        toast.info('Respostas anteriores carregadas. Edite o que precisar e envie novamente.');
+        toast.info('Respostas anteriores carregadas nos campos ainda em branco. Revise e envie.');
       }
     } catch (error) {
       console.error('Error loading previous responses:', error);
@@ -180,6 +190,12 @@ export default function PublicAnamneseForm() {
 
   const handleAnswerChange = (questionId: string, value: any) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
+    setMissingIds(prev => {
+      if (!prev.has(questionId)) return prev;
+      const next = new Set(prev);
+      next.delete(questionId);
+      return next;
+    });
   };
 
   const handleCommentChange = (questionId: string, value: string) => {
@@ -189,11 +205,16 @@ export default function PublicAnamneseForm() {
   const handleCheckboxChange = (questionId: string, option: string, checked: boolean) => {
     setAnswers(prev => {
       const current = prev[questionId] || [];
-      if (checked) {
-        return { ...prev, [questionId]: [...current, option] };
-      } else {
-        return { ...prev, [questionId]: current.filter((o: string) => o !== option) };
-      }
+      const updated = checked
+        ? [...current, option]
+        : current.filter((o: string) => o !== option);
+      return { ...prev, [questionId]: updated };
+    });
+    setMissingIds(prev => {
+      if (!prev.has(questionId)) return prev;
+      const next = new Set(prev);
+      next.delete(questionId);
+      return next;
     });
   };
 
@@ -216,22 +237,47 @@ export default function PublicAnamneseForm() {
       return;
     }
 
+    const missing = new Set<string>();
+    const missingLabels: string[] = [];
     for (const question of questions) {
+      let isMissing = false;
       if (question.is_required) {
         const answer = answers[question.id];
-        if (!answer || (Array.isArray(answer) && answer.length === 0)) {
-          toast.error(`Por favor responda: ${question.question_text}`);
-          return;
-        }
+        const empty =
+          answer === undefined ||
+          answer === null ||
+          (Array.isArray(answer) && answer.length === 0) ||
+          (typeof answer === 'string' && answer.trim() === '');
+        if (empty) isMissing = true;
       }
-      if (question.has_comment_field && question.comment_field_required) {
+      if (!isMissing && question.has_comment_field && question.comment_field_required) {
         const comment = comments[question.id];
-        if (!comment || !comment.trim()) {
-          toast.error(`Por favor preencha o comentário: ${question.comment_field_label}`);
-          return;
-        }
+        if (!comment || !comment.trim()) isMissing = true;
+      }
+      if (isMissing) {
+        missing.add(question.id);
+        missingLabels.push(question.question_text.replace(/[:?.\s]+$/, ''));
       }
     }
+
+    if (missing.size > 0) {
+      setMissingIds(missing);
+      const firstId = Array.from(missing)[0];
+      const el = document.getElementById(`q-${firstId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const preview = missingLabels.slice(0, 3).join(', ');
+      const extra = missingLabels.length > 3 ? ` (+${missingLabels.length - 3})` : '';
+      toast.error(
+        missing.size === 1
+          ? `Responda: ${preview}`
+          : `${missing.size} perguntas pendentes: ${preview}${extra}`
+      );
+      return;
+    }
+
+    setMissingIds(new Set());
 
     setSubmitting(true);
 
@@ -369,10 +415,7 @@ export default function PublicAnamneseForm() {
                   id="email"
                   type="email"
                   value={athleteEmail}
-                  onChange={(e) => {
-                    setAthleteEmail(e.target.value);
-                    setPreviousLoaded(false);
-                  }}
+                  onChange={(e) => setAthleteEmail(e.target.value)}
                   onBlur={handleEmailBlur}
                   placeholder="Use o email cadastrado pelo seu assessor"
                   required
@@ -404,14 +447,26 @@ export default function PublicAnamneseForm() {
                 <CardTitle className="text-lg capitalize">{section.replace(/_/g, ' ')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {questionsBySection[section].map((question, index) => (
-                  <div key={question.id} className="space-y-4">
+                {questionsBySection[section].map((question, index) => {
+                  const isMissing = missingIds.has(question.id);
+                  return (
+                  <div
+                    key={question.id}
+                    id={`q-${question.id}`}
+                    className={cn(
+                      "space-y-4 rounded-md transition-colors",
+                      isMissing && "ring-2 ring-destructive/60 bg-destructive/5 p-3 -m-3"
+                    )}
+                  >
                     <div className="flex items-start gap-2">
                       <span className="text-muted-foreground font-medium">{index + 1}.</span>
                       <div className="flex-1">
                         <Label className={cn(question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
                           {question.question_text}
                         </Label>
+                        {isMissing && (
+                          <p className="text-xs text-destructive mt-1">Esta pergunta é obrigatória.</p>
+                        )}
                       </div>
                     </div>
 
@@ -540,7 +595,8 @@ export default function PublicAnamneseForm() {
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
           ))}
