@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
             .select().single();
           bookingLink = newLink;
         }
-        const bookingUrl = `${appUrl}/booking/${bookingLink.token}`;
+        const bookingUrl = `${buildBookingUrl(bookingLink.token)}`;
         emailTemplate = 'booking-link';
         templateData.link = bookingUrl;
         templateData.isFollowup = messageType === 'followup' || (fullClient.onboarding_type === 'continuation');
@@ -402,7 +402,7 @@ Deno.serve(async (req) => {
         bookingLink = newLink;
       }
 
-      const bookingUrl = `${appUrl}/booking/${bookingLink.token}`;
+      const bookingUrl = `${buildBookingUrl(bookingLink.token)}`;
 
       rendered = renderTemplate(
         { title: template.title, body: template.body },
