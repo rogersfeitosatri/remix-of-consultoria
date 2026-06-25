@@ -460,8 +460,8 @@ export default function PublicBooking() {
     );
   }
 
-  // Only block when a token was provided but didn't resolve to a schedule.
-  // Without token, we offer the public lead booking flow.
+  // Only block when the legacy ?token= was provided but didn't resolve.
+  // (The new ?bt= path does its validation server-side via the RPC.)
   if (token && !consultationSchedule) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -474,7 +474,13 @@ export default function PublicBooking() {
     );
   }
 
-  const isPublicLeadFlow = !token;
+  // Three modes:
+  // - token       → legacy consultation_schedule flow
+  // - bookingToken → unified athlete-token flow (?bt=)
+  // - neither     → public lead flow
+  const isAthleteTokenFlow = !!bookingToken;
+  const isLegacyTokenFlow = !!token && !!consultationSchedule;
+  const isPublicLeadFlow = !isAthleteTokenFlow && !isLegacyTokenFlow;
 
   if (confirmed) {
     return (
@@ -520,12 +526,12 @@ export default function PublicBooking() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>
-              {isPublicLeadFlow ? 'Agende sua consulta' : `Olá, ${consultationSchedule!.clients.name}!`}
+              {isLegacyTokenFlow ? `Olá, ${consultationSchedule!.clients.name}!` : 'Agende sua consulta'}
             </CardTitle>
             <CardDescription>
               {isPublicLeadFlow
                 ? 'Escolha o melhor dia e horário e preencha seus dados para confirmar.'
-                : 'Escolha o melhor dia e horário para sua consulta'}
+                : 'Escolha o melhor dia e horário para sua consulta.'}
             </CardDescription>
           </CardHeader>
         </Card>
