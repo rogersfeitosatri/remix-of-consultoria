@@ -280,6 +280,45 @@ export default function PublicBooking() {
     }
   };
 
+  // Unified athlete-token flow (?bt={booking_links.token})
+  // Uses the SAME RPC as the legacy /booking/{token} page so behavior matches.
+  const handleBookingTokenBooking = async () => {
+    if (!selectedDate || !selectedTime || !bookingToken) {
+      toast.error('Selecione data e horário');
+      return;
+    }
+
+    setBooking(true);
+    try {
+      const { data, error } = await supabase.rpc('create_public_booking_appointment', {
+        p_token: bookingToken,
+        p_date: format(selectedDate, 'yyyy-MM-dd'),
+        p_time: selectedTime + ':00',
+      });
+      if (error) throw error;
+
+      const result = Array.isArray(data) ? data[0] : data;
+      const appointmentId = result?.appointment_id || result;
+
+      if (appointmentId) {
+        try {
+          await supabase.functions.invoke('create-calendar-event', {
+            body: { appointmentId },
+          });
+        } catch (calErr) {
+          console.error('Calendar creation error:', calErr);
+        }
+      }
+
+      setConfirmed(true);
+      toast.success('Consulta agendada com sucesso!');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao agendar');
+    } finally {
+      setBooking(false);
+    }
+  };
+
   const handlePublicLeadBooking = async () => {
     if (!selectedDate || !selectedTime || !slug) {
       toast.error('Selecione data e horário');
