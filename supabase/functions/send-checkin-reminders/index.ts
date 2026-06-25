@@ -114,7 +114,41 @@ Deno.serve(async (req) => {
         // Skip frozen clients
         if (client?.is_frozen) {
           console.log('[send-checkin-reminders] Skipping frozen client:', checkin.client_id);
+          await supabase
+            .from('scheduled_checkins')
+            .update({ status: 'cancelled', sent_at: new Date().toISOString() })
+            .eq('id', checkin.id);
           results.push({ checkinId: checkin.id, status: 'skipped', error: 'Client frozen' });
+          continue;
+        }
+
+        // HARD GUARD: skip inactive / expired / non-active-status clients.
+        // Frozen, inactive, expired plans or non-active statuses must NEVER receive check-in links.
+        const isExpired = !!(client?.end_date && client.end_date < todayStr);
+        const isInactiveStatus = client?.athlete_status && client.athlete_status !== 'active';
+        if (!client?.is_active || isExpired || isInactiveStatus) {
+          const reason = !client?.is_active
+            ? 'client_inactive'
+            : isExpired
+            ? 'plan_expired'
+            : `status_${client?.athlete_status}`;
+          console.log('[send-checkin-reminders] Skipping non-active client:', checkin.client_id, reason);
+          // Cancel the schedule entry to prevent re-attempts and surface in audit
+          await supabase
+            .from('scheduled_checkins')
+            .update({ status: 'cancelled', sent_at: new Date().toISOString() })
+            .eq('id', checkin.id);
+          await supabase.from('whatsapp_message_logs').insert({
+            user_id: checkin.user_id,
+            client_id: checkin.client_id,
+            message_type: 'checkin_reminder',
+            template_key: 'checkin_reminder',
+            to_phone: client?.phone || 'N/A',
+            status: 'skipped',
+            error_message: `Blocked: ${reason}`,
+            metadata: { scheduled_checkin_id: checkin.id, reason },
+          });
+          results.push({ checkinId: checkin.id, status: 'skipped', error: reason });
           continue;
         }
 
