@@ -689,7 +689,13 @@ export default function PublicBooking() {
 
               <div className="flex justify-end pt-2">
                 <Button
-                  onClick={isPublicLeadFlow ? handlePublicLeadBooking : handleConfirmBooking}
+                  onClick={
+                    isAthleteTokenFlow
+                      ? handleBookingTokenBooking
+                      : isPublicLeadFlow
+                        ? handlePublicLeadBooking
+                        : handleConfirmBooking
+                  }
                   disabled={booking}
                   size="lg"
                   className="w-full sm:w-auto"
