@@ -595,7 +595,8 @@ export default function PublicAnamneseForm() {
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
           ))}
