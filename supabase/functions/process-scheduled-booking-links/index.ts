@@ -225,7 +225,16 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const bookingUrl = `${baseUrl}/booking/${bookingLink.token}`;
+        // Resolve unified public link /agendar/{slug}?bt={token}
+        const { data: adminSettings } = await supabase
+          .from('scheduling_settings')
+          .select('booking_link_slug')
+          .eq('user_id', invite.admin_user_id)
+          .maybeSingle();
+        const bookingSlug: string | null = adminSettings?.booking_link_slug ?? null;
+        const bookingUrl = bookingSlug
+          ? `${baseUrl}/agendar/${bookingSlug}?bt=${bookingLink.token}`
+          : `${baseUrl}/booking/${bookingLink.token}`;
         
         // Render the template with variables
         const rendered = renderTemplate(
