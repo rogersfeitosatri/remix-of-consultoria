@@ -40,7 +40,7 @@ export default function PublicBooking() {
   });
   // Availability rules (same source as the WhatsApp booking flow). Falls back
   // to scheduling_time_blocks internally when availability_rules is empty.
-  const { data: availabilityRules = [] } = useAvailabilityRulesByAdmin(settings?.user_id);
+  const { data: availabilityRules = [], isLoading: rulesLoading, isFetching: rulesFetching } = useAvailabilityRulesByAdmin(settings?.user_id);
 
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>();
@@ -427,7 +427,7 @@ export default function PublicBooking() {
     };
   }, [showDebug, settings, configuredDays, availabilityRules, bufferMinutes, blocks]);
 
-  if (settingsLoading) {
+  if (settingsLoading || (settings?.user_id && (rulesLoading || rulesFetching))) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
