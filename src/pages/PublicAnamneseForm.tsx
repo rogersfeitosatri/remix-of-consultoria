@@ -190,6 +190,12 @@ export default function PublicAnamneseForm() {
 
   const handleAnswerChange = (questionId: string, value: any) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }));
+    setMissingIds(prev => {
+      if (!prev.has(questionId)) return prev;
+      const next = new Set(prev);
+      next.delete(questionId);
+      return next;
+    });
   };
 
   const handleCommentChange = (questionId: string, value: string) => {
@@ -199,11 +205,16 @@ export default function PublicAnamneseForm() {
   const handleCheckboxChange = (questionId: string, option: string, checked: boolean) => {
     setAnswers(prev => {
       const current = prev[questionId] || [];
-      if (checked) {
-        return { ...prev, [questionId]: [...current, option] };
-      } else {
-        return { ...prev, [questionId]: current.filter((o: string) => o !== option) };
-      }
+      const updated = checked
+        ? [...current, option]
+        : current.filter((o: string) => o !== option);
+      return { ...prev, [questionId]: updated };
+    });
+    setMissingIds(prev => {
+      if (!prev.has(questionId)) return prev;
+      const next = new Set(prev);
+      next.delete(questionId);
+      return next;
     });
   };
 
