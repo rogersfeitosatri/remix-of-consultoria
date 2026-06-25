@@ -159,6 +159,18 @@ Deno.serve(async (req) => {
 
     if (clientError || !client) throw new Error('Client not found');
 
+    // Resolve admin booking slug (for the unified public link /agendar/{slug}?bt=...)
+    const { data: adminSettings } = await supabase
+      .from('scheduling_settings')
+      .select('booking_link_slug')
+      .eq('user_id', client.user_id)
+      .maybeSingle();
+    const bookingSlug: string | null = adminSettings?.booking_link_slug ?? null;
+    const buildBookingUrl = (token: string) =>
+      bookingSlug
+        ? `${appUrl}/agendar/${bookingSlug}?bt=${token}`
+        : `${appUrl}/booking/${token}`;
+
     const messageType = body.messageType ?? 'booking_invite';
     const templateKey =
       body.templateKey ??
