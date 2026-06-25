@@ -237,22 +237,47 @@ export default function PublicAnamneseForm() {
       return;
     }
 
+    const missing = new Set<string>();
+    const missingLabels: string[] = [];
     for (const question of questions) {
+      let isMissing = false;
       if (question.is_required) {
         const answer = answers[question.id];
-        if (!answer || (Array.isArray(answer) && answer.length === 0)) {
-          toast.error(`Por favor responda: ${question.question_text}`);
-          return;
-        }
+        const empty =
+          answer === undefined ||
+          answer === null ||
+          (Array.isArray(answer) && answer.length === 0) ||
+          (typeof answer === 'string' && answer.trim() === '');
+        if (empty) isMissing = true;
       }
-      if (question.has_comment_field && question.comment_field_required) {
+      if (!isMissing && question.has_comment_field && question.comment_field_required) {
         const comment = comments[question.id];
-        if (!comment || !comment.trim()) {
-          toast.error(`Por favor preencha o comentário: ${question.comment_field_label}`);
-          return;
-        }
+        if (!comment || !comment.trim()) isMissing = true;
+      }
+      if (isMissing) {
+        missing.add(question.id);
+        missingLabels.push(question.question_text.replace(/[:?.\s]+$/, ''));
       }
     }
+
+    if (missing.size > 0) {
+      setMissingIds(missing);
+      const firstId = Array.from(missing)[0];
+      const el = document.getElementById(`q-${firstId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const preview = missingLabels.slice(0, 3).join(', ');
+      const extra = missingLabels.length > 3 ? ` (+${missingLabels.length - 3})` : '';
+      toast.error(
+        missing.size === 1
+          ? `Responda: ${preview}`
+          : `${missing.size} perguntas pendentes: ${preview}${extra}`
+      );
+      return;
+    }
+
+    setMissingIds(new Set());
 
     setSubmitting(true);
 
