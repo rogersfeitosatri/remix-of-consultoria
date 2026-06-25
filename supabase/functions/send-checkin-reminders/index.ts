@@ -18,6 +18,9 @@ interface ScheduledCheckin {
     phone: string;
     athlete_user_id: string | null;
     is_frozen: boolean;
+    is_active: boolean;
+    end_date: string | null;
+    athlete_status: string | null;
   };
 }
 
