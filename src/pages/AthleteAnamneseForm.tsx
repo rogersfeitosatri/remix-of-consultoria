@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { PersonStanding, ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import { PersonStanding, ArrowLeft, ArrowRight, Check, Loader2, Plus, Trash2, CalendarDays } from 'lucide-react';
 import { MealRoutineSection, defaultMealRoutineData } from '@/components/anamnese/MealRoutineSection';
 
 // Section definitions
