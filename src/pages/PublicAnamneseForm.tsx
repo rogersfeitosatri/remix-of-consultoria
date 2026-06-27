@@ -99,13 +99,14 @@ export default function PublicAnamneseForm() {
     const initialAnswers: Record<string, any> = {};
     const initialComments: Record<string, string> = {};
     qs.forEach((q) => {
+      const type = resolveQuestionType(q);
       if (q.question_type === 'checkbox' || q.question_type === 'multiselect') {
         initialAnswers[q.id] = [];
       } else if (q.question_type === 'scale') {
         initialAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
-      } else if (q.question_type === 'meal_items') {
+      } else if (type === 'meal_items') {
         initialAnswers[q.id] = { horario: '', itens: [''], bebidas: '' };
-      } else if (q.question_type === 'training_week') {
+      } else if (type === 'training_week') {
         initialAnswers[q.id] = {
           Segunda: { modalidade: '', turno: '', intensidade: '' },
           Terça: { modalidade: '', turno: '', intensidade: '' },
@@ -329,6 +330,42 @@ export default function PublicAnamneseForm() {
     setIsEditMode(true);
   };
 
+  // Resolve effective question type — falls back to text-pattern detection when
+  // the DB still stores the old 'textarea'/'long_text' type for meal/training questions.
+  const resolveQuestionType = (q: Question): string => {
+    if (q.question_type === 'meal_items') return 'meal_items';
+    if (q.question_type === 'training_week') return 'training_week';
+    // Detect meal questions by section or question text
+    const sectionLower = (q.section || '').toLowerCase();
+    const textLower = (q.question_text || '').toLowerCase();
+    const isMealSection =
+      sectionLower.includes('come habitualmente') ||
+      sectionLower.includes('rotina alimentar') ||
+      sectionLower.includes('alimenta');
+    const isMealQuestion =
+      textLower.includes('horário e o que come') ||
+      textLower.includes('horario e o que come') ||
+      textLower.includes('café da manhã') ||
+      textLower.includes('cafe da manha') ||
+      textLower.includes('almoço') ||
+      textLower.includes('almoco') ||
+      textLower.includes('jantar') ||
+      textLower.includes('lanche') ||
+      textLower.includes('ceia');
+    if ((isMealSection || isMealQuestion) && (q.question_type === 'textarea' || q.question_type === 'long_text' || q.question_type === 'text')) {
+      return 'meal_items';
+    }
+    // Detect training week by text
+    const isTrainingQuestion =
+      textLower.includes('rotina de treino') ||
+      textLower.includes('treino semanal') ||
+      textLower.includes('semana de treino');
+    if (isTrainingQuestion && (q.question_type === 'textarea' || q.question_type === 'long_text' || q.question_type === 'text')) {
+      return 'training_week';
+    }
+    return q.question_type;
+  };
+
   // Group questions by section while preserving order_index order
   const orderedSections: string[] = [];
   const questionsBySection = questions.reduce((acc, q) => {
@@ -460,6 +497,7 @@ export default function PublicAnamneseForm() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {questionsBySection[section].map((question, index) => {
+                  const qType = resolveQuestionType(question);
                   const isMissing = missingIds.has(question.id);
                   return (
                   <div
@@ -482,7 +520,7 @@ export default function PublicAnamneseForm() {
                       </div>
                     </div>
 
-                    {(question.question_type === 'short_text' || question.question_type === 'text') && (
+                    {(qType === 'short_text' || qType === 'text') && (
                       <Input
                         value={answers[question.id] || ''}
                         onChange={(e) => handleAnswerChange(question.id, e.target.value)}
@@ -490,7 +528,7 @@ export default function PublicAnamneseForm() {
                       />
                     )}
 
-                    {(question.question_type === 'long_text' || question.question_type === 'textarea') && (
+                    {(qType === 'long_text' || qType === 'textarea') && (
                       <Textarea
                         value={answers[question.id] || ''}
                         onChange={(e) => handleAnswerChange(question.id, e.target.value)}
@@ -499,7 +537,7 @@ export default function PublicAnamneseForm() {
                       />
                     )}
 
-                    {question.question_type === 'select' && question.options && (
+                    {qType === 'select' && question.options && (
                       <RadioGroup
                         value={answers[question.id] || undefined}
                         onValueChange={(value) => handleAnswerChange(question.id, value)}
@@ -518,7 +556,7 @@ export default function PublicAnamneseForm() {
                       </RadioGroup>
                     )}
 
-                    {question.question_type === 'multiselect' && question.options && (
+                    {qType === 'multiselect' && question.options && (
                       <div className="space-y-2">
                         {(question.options as string[]).map((o) => (o ?? '').trim()).filter(Boolean).map((option, i) => (
                           <div key={i} className="flex items-center space-x-2">
@@ -535,7 +573,7 @@ export default function PublicAnamneseForm() {
                       </div>
                     )}
 
-                    {question.question_type === 'multiple_choice' && question.options && (
+                    {qType === 'multiple_choice' && question.options && (
                       <RadioGroup
                         value={answers[question.id] || undefined}
                         onValueChange={(value) => handleAnswerChange(question.id, value)}
@@ -551,7 +589,7 @@ export default function PublicAnamneseForm() {
                       </RadioGroup>
                     )}
 
-                    {question.question_type === 'checkbox' && question.options && (
+                    {qType === 'checkbox' && question.options && (
                       <div className="space-y-2">
                         {(question.options as string[]).map((o) => (o ?? '').trim()).filter(Boolean).map((option, i) => (
                           <div key={i} className="flex items-center space-x-2">
@@ -568,7 +606,7 @@ export default function PublicAnamneseForm() {
                       </div>
                     )}
 
-                    {question.question_type === 'scale' && (
+                    {qType === 'scale' && (
                       <div className="space-y-4">
                         <div className="flex justify-between text-sm text-muted-foreground">
                           <span>{question.scale_min}</span>
@@ -586,14 +624,14 @@ export default function PublicAnamneseForm() {
                       </div>
                     )}
 
-                    {question.question_type === 'meal_items' && (
+                    {qType === 'meal_items' && (
                       <MealItemsRenderer
                         value={answers[question.id] || { horario: '', itens: [''], bebidas: '' }}
                         onChange={(v) => handleAnswerChange(question.id, v)}
                       />
                     )}
 
-                    {question.question_type === 'training_week' && (
+                    {qType === 'training_week' && (
                       <TrainingWeekRenderer
                         value={answers[question.id] || {}}
                         onChange={(v) => handleAnswerChange(question.id, v)}
@@ -602,7 +640,7 @@ export default function PublicAnamneseForm() {
 
                     {question.has_comment_field && (
                       <div className="mt-4 pt-4 border-t border-border/50">
-                        <Label 
+                        <Label
                           htmlFor={`comment-${question.id}`}
                           className={cn(
                             "text-sm text-muted-foreground",
