@@ -59,12 +59,16 @@ interface FormData {
   volume_semanal_km: string;
   provas_participadas: string;
   lesoes_historico: string;
+  modalidades_treino: Array<{ modalidade: string; dia: string; horario: string }>;
 
   // Objetivo Principal
   objetivo_principal: string;
   objetivo_secundario: string;
   meta_especifica: string;
   prazo_meta: string;
+  tem_prova_alvo: string;
+  prova_alvo_nome: string;
+  prova_alvo_data: string;
 
   // Medidas
   peso_atual: string;
