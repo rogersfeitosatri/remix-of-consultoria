@@ -917,6 +917,85 @@ export default function AthleteAnamneseForm() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Prova alvo */}
+            <Card className="border-primary/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  Você tem uma prova alvo?
+                </CardTitle>
+                <CardDescription>
+                  Se tem uma prova específica como meta, informe qual é e a data — calcularemos quantas semanas faltam.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <RadioGroup
+                  value={formData.tem_prova_alvo}
+                  onValueChange={(v) => updateFormData('tem_prova_alvo', v)}
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="nao" id="prova-nao" />
+                    <Label htmlFor="prova-nao">Não, sem prova alvo definida</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sim" id="prova-sim" />
+                    <Label htmlFor="prova-sim">Sim, tenho uma prova alvo</Label>
+                  </div>
+                </RadioGroup>
+
+                {formData.tem_prova_alvo === 'sim' && (
+                  <div className="space-y-4 pt-2">
+                    <div className="space-y-2">
+                      <Label>Qual é a prova alvo? *</Label>
+                      <Input
+                        value={formData.prova_alvo_nome}
+                        onChange={(e) => updateFormData('prova_alvo_nome', e.target.value)}
+                        placeholder="Ex: Maratona do Rio 2026, Meia de São Paulo..."
+                        className={errors.prova_alvo_nome ? 'border-destructive' : ''}
+                      />
+                      {errors.prova_alvo_nome && (
+                        <p className="text-xs text-destructive">{errors.prova_alvo_nome}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Data da prova *</Label>
+                      <Input
+                        type="date"
+                        value={formData.prova_alvo_data}
+                        onChange={(e) => updateFormData('prova_alvo_data', e.target.value)}
+                        className={errors.prova_alvo_data ? 'border-destructive' : ''}
+                      />
+                      {errors.prova_alvo_data && (
+                        <p className="text-xs text-destructive">{errors.prova_alvo_data}</p>
+                      )}
+                    </div>
+                    {formData.prova_alvo_data && (() => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const raceDate = new Date(formData.prova_alvo_data + 'T00:00:00');
+                      const diffDays = Math.ceil((raceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      const weeks = Math.floor(diffDays / 7);
+                      const remainingDays = diffDays % 7;
+                      if (diffDays < 0) {
+                        return (
+                          <div className="rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm">
+                            ⚠️ A data informada já passou. Confira se está correta.
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="rounded-md bg-primary/10 border border-primary/30 p-3 text-sm">
+                          📅 Faltam <strong>{weeks} {weeks === 1 ? 'semana' : 'semanas'}</strong>
+                          {remainingDays > 0 && <> e <strong>{remainingDays} {remainingDays === 1 ? 'dia' : 'dias'}</strong></>}
+                          {' '}até a prova ({diffDays} {diffDays === 1 ? 'dia' : 'dias'} no total).
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         );
 
