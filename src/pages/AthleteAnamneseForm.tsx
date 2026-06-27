@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { PersonStanding, ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import { PersonStanding, ArrowLeft, ArrowRight, Check, Loader2, Plus, Trash2, CalendarDays } from 'lucide-react';
 import { MealRoutineSection, defaultMealRoutineData } from '@/components/anamnese/MealRoutineSection';
 
 // Section definitions
@@ -59,12 +59,16 @@ interface FormData {
   volume_semanal_km: string;
   provas_participadas: string;
   lesoes_historico: string;
+  modalidades_treino: Array<{ modalidade: string; dia: string; horario: string }>;
 
   // Objetivo Principal
   objetivo_principal: string;
   objetivo_secundario: string;
   meta_especifica: string;
   prazo_meta: string;
+  tem_prova_alvo: string;
+  prova_alvo_nome: string;
+  prova_alvo_data: string;
 
   // Medidas
   peso_atual: string;
@@ -129,10 +133,14 @@ const defaultFormData: FormData = {
   volume_semanal_km: '',
   provas_participadas: '',
   lesoes_historico: '',
+  modalidades_treino: [],
   objetivo_principal: '',
   objetivo_secundario: '',
   meta_especifica: '',
   prazo_meta: '',
+  tem_prova_alvo: '',
+  prova_alvo_nome: '',
+  prova_alvo_data: '',
   peso_atual: '',
   altura: '',
   peso_ideal: '',
@@ -210,6 +218,10 @@ export default function AthleteAnamneseForm() {
 
       case 'objetivo':
         if (!formData.objetivo_principal) newErrors.objetivo_principal = 'Campo obrigatório';
+        if (formData.tem_prova_alvo === 'sim') {
+          if (!formData.prova_alvo_nome.trim()) newErrors.prova_alvo_nome = 'Informe o nome da prova';
+          if (!formData.prova_alvo_data) newErrors.prova_alvo_data = 'Informe a data da prova';
+        }
         break;
 
       case 'medidas':
@@ -748,6 +760,94 @@ export default function AthleteAnamneseForm() {
                 rows={3}
               />
             </div>
+
+            {/* Outras modalidades de treino */}
+            <Card className="border-primary/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  Outras modalidades de treino na semana
+                </CardTitle>
+                <CardDescription>
+                  Inclua modalidades além da corrida (musculação, bike, natação, funcional, pilates, yoga...) e o dia/horário que costuma realizar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {formData.modalidades_treino.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">
+                    Nenhuma modalidade adicionada. Clique em "Adicionar modalidade" se realiza outras atividades.
+                  </p>
+                )}
+                {formData.modalidades_treino.map((item, idx) => (
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 rounded-md border bg-muted/30">
+                    <div className="md:col-span-5 space-y-1">
+                      <Label className="text-xs">Modalidade</Label>
+                      <Input
+                        value={item.modalidade}
+                        onChange={(e) => {
+                          const next = [...formData.modalidades_treino];
+                          next[idx] = { ...next[idx], modalidade: e.target.value };
+                          updateFormData('modalidades_treino', next);
+                        }}
+                        placeholder="Ex: Musculação"
+                      />
+                    </div>
+                    <div className="md:col-span-4 space-y-1">
+                      <Label className="text-xs">Dia(s) da semana</Label>
+                      <Input
+                        value={item.dia}
+                        onChange={(e) => {
+                          const next = [...formData.modalidades_treino];
+                          next[idx] = { ...next[idx], dia: e.target.value };
+                          updateFormData('modalidades_treino', next);
+                        }}
+                        placeholder="Ex: Seg, Qua, Sex"
+                      />
+                    </div>
+                    <div className="md:col-span-2 space-y-1">
+                      <Label className="text-xs">Horário</Label>
+                      <Input
+                        type="time"
+                        value={item.horario}
+                        onChange={(e) => {
+                          const next = [...formData.modalidades_treino];
+                          next[idx] = { ...next[idx], horario: e.target.value };
+                          updateFormData('modalidades_treino', next);
+                        }}
+                      />
+                    </div>
+                    <div className="md:col-span-1 flex md:items-end justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          const next = formData.modalidades_treino.filter((_, i) => i !== idx);
+                          updateFormData('modalidades_treino', next);
+                        }}
+                        aria-label="Remover modalidade"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    updateFormData('modalidades_treino', [
+                      ...formData.modalidades_treino,
+                      { modalidade: '', dia: '', horario: '' },
+                    ])
+                  }
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar modalidade
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         );
 
@@ -817,6 +917,85 @@ export default function AthleteAnamneseForm() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Prova alvo */}
+            <Card className="border-primary/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  Você tem uma prova alvo?
+                </CardTitle>
+                <CardDescription>
+                  Se tem uma prova específica como meta, informe qual é e a data — calcularemos quantas semanas faltam.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <RadioGroup
+                  value={formData.tem_prova_alvo}
+                  onValueChange={(v) => updateFormData('tem_prova_alvo', v)}
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="nao" id="prova-nao" />
+                    <Label htmlFor="prova-nao">Não, sem prova alvo definida</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sim" id="prova-sim" />
+                    <Label htmlFor="prova-sim">Sim, tenho uma prova alvo</Label>
+                  </div>
+                </RadioGroup>
+
+                {formData.tem_prova_alvo === 'sim' && (
+                  <div className="space-y-4 pt-2">
+                    <div className="space-y-2">
+                      <Label>Qual é a prova alvo? *</Label>
+                      <Input
+                        value={formData.prova_alvo_nome}
+                        onChange={(e) => updateFormData('prova_alvo_nome', e.target.value)}
+                        placeholder="Ex: Maratona do Rio 2026, Meia de São Paulo..."
+                        className={errors.prova_alvo_nome ? 'border-destructive' : ''}
+                      />
+                      {errors.prova_alvo_nome && (
+                        <p className="text-xs text-destructive">{errors.prova_alvo_nome}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Data da prova *</Label>
+                      <Input
+                        type="date"
+                        value={formData.prova_alvo_data}
+                        onChange={(e) => updateFormData('prova_alvo_data', e.target.value)}
+                        className={errors.prova_alvo_data ? 'border-destructive' : ''}
+                      />
+                      {errors.prova_alvo_data && (
+                        <p className="text-xs text-destructive">{errors.prova_alvo_data}</p>
+                      )}
+                    </div>
+                    {formData.prova_alvo_data && (() => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const raceDate = new Date(formData.prova_alvo_data + 'T00:00:00');
+                      const diffDays = Math.ceil((raceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      const weeks = Math.floor(diffDays / 7);
+                      const remainingDays = diffDays % 7;
+                      if (diffDays < 0) {
+                        return (
+                          <div className="rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm">
+                            ⚠️ A data informada já passou. Confira se está correta.
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="rounded-md bg-primary/10 border border-primary/30 p-3 text-sm">
+                          📅 Faltam <strong>{weeks} {weeks === 1 ? 'semana' : 'semanas'}</strong>
+                          {remainingDays > 0 && <> e <strong>{remainingDays} {remainingDays === 1 ? 'dia' : 'dias'}</strong></>}
+                          {' '}até a prova ({diffDays} {diffDays === 1 ? 'dia' : 'dias'} no total).
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         );
 
