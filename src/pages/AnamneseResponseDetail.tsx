@@ -39,6 +39,16 @@ export default function AnamneseResponseDetail() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('respostas');
 
+  // Admin guidance for AI (persisted per client in localStorage)
+  const [guidance, setGuidance] = useState({
+    meals_count: '' as string,
+    target_kcal: '' as string,
+    target_cho_gkg: '' as string,
+    target_protein_gkg: '' as string,
+    target_fat_gkg: '' as string,
+    custom_instructions: '' as string,
+  });
+
   const { data: responseData, isLoading, isError } = useQuery({
     queryKey: ['anamnese_response_detail', responseId],
     queryFn: async () => {
