@@ -716,7 +716,80 @@ export default function AnamneseResponseDetail() {
           </TabsContent>
 
           {/* AI Analysis Tab */}
-          <TabsContent value="ia" className="mt-6">
+          <TabsContent value="ia" className="mt-6 space-y-6">
+            {/* Admin guidance panel — always available so the admin can tune the AI before (re)analyzing */}
+            <Card className="border-primary/30 bg-primary/[0.03]">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-primary" />
+                  Orientações para a IA (antes de gerar a análise)
+                </CardTitle>
+                <CardDescription>
+                  Defina parâmetros e instruções específicas. A IA usará esses valores como base obrigatória ao montar a progressão de CHO, o plano alimentar e os totais diários. Salvos automaticamente neste navegador.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="space-y-1">
+                    <Label htmlFor="g_meals" className="text-xs">Nº de refeições</Label>
+                    <Input id="g_meals" inputMode="numeric" placeholder="ex: 5" value={guidance.meals_count}
+                      onChange={(e) => saveGuidanceLocal({ ...guidance, meals_count: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="g_kcal" className="text-xs">Meta calórica (kcal/dia)</Label>
+                    <Input id="g_kcal" inputMode="numeric" placeholder="ex: 2200" value={guidance.target_kcal}
+                      onChange={(e) => saveGuidanceLocal({ ...guidance, target_kcal: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="g_cho" className="text-xs">CHO (g/kg)</Label>
+                    <Input id="g_cho" inputMode="decimal" placeholder="ex: 5" value={guidance.target_cho_gkg}
+                      onChange={(e) => saveGuidanceLocal({ ...guidance, target_cho_gkg: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="g_ptn" className="text-xs">PTN (g/kg)</Label>
+                    <Input id="g_ptn" inputMode="decimal" placeholder="ex: 1.8" value={guidance.target_protein_gkg}
+                      onChange={(e) => saveGuidanceLocal({ ...guidance, target_protein_gkg: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="g_lip" className="text-xs">LIP (g/kg)</Label>
+                    <Input id="g_lip" inputMode="decimal" placeholder="ex: 1.0" value={guidance.target_fat_gkg}
+                      onChange={(e) => saveGuidanceLocal({ ...guidance, target_fat_gkg: e.target.value })} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="g_notes" className="text-xs">Orientações adicionais para a IA</Label>
+                  <Textarea
+                    id="g_notes"
+                    rows={3}
+                    placeholder="Ex: priorizar carboidratos integrais, evitar lactose, incluir lanche pré-treino às 17h, focar em recuperação após long run de sábado..."
+                    value={guidance.custom_instructions}
+                    onChange={(e) => saveGuidanceLocal({ ...guidance, custom_instructions: e.target.value })}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => analyzeAthleteMutation.mutate()}
+                    disabled={analyzeAthleteMutation.isPending}
+                    className="gap-2"
+                  >
+                    {analyzeAthleteMutation.isPending ? (
+                      <><RefreshCw className="h-4 w-4 animate-spin" />Analisando...</>
+                    ) : structuredAnalysis ? (
+                      <><RefreshCw className="h-4 w-4" />Reanalisar com estas orientações</>
+                    ) : (
+                      <><Brain className="h-4 w-4" />Gerar análise com estas orientações</>
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => saveGuidanceLocal({ meals_count: '', target_kcal: '', target_cho_gkg: '', target_protein_gkg: '', target_fat_gkg: '', custom_instructions: '' })}
+                  >
+                    Limpar orientações
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {structuredAnalysis ? (
               <div className="space-y-6">
                 {/* Header with reanalyze */}
