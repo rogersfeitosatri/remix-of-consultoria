@@ -356,11 +356,17 @@ export default function PublicAnamneseForm() {
       return 'meal_items';
     }
     // Detect training week by text
+    const isTrainingSection =
+      sectionLower.includes('treino') ||
+      sectionLower.includes('competição') ||
+      sectionLower.includes('competicao');
     const isTrainingQuestion =
       textLower.includes('rotina de treino') ||
       textLower.includes('treino semanal') ||
-      textLower.includes('semana de treino');
-    if (isTrainingQuestion && (q.question_type === 'textarea' || q.question_type === 'long_text' || q.question_type === 'text')) {
+      textLower.includes('semana de treino') ||
+      textLower.includes('modalidade') ||
+      (isTrainingSection && (textLower.includes('semana') || textLower.includes('dia')));
+    if ((isTrainingSection || isTrainingQuestion) && (q.question_type === 'textarea' || q.question_type === 'long_text' || q.question_type === 'text')) {
       return 'training_week';
     }
     return q.question_type;
@@ -795,15 +801,26 @@ const INTENSIDADES_OPT = [
 function TrainingWeekRenderer({ value, onChange }: { value: any; onChange: (v: any) => void }) {
   const setDay = (dia: string, field: string, v: string) => {
     const day = { ...(value[dia] || {}), [field]: v };
-    if (field === 'modalidade' && v === 'repouso') { day.turno = ''; day.intensidade = ''; }
+    if (field === 'modalidade' && v === 'repouso') {
+      day.turno = ''; day.intensidade = ''; day.longao = false;
+    }
+    if (field === 'modalidade' && v !== 'corrida' && v !== 'ciclismo') {
+      day.longao = false;
+    }
+    onChange({ ...value, [dia]: day });
+  };
+
+  const toggleLongao = (dia: string, checked: boolean) => {
+    const day = { ...(value[dia] || {}), longao: checked };
     onChange({ ...value, [dia]: day });
   };
 
   return (
     <div className="space-y-3">
       {DIAS_SEMANA.map((dia) => {
-        const day = value[dia] || { modalidade: '', turno: '', intensidade: '' };
+        const day = value[dia] || { modalidade: '', turno: '', intensidade: '', longao: false };
         const isRepouso = day.modalidade === 'repouso';
+        const showLongao = day.modalidade === 'corrida' || day.modalidade === 'ciclismo';
         return (
           <div key={dia} className={`rounded-lg border p-3 space-y-2 ${isRepouso ? 'opacity-60' : ''}`}>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{dia}</p>
@@ -821,6 +838,20 @@ function TrainingWeekRenderer({ value, onChange }: { value: any; onChange: (v: a
                 <SelectContent>{INTENSIDADES_OPT.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            {showLongao && (
+              <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
+                <input
+                  type="checkbox"
+                  checked={!!day.longao}
+                  onChange={(e) => toggleLongao(dia, e.target.checked)}
+                  className="h-4 w-4 rounded border-input accent-primary"
+                />
+                <span className="text-sm text-muted-foreground">
+                  🐢 É o <strong>longão</strong> da semana
+                  <span className="text-xs ml-1">(volume longo / sessão de resistência)</span>
+                </span>
+              </label>
+            )}
           </div>
         );
       })}
