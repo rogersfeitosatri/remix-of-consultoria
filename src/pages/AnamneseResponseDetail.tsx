@@ -240,26 +240,73 @@ export default function AnamneseResponseDetail() {
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 18;
     const maxWidth = pageWidth - margin * 2;
-    let y = 20;
+    let y = 22;
 
-    const addText = (text: string, size: number, bold = false, color: [number, number, number] = [33, 33, 33]) => {
+    // Strip emojis / non-WinAnsi symbols that jsPDF helvetica cannot render (avoids "Ø=ÜÊ" garbage)
+    const clean = (s: any) => {
+      if (s === null || s === undefined) return '';
+      let str = String(s);
+      // Remove emoji and symbol ranges
+      str = str.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F000}-\u{1F2FF}]/gu, '');
+      // Normalize arrows/bullets
+      str = str.replace(/→/g, '->').replace(/[•·]/g, '-');
+      return str.replace(/\s+\n/g, '\n').trim();
+    };
+
+    const ensureSpace = (needed: number) => {
+      if (y + needed > pageHeight - 18) { doc.addPage(); y = 22; }
+    };
+
+    const addText = (text: string, size: number, bold = false, color: [number, number, number] = [33, 33, 33], opts: { indent?: number } = {}) => {
+      const indent = opts.indent || 0;
       doc.setFontSize(size);
       doc.setFont('helvetica', bold ? 'bold' : 'normal');
-      doc.setTextColor(...color);
-      const lines = doc.splitTextToSize(text, maxWidth);
+      doc.setTextColor(color[0], color[1], color[2]);
+      const lineHeight = size * 0.5 + 1.2;
+      const lines = doc.splitTextToSize(clean(text), maxWidth - indent);
       for (const line of lines) {
-        if (y > 275) { doc.addPage(); y = 20; }
-        doc.text(line, margin, y);
-        y += size * 0.45;
+        ensureSpace(lineHeight);
+        doc.text(line, margin + indent, y);
+        y += lineHeight;
       }
     };
     const addSpace = (px: number) => { y += px; };
     const addSeparator = () => {
-      doc.setDrawColor(200, 200, 200);
+      ensureSpace(6);
+      doc.setDrawColor(220, 220, 220);
       doc.line(margin, y, pageWidth - margin, y);
-      addSpace(8);
+      addSpace(6);
+    };
+
+    // Filled section header with colored bar
+    const addSectionHeader = (title: string, color: [number, number, number] = [30, 80, 60]) => {
+      ensureSpace(14);
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.rect(margin, y - 4, 3, 10, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(color[0], color[1], color[2]);
+      doc.text(clean(title), margin + 6, y + 3);
+      y += 12;
+    };
+
+    // Colored stat box used for macro/progression cards
+    const drawStatBox = (x: number, w: number, label: string, value: string, fill: [number, number, number], stroke: [number, number, number], textColor: [number, number, number]) => {
+      const h = 18;
+      doc.setFillColor(fill[0], fill[1], fill[2]);
+      doc.setDrawColor(stroke[0], stroke[1], stroke[2]);
+      doc.roundedRect(x, y, w, h, 2, 2, 'FD');
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text(clean(value), x + w / 2, y + 8, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(90, 90, 90);
+      doc.text(clean(label), x + w / 2, y + 14, { align: 'center' });
     };
 
     const clientName = (responseData.clients as any)?.name || (responseData as any).respondent_name || 'Atleta';
@@ -269,103 +316,162 @@ export default function AnamneseResponseDetail() {
       const sa = getStructuredAnalysis();
       if (!sa) { toast.error('Análise não disponível'); return; }
 
-      addText('ANÁLISE NUTRICIONAL INTELIGENTE', 16, true, [30, 80, 60]);
-      addSpace(2);
-      addText(`Atleta: ${clientName} • ${submittedAt}`, 10, false, [100, 100, 100]);
+      // Header banner
+      doc.setFillColor(30, 80, 60);
+      doc.rect(0, 0, pageWidth, 16, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(255, 255, 255);
+      doc.text('ANÁLISE NUTRICIONAL INTELIGENTE', margin, 11);
+      y = 24;
+      addText(`Atleta: ${clientName}    |    ${submittedAt}`, 10, false, [100, 100, 100]);
       addSpace(4);
-      addSeparator();
 
       // 1. Summary
-      addText('1. RESUMO DO ATLETA', 13, true, [30, 80, 60]);
-      addSpace(3);
-      addText(sa.athlete_summary || '', 10);
+      addSectionHeader('1. Resumo do Atleta');
+      addText(sa.athlete_summary || '-', 10);
       addSpace(6);
 
       // 2. Carb estimation
       if (sa.carb_estimation) {
-        addText('2. ESTIMATIVA NUTRICIONAL ATUAL', 13, true, [30, 80, 60]);
-        addSpace(3);
-        addText(`CHO atual estimado: ~${sa.carb_estimation.current_cho_gkg} g/kg (${sa.carb_estimation.classification})`, 10, true);
-        if (sa.carb_estimation.current_protein_gkg) addText(`Proteína: ~${sa.carb_estimation.current_protein_gkg} g/kg`, 10);
-        if (sa.carb_estimation.current_fat_gkg) addText(`Gordura: ~${sa.carb_estimation.current_fat_gkg} g/kg`, 10);
-        if (sa.carb_estimation.estimated_kcal) addText(`Kcal estimada: ~${sa.carb_estimation.estimated_kcal} kcal/dia`, 10);
-        addSpace(2);
-        addText(sa.carb_estimation.reasoning, 9, false, [80, 80, 80]);
+        addSectionHeader('2. Estimativa Nutricional Atual');
+        ensureSpace(24);
+        const cols = 4;
+        const gap = 4;
+        const colW = (maxWidth - gap * (cols - 1)) / cols;
+        const ce = sa.carb_estimation;
+        drawStatBox(margin + 0 * (colW + gap), colW, 'CHO (g/kg)', `~${ce.current_cho_gkg}`, [255, 240, 230], [255, 180, 100], [200, 100, 30]);
+        drawStatBox(margin + 1 * (colW + gap), colW, 'Classificação', String(ce.classification || '-'), [255, 230, 230], [220, 100, 100], [180, 50, 50]);
+        drawStatBox(margin + 2 * (colW + gap), colW, 'PTN (g/kg)', ce.current_protein_gkg ? `~${ce.current_protein_gkg}` : '-', [230, 240, 255], [120, 160, 220], [50, 90, 170]);
+        drawStatBox(margin + 3 * (colW + gap), colW, 'kcal/dia', ce.estimated_kcal ? `~${ce.estimated_kcal}` : '-', [235, 245, 235], [120, 180, 120], [40, 120, 50]);
+        y += 22;
+        addText(ce.reasoning, 9, false, [90, 90, 90]);
         addSpace(6);
       }
 
       // 3. Progression
       if (sa.carb_progression) {
-        addText('3. PROGRESSÃO DE CARBOIDRATOS', 13, true, [30, 80, 60]);
-        addSpace(3);
-        addText(`Atual: ${sa.carb_progression.current} g/kg → Próximo: ${sa.carb_progression.next_target} → Meta: ${sa.carb_progression.final_goal} g/kg`, 10, true);
-        addText(`Incremento: ${sa.carb_progression.increment}`, 10);
-        addText(sa.carb_progression.rationale, 9, false, [80, 80, 80]);
+        addSectionHeader('3. Estratégia de Progressão de Carboidratos');
+        ensureSpace(24);
+        const cp = sa.carb_progression;
+        const cols = 3;
+        const gap = 6;
+        const colW = (maxWidth - gap * (cols - 1) - 50) / cols; // leave room for increment chip
+        drawStatBox(margin + 0 * (colW + gap), colW, 'g/kg atual', String(cp.current ?? '-'), [255, 230, 230], [220, 100, 100], [180, 50, 50]);
+        drawStatBox(margin + 1 * (colW + gap), colW, 'g/kg próximo', String(cp.next_target ?? '-'), [255, 245, 220], [220, 180, 80], [160, 110, 20]);
+        drawStatBox(margin + 2 * (colW + gap), colW, 'g/kg meta', String(cp.final_goal ?? '-'), [230, 245, 230], [120, 180, 120], [40, 120, 50]);
+        // Increment chip on the right
+        const chipX = margin + 3 * (colW + gap);
+        doc.setFillColor(240, 240, 240);
+        doc.setDrawColor(200, 200, 200);
+        doc.roundedRect(chipX, y, pageWidth - margin - chipX, 18, 2, 2, 'FD');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(70, 70, 70);
+        doc.text(clean(`Incremento: ${cp.increment ?? '-'}`), chipX + 4, y + 11);
+        y += 22;
+        addText(cp.rationale, 9, false, [90, 90, 90]);
         addSpace(6);
       }
 
       // 4. Meal plan
       if (sa.meal_plan?.meals) {
-        addText('4. PLANO ALIMENTAR', 13, true, [30, 80, 60]);
-        addSpace(3);
+        addSectionHeader('4. Plano Alimentar');
         for (const meal of sa.meal_plan.meals) {
-          addText(meal.meal_name, 11, true);
+          ensureSpace(14);
+          // Meal name pill
+          doc.setFillColor(245, 248, 245);
+          doc.setDrawColor(210, 225, 210);
+          const pillH = 8;
+          doc.roundedRect(margin, y - 1, maxWidth, pillH, 1.5, 1.5, 'FD');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10.5);
+          doc.setTextColor(30, 80, 60);
+          doc.text(clean(meal.meal_name), margin + 3, y + 5);
+          y += pillH + 3;
           for (const fg of meal.food_groups || []) {
-            addText(`  ${fg.group}: ${fg.options}`, 10);
+            addText(`${fg.group}: ${fg.options}`, 9.5, false, [40, 40, 40], { indent: 4 });
           }
-          if (meal.meal_macros) addText(`  📊 ${meal.meal_macros}`, 9, false, [80, 120, 80]);
-          if (meal.timing_note) addText(`  ⏰ ${meal.timing_note}`, 9, false, [100, 100, 100]);
-          addSpace(3);
+          if (meal.meal_macros) addText(`Macros: ${meal.meal_macros}`, 8.5, true, [60, 120, 70], { indent: 4 });
+          if (meal.timing_note) addText(`Timing: ${meal.timing_note}`, 8.5, false, [110, 110, 110], { indent: 4 });
+          addSpace(4);
         }
         if (sa.meal_plan.daily_totals) {
-          addSpace(3);
-          addSeparator();
-          addText('TOTAIS DIÁRIOS APROXIMADOS', 11, true, [30, 80, 60]);
           addSpace(2);
+          ensureSpace(28);
+          // Totals box
+          const boxH = 22;
+          doc.setFillColor(245, 250, 247);
+          doc.setDrawColor(180, 210, 190);
+          doc.roundedRect(margin, y, maxWidth, boxH, 2, 2, 'FD');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(30, 80, 60);
+          doc.text('TOTAIS DIÁRIOS APROXIMADOS', margin + 4, y + 6);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(50, 50, 50);
           const dt = sa.meal_plan.daily_totals;
-          addText(`Calorias: ~${dt.kcal} kcal`, 10, true);
-          addText(`Carboidratos: ~${dt.cho_g}g (${dt.cho_gkg} g/kg)`, 10);
-          addText(`Proteínas: ~${dt.protein_g}g${dt.protein_gkg ? ` (${dt.protein_gkg} g/kg)` : ''}`, 10);
-          addText(`Gorduras: ~${dt.fat_g}g`, 10);
-          addSeparator();
+          const totals = [
+            `kcal: ~${dt.kcal}`,
+            `CHO: ~${dt.cho_g}g (${dt.cho_gkg} g/kg)`,
+            `PTN: ~${dt.protein_g}g${dt.protein_gkg ? ` (${dt.protein_gkg} g/kg)` : ''}`,
+            `LIP: ~${dt.fat_g}g`,
+          ];
+          const colW = maxWidth / 4;
+          totals.forEach((t, i) => {
+            doc.text(clean(t), margin + 4 + i * colW, y + 16);
+          });
+          y += boxH + 6;
         }
-        addSpace(4);
+        addSpace(2);
       }
 
       // 5. Orientations
       if (sa.strategic_orientations) {
-        addText('5. ORIENTAÇÕES ESTRATÉGICAS', 13, true, [30, 80, 60]);
-        addSpace(3);
-        if (sa.strategic_orientations.meal_routine?.length) {
-          addText('Rotina Alimentar:', 10, true);
-          sa.strategic_orientations.meal_routine.forEach((o: string) => addText(`• ${o}`, 9));
+        addSectionHeader('5. Orientações Estratégicas');
+        const so = sa.strategic_orientations;
+        if (so.meal_routine?.length) {
+          addText('Rotina Alimentar', 10, true, [50, 50, 50]);
+          so.meal_routine.forEach((o: string) => addText(`- ${o}`, 9, false, [60, 60, 60], { indent: 4 }));
           addSpace(3);
         }
-        if (sa.strategic_orientations.training_strategy?.length) {
-          addText('Estratégia para Treino:', 10, true);
-          sa.strategic_orientations.training_strategy.forEach((o: string) => addText(`• ${o}`, 9));
+        if (so.training_strategy?.length) {
+          addText('Estratégia para Treino', 10, true, [50, 50, 50]);
+          so.training_strategy.forEach((o: string) => addText(`- ${o}`, 9, false, [60, 60, 60], { indent: 4 }));
           addSpace(3);
         }
-        if (sa.strategic_orientations.supplementation?.length) {
-          addText('Suplementação:', 10, true);
-          sa.strategic_orientations.supplementation.forEach((s: any) => addText(`• ${s.supplement}: ${s.recommendation}`, 9));
+        if (so.supplementation?.length) {
+          addText('Suplementação', 10, true, [50, 50, 50]);
+          so.supplementation.forEach((s: any) => addText(`- ${s.supplement}: ${s.recommendation}`, 9, false, [60, 60, 60], { indent: 4 }));
           addSpace(3);
         }
-        if (sa.strategic_orientations.race_context) {
-          addText('Contexto da Prova:', 10, true);
-          addText(sa.strategic_orientations.race_context, 9);
+        if (so.race_context) {
+          addText('Contexto da Prova', 10, true, [50, 50, 50]);
+          addText(so.race_context, 9, false, [60, 60, 60], { indent: 4 });
         }
         addSpace(4);
       }
 
       // 6. Alerts
       if (sa.alerts?.length) {
-        addText('6. ALERTAS IMPORTANTES', 13, true, [180, 80, 30]);
-        addSpace(3);
-        sa.alerts.forEach((a: string) => addText(`⚠ ${a}`, 10));
+        addSectionHeader('6. Alertas Importantes', [180, 80, 30]);
+        sa.alerts.forEach((a: string) => {
+          ensureSpace(10);
+          doc.setFillColor(255, 248, 235);
+          doc.setDrawColor(230, 180, 100);
+          const lines = doc.splitTextToSize(clean(`! ${a}`), maxWidth - 6);
+          const h = lines.length * 4.6 + 4;
+          doc.roundedRect(margin, y, maxWidth, h, 1.5, 1.5, 'FD');
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(140, 70, 20);
+          doc.text(lines, margin + 3, y + 5);
+          y += h + 3;
+        });
       }
 
-      addSpace(8);
+      addSpace(6);
       addSeparator();
       addText('Rogers Feitosa - Nutrição & Treinamento', 8, false, [150, 150, 150]);
 
