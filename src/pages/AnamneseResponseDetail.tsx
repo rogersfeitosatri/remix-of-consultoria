@@ -84,11 +84,47 @@ export default function AnamneseResponseDetail() {
     enabled: !!responseData?.client_id,
   });
 
+  // Load saved guidance from localStorage when client is known
+  const guidanceStorageKey = responseData?.client_id ? `ai-guidance:${responseData.client_id}` : null;
+  useEffect(() => {
+    if (!guidanceStorageKey) return;
+    try {
+      const raw = localStorage.getItem(guidanceStorageKey);
+      if (raw) setGuidance((prev) => ({ ...prev, ...JSON.parse(raw) }));
+    } catch {}
+  }, [guidanceStorageKey]);
+
+  const saveGuidanceLocal = (next: typeof guidance) => {
+    setGuidance(next);
+    if (guidanceStorageKey) {
+      try { localStorage.setItem(guidanceStorageKey, JSON.stringify(next)); } catch {}
+    }
+  };
+
+  const buildGuidancePayload = () => {
+    const toNum = (v: string) => {
+      const n = parseFloat(String(v).replace(',', '.'));
+      return Number.isFinite(n) ? n : undefined;
+    };
+    const payload: Record<string, any> = {
+      meals_count: toNum(guidance.meals_count),
+      target_kcal: toNum(guidance.target_kcal),
+      target_cho_gkg: toNum(guidance.target_cho_gkg),
+      target_protein_gkg: toNum(guidance.target_protein_gkg),
+      target_fat_gkg: toNum(guidance.target_fat_gkg),
+      custom_instructions: guidance.custom_instructions?.trim() || undefined,
+    };
+    // Only return if anything is set
+    const hasAny = Object.values(payload).some((v) => v !== undefined && v !== '');
+    return hasAny ? payload : undefined;
+  };
+
   const analyzeAthleteMutation = useMutation({
     mutationFn: async () => {
       if (!responseData?.client_id) throw new Error('Client ID not found');
+      const adminGuidance = buildGuidancePayload();
       const { data, error } = await supabase.functions.invoke('analyze-athlete', {
-        body: { clientId: responseData.client_id },
+        body: { clientId: responseData.client_id, adminGuidance },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
