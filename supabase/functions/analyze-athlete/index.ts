@@ -441,5 +441,5 @@ function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, 
 - Jantar: ${mealDescription(profile.meal_dinner)}
 - Ceia: ${profile.meal_supper_enabled ? mealDescription(profile.meal_supper) : 'Não faz'}
 - Fim de semana: ${profile.weekend_changes || 'N/I'} - ${profile.weekend_description || 'N/I'}
-${anamneseSection}`;
+${anamneseSection}${guidanceBlock}`;
 }
