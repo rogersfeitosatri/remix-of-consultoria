@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { clientId } = await req.json();
+    const { clientId, adminGuidance } = await req.json();
     if (!clientId) throw new Error('clientId is required');
 
     console.log('Analyzing athlete for client:', clientId);
