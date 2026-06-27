@@ -760,6 +760,94 @@ export default function AthleteAnamneseForm() {
                 rows={3}
               />
             </div>
+
+            {/* Outras modalidades de treino */}
+            <Card className="border-primary/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  Outras modalidades de treino na semana
+                </CardTitle>
+                <CardDescription>
+                  Inclua modalidades além da corrida (musculação, bike, natação, funcional, pilates, yoga...) e o dia/horário que costuma realizar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {formData.modalidades_treino.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">
+                    Nenhuma modalidade adicionada. Clique em "Adicionar modalidade" se realiza outras atividades.
+                  </p>
+                )}
+                {formData.modalidades_treino.map((item, idx) => (
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 rounded-md border bg-muted/30">
+                    <div className="md:col-span-5 space-y-1">
+                      <Label className="text-xs">Modalidade</Label>
+                      <Input
+                        value={item.modalidade}
+                        onChange={(e) => {
+                          const next = [...formData.modalidades_treino];
+                          next[idx] = { ...next[idx], modalidade: e.target.value };
+                          updateFormData('modalidades_treino', next);
+                        }}
+                        placeholder="Ex: Musculação"
+                      />
+                    </div>
+                    <div className="md:col-span-4 space-y-1">
+                      <Label className="text-xs">Dia(s) da semana</Label>
+                      <Input
+                        value={item.dia}
+                        onChange={(e) => {
+                          const next = [...formData.modalidades_treino];
+                          next[idx] = { ...next[idx], dia: e.target.value };
+                          updateFormData('modalidades_treino', next);
+                        }}
+                        placeholder="Ex: Seg, Qua, Sex"
+                      />
+                    </div>
+                    <div className="md:col-span-2 space-y-1">
+                      <Label className="text-xs">Horário</Label>
+                      <Input
+                        type="time"
+                        value={item.horario}
+                        onChange={(e) => {
+                          const next = [...formData.modalidades_treino];
+                          next[idx] = { ...next[idx], horario: e.target.value };
+                          updateFormData('modalidades_treino', next);
+                        }}
+                      />
+                    </div>
+                    <div className="md:col-span-1 flex md:items-end justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          const next = formData.modalidades_treino.filter((_, i) => i !== idx);
+                          updateFormData('modalidades_treino', next);
+                        }}
+                        aria-label="Remover modalidade"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    updateFormData('modalidades_treino', [
+                      ...formData.modalidades_treino,
+                      { modalidade: '', dia: '', horario: '' },
+                    ])
+                  }
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar modalidade
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         );
 
