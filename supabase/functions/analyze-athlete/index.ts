@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       anamneseQuestions = questions || [];
     }
 
-    const prompt = buildAnalysisPrompt(profile, client, anamneseResponses, anamneseQuestions);
+    const prompt = buildAnalysisPrompt(profile, client, anamneseResponses, anamneseQuestions, adminGuidance);
 
     console.log('Sending request to Lovable AI Gateway...');
 
