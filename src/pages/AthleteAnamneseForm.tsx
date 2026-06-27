@@ -218,6 +218,10 @@ export default function AthleteAnamneseForm() {
 
       case 'objetivo':
         if (!formData.objetivo_principal) newErrors.objetivo_principal = 'Campo obrigatório';
+        if (formData.tem_prova_alvo === 'sim') {
+          if (!formData.prova_alvo_nome.trim()) newErrors.prova_alvo_nome = 'Informe o nome da prova';
+          if (!formData.prova_alvo_data) newErrors.prova_alvo_data = 'Informe a data da prova';
+        }
         break;
 
       case 'medidas':
