@@ -76,6 +76,8 @@ const questionTypes = [
   { value: 'scale', label: 'Escala (1-10)' },
   { value: 'boolean', label: 'Sim/Não' },
   { value: 'date', label: 'Data' },
+  { value: 'meal_items', label: '🍽️ Refeição (horário + alimentos)' },
+  { value: 'training_week', label: '🏋️ Rotina de Treino Semanal' },
 ];
 
 export default function AnamneseFormBuilder() {

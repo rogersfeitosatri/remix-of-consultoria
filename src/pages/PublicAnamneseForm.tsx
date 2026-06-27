@@ -10,7 +10,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { PersonStanding, Send, CheckCircle2, Pencil, Info } from 'lucide-react';
+import { PersonStanding, Send, CheckCircle2, Pencil, Info, Plus, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -102,6 +103,18 @@ export default function PublicAnamneseForm() {
         initialAnswers[q.id] = [];
       } else if (q.question_type === 'scale') {
         initialAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
+      } else if (q.question_type === 'meal_items') {
+        initialAnswers[q.id] = { horario: '', itens: [''], bebidas: '' };
+      } else if (q.question_type === 'training_week') {
+        initialAnswers[q.id] = {
+          Segunda: { modalidade: '', turno: '', intensidade: '' },
+          Terça: { modalidade: '', turno: '', intensidade: '' },
+          Quarta: { modalidade: '', turno: '', intensidade: '' },
+          Quinta: { modalidade: '', turno: '', intensidade: '' },
+          Sexta: { modalidade: '', turno: '', intensidade: '' },
+          Sábado: { modalidade: '', turno: '', intensidade: '' },
+          Domingo: { modalidade: '', turno: '', intensidade: '' },
+        };
       } else {
         initialAnswers[q.id] = '';
       }
@@ -573,6 +586,20 @@ export default function PublicAnamneseForm() {
                       </div>
                     )}
 
+                    {question.question_type === 'meal_items' && (
+                      <MealItemsRenderer
+                        value={answers[question.id] || { horario: '', itens: [''], bebidas: '' }}
+                        onChange={(v) => handleAnswerChange(question.id, v)}
+                      />
+                    )}
+
+                    {question.question_type === 'training_week' && (
+                      <TrainingWeekRenderer
+                        value={answers[question.id] || {}}
+                        onChange={(v) => handleAnswerChange(question.id, v)}
+                      />
+                    )}
+
                     {question.has_comment_field && (
                       <div className="mt-4 pt-4 border-t border-border/50">
                         <Label 
@@ -645,6 +672,120 @@ export default function PublicAnamneseForm() {
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// ── Meal Items Renderer ────────────────────────────────────────────────────────
+function MealItemsRenderer({
+  value,
+  onChange,
+}: {
+  value: { horario: string; itens: string[]; bebidas: string };
+  onChange: (v: any) => void;
+}) {
+  const itens = value.itens?.length ? value.itens : [''];
+
+  const setField = (field: string, v: string) => onChange({ ...value, [field]: v });
+  const setItem = (i: number, v: string) => {
+    const next = [...itens]; next[i] = v; onChange({ ...value, itens: next });
+  };
+  const addItem = () => onChange({ ...value, itens: [...itens, ''] });
+  const removeItem = (i: number) => {
+    if (itens.length <= 1) return;
+    onChange({ ...value, itens: itens.filter((_, idx) => idx !== i) });
+  };
+
+  return (
+    <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
+      <div className="space-y-1">
+        <Label className="text-xs font-medium flex items-center gap-1">🕐 Horário habitual</Label>
+        <Input type="time" value={value.horario || ''} onChange={(e) => setField('horario', e.target.value)} className="w-36" />
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs font-medium">Alimentos e porções</Label>
+        {itens.map((item, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <Input
+              value={item}
+              onChange={(e) => setItem(i, e.target.value)}
+              placeholder="Ex: Arroz branco – 2 colheres de sopa"
+            />
+            <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(i)} disabled={itens.length <= 1} className="h-9 w-9 p-0 shrink-0">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <p className="text-xs text-muted-foreground">Use medidas caseiras: colher, fatia, copo, unidade, gramas…</p>
+        <Button type="button" variant="ghost" size="sm" onClick={addItem} className="gap-1 px-2">
+          <Plus className="h-4 w-4" /> Adicionar alimento
+        </Button>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs font-medium">Bebidas e quantidades</Label>
+        <Input value={value.bebidas || ''} onChange={(e) => setField('bebidas', e.target.value)} placeholder="Ex: 1 copo de suco de laranja, 200ml de café…" />
+      </div>
+    </div>
+  );
+}
+
+// ── Training Week Renderer ─────────────────────────────────────────────────────
+const DIAS_SEMANA = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] as const;
+const MODALIDADES_OPT = [
+  { value: 'repouso', label: '😴 Repouso' },
+  { value: 'corrida', label: '🏃 Corrida' },
+  { value: 'ciclismo', label: '🚴 Ciclismo' },
+  { value: 'natacao', label: '🏊 Natação' },
+  { value: 'musculacao', label: '🏋️ Musculação' },
+  { value: 'funcional', label: '⚡ Funcional' },
+  { value: 'triathlon', label: '🏅 Triathlon' },
+  { value: 'outro', label: '🎯 Outro' },
+];
+const TURNOS_OPT = [
+  { value: 'manha', label: 'Manhã' },
+  { value: 'tarde', label: 'Tarde' },
+  { value: 'noite', label: 'Noite' },
+];
+const INTENSIDADES_OPT = [
+  { value: 'leve', label: '🟢 Leve' },
+  { value: 'moderado', label: '🟡 Moderado' },
+  { value: 'intenso', label: '🔴 Intenso' },
+];
+
+function TrainingWeekRenderer({ value, onChange }: { value: any; onChange: (v: any) => void }) {
+  const setDay = (dia: string, field: string, v: string) => {
+    const day = { ...(value[dia] || {}), [field]: v };
+    if (field === 'modalidade' && v === 'repouso') { day.turno = ''; day.intensidade = ''; }
+    onChange({ ...value, [dia]: day });
+  };
+
+  return (
+    <div className="space-y-3">
+      {DIAS_SEMANA.map((dia) => {
+        const day = value[dia] || { modalidade: '', turno: '', intensidade: '' };
+        const isRepouso = day.modalidade === 'repouso';
+        return (
+          <div key={dia} className={`rounded-lg border p-3 space-y-2 ${isRepouso ? 'opacity-60' : ''}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{dia}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <Select value={day.modalidade} onValueChange={(v) => setDay(dia, 'modalidade', v)}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Modalidade…" /></SelectTrigger>
+                <SelectContent>{MODALIDADES_OPT.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={day.turno} onValueChange={(v) => setDay(dia, 'turno', v)} disabled={isRepouso || !day.modalidade}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Turno…" /></SelectTrigger>
+                <SelectContent>{TURNOS_OPT.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={day.intensidade} onValueChange={(v) => setDay(dia, 'intensidade', v)} disabled={isRepouso || !day.modalidade}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Intensidade…" /></SelectTrigger>
+                <SelectContent>{INTENSIDADES_OPT.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
