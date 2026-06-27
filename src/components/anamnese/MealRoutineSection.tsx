@@ -1,19 +1,10 @@
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Info, Utensils } from 'lucide-react';
-import { MealCard } from './MealCard';
-
-interface MealData {
-  horario: string;
-  comida: string;
-  quantidades: string;
-  bebidas: string;
-  observacoes: string;
-}
+import { MealCard, MealData, emptyMealData } from './MealCard';
 
 interface MealRoutineData {
   cafe_da_manha: MealData;
@@ -34,14 +25,6 @@ interface MealRoutineSectionProps {
   onChange: (data: MealRoutineData) => void;
   errors: Record<string, any>;
 }
-
-const emptyMealData: MealData = {
-  horario: '',
-  comida: '',
-  quantidades: '',
-  bebidas: '',
-  observacoes: '',
-};
 
 export const defaultMealRoutineData: MealRoutineData = {
   cafe_da_manha: { ...emptyMealData },
@@ -76,13 +59,11 @@ export function MealRoutineSection({ data, onChange, errors }: MealRoutineSectio
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Seja o mais específico e realista possível. O plano alimentar será montado com base no que você já costuma comer. 
-          Use medidas caseiras (colher, fatia, copo, unidade) e cite marcas quando fizer sentido.
+          Seja o mais específico e realista possível. Para cada refeição, informe o horário e adicione cada alimento com a porção (ex: "Arroz branco – 2 colheres de sopa"). Use medidas caseiras.
         </AlertDescription>
       </Alert>
 
       <div className="space-y-4">
-        {/* Café da manhã - Obrigatório */}
         <MealCard
           mealKey="cafe_da_manha"
           mealName="Café da Manhã"
@@ -93,7 +74,6 @@ export function MealRoutineSection({ data, onChange, errors }: MealRoutineSectio
           errors={errors.cafe_da_manha || {}}
         />
 
-        {/* Lanche da manhã - Opcional */}
         <MealCard
           mealKey="lanche_manha"
           mealName="Lanche da Manhã"
@@ -105,7 +85,6 @@ export function MealRoutineSection({ data, onChange, errors }: MealRoutineSectio
           errors={errors.lanche_manha || {}}
         />
 
-        {/* Almoço - Obrigatório */}
         <MealCard
           mealKey="almoco"
           mealName="Almoço"
@@ -116,7 +95,6 @@ export function MealRoutineSection({ data, onChange, errors }: MealRoutineSectio
           errors={errors.almoco || {}}
         />
 
-        {/* Lanche da tarde - Opcional */}
         <MealCard
           mealKey="lanche_tarde"
           mealName="Lanche da Tarde"
@@ -128,7 +106,6 @@ export function MealRoutineSection({ data, onChange, errors }: MealRoutineSectio
           errors={errors.lanche_tarde || {}}
         />
 
-        {/* Jantar - Obrigatório */}
         <MealCard
           mealKey="jantar"
           mealName="Jantar"
@@ -139,7 +116,6 @@ export function MealRoutineSection({ data, onChange, errors }: MealRoutineSectio
           errors={errors.jantar || {}}
         />
 
-        {/* Ceia - Opcional */}
         <MealCard
           mealKey="ceia"
           mealName="Ceia"
@@ -152,7 +128,6 @@ export function MealRoutineSection({ data, onChange, errors }: MealRoutineSectio
         />
       </div>
 
-      {/* Pergunta sobre fim de semana */}
       <Card className="mt-6">
         <CardHeader>
           <CardTitle className="text-base">Sua alimentação muda muito nos fins de semana?</CardTitle>
