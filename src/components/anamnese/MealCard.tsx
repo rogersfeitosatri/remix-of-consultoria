@@ -2,11 +2,23 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronUp, Utensils, Clock } from 'lucide-react';
+import { ChevronDown, ChevronUp, Utensils, Clock, Plus, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+
+export interface MealData {
+  horario: string;
+  itens: string[];
+  bebidas: string;
+}
+
+export const emptyMealData: MealData = {
+  horario: '',
+  itens: [''],
+  bebidas: '',
+};
 
 interface MealCardProps {
   mealKey: string;
@@ -14,14 +26,8 @@ interface MealCardProps {
   isRequired: boolean;
   isEnabled: boolean;
   onToggle?: (enabled: boolean) => void;
-  data: {
-    horario: string;
-    comida: string;
-    quantidades: string;
-    bebidas: string;
-    observacoes: string;
-  };
-  onChange: (data: MealCardProps['data']) => void;
+  data: MealData;
+  onChange: (data: MealData) => void;
   errors?: Record<string, string>;
 }
 
@@ -37,8 +43,24 @@ export function MealCard({
 }: MealCardProps) {
   const [isOpen, setIsOpen] = useState(isRequired || isEnabled);
 
-  const handleChange = (field: keyof MealCardProps['data'], value: string) => {
+  const handleFieldChange = (field: 'horario' | 'bebidas', value: string) => {
     onChange({ ...data, [field]: value });
+  };
+
+  const handleItemChange = (index: number, value: string) => {
+    const newItens = [...data.itens];
+    newItens[index] = value;
+    onChange({ ...data, itens: newItens });
+  };
+
+  const handleAddItem = () => {
+    onChange({ ...data, itens: [...data.itens, ''] });
+  };
+
+  const handleRemoveItem = (index: number) => {
+    if (data.itens.length <= 1) return;
+    const newItens = data.itens.filter((_, i) => i !== index);
+    onChange({ ...data, itens: newItens });
   };
 
   // For optional meals, show toggle
@@ -64,7 +86,7 @@ export function MealCard({
             </div>
           </div>
         </CardHeader>
-        
+
         {isEnabled && (
           <Collapsible open={isOpen} onOpenChange={setIsOpen}>
             <CollapsibleTrigger className="w-full px-6 py-2 flex items-center justify-center text-sm text-muted-foreground hover:text-foreground transition-colors border-t">
@@ -76,7 +98,14 @@ export function MealCard({
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent className="pt-0 pb-4 space-y-4">
-                <MealFields data={data} onChange={handleChange} errors={errors} />
+                <MealFields
+                  data={data}
+                  onFieldChange={handleFieldChange}
+                  onItemChange={handleItemChange}
+                  onAddItem={handleAddItem}
+                  onRemoveItem={handleRemoveItem}
+                  errors={errors}
+                />
               </CardContent>
             </CollapsibleContent>
           </Collapsible>
@@ -103,7 +132,14 @@ export function MealCard({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="pt-0 pb-4 space-y-4">
-            <MealFields data={data} onChange={handleChange} errors={errors} />
+            <MealFields
+              data={data}
+              onFieldChange={handleFieldChange}
+              onItemChange={handleItemChange}
+              onAddItem={handleAddItem}
+              onRemoveItem={handleRemoveItem}
+              errors={errors}
+            />
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
@@ -113,11 +149,17 @@ export function MealCard({
 
 function MealFields({
   data,
-  onChange,
+  onFieldChange,
+  onItemChange,
+  onAddItem,
+  onRemoveItem,
   errors,
 }: {
-  data: MealCardProps['data'];
-  onChange: (field: keyof MealCardProps['data'], value: string) => void;
+  data: MealData;
+  onFieldChange: (field: 'horario' | 'bebidas', value: string) => void;
+  onItemChange: (index: number, value: string) => void;
+  onAddItem: () => void;
+  onRemoveItem: (index: number) => void;
   errors: Record<string, string>;
 }) {
   return (
@@ -130,55 +172,61 @@ function MealFields({
         <Input
           type="time"
           value={data.horario}
-          onChange={(e) => onChange('horario', e.target.value)}
+          onChange={(e) => onFieldChange('horario', e.target.value)}
           className={errors.horario ? 'border-destructive' : ''}
         />
         {errors.horario && <p className="text-xs text-destructive">{errors.horario}</p>}
       </div>
 
       <div className="space-y-2">
-        <Label>O que costuma comer? *</Label>
-        <Textarea
-          value={data.comida}
-          onChange={(e) => onChange('comida', e.target.value)}
-          placeholder="Descreva os alimentos que costuma comer nessa refeição..."
-          rows={3}
-          className={errors.comida ? 'border-destructive' : ''}
-        />
-        {errors.comida && <p className="text-xs text-destructive">{errors.comida}</p>}
-      </div>
-
-      <div className="space-y-2">
-        <Label>Quantidades aproximadas (medidas caseiras) *</Label>
-        <Textarea
-          value={data.quantidades}
-          onChange={(e) => onChange('quantidades', e.target.value)}
-          placeholder="Ex: 2 fatias de pão, 1 colher de manteiga, 1 copo de leite..."
-          rows={2}
-          className={errors.quantidades ? 'border-destructive' : ''}
-        />
-        {errors.quantidades && <p className="text-xs text-destructive">{errors.quantidades}</p>}
+        <Label>Alimentos e porções *</Label>
+        <div className="space-y-2">
+          {data.itens.map((item, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <Input
+                value={item}
+                onChange={(e) => onItemChange(index, e.target.value)}
+                placeholder="Ex: Arroz branco – 2 colheres de sopa"
+                className={errors.itens ? 'border-destructive' : ''}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onRemoveItem(index)}
+                disabled={data.itens.length <= 1}
+                className="shrink-0 h-9 w-9 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+        {errors.itens && <p className="text-xs text-destructive">{errors.itens}</p>}
+        <p className="text-xs text-muted-foreground">
+          Use medidas caseiras: colher, fatia, copo, unidade, gramas...
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onAddItem}
+          className="flex items-center gap-1 px-2"
+        >
+          <Plus className="h-4 w-4" />
+          Adicionar alimento
+        </Button>
       </div>
 
       <div className="space-y-2">
         <Label>Bebidas e quantidades *</Label>
         <Input
           value={data.bebidas}
-          onChange={(e) => onChange('bebidas', e.target.value)}
+          onChange={(e) => onFieldChange('bebidas', e.target.value)}
           placeholder="Ex: 1 copo de suco de laranja, 200ml de café..."
           className={errors.bebidas ? 'border-destructive' : ''}
         />
         {errors.bebidas && <p className="text-xs text-destructive">{errors.bebidas}</p>}
-      </div>
-
-      <div className="space-y-2">
-        <Label>Observações (opcional)</Label>
-        <Textarea
-          value={data.observacoes}
-          onChange={(e) => onChange('observacoes', e.target.value)}
-          placeholder="Fome excessiva, beliscos, doces, repetição de prato..."
-          rows={2}
-        />
       </div>
     </>
   );

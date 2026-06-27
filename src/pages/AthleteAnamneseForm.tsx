@@ -22,12 +22,14 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { PersonStanding, ArrowLeft, ArrowRight, Check, Loader2, Plus, Trash2, CalendarDays } from 'lucide-react';
 import { MealRoutineSection, defaultMealRoutineData } from '@/components/anamnese/MealRoutineSection';
+import { TrainingWeekSection, defaultTrainingWeekData, TrainingWeekData } from '@/components/anamnese/TrainingWeekSection';
 
 // Section definitions
 const sections = [
   { id: 'dados_pessoais', title: 'Dados Pessoais', icon: '👤' },
   { id: 'rotina_trabalho', title: 'Rotina e Trabalho', icon: '💼' },
   { id: 'historico_corrida', title: 'Histórico de Corrida', icon: '🏃' },
+  { id: 'rotina_treino', title: 'Rotina de Treinos', icon: '🏋️' },
   { id: 'objetivo', title: 'Objetivo Principal', icon: '🎯' },
   { id: 'medidas', title: 'Peso, Altura e Histórico', icon: '📏' },
   { id: 'sono_estresse', title: 'Sono e Estresse', icon: '😴' },
@@ -51,6 +53,10 @@ interface FormData {
   horario_trabalho: string;
   trabalho_sedentario: string;
   horas_sentado: string;
+  nivel_atividade_diaria: string;
+
+  // Rotina de Treino
+  rotina_treino: TrainingWeekData;
 
   // Histórico de Corrida
   pratica_corrida: string;
@@ -127,6 +133,8 @@ const defaultFormData: FormData = {
   horario_trabalho: '',
   trabalho_sedentario: '',
   horas_sentado: '',
+  nivel_atividade_diaria: '',
+  rotina_treino: defaultTrainingWeekData,
   pratica_corrida: '',
   tempo_pratica: '',
   frequencia_semanal: '',
@@ -210,6 +218,11 @@ export default function AthleteAnamneseForm() {
       case 'rotina_trabalho':
         if (!formData.profissao.trim()) newErrors.profissao = 'Campo obrigatório';
         if (!formData.trabalho_sedentario) newErrors.trabalho_sedentario = 'Campo obrigatório';
+        if (!formData.nivel_atividade_diaria) newErrors.nivel_atividade_diaria = 'Campo obrigatório';
+        break;
+
+      case 'rotina_treino':
+        // Não obrigatório — atleta pode deixar dias em branco
         break;
 
       case 'historico_corrida':
@@ -257,42 +270,34 @@ export default function AthleteAnamneseForm() {
         const mealErrors: Record<string, any> = {};
         const { rotina_alimentar } = formData;
 
+        const validateMeal = (mealData: any): Record<string, string> => {
+          const err: Record<string, string> = {};
+          if (!mealData.horario) err.horario = 'Campo obrigatório';
+          const hasItem = (mealData.itens || []).some((i: string) => i.trim());
+          if (!hasItem) err.itens = 'Adicione ao menos um alimento';
+          return err;
+        };
+
         // Validate required meals
         ['cafe_da_manha', 'almoco', 'jantar'].forEach((meal) => {
           const mealData = rotina_alimentar[meal as keyof typeof rotina_alimentar] as any;
-          const mealErr: Record<string, string> = {};
-          if (!mealData.horario) mealErr.horario = 'Campo obrigatório';
-          if (!mealData.comida?.trim()) mealErr.comida = 'Campo obrigatório';
-          if (!mealData.quantidades?.trim()) mealErr.quantidades = 'Campo obrigatório';
-          if (!mealData.bebidas?.trim()) mealErr.bebidas = 'Campo obrigatório';
+          const mealErr = validateMeal(mealData);
           if (Object.keys(mealErr).length > 0) mealErrors[meal] = mealErr;
         });
 
         // Validate optional meals if enabled
         if (rotina_alimentar.lanche_manha_enabled) {
-          const mealErr: Record<string, string> = {};
-          if (!rotina_alimentar.lanche_manha.horario) mealErr.horario = 'Campo obrigatório';
-          if (!rotina_alimentar.lanche_manha.comida?.trim()) mealErr.comida = 'Campo obrigatório';
-          if (!rotina_alimentar.lanche_manha.quantidades?.trim()) mealErr.quantidades = 'Campo obrigatório';
-          if (!rotina_alimentar.lanche_manha.bebidas?.trim()) mealErr.bebidas = 'Campo obrigatório';
+          const mealErr = validateMeal(rotina_alimentar.lanche_manha);
           if (Object.keys(mealErr).length > 0) mealErrors.lanche_manha = mealErr;
         }
 
         if (rotina_alimentar.lanche_tarde_enabled) {
-          const mealErr: Record<string, string> = {};
-          if (!rotina_alimentar.lanche_tarde.horario) mealErr.horario = 'Campo obrigatório';
-          if (!rotina_alimentar.lanche_tarde.comida?.trim()) mealErr.comida = 'Campo obrigatório';
-          if (!rotina_alimentar.lanche_tarde.quantidades?.trim()) mealErr.quantidades = 'Campo obrigatório';
-          if (!rotina_alimentar.lanche_tarde.bebidas?.trim()) mealErr.bebidas = 'Campo obrigatório';
+          const mealErr = validateMeal(rotina_alimentar.lanche_tarde);
           if (Object.keys(mealErr).length > 0) mealErrors.lanche_tarde = mealErr;
         }
 
         if (rotina_alimentar.ceia_enabled) {
-          const mealErr: Record<string, string> = {};
-          if (!rotina_alimentar.ceia.horario) mealErr.horario = 'Campo obrigatório';
-          if (!rotina_alimentar.ceia.comida?.trim()) mealErr.comida = 'Campo obrigatório';
-          if (!rotina_alimentar.ceia.quantidades?.trim()) mealErr.quantidades = 'Campo obrigatório';
-          if (!rotina_alimentar.ceia.bebidas?.trim()) mealErr.bebidas = 'Campo obrigatório';
+          const mealErr = validateMeal(rotina_alimentar.ceia);
           if (Object.keys(mealErr).length > 0) mealErrors.ceia = mealErr;
         }
 
@@ -403,6 +408,8 @@ export default function AthleteAnamneseForm() {
         work_schedule: formData.horario_trabalho,
         sedentary_work: formData.trabalho_sedentario,
         hours_sitting: formData.horas_sentado,
+        daily_activity_level: formData.nivel_atividade_diaria,
+        training_week: formData.rotina_treino,
         // Histórico de Corrida
         practices_running: formData.pratica_corrida,
         running_time: formData.tempo_pratica,
@@ -666,7 +673,52 @@ export default function AthleteAnamneseForm() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">
+                Como costuma ser o seu dia no geral? *
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Considere sua rotina fora dos treinos — trabalho, deslocamentos, tarefas do dia a dia. Isso ajuda a calcular o quanto você gasta de energia nas 24 horas.
+              </p>
+              <RadioGroup
+                value={formData.nivel_atividade_diaria}
+                onValueChange={(v) => updateFormData('nivel_atividade_diaria', v)}
+                className="space-y-3"
+              >
+                <div className="flex items-start space-x-3 rounded-lg border p-3 hover:bg-accent/50 transition-colors cursor-pointer">
+                  <RadioGroupItem value="sedentario" id="ativ-sed" className="mt-0.5" />
+                  <Label htmlFor="ativ-sed" className="cursor-pointer space-y-0.5">
+                    <span className="font-medium">🪑 Sedentário</span>
+                    <p className="text-xs text-muted-foreground font-normal">Fico sentado a maior parte do dia (home office, escritório, estudo)</p>
+                  </Label>
+                </div>
+                <div className="flex items-start space-x-3 rounded-lg border p-3 hover:bg-accent/50 transition-colors cursor-pointer">
+                  <RadioGroupItem value="pouco_movimento" id="ativ-pouco" className="mt-0.5" />
+                  <Label htmlFor="ativ-pouco" className="cursor-pointer space-y-0.5">
+                    <span className="font-medium">🚶 Pouco movimento</span>
+                    <p className="text-xs text-muted-foreground font-normal">Alterno entre ficar sentado e me movimentar ao longo do dia</p>
+                  </Label>
+                </div>
+                <div className="flex items-start space-x-3 rounded-lg border p-3 hover:bg-accent/50 transition-colors cursor-pointer">
+                  <RadioGroupItem value="muito_movimento" id="ativ-muito" className="mt-0.5" />
+                  <Label htmlFor="ativ-muito" className="cursor-pointer space-y-0.5">
+                    <span className="font-medium">🏃 Muito movimento</span>
+                    <p className="text-xs text-muted-foreground font-normal">Fico de pé, andando ou fazendo esforço físico a maior parte do dia (professor, vendedor, obra, etc.)</p>
+                  </Label>
+                </div>
+              </RadioGroup>
+              {errors.nivel_atividade_diaria && <p className="text-xs text-destructive">{errors.nivel_atividade_diaria}</p>}
+            </div>
           </div>
+        );
+
+      case 'rotina_treino':
+        return (
+          <TrainingWeekSection
+            data={formData.rotina_treino}
+            onChange={(data) => updateFormData('rotina_treino', data)}
+          />
         );
 
       case 'historico_corrida':
