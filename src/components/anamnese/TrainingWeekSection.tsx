@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Info, Dumbbell } from 'lucide-react';
 
 const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] as const;
@@ -32,18 +34,19 @@ export interface TrainingDay {
   modalidade: string;
   turno: string;
   intensidade: string;
+  longao?: boolean;
 }
 
 export type TrainingWeekData = Record<typeof DIAS[number], TrainingDay>;
 
 export const defaultTrainingWeekData: TrainingWeekData = {
-  Segunda: { modalidade: '', turno: '', intensidade: '' },
-  Terça: { modalidade: '', turno: '', intensidade: '' },
-  Quarta: { modalidade: '', turno: '', intensidade: '' },
-  Quinta: { modalidade: '', turno: '', intensidade: '' },
-  Sexta: { modalidade: '', turno: '', intensidade: '' },
-  Sábado: { modalidade: '', turno: '', intensidade: '' },
-  Domingo: { modalidade: '', turno: '', intensidade: '' },
+  Segunda: { modalidade: '', turno: '', intensidade: '', longao: false },
+  Terça: { modalidade: '', turno: '', intensidade: '', longao: false },
+  Quarta: { modalidade: '', turno: '', intensidade: '', longao: false },
+  Quinta: { modalidade: '', turno: '', intensidade: '', longao: false },
+  Sexta: { modalidade: '', turno: '', intensidade: '', longao: false },
+  Sábado: { modalidade: '', turno: '', intensidade: '', longao: false },
+  Domingo: { modalidade: '', turno: '', intensidade: '', longao: false },
 };
 
 interface TrainingWeekSectionProps {
@@ -52,11 +55,13 @@ interface TrainingWeekSectionProps {
 }
 
 export function TrainingWeekSection({ data, onChange }: TrainingWeekSectionProps) {
-  const handleDayChange = (dia: typeof DIAS[number], field: keyof TrainingDay, value: string) => {
+  const handleDayChange = (dia: typeof DIAS[number], field: keyof TrainingDay, value: string | boolean) => {
     const updated = { ...data, [dia]: { ...data[dia], [field]: value } };
-    // Se mudou para repouso, limpa turno e intensidade
     if (field === 'modalidade' && value === 'repouso') {
-      updated[dia] = { modalidade: 'repouso', turno: '', intensidade: '' };
+      updated[dia] = { modalidade: 'repouso', turno: '', intensidade: '', longao: false };
+    }
+    if (field === 'modalidade' && value !== 'corrida' && value !== 'ciclismo') {
+      updated[dia] = { ...updated[dia], longao: false };
     }
     onChange(updated);
   };
@@ -79,6 +84,7 @@ export function TrainingWeekSection({ data, onChange }: TrainingWeekSectionProps
         {DIAS.map((dia) => {
           const day = data[dia];
           const isRepouso = day.modalidade === 'repouso';
+          const showLongao = day.modalidade === 'corrida' || day.modalidade === 'ciclismo';
           return (
             <Card key={dia} className={isRepouso ? 'opacity-60' : ''}>
               <CardHeader className="py-3 pb-0">
@@ -86,9 +92,8 @@ export function TrainingWeekSection({ data, onChange }: TrainingWeekSectionProps
                   {dia}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-3 pb-4">
+              <CardContent className="pt-3 pb-4 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Modalidade */}
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">Modalidade</p>
                     <Select
@@ -100,15 +105,12 @@ export function TrainingWeekSection({ data, onChange }: TrainingWeekSectionProps
                       </SelectTrigger>
                       <SelectContent>
                         {MODALIDADES.map((m) => (
-                          <SelectItem key={m.value} value={m.value}>
-                            {m.label}
-                          </SelectItem>
+                          <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {/* Turno */}
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">Turno</p>
                     <Select
@@ -121,15 +123,12 @@ export function TrainingWeekSection({ data, onChange }: TrainingWeekSectionProps
                       </SelectTrigger>
                       <SelectContent>
                         {TURNOS.map((t) => (
-                          <SelectItem key={t.value} value={t.value}>
-                            {t.label}
-                          </SelectItem>
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {/* Intensidade */}
                   <div className="space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">Intensidade</p>
                     <Select
@@ -142,14 +141,26 @@ export function TrainingWeekSection({ data, onChange }: TrainingWeekSectionProps
                       </SelectTrigger>
                       <SelectContent>
                         {INTENSIDADES.map((i) => (
-                          <SelectItem key={i.value} value={i.value}>
-                            {i.label}
-                          </SelectItem>
+                          <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
+
+                {showLongao && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <Checkbox
+                      id={`longao-${dia}`}
+                      checked={!!day.longao}
+                      onCheckedChange={(checked) => handleDayChange(dia, 'longao', !!checked)}
+                    />
+                    <Label htmlFor={`longao-${dia}`} className="cursor-pointer font-normal text-sm">
+                      🐢 É o <strong>longão</strong> da semana
+                      <span className="text-xs text-muted-foreground ml-1">(volume longo / sessão de resistência)</span>
+                    </Label>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
