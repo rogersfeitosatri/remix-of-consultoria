@@ -370,7 +370,7 @@ function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, 
   }
 
   if (!profile) {
-    return `## DADOS DO ATLETA\n### Dados Pessoais\n- Nome: ${client.name}\n- Email: ${client.email || 'N/I'}\n- Telefone: ${client.phone || 'N/I'}\n- Prova Alvo: ${client.target_race || 'N/I'}\n${anamneseSection}\n\nIMPORTANTE: Se peso/altura não disponíveis, use estimativas e sinalize nos alertas.`;
+    return `## DADOS DO ATLETA\n### Dados Pessoais\n- Nome: ${client.name}\n- Email: ${client.email || 'N/I'}\n- Telefone: ${client.phone || 'N/I'}\n- Prova Alvo: ${client.target_race || 'N/I'}\n${anamneseSection}${guidanceBlock}\n\nIMPORTANTE: Se peso/altura não disponíveis, use estimativas e sinalize nos alertas.`;
   }
 
   return `## DADOS DO ATLETA
