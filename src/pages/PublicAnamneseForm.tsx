@@ -9,7 +9,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PersonStanding, Send, CheckCircle2, Pencil, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -433,26 +432,27 @@ export default function PublicAnamneseForm() {
                     )}
 
                     {question.question_type === 'select' && question.options && (
-                      <Select
+                      <RadioGroup
                         value={answers[question.id] || undefined}
                         onValueChange={(value) => handleAnswerChange(question.id, value)}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma opção" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(question.options as string[]).filter(Boolean).map((option, i) => (
-                            <SelectItem key={i} value={option}>
-                              {option}
-                            </SelectItem>
+                        {(question.options as string[])
+                          .map((o) => (o ?? '').trim())
+                          .filter(Boolean)
+                          .map((option, i) => (
+                            <div key={i} className="flex items-center space-x-2">
+                              <RadioGroupItem value={option} id={`${question.id}-${i}`} />
+                              <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
+                                {option}
+                              </Label>
+                            </div>
                           ))}
-                        </SelectContent>
-                      </Select>
+                      </RadioGroup>
                     )}
 
                     {question.question_type === 'multiselect' && question.options && (
                       <div className="space-y-2">
-                        {(question.options as string[]).map((option, i) => (
+                        {(question.options as string[]).map((o) => (o ?? '').trim()).filter(Boolean).map((option, i) => (
                           <div key={i} className="flex items-center space-x-2">
                             <Checkbox
                               id={`${question.id}-${i}`}
@@ -472,7 +472,7 @@ export default function PublicAnamneseForm() {
                         value={answers[question.id] || undefined}
                         onValueChange={(value) => handleAnswerChange(question.id, value)}
                       >
-                        {(question.options as string[]).map((option, i) => (
+                        {(question.options as string[]).map((o) => (o ?? '').trim()).filter(Boolean).map((option, i) => (
                           <div key={i} className="flex items-center space-x-2">
                             <RadioGroupItem value={option} id={`${question.id}-${i}`} />
                             <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">
@@ -485,7 +485,7 @@ export default function PublicAnamneseForm() {
 
                     {question.question_type === 'checkbox' && question.options && (
                       <div className="space-y-2">
-                        {(question.options as string[]).map((option, i) => (
+                        {(question.options as string[]).map((o) => (o ?? '').trim()).filter(Boolean).map((option, i) => (
                           <div key={i} className="flex items-center space-x-2">
                             <Checkbox
                               id={`${question.id}-${i}`}
