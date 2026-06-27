@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { clientId } = await req.json();
+    const { clientId, adminGuidance } = await req.json();
     if (!clientId) throw new Error('clientId is required');
 
     console.log('Analyzing athlete for client:', clientId);
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       anamneseQuestions = questions || [];
     }
 
-    const prompt = buildAnalysisPrompt(profile, client, anamneseResponses, anamneseQuestions);
+    const prompt = buildAnalysisPrompt(profile, client, anamneseResponses, anamneseQuestions, adminGuidance);
 
     console.log('Sending request to Lovable AI Gateway...');
 
@@ -316,7 +316,24 @@ const ANALYSIS_SCHEMA = {
   additionalProperties: false,
 };
 
-function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, anamneseQuestions: any[]): string {
+function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, anamneseQuestions: any[], adminGuidance?: any): string {
+  let guidanceBlock = '';
+  if (adminGuidance && typeof adminGuidance === 'object') {
+    const g = adminGuidance;
+    const lines: string[] = [];
+    if (g.meals_count) lines.push(`- Número de refeições no plano: ${g.meals_count}`);
+    if (g.target_kcal) lines.push(`- Meta calórica diária: ${g.target_kcal} kcal`);
+    if (g.target_cho_gkg) lines.push(`- Meta de CHO: ${g.target_cho_gkg} g/kg`);
+    if (g.target_protein_gkg) lines.push(`- Meta de Proteína: ${g.target_protein_gkg} g/kg`);
+    if (g.target_fat_gkg) lines.push(`- Meta de Gordura: ${g.target_fat_gkg} g/kg`);
+    if (g.custom_instructions && String(g.custom_instructions).trim()) {
+      lines.push(`- Orientações adicionais do nutricionista: ${String(g.custom_instructions).trim()}`);
+    }
+    if (lines.length) {
+      guidanceBlock = `\n\n## ORIENTAÇÕES OBRIGATÓRIAS DO NUTRICIONISTA RESPONSÁVEL\nUse EXATAMENTE estes parâmetros ao montar a progressão de carboidratos, o plano alimentar e os totais diários. Estes valores PREVALECEM sobre estimativas automáticas:\n${lines.join('\n')}\n`;
+    }
+  }
+
   const mealDescription = (meal: any) => {
     if (!meal) return 'Não informado';
     return `Horário: ${meal.time || 'N/I'}, Local: ${meal.location || 'N/I'}, Alimentos: ${meal.foods || 'N/I'}`;
@@ -353,7 +370,7 @@ function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, 
   }
 
   if (!profile) {
-    return `## DADOS DO ATLETA\n### Dados Pessoais\n- Nome: ${client.name}\n- Email: ${client.email || 'N/I'}\n- Telefone: ${client.phone || 'N/I'}\n- Prova Alvo: ${client.target_race || 'N/I'}\n${anamneseSection}\n\nIMPORTANTE: Se peso/altura não disponíveis, use estimativas e sinalize nos alertas.`;
+    return `## DADOS DO ATLETA\n### Dados Pessoais\n- Nome: ${client.name}\n- Email: ${client.email || 'N/I'}\n- Telefone: ${client.phone || 'N/I'}\n- Prova Alvo: ${client.target_race || 'N/I'}\n${anamneseSection}${guidanceBlock}\n\nIMPORTANTE: Se peso/altura não disponíveis, use estimativas e sinalize nos alertas.`;
   }
 
   return `## DADOS DO ATLETA
@@ -424,5 +441,5 @@ function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, 
 - Jantar: ${mealDescription(profile.meal_dinner)}
 - Ceia: ${profile.meal_supper_enabled ? mealDescription(profile.meal_supper) : 'Não faz'}
 - Fim de semana: ${profile.weekend_changes || 'N/I'} - ${profile.weekend_description || 'N/I'}
-${anamneseSection}`;
+${anamneseSection}${guidanceBlock}`;
 }

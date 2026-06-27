@@ -16,6 +16,7 @@ export interface Client {
   checkin_frequency: 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly' | null;
   has_checkin: boolean;
   has_agenda_access: boolean;
+  ai_whatsapp_enabled?: boolean;
   start_date: string;
   end_date: string;
   checkin_start_date?: string | null;
@@ -1010,7 +1011,7 @@ export function useUpdatePayment() {
 
       const { data, error } = await supabase
         .from('payments')
-        .update(updateData)
+        .update(updateData as any)
         .eq('id', id)
         .select()
         .single();
@@ -1058,7 +1059,7 @@ export function useUpdateConsultationSchedule() {
       
       const { data, error } = await supabase
         .from('consultation_schedules')
-        .update(finalUpdates)
+        .update(finalUpdates as any)
         .eq('id', id)
         .select()
         .single();

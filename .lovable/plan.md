@@ -1,64 +1,63 @@
-## Visão geral
+## Objetivo
+Ter **um único link público** — `https://rogersfeitosa.com.br/agendar/{slug}` (ex.: `/agendar/agendarf`) — usado em Settings, landing, WhatsApp e e-mails. Ele mostra **exatamente** os mesmos dias/horários do link atual que funciona, e diferencia atleta x lead pelo e-mail informado.
 
-Novo fluxo de onboarding **isolado** para novos atletas: escolha do plano → registro como `pending` → link de pagamento via WhatsApp → webhook Mercado Pago confirma → ativação automática (consultoria) ou pipeline de consultas (consultas). **Atletas existentes não são afetados.**
+## Situação atual (causa do problema)
 
-Vou usar nomes/tabelas novas (prefixo `onboarding_`) para não conflitar com `plan_templates`, `payments` e `financial_transactions` já existentes.
+Existem duas rotas com fontes de dados distintas:
 
----
+| Rota | Página | Fonte dos horários |
+|---|---|---|
+| `/agendar/{slug}` (Settings) | `PublicBooking.tsx` | `scheduling_time_blocks` (blocos manuais — vazios) |
+| `/booking/{token}` (WhatsApp) | `PublicBookingConsult.tsx` | `availability_rules` + `scheduling_blocks` + `appointments` (funciona) |
 
-## FASE 1 — Fundação (esta entrega)
+Resultado: o link do Settings parece "sem horários" porque está olhando a tabela errada.
 
-**Banco:**
-- `onboarding_plans` — 6 linhas fixas (slug, categoria, periodicidade, duração, consultas, frequência check-in, **payment_link**, **price**). Seed com seus valores: 497 / 797 / 1497 / 997 / 1697 / 2997.
-- `onboarding_payment_settings` — `mp_public_key`, `reminder_days`, `webhook_secret`. (Access Token vai como secret `MP_ACCESS_TOKEN`.)
-- `clients` (alter): adicionar `selected_plan_id`, `onboarding_status` (`pending|payment_sent|confirmed|active`), `plan_sent_at`. Sem alterar nada nas linhas existentes.
-- 3 templates novos em `whatsapp_templates` (slugs `onboarding_payment_link`, `onboarding_confirmation_consultoria`, `onboarding_confirmation_consultas`, `onboarding_payment_reminder`).
+## Solução
 
-**Admin UI:** Nova página `/configuracoes/onboarding` com 3 seções: Mercado Pago (public key + botão pedir secret do access token), Planos (tabela editável dos 6 planos: link MP + valor), Lembrete (dias).
+**Refatorar `PublicBooking` (`/agendar/{slug}`) para usar a mesma lógica de disponibilidade do `PublicBookingConsult`**, e transformá-lo no único link oficial — usado por todos os fluxos.
 
-**Pergunta importante:** o atleta **não vê valores** na anamnese — só o nome do plano (conforme você pediu).
+### 1. Unificar fonte de horários em `/agendar/{slug}`
 
----
+Em `src/pages/PublicBooking.tsx`:
+- Trocar a leitura de `scheduling_time_blocks` por `get_public_scheduling_settings_by_user` + `availability_rules` + `get_public_scheduling_blocks` + `get_public_appointment_slots` (mesmas RPCs já usadas pelo `PublicBookingConsult`).
+- Manter `availableDates` / `availableSlots` calculados a partir de `availability_rules` (regra semanal), respeitando `min_advance_hours`, `max_advance_days` e buffers de `scheduling_settings`.
 
-## FASE 2 — Pergunta 0 + envio do link
+### 2. Identificação por e-mail (atleta x lead)
 
-- Nova rota pública `/onboarding/plano/:slug?` (ou via link da anamnese) com tela dedicada de seleção de plano (6 cards, **sem valores**).
-- Após escolher, segue para a anamnese pública já existente carregando o `selected_plan_id` em estado.
-- Ao enviar a anamnese: edge function cria o `client` com `onboarding_status='pending'` + `selected_plan_id`, envia WhatsApp com template `onboarding_payment_link` (variáveis: `{nome_atleta}`, `{plano_nome}`, `{link_pagamento}`), seta status para `payment_sent`.
+Fluxo na tela:
+1. Tela inicial pede e-mail (e telefone opcional).
+2. Ao avançar, chama `validate_booking_email_v2` com o e-mail:
+   - **Atleta ativo encontrado** → segue como atleta: ao confirmar, cria registro em `appointments` via `create_public_booking_appointment` (mesma RPC do fluxo atual do WhatsApp), com toda a validação de elegibilidade já existente (ativo, não congelado, dentro da janela).
+   - **Não encontrado / não elegível** → segue como lead: pede nome completo, cria registro em `consultation_schedules` via `create_public_lead_appointment`.
+3. Mensagens claras quando o atleta está inativo/congelado/expirado ("Sua conta não está elegível para agendamento — fale com o nutricionista").
 
----
+### 3. Aposentar a rota `/booking/{token}` (com retrocompatibilidade)
 
-## FASE 3 — Webhook MP + ativação
+- Manter a rota `/booking/:token` viva por enquanto, mas convertê-la em **redirecionamento 302/Navigate** para `/agendar/{slug}` (preservando `?email={email_do_atleta}` extraído do `booking_links.token` para pular o passo do e-mail).
+- Isso garante que qualquer link `/booking/...` já entregue continue funcionando.
 
-- Edge function pública `mp-webhook` (sem JWT): valida assinatura, busca o pagamento via API do MP com o `MP_ACCESS_TOKEN`, idempotência por `mp_payment_id`.
-- Identifica o cliente pelo `external_reference` (preferencial) ou e-mail/telefone do pagador.
-- Cria registro em `financial_transactions` (categoria "Plano", método retornado pelo MP) e em `payments`.
-- Atualiza `client`: `onboarding_status='confirmed'`, `start_date`, `end_date` (start + duração do plano).
-- Dispara WhatsApp:
-  - Consultoria → template `onboarding_confirmation_consultoria` (aguarda admin marcar plano enviado → check-ins mensais a partir de `plan_sent_at + 1 mês`).
-  - Consultas → template `onboarding_confirmation_consultas` com link de agendamento da 1ª consulta (usa fluxo existente). Check-ins quinzenais só são gerados quando a 1ª consulta for confirmada (segunda mais próxima após `data_1a_consulta + 7 dias`).
+### 4. Todos os envios passam a usar o link único
 
----
+Atualizar para gerar `${appUrl}/agendar/{slug}?email={email_url_encoded}`:
+- `supabase/functions/send-booking-link/index.ts` (linhas 266 e 393)
+- `supabase/functions/process-scheduled-booking-links/index.ts` (linha 228)
+- `supabase/functions/_shared/transactional-email-templates/booking-link.tsx` (exemplo do template)
+- Qualquer outra função que monte `/booking/${token}` (varrer e ajustar).
 
-## FASE 4 — Lembrete + alerta de renovação
+O parâmetro `?email=` apenas pré-preenche e pula a etapa de identificação — a validação real continua server-side via RPC.
 
-- Cron diário: para `clients` com `onboarding_status='payment_sent'` há ≥ `reminder_days`, envia template `onboarding_payment_reminder`.
-- Webhook detecta pagamento de atleta já ativo → cria entrada em `renewal_alerts` e mostra card no dashboard admin com botões "Atualizar automaticamente" / "Manter manual".
+### 5. Settings
 
----
+Manter exatamente como está no print (`/agendar/{slug}`). Adicionar uma nota curta abaixo do campo: "Este é o link usado em todos os envios automáticos (WhatsApp e e-mail)."
 
 ## Detalhes técnicos
 
-- Cálculo "4 dias úteis" via função SQL `add_business_days(date, int)` excluindo sáb/dom (feriados em uma tabela `holidays_br` simples).
-- Timezone `America/Fortaleza` (memory rule).
-- Idempotência: `UNIQUE(mp_payment_id)` em `payments` (nova coluna).
-- Segurança: webhook valida `x-signature` do MP. RLS: tudo só admin; `onboarding_plans.SELECT` público (sem expor `payment_link` para anônimos — apenas `slug`, `name`, `description`).
-- Templates em `whatsapp_templates` com `is_active` (cumprindo memory "All Automatic Messages in Central").
+- Nenhuma alteração de schema necessária. Todas as RPCs já existem (`get_public_scheduling_settings_by_user`, `get_public_scheduling_blocks`, `get_public_appointment_slots`, `validate_booking_email_v2`, `create_public_booking_appointment`, `create_public_lead_appointment`).
+- `booking_links.token` continua sendo gerado/armazenado (para auditoria e para extrair o e-mail no redirect), mas deixa de aparecer em mensagens.
+- Tabela `scheduling_time_blocks` permanece, mas deixa de ser fonte do link público — pode ser revisada/removida em iteração futura.
+- Testes pós-deploy: (a) abrir `/agendar/agendarf` anônimo → ver dias/horários reais; (b) informar e-mail de atleta ativo → criar `appointments`; (c) informar e-mail novo → criar lead em `consultation_schedules`; (d) abrir `/booking/{token}` antigo → redireciona para `/agendar/agendarf?email=...` e mostra slots; (e) disparar `send-booking-link` para um atleta e conferir que a URL no WhatsApp aponta para `/agendar/...`.
 
----
-
-## O que vou entregar agora
-
-**Apenas Fase 1**: migration + página admin de configurações + seed dos planos + 4 templates novos + pedido do secret `MP_ACCESS_TOKEN`. Ao final você confirma os 6 links do Mercado Pago e aprovo a Fase 2.
-
-Posso seguir?
+## Fora do escopo
+- Não alterar o fluxo de Strategic Call (`/agendar-call/{slug}`) — segue independente.
+- Não mexer no NutriPeriodiza nem em check-ins.
+- Não alterar regras de elegibilidade existentes (Booking Validation V2 permanece).

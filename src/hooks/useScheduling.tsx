@@ -279,7 +279,7 @@ export function useCreateAppointment() {
     mutationFn: async (appointment: Omit<Appointment, 'id' | 'created_at' | 'updated_at'>) => {
       const { data, error } = await supabase
         .from('appointments')
-        .insert(appointment)
+        .insert(appointment as any)
         .select()
         .single();
       if (error) throw error;
@@ -300,7 +300,7 @@ export function useUpdateAppointment() {
     mutationFn: async ({ id, ...updates }: Partial<Appointment> & { id: string }) => {
       const { error } = await supabase
         .from('appointments')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id);
       if (error) throw error;
     },
