@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { callAiJson } from "../_shared/aiClient.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,10 +99,8 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 
     if (!supabaseUrl || !supabaseServiceKey) throw new Error('Supabase configuration missing');
-    if (!openaiApiKey) throw new Error('OPENAI_API_KEY is not configured');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { screeningId } = await req.json();
@@ -222,53 +221,16 @@ IMPORTANTE:
 - Se houver histórico, compare evolução e ajuste recomendações
 - Seja preciso e objetivo, focando no essencial para o momento do atleta`;
 
-    console.log('Sending to Lovable AI...');
+    console.log('Sending to Gemini (with fallback)...');
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt },
-        ],
-        max_completion_tokens: 3000,
-      }),
+    const { data: analysisResult, provider, model } = await callAiJson({
+      systemPrompt,
+      userPrompt: prompt,
+      maxTokens: 3000,
+      fallback: 'openai-gpt4o',
     });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded. Tente novamente em alguns segundos.' }), {
-          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: 'Créditos insuficientes.' }), {
-          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const errorText = await response.text();
-      console.error('AI error:', response.status, errorText);
-      throw new Error(`AI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
-
-    let analysisResult;
-    try {
-      let clean = aiResponse.trim();
-      if (clean.startsWith('```json')) clean = clean.replace(/^```json\n?/, '').replace(/\n?```$/, '');
-      else if (clean.startsWith('```')) clean = clean.replace(/^```\n?/, '').replace(/\n?```$/, '');
-      analysisResult = JSON.parse(clean);
-    } catch {
-      console.error('Failed to parse AI response:', aiResponse);
-      throw new Error('Failed to parse metabolic analysis');
-    }
+    console.log(`Metabolic analysis received from ${provider}/${model}`);
 
     // Save AI analysis to the screening record
     const { error: updateError } = await supabase

@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { callAiJson } from "../_shared/aiClient.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,14 +15,9 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase configuration is missing');
-    }
-
-    if (!openaiApiKey) {
-      throw new Error('OPENAI_API_KEY is not configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -112,21 +108,9 @@ Deno.serve(async (req) => {
       athleteProfile
     );
 
-    console.log('Sending request to Lovable AI...');
+    console.log('Sending request to Gemini (with fallback)...');
 
-    // Call Lovable AI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: `Você é um nutricionista esportivo funcional especializado em corredores, baseando suas análises no Tratado de Nutrição Esportiva Funcional (Paschoal & Naves).
+    const CHECKIN_SYSTEM_PROMPT = `Você é um nutricionista esportivo funcional especializado em corredores, baseando suas análises no Tratado de Nutrição Esportiva Funcional (Paschoal & Naves).
 
 ## BASE DE CONHECIMENTO
 Princípios: Individualidade bioquímica, Teia de Interconexões Metabólicas (8 sistemas: Assimilação, Defesa/Reparo, Energia, Biotransformação, Transporte, Comunicação, Integridade Estrutural, Mental/Emocional), Sistema ATMS.
@@ -147,43 +131,16 @@ IMPORTANTE:
 - Identifique padrões relacionados aos sistemas funcionais (teia metabólica)
 - O feedback sugerido deve ser empático e motivacional
 - Nunca invente informações que não estão nos dados
-- Foque no essencial para o momento do atleta`
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_completion_tokens: 2000,
-      }),
+- Foque no essencial para o momento do atleta`;
+
+    const { data: analysisData, provider, model } = await callAiJson({
+      systemPrompt: CHECKIN_SYSTEM_PROMPT,
+      userPrompt: prompt,
+      maxTokens: 2000,
+      fallback: 'openai-gpt4o',
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Lovable AI API error:', response.status, errorText);
-      throw new Error(`AI API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
-
-    console.log('AI response received');
-
-    // Parse the AI response
-    let analysisData;
-    try {
-      // Remove markdown code blocks if present
-      let cleanResponse = aiResponse.trim();
-      if (cleanResponse.startsWith('```json')) {
-        cleanResponse = cleanResponse.replace(/^```json\n?/, '').replace(/\n?```$/, '');
-      } else if (cleanResponse.startsWith('```')) {
-        cleanResponse = cleanResponse.replace(/^```\n?/, '').replace(/\n?```$/, '');
-      }
-      analysisData = JSON.parse(cleanResponse);
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', aiResponse);
-      throw new Error('Failed to parse AI analysis response');
-    }
+    console.log(`AI response received from ${provider}/${model}`);
 
     // Check if analysis already exists for this check-in
     const { data: existingAnalysis } = await supabase
@@ -199,8 +156,8 @@ IMPORTANTE:
       evolution_trend: analysisData.evolution_trend,
       alerts: analysisData.alerts || [],
       suggested_feedback: analysisData.suggested_feedback,
-      raw_response: aiResponse,
-      model_used: 'openai/gpt-5-mini',
+      raw_response: JSON.stringify(analysisData),
+      model_used: `${provider}/${model}`,
     };
 
     let result;
