@@ -366,7 +366,12 @@ export default function PublicAnamneseForm() {
       textLower.includes('jantar') ||
       textLower.includes('lanche') ||
       textLower.includes('ceia');
-    if ((isMealSection || isMealQuestion) && (q.question_type === 'textarea' || q.question_type === 'long_text' || q.question_type === 'text')) {
+    // Perguntas sobre alimentação DURANTE o treino/competição/prova são texto livre,
+    // não o bloco estruturado de refeição habitual.
+    const isDuringActivity =
+      textLower.includes('durante') &&
+      (textLower.includes('treino') || textLower.includes('competi') || textLower.includes('prova') || textLower.includes('atividade'));
+    if (!isDuringActivity && (isMealSection || isMealQuestion) && (q.question_type === 'textarea' || q.question_type === 'long_text' || q.question_type === 'text')) {
       return 'meal_items';
     }
     // Detect training week by the specific frequency/modalities question (NOT the whole section)
