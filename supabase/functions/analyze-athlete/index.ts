@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { callAiStructured } from "../_shared/aiClient.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,10 +14,8 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
 
     if (!supabaseUrl || !supabaseServiceKey) throw new Error('Supabase configuration is missing');
-    if (!lovableApiKey) throw new Error('LOVABLE_API_KEY is not configured');
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { clientId, adminGuidance } = await req.json();
@@ -62,59 +61,18 @@ Deno.serve(async (req) => {
 
     const prompt = buildAnalysisPrompt(profile, client, anamneseResponses, anamneseQuestions, adminGuidance);
 
-    console.log('Sending request to Lovable AI Gateway...');
+    console.log('Sending request to Gemini (with fallback)...');
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          {
-            role: 'system',
-            content: SYSTEM_PROMPT,
-          },
-          { role: 'user', content: prompt }
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "submit_athlete_analysis",
-              description: "Submit the complete structured nutritional analysis for the athlete",
-              parameters: ANALYSIS_SCHEMA,
-            }
-          }
-        ],
-        tool_choice: { type: "function", function: { name: "submit_athlete_analysis" } },
-      }),
+    const { data: analysisData, provider, model } = await callAiStructured({
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt: prompt,
+      toolName: 'submit_athlete_analysis',
+      toolDescription: 'Submit the complete structured nutritional analysis for the athlete',
+      schema: ANALYSIS_SCHEMA,
+      fallback: 'lovable-gemini-pro',
     });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns minutos." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos insuficientes. Adicione créditos ao workspace." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errText = await response.text();
-      console.error('AI gateway error:', response.status, errText);
-      throw new Error(`AI error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("AI did not return structured data");
-
-    const analysisData = JSON.parse(toolCall.function.arguments);
-    console.log('AI analysis received with sections:', Object.keys(analysisData));
+    console.log(`AI analysis received from ${provider}/${model} with sections:`, Object.keys(analysisData));
 
     // Map to DB columns - store the new structured analysis in diagnosis (text) + raw_response (full JSON)
     const { data: existingAnalysis } = await supabase
@@ -139,7 +97,7 @@ Deno.serve(async (req) => {
       },
       alerts: analysisData.alerts || [],
       raw_response: JSON.stringify(analysisData),
-      model_used: 'google/gemini-2.5-pro',
+      model_used: `${provider}/${model}`,
     };
 
     let result;
@@ -175,6 +133,17 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error in analyze-athlete function:', error);
+    const status = (error as any)?.status;
+    if (status === 429) {
+      return new Response(JSON.stringify({ error: "Limite de requisições da IA excedido. Tente novamente em alguns minutos." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (status === 402) {
+      return new Response(JSON.stringify({ error: "Créditos da IA insuficientes. Verifique a cota do provedor." }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
