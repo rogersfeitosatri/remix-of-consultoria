@@ -10,15 +10,25 @@ import { Badge } from '@/components/ui/badge';
 
 export interface MealData {
   horario: string;
-  itens: string[];
+  // Cada alimento é um "slot" com uma ou mais opções/substituições (ex: pão OU tapioca OU cuscuz)
+  itens: string[][];
   bebidas: string;
 }
 
 export const emptyMealData: MealData = {
   horario: '',
-  itens: [''],
+  itens: [['']],
   bebidas: '',
 };
+
+// Normaliza o formato antigo (string[]) para o novo (string[][])
+export function normalizeMealItens(itens: any): string[][] {
+  if (!Array.isArray(itens) || itens.length === 0) return [['']];
+  return itens.map((slot) => {
+    if (Array.isArray(slot)) return slot.length ? slot : [''];
+    return [typeof slot === 'string' ? slot : ''];
+  });
+}
 
 interface MealCardProps {
   mealKey: string;
@@ -43,24 +53,34 @@ export function MealCard({
 }: MealCardProps) {
   const [isOpen, setIsOpen] = useState(isRequired || isEnabled);
 
+  const itens = normalizeMealItens(data.itens);
+
   const handleFieldChange = (field: 'horario' | 'bebidas', value: string) => {
     onChange({ ...data, [field]: value });
   };
 
-  const handleItemChange = (index: number, value: string) => {
-    const newItens = [...data.itens];
-    newItens[index] = value;
-    onChange({ ...data, itens: newItens });
+  const update = (next: string[][]) => onChange({ ...data, itens: next });
+
+  const handleOptionChange = (si: number, oi: number, value: string) => {
+    update(itens.map((slot, i) => (i === si ? slot.map((o, j) => (j === oi ? value : o)) : slot)));
+  };
+
+  const handleAddOption = (si: number) => {
+    update(itens.map((slot, i) => (i === si ? [...slot, ''] : slot)));
+  };
+
+  const handleRemoveOption = (si: number, oi: number) => {
+    const next = itens.map((slot, i) => (i === si ? slot.filter((_, j) => j !== oi) : slot));
+    update(next.map((slot) => (slot.length ? slot : [''])));
   };
 
   const handleAddItem = () => {
-    onChange({ ...data, itens: [...data.itens, ''] });
+    update([...itens, ['']]);
   };
 
-  const handleRemoveItem = (index: number) => {
-    if (data.itens.length <= 1) return;
-    const newItens = data.itens.filter((_, i) => i !== index);
-    onChange({ ...data, itens: newItens });
+  const handleRemoveItem = (si: number) => {
+    if (itens.length <= 1) return;
+    update(itens.filter((_, i) => i !== si));
   };
 
   // For optional meals, show toggle
@@ -100,8 +120,11 @@ export function MealCard({
               <CardContent className="pt-0 pb-4 space-y-4">
                 <MealFields
                   data={data}
+                  itens={itens}
                   onFieldChange={handleFieldChange}
-                  onItemChange={handleItemChange}
+                  onOptionChange={handleOptionChange}
+                  onAddOption={handleAddOption}
+                  onRemoveOption={handleRemoveOption}
                   onAddItem={handleAddItem}
                   onRemoveItem={handleRemoveItem}
                   errors={errors}
@@ -149,17 +172,23 @@ export function MealCard({
 
 function MealFields({
   data,
+  itens,
   onFieldChange,
-  onItemChange,
+  onOptionChange,
+  onAddOption,
+  onRemoveOption,
   onAddItem,
   onRemoveItem,
   errors,
 }: {
   data: MealData;
+  itens: string[][];
   onFieldChange: (field: 'horario' | 'bebidas', value: string) => void;
-  onItemChange: (index: number, value: string) => void;
+  onOptionChange: (si: number, oi: number, value: string) => void;
+  onAddOption: (si: number) => void;
+  onRemoveOption: (si: number, oi: number) => void;
   onAddItem: () => void;
-  onRemoveItem: (index: number) => void;
+  onRemoveItem: (si: number) => void;
   errors: Record<string, string>;
 }) {
   return (
@@ -178,33 +207,38 @@ function MealFields({
         {errors.horario && <p className="text-xs text-destructive">{errors.horario}</p>}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <Label>Alimentos e porções *</Label>
-        <div className="space-y-2">
-          {data.itens.map((item, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <Input
-                value={item}
-                onChange={(e) => onItemChange(index, e.target.value)}
-                placeholder="Ex: Arroz branco – 2 colheres de sopa"
-                className={errors.itens ? 'border-destructive' : ''}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => onRemoveItem(index)}
-                disabled={data.itens.length <= 1}
-                className="shrink-0 h-9 w-9 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-        </div>
+        {itens.map((slot, si) => (
+          <div key={si} className="rounded-md border bg-background/60 p-2 space-y-1.5">
+            {slot.map((option, oi) => (
+              <div key={oi} className="flex items-center gap-2">
+                {oi > 0 && <span className="text-xs text-muted-foreground font-medium shrink-0 w-7 text-center">ou</span>}
+                <Input
+                  value={option}
+                  onChange={(e) => onOptionChange(si, oi, e.target.value)}
+                  placeholder={oi === 0 ? 'Ex: Pão francês – 2 fatias' : 'Substituição. Ex: Tapioca – 1 unidade'}
+                  className={errors.itens && si === 0 && oi === 0 ? 'border-destructive' : ''}
+                />
+                {oi > 0 ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => onRemoveOption(si, oi)} className="shrink-0 h-9 w-9 p-0">
+                    <X className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => onRemoveItem(si)} disabled={itens.length <= 1} className="shrink-0 h-9 w-9 p-0">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            <Button type="button" variant="ghost" size="sm" onClick={() => onAddOption(si)} className="gap-1 px-2 h-7 text-xs text-muted-foreground">
+              <Plus className="h-3 w-3" /> ou (substituição)
+            </Button>
+          </div>
+        ))}
         {errors.itens && <p className="text-xs text-destructive">{errors.itens}</p>}
         <p className="text-xs text-muted-foreground">
-          Use medidas caseiras: colher, fatia, copo, unidade, gramas...
+          Cada linha é um alimento. Use "ou (substituição)" para registrar variações que você costuma comer (ex: pão ou tapioca ou cuscuz). Use medidas caseiras: colher, fatia, copo, unidade, gramas...
         </p>
         <Button
           type="button"

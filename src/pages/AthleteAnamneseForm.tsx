@@ -273,7 +273,10 @@ export default function AthleteAnamneseForm() {
         const validateMeal = (mealData: any): Record<string, string> => {
           const err: Record<string, string> = {};
           if (!mealData.horario) err.horario = 'Campo obrigatório';
-          const hasItem = (mealData.itens || []).some((i: string) => i.trim());
+          // itens pode ser string[] (formato antigo) ou string[][] (slots com opções)
+          const hasItem = (mealData.itens || []).some((slot: any) =>
+            Array.isArray(slot) ? slot.some((o: string) => o?.trim()) : String(slot ?? '').trim()
+          );
           if (!hasItem) err.itens = 'Adicione ao menos um alimento';
           return err;
         };
