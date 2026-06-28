@@ -810,6 +810,9 @@ const INTENSIDADES_OPT = [
   { value: 'intenso', label: '🔴 Intenso' },
 ];
 
+// Modalidades de endurance onde faz sentido marcar "longão" (sessão longa)
+const ENDURANCE_MODALIDADES = ['corrida', 'ciclismo', 'natacao', 'triathlon'];
+
 const emptyTrainingSession = () => ({ modalidade: '', turno: '', intensidade: '', longao: false });
 
 function TrainingWeekRenderer({ value, onChange }: { value: any; onChange: (v: any) => void }) {
@@ -828,7 +831,7 @@ function TrainingWeekRenderer({ value, onChange }: { value: any; onChange: (v: a
     if (field === 'modalidade') {
       if (v === 'repouso') {
         sessions[idx] = { modalidade: 'repouso', turno: '', intensidade: '', longao: false };
-      } else if (v !== 'corrida' && v !== 'ciclismo') {
+      } else if (!ENDURANCE_MODALIDADES.includes(v)) {
         sessions[idx] = { ...sessions[idx], longao: false };
       }
     }
@@ -856,7 +859,7 @@ function TrainingWeekRenderer({ value, onChange }: { value: any; onChange: (v: a
 
             {sessions.map((session, idx) => {
               const isRepouso = session.modalidade === 'repouso';
-              const showLongao = session.modalidade === 'corrida' || session.modalidade === 'ciclismo';
+              const showLongao = ENDURANCE_MODALIDADES.includes(session.modalidade);
               return (
                 <div key={idx} className={`space-y-2 ${isRepouso ? 'opacity-60' : ''} ${idx > 0 ? 'pt-3 border-t border-dashed' : ''}`}>
                   <div className="flex items-start gap-2">
