@@ -118,7 +118,7 @@ export default function PublicAnamneseForm() {
       } else if (q.question_type === 'scale') {
         initialAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
       } else if (type === 'meal_items') {
-        initialAnswers[q.id] = { horario: '', itens: [''], bebidas: '' };
+        initialAnswers[q.id] = { horario: '', itens: [['']], bebidas: '' };
       } else if (type === 'training_week') {
         const emptyDay = () => [{ modalidade: '', turno: '', intensidade: '', longao: false }];
         initialAnswers[q.id] = {
@@ -649,7 +649,7 @@ export default function PublicAnamneseForm() {
 
                     {qType === 'meal_items' && (
                       <MealItemsRenderer
-                        value={answers[question.id] || { horario: '', itens: [''], bebidas: '' }}
+                        value={answers[question.id] || { horario: '', itens: [['']], bebidas: '' }}
                         onChange={(v) => handleAnswerChange(question.id, v)}
                       />
                     )}
@@ -738,23 +738,42 @@ export default function PublicAnamneseForm() {
 }
 
 // ── Meal Items Renderer ────────────────────────────────────────────────────────
+// Cada alimento é um "slot" com uma ou mais opções/substituições (ex: pão OU tapioca OU cuscuz).
+// Estrutura: itens = string[][]  (lista de slots, cada slot = lista de opções).
+// Normaliza o formato antigo (string[]) automaticamente.
+function normalizeItens(itens: any): string[][] {
+  if (!Array.isArray(itens) || itens.length === 0) return [['']];
+  return itens.map((slot) => {
+    if (Array.isArray(slot)) return slot.length ? slot : [''];
+    return [typeof slot === 'string' ? slot : ''];
+  });
+}
+
 function MealItemsRenderer({
   value,
   onChange,
 }: {
-  value: { horario: string; itens: string[]; bebidas: string };
+  value: { horario: string; itens: any; bebidas: string };
   onChange: (v: any) => void;
 }) {
-  const itens = value.itens?.length ? value.itens : [''];
+  const itens = normalizeItens(value.itens);
 
   const setField = (field: string, v: string) => onChange({ ...value, [field]: v });
-  const setItem = (i: number, v: string) => {
-    const next = [...itens]; next[i] = v; onChange({ ...value, itens: next });
+  const update = (next: string[][]) => onChange({ ...value, itens: next });
+
+  const setOption = (si: number, oi: number, v: string) => {
+    const next = itens.map((slot, i) => (i === si ? slot.map((o, j) => (j === oi ? v : o)) : slot));
+    update(next);
   };
-  const addItem = () => onChange({ ...value, itens: [...itens, ''] });
-  const removeItem = (i: number) => {
+  const addOption = (si: number) => update(itens.map((slot, i) => (i === si ? [...slot, ''] : slot)));
+  const removeOption = (si: number, oi: number) => {
+    const next = itens.map((slot, i) => (i === si ? slot.filter((_, j) => j !== oi) : slot));
+    update(next.map((slot) => (slot.length ? slot : [''])));
+  };
+  const addItem = () => update([...itens, ['']]);
+  const removeItem = (si: number) => {
     if (itens.length <= 1) return;
-    onChange({ ...value, itens: itens.filter((_, idx) => idx !== i) });
+    update(itens.filter((_, i) => i !== si));
   };
 
   return (
@@ -764,21 +783,38 @@ function MealItemsRenderer({
         <Input type="time" value={value.horario || ''} onChange={(e) => setField('horario', e.target.value)} className="w-36" />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <Label className="text-xs font-medium">Alimentos e porções</Label>
-        {itens.map((item, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <Input
-              value={item}
-              onChange={(e) => setItem(i, e.target.value)}
-              placeholder="Ex: Arroz branco – 2 colheres de sopa"
-            />
-            <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(i)} disabled={itens.length <= 1} className="h-9 w-9 p-0 shrink-0">
-              <X className="h-4 w-4" />
+        {itens.map((slot, si) => (
+          <div key={si} className="rounded-md border bg-background/60 p-2 space-y-1.5">
+            {slot.map((option, oi) => (
+              <div key={oi} className="flex items-center gap-2">
+                {oi > 0 && <span className="text-xs text-muted-foreground font-medium shrink-0 w-7 text-center">ou</span>}
+                <Input
+                  value={option}
+                  onChange={(e) => setOption(si, oi, e.target.value)}
+                  placeholder={oi === 0 ? 'Ex: Pão francês – 2 fatias' : 'Substituição. Ex: Tapioca – 1 unidade'}
+                  className={oi > 0 ? 'flex-1' : ''}
+                />
+                {oi > 0 ? (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removeOption(si, oi)} className="h-9 w-9 p-0 shrink-0">
+                    <X className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(si)} disabled={itens.length <= 1} className="h-9 w-9 p-0 shrink-0">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            <Button type="button" variant="ghost" size="sm" onClick={() => addOption(si)} className="gap-1 px-2 h-7 text-xs text-muted-foreground">
+              <Plus className="h-3 w-3" /> ou (substituição)
             </Button>
           </div>
         ))}
-        <p className="text-xs text-muted-foreground">Use medidas caseiras: colher, fatia, copo, unidade, gramas…</p>
+        <p className="text-xs text-muted-foreground">
+          Cada linha é um alimento. Use "ou (substituição)" para registrar variações que você costuma comer (ex: pão ou tapioca ou cuscuz). Use medidas caseiras: colher, fatia, copo, unidade, gramas…
+        </p>
         <Button type="button" variant="ghost" size="sm" onClick={addItem} className="gap-1 px-2">
           <Plus className="h-4 w-4" /> Adicionar alimento
         </Button>
