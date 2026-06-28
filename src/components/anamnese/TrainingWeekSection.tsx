@@ -41,6 +41,9 @@ export interface TrainingSession {
 // Cada dia pode ter uma ou mais sessões (modalidades)
 export type TrainingWeekData = Record<typeof DIAS[number], TrainingSession[]>;
 
+// Modalidades de endurance onde faz sentido marcar "longão" (sessão longa)
+const ENDURANCE_MODALIDADES = ['corrida', 'ciclismo', 'natacao', 'triathlon'];
+
 const emptySession = (): TrainingSession => ({ modalidade: '', turno: '', intensidade: '', longao: false });
 
 export const defaultTrainingWeekData: TrainingWeekData = {
@@ -75,7 +78,7 @@ export function TrainingWeekSection({ data, onChange }: TrainingWeekSectionProps
     if (field === 'modalidade') {
       if (value === 'repouso') {
         sessions[idx] = { modalidade: 'repouso', turno: '', intensidade: '', longao: false };
-      } else if (value !== 'corrida' && value !== 'ciclismo') {
+      } else if (!ENDURANCE_MODALIDADES.includes(value as string)) {
         sessions[idx] = { ...sessions[idx], longao: false };
       }
     }
@@ -116,7 +119,7 @@ export function TrainingWeekSection({ data, onChange }: TrainingWeekSectionProps
               <CardContent className="pt-3 pb-4 space-y-3">
                 {sessions.map((session, idx) => {
                   const isRepouso = session.modalidade === 'repouso';
-                  const showLongao = session.modalidade === 'corrida' || session.modalidade === 'ciclismo';
+                  const showLongao = ENDURANCE_MODALIDADES.includes(session.modalidade);
                   return (
                     <div key={idx} className={`space-y-2 ${isRepouso ? 'opacity-60' : ''} ${idx > 0 ? 'pt-3 border-t border-dashed' : ''}`}>
                       <div className="flex items-start gap-2">
