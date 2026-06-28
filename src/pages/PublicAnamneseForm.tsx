@@ -38,6 +38,19 @@ interface Form {
   is_active: boolean;
 }
 
+// A prova alvo já é perguntada na seção de Objetivos, então a pergunta de
+// "Principais Competições / Eventos Alvo" na seção de treinos é redundante e fica oculta.
+function isHiddenQuestion(q: Question): boolean {
+  const t = (q.question_text || '').toLowerCase();
+  return (
+    t.includes('principais competições') ||
+    t.includes('principais competicoes') ||
+    t.includes('eventos alvo') ||
+    ((t.includes('competição') || t.includes('competicao') || t.includes('competições') || t.includes('competicoes')) &&
+      t.includes('alvo'))
+  );
+}
+
 export default function PublicAnamneseForm() {
   const { formId } = useParams<{ formId: string }>();
 
@@ -79,7 +92,7 @@ export default function PublicAnamneseForm() {
           .order('order_index', { ascending: true });
 
         if (questionsError) throw questionsError;
-        const typedQuestions = questionsData as Question[];
+        const typedQuestions = (questionsData as Question[]).filter((q) => !isHiddenQuestion(q));
         setQuestions(typedQuestions);
 
         // Initialize answers and comments
@@ -107,14 +120,15 @@ export default function PublicAnamneseForm() {
       } else if (type === 'meal_items') {
         initialAnswers[q.id] = { horario: '', itens: [''], bebidas: '' };
       } else if (type === 'training_week') {
+        const emptyDay = () => [{ modalidade: '', turno: '', intensidade: '', longao: false }];
         initialAnswers[q.id] = {
-          Segunda: { modalidade: '', turno: '', intensidade: '' },
-          Terça: { modalidade: '', turno: '', intensidade: '' },
-          Quarta: { modalidade: '', turno: '', intensidade: '' },
-          Quinta: { modalidade: '', turno: '', intensidade: '' },
-          Sexta: { modalidade: '', turno: '', intensidade: '' },
-          Sábado: { modalidade: '', turno: '', intensidade: '' },
-          Domingo: { modalidade: '', turno: '', intensidade: '' },
+          Segunda: emptyDay(),
+          Terça: emptyDay(),
+          Quarta: emptyDay(),
+          Quinta: emptyDay(),
+          Sexta: emptyDay(),
+          Sábado: emptyDay(),
+          Domingo: emptyDay(),
         };
       } else {
         initialAnswers[q.id] = '';
@@ -355,18 +369,16 @@ export default function PublicAnamneseForm() {
     if ((isMealSection || isMealQuestion) && (q.question_type === 'textarea' || q.question_type === 'long_text' || q.question_type === 'text')) {
       return 'meal_items';
     }
-    // Detect training week by text
-    const isTrainingSection =
-      sectionLower.includes('treino') ||
-      sectionLower.includes('competição') ||
-      sectionLower.includes('competicao');
+    // Detect training week by the specific frequency/modalities question (NOT the whole section)
     const isTrainingQuestion =
+      textLower.includes('frequência semanal') ||
+      textLower.includes('frequencia semanal') ||
+      textLower.includes('modalidades por dia') ||
       textLower.includes('rotina de treino') ||
       textLower.includes('treino semanal') ||
       textLower.includes('semana de treino') ||
-      textLower.includes('modalidade') ||
-      (isTrainingSection && (textLower.includes('semana') || textLower.includes('dia')));
-    if ((isTrainingSection || isTrainingQuestion) && (q.question_type === 'textarea' || q.question_type === 'long_text' || q.question_type === 'text')) {
+      (textLower.includes('modalidade') && textLower.includes('dia'));
+    if (isTrainingQuestion && (q.question_type === 'textarea' || q.question_type === 'long_text' || q.question_type === 'text')) {
       return 'training_week';
     }
     return q.question_type;
@@ -798,60 +810,97 @@ const INTENSIDADES_OPT = [
   { value: 'intenso', label: '🔴 Intenso' },
 ];
 
+const emptyTrainingSession = () => ({ modalidade: '', turno: '', intensidade: '', longao: false });
+
 function TrainingWeekRenderer({ value, onChange }: { value: any; onChange: (v: any) => void }) {
-  const setDay = (dia: string, field: string, v: string) => {
-    const day = { ...(value[dia] || {}), [field]: v };
-    if (field === 'modalidade' && v === 'repouso') {
-      day.turno = ''; day.intensidade = ''; day.longao = false;
-    }
-    if (field === 'modalidade' && v !== 'corrida' && v !== 'ciclismo') {
-      day.longao = false;
-    }
-    onChange({ ...value, [dia]: day });
+  // Normalize a day to an array of sessions (supports legacy single-object shape)
+  const getSessions = (dia: string): any[] => {
+    const v = value[dia];
+    if (Array.isArray(v)) return v.length ? v : [emptyTrainingSession()];
+    if (v && typeof v === 'object' && 'modalidade' in v) return [v];
+    return [emptyTrainingSession()];
   };
 
-  const toggleLongao = (dia: string, checked: boolean) => {
-    const day = { ...(value[dia] || {}), longao: checked };
-    onChange({ ...value, [dia]: day });
+  const setSessions = (dia: string, sessions: any[]) => onChange({ ...value, [dia]: sessions });
+
+  const setField = (dia: string, idx: number, field: string, v: string) => {
+    const sessions = getSessions(dia).map((s, i) => (i === idx ? { ...s, [field]: v } : s));
+    if (field === 'modalidade') {
+      if (v === 'repouso') {
+        sessions[idx] = { modalidade: 'repouso', turno: '', intensidade: '', longao: false };
+      } else if (v !== 'corrida' && v !== 'ciclismo') {
+        sessions[idx] = { ...sessions[idx], longao: false };
+      }
+    }
+    setSessions(dia, sessions);
+  };
+
+  const toggleLongao = (dia: string, idx: number, checked: boolean) => {
+    setSessions(dia, getSessions(dia).map((s, i) => (i === idx ? { ...s, longao: checked } : s)));
+  };
+
+  const addSession = (dia: string) => setSessions(dia, [...getSessions(dia), emptyTrainingSession()]);
+  const removeSession = (dia: string, idx: number) => {
+    const sessions = getSessions(dia);
+    if (sessions.length <= 1) return;
+    setSessions(dia, sessions.filter((_, i) => i !== idx));
   };
 
   return (
     <div className="space-y-3">
       {DIAS_SEMANA.map((dia) => {
-        const day = value[dia] || { modalidade: '', turno: '', intensidade: '', longao: false };
-        const isRepouso = day.modalidade === 'repouso';
-        const showLongao = day.modalidade === 'corrida' || day.modalidade === 'ciclismo';
+        const sessions = getSessions(dia);
         return (
-          <div key={dia} className={`rounded-lg border p-3 space-y-2 ${isRepouso ? 'opacity-60' : ''}`}>
+          <div key={dia} className="rounded-lg border p-3 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{dia}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <Select value={day.modalidade} onValueChange={(v) => setDay(dia, 'modalidade', v)}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Modalidade…" /></SelectTrigger>
-                <SelectContent>{MODALIDADES_OPT.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={day.turno} onValueChange={(v) => setDay(dia, 'turno', v)} disabled={isRepouso || !day.modalidade}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Turno…" /></SelectTrigger>
-                <SelectContent>{TURNOS_OPT.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={day.intensidade} onValueChange={(v) => setDay(dia, 'intensidade', v)} disabled={isRepouso || !day.modalidade}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Intensidade…" /></SelectTrigger>
-                <SelectContent>{INTENSIDADES_OPT.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            {showLongao && (
-              <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
-                <input
-                  type="checkbox"
-                  checked={!!day.longao}
-                  onChange={(e) => toggleLongao(dia, e.target.checked)}
-                  className="h-4 w-4 rounded border-input accent-primary"
-                />
-                <span className="text-sm text-muted-foreground">
-                  🐢 É o <strong>longão</strong> da semana
-                  <span className="text-xs ml-1">(volume longo / sessão de resistência)</span>
-                </span>
-              </label>
-            )}
+
+            {sessions.map((session, idx) => {
+              const isRepouso = session.modalidade === 'repouso';
+              const showLongao = session.modalidade === 'corrida' || session.modalidade === 'ciclismo';
+              return (
+                <div key={idx} className={`space-y-2 ${isRepouso ? 'opacity-60' : ''} ${idx > 0 ? 'pt-3 border-t border-dashed' : ''}`}>
+                  <div className="flex items-start gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
+                      <Select value={session.modalidade} onValueChange={(v) => setField(dia, idx, 'modalidade', v)}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Modalidade…" /></SelectTrigger>
+                        <SelectContent>{MODALIDADES_OPT.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <Select value={session.turno} onValueChange={(v) => setField(dia, idx, 'turno', v)} disabled={isRepouso || !session.modalidade}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Turno…" /></SelectTrigger>
+                        <SelectContent>{TURNOS_OPT.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <Select value={session.intensidade} onValueChange={(v) => setField(dia, idx, 'intensidade', v)} disabled={isRepouso || !session.modalidade}>
+                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Intensidade…" /></SelectTrigger>
+                        <SelectContent>{INTENSIDADES_OPT.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    {sessions.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeSession(dia, idx)} className="h-9 w-9 p-0 shrink-0">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {showLongao && (
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={!!session.longao}
+                        onChange={(e) => toggleLongao(dia, idx, e.target.checked)}
+                        className="h-4 w-4 rounded border-input accent-primary"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        🐢 É o <strong>longão</strong> da semana
+                        <span className="text-xs ml-1">(volume longo / sessão de resistência)</span>
+                      </span>
+                    </label>
+                  )}
+                </div>
+              );
+            })}
+
+            <Button type="button" variant="ghost" size="sm" onClick={() => addSession(dia)} className="gap-1 px-2 h-8 text-xs">
+              <Plus className="h-3.5 w-3.5" /> Adicionar modalidade neste dia
+            </Button>
           </div>
         );
       })}
