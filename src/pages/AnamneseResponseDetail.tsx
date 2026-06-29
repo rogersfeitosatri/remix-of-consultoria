@@ -23,6 +23,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
+import { formatStructuredAnswer } from '@/lib/formatAnamneseAnswer';
 
 interface AnamneseQuestion {
   id: string;
@@ -160,6 +161,8 @@ export default function AnamneseResponseDetail() {
     return acc;
   }, {} as Record<string, AnamneseQuestion[]>);
 
+  const formatStructured = formatStructuredAnswer;
+
   const formatAnswer = (questionId: string, questionType: string): string => {
     const responses = responseData?.responses as Record<string, any> | null;
     if (!responses) return '(não respondeu)';
@@ -171,10 +174,13 @@ export default function AnamneseResponseDetail() {
         const mainAnswer = answer.answer;
         const comment = answer.comment;
         if (mainAnswer === undefined || mainAnswer === null || mainAnswer === '') return '(não respondeu)';
-        let result = Array.isArray(mainAnswer) ? (mainAnswer.length > 0 ? mainAnswer.join(', ') : '(não respondeu)') : String(mainAnswer);
+        const structured = formatStructured(mainAnswer);
+        let result = structured ?? (Array.isArray(mainAnswer) ? (mainAnswer.length > 0 ? mainAnswer.join(', ') : '(não respondeu)') : String(mainAnswer));
         if (comment && String(comment).trim()) result += `\nObservação: ${comment}`;
         return result;
       }
+      const structured = formatStructured(answer);
+      if (structured) return structured;
       const entries = Object.entries(answer);
       if (entries.length === 0) return '(não respondeu)';
       return entries.filter(([_, v]) => v !== null && v !== undefined && v !== '').map(([k, v]) => `${k}: ${v}`).join('\n') || '(não respondeu)';

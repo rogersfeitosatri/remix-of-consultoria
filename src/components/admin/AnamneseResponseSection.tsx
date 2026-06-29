@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { formatStructuredAnswer } from '@/lib/formatAnamneseAnswer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -140,18 +141,23 @@ export function AnamneseResponseSection({ clientId, clientName }: AnamneseRespon
     // Handle new format with answer and comment
     if (typeof response === 'object' && response.answer !== undefined) {
       const answer = response.answer;
-      const answerText = Array.isArray(answer) ? answer.join(', ') : String(answer);
+      const structured = formatStructuredAnswer(answer);
+      const answerText = structured ?? (Array.isArray(answer) ? answer.join(', ') : String(answer));
       if (response.comment) {
         return `${answerText} (Comentário: ${response.comment})`;
       }
       return answerText || 'Não respondido';
     }
-    
+
+    // Structured object stored directly (sem wrapper answer/comment)
+    const structuredDirect = formatStructuredAnswer(response);
+    if (structuredDirect) return structuredDirect;
+
     // Handle old format
     if (Array.isArray(response)) {
       return response.join(', ');
     }
-    
+
     return String(response) || 'Não respondido';
   };
 
@@ -308,7 +314,7 @@ export function AnamneseResponseSection({ clientId, clientName }: AnamneseRespon
                           return (
                             <div key={question.id} className="space-y-1">
                               <p className="text-sm font-medium">{question.question_text}</p>
-                              <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                              <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded whitespace-pre-wrap">
                                 {formatAnswer(response)}
                               </p>
                             </div>
