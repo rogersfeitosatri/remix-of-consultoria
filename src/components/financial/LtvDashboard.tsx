@@ -171,7 +171,14 @@ export function LtvDashboard() {
       );
       const ch = historyByClient.get(c.id) || [];
 
-      const ltv = cp.reduce((s, p) => s + Number(p.amount || 0), 0);
+      // LTV baseado no VALOR DO PACOTE contratado (não em parcelas/lançamentos).
+      // O campo monthly_value armazena o valor TOTAL do pacote do plano.
+      // LTV = pacote do plano atual + pacote de cada renovação registrada.
+      const currentPkg = Number(c.monthly_value || 0);
+      const renewalPkgs = ch.reduce((s, h) => s + Number(h.monthly_value || 0), 0);
+      const paidSum = cp.reduce((s, p) => s + Number(p.amount || 0), 0);
+      // Fallback: se o paciente pagou mas não há valor de pacote cadastrado, usa o realizado.
+      const ltv = (currentPkg + renewalPkgs) > 0 ? currentPkg + renewalPkgs : paidSum;
       const renewals = ch.length;                  // cada history row = 1 renovação
       const planPeriods = renewals + 1;            // + plano atual
       const lastPaymentDate = cp.length ? cp[cp.length - 1].paid_at : null;
@@ -213,9 +220,10 @@ export function LtvDashboard() {
     const paidPayments = payments.filter((p) => p.status === 'paid' && p.paid_at);
     const totalRevenue = paidPayments.reduce((s, p) => s + Number(p.amount || 0), 0);
 
-    // Ticket médio = receita ÷ nº de vendas (planos vendidos), não parcelas
+    // Ticket médio = valor total dos pacotes contratados ÷ nº de planos vendidos.
+    // Usa o valor do pacote (LTV), não a soma de pagamentos, para refletir o preço médio de uma venda.
     const totalSales = withPay.reduce((s, c) => s + c.planPeriods, 0);
-    const ticketMedio = totalSales ? totalRevenue / totalSales : 0;
+    const ticketMedio = totalSales ? totalLtv / totalSales : 0;
 
     // Ticket dos últimos 30 dias: receita ÷ nº de planos iniciados/renovados no período
     const cutoff30 = subMonths(new Date(), 1);
@@ -555,9 +563,9 @@ export function LtvDashboard() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="text-xs space-y-2 text-muted-foreground">
-              <p><span className="text-foreground font-medium">LTV (Lifetime Value):</span> quanto cada paciente já te pagou desde que entrou. Soma de TODOS os pagamentos confirmados dele.</p>
-              <p><span className="text-foreground font-medium">LTV médio:</span> média de LTV entre todos os pacientes que já pagaram pelo menos uma vez.</p>
-              <p><span className="text-foreground font-medium">Ticket médio:</span> receita total ÷ número de planos vendidos (planos atuais + renovações). Diz quanto, em média, cada venda valeu.</p>
+              <p><span className="text-foreground font-medium">LTV (Lifetime Value):</span> valor total dos pacotes que o paciente contratou — o valor do plano atual mais o de cada renovação. Usa o valor do pacote que você cadastra (não parcelas mês a mês).</p>
+              <p><span className="text-foreground font-medium">LTV médio:</span> média de LTV entre todos os pacientes que já contrataram pelo menos um plano.</p>
+              <p><span className="text-foreground font-medium">Ticket médio:</span> valor total dos pacotes contratados ÷ número de planos vendidos (plano atual + renovações). Diz quanto, em média, cada venda/pacote valeu.</p>
               <p><span className="text-foreground font-medium">Ticket (30d):</span> mesmo cálculo, mas só com planos novos ou renovados nos últimos 30 dias.</p>
               <p><span className="text-foreground font-medium">MRR (Monthly Recurring Revenue):</span> receita mensal equivalente dos planos ativos. Pega o valor total do plano e divide pela duração em meses.</p>
               <p><span className="text-foreground font-medium">Receita / ativo:</span> quanto cada paciente ativo gerou de receita nos últimos 12 meses, em média.</p>
@@ -576,9 +584,9 @@ export function LtvDashboard() {
         <h3 className="text-sm font-semibold text-muted-foreground mb-2">Receita e LTV</h3>
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <KpiCard title="LTV médio" value={brl(kpis.avgLtv)} icon={<DollarSign className="h-4 w-4" />}
-            help="Soma de tudo que cada paciente pagou (LTV), dividido pelo número de pacientes que já pagaram alguma vez." />
-          <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} subtitle="receita ÷ planos vendidos" icon={<DollarSign className="h-4 w-4" />}
-            help="Receita total dividida pelo número de planos vendidos (plano atual + cada renovação conta como 1 venda). Mostra quanto, em média, cada venda valeu." />
+            help="Média do valor total de pacotes contratados por paciente (plano atual + renovações), entre os pacientes que já contrataram pelo menos um plano." />
+          <KpiCard title="Ticket médio" value={brl(kpis.ticketMedio)} subtitle="pacotes ÷ planos vendidos" icon={<DollarSign className="h-4 w-4" />}
+            help="Valor total dos pacotes contratados dividido pelo número de planos vendidos (plano atual + cada renovação conta como 1 venda). Mostra o preço médio de uma venda." />
           <KpiCard title="Ticket (30d)" value={brl(kpis.ticket30)} subtitle="planos novos/renovados" icon={<TrendingUp className="h-4 w-4" />}
             help="Mesmo cálculo do ticket médio, mas considerando apenas planos iniciados ou renovados nos últimos 30 dias." />
           <KpiCard title="MRR" value={brl(kpis.mrr)} subtitle="receita mensal equivalente" icon={<Repeat className="h-4 w-4" />}
