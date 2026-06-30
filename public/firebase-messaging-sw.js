@@ -1,19 +1,14 @@
-/* Service worker do Firebase Cloud Messaging (push em segundo plano).
- *
- * IMPORTANTE: preencha o objeto firebaseConfig abaixo com os MESMOS valores
- * usados no app (src/lib/firebase.ts). O service worker NÃO enxerga as
- * variáveis VITE_*, então os valores precisam ser colados aqui literalmente.
- */
+/* Service worker do Firebase Cloud Messaging (push em segundo plano). */
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-  apiKey: 'COLE_AQUI',
-  authDomain: 'COLE_AQUI',
-  projectId: 'COLE_AQUI',
-  storageBucket: 'COLE_AQUI',
-  messagingSenderId: 'COLE_AQUI',
-  appId: 'COLE_AQUI',
+  apiKey: '__PREENCHER_API_KEY_WEB_FIREBASE__',
+  authDomain: 'rfconsultoria-c8f44.firebaseapp.com',
+  projectId: 'rfconsultoria-c8f44',
+  storageBucket: 'rfconsultoria-c8f44.firebasestorage.app',
+  messagingSenderId: '520882593280',
+  appId: '1:520882593280:web:ecf57d2aa8eba6534d02e5',
 };
 
 try {
@@ -33,7 +28,6 @@ try {
   // Firebase ainda não configurado — ignora.
 }
 
-// Ao clicar na notificação, abre a aba de Ajustes.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = (event.notification.data && event.notification.data.url) || '/adjustments';
