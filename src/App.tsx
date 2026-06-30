@@ -26,6 +26,7 @@ import ContentManager from "./pages/ContentManager";
 import LinkBioManager from "./pages/LinkBioManager";
 import Forms from "./pages/Forms";
 import Tasks from "./pages/Tasks";
+import Adjustments from "./pages/Adjustments";
 import NutritionalPeriodization from "./pages/NutritionalPeriodization";
 import MetabolicWeb from "./pages/MetabolicWeb";
 import StrategicCalls from "./pages/StrategicCalls";
@@ -155,6 +156,7 @@ function AppRoutes() {
         <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
         <Route path="/tasks" element={<ProtectedRoute adminOnly><Tasks /></ProtectedRoute>} />
+        <Route path="/adjustments" element={<ProtectedRoute adminOnly><Adjustments /></ProtectedRoute>} />
         <Route path="/clients" element={<ProtectedRoute adminOnly><Clients /></ProtectedRoute>} />
         <Route path="/periodization" element={<ProtectedRoute adminOnly><NutritionalPeriodization /></ProtectedRoute>} />
         <Route path="/metabolic-web" element={<ProtectedRoute adminOnly><MetabolicWeb /></ProtectedRoute>} />
