@@ -18,13 +18,14 @@
 // (o pacote 'firebase' é instalado no ambiente de produção).
 
 export const firebaseConfig = {
-  // A Web API key do Firebase não é secreta (fica no cliente). Restrinja-a por domínio no Google Cloud.
+  // Config do projeto rfconsultoria-c8f44. A Web API key não é secreta (fica no cliente);
+  // restrinja-a por domínio no Google Cloud Console.
   apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string | undefined) ?? 'AIzaSyDG1k8Lvh2pl66Mlxaei5uFixWcwGs7pQE',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID as string | undefined,
+  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined) ?? 'rfconsultoria-c8f44.firebaseapp.com',
+  projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined) ?? 'rfconsultoria-c8f44',
+  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined) ?? 'rfconsultoria-c8f44.firebasestorage.app',
+  messagingSenderId: (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined) ?? '520882593280',
+  appId: (import.meta.env.VITE_FIREBASE_APP_ID as string | undefined) ?? '1:520882593280:web:ecf57d2aa8eba6534d02e5',
 };
 
 export const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;

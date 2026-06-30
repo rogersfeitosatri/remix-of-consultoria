@@ -9,11 +9,11 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-com
 
 const firebaseConfig = {
   apiKey: 'AIzaSyDG1k8Lvh2pl66Mlxaei5uFixWcwGs7pQE',
-  authDomain: 'COLE_AQUI',      // ex: SEU-PROJETO.firebaseapp.com
-  projectId: 'COLE_AQUI',       // ex: seu-projeto
-  storageBucket: 'COLE_AQUI',   // ex: SEU-PROJETO.appspot.com
-  messagingSenderId: 'COLE_AQUI',
-  appId: 'COLE_AQUI',
+  authDomain: 'rfconsultoria-c8f44.firebaseapp.com',
+  projectId: 'rfconsultoria-c8f44',
+  storageBucket: 'rfconsultoria-c8f44.firebasestorage.app',
+  messagingSenderId: '520882593280',
+  appId: '1:520882593280:web:ecf57d2aa8eba6534d02e5',
 };
 
 try {
