@@ -3,7 +3,7 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-  apiKey: '__PREENCHER_API_KEY_WEB_FIREBASE__',
+  apiKey: 'AIzaSyDG1k8Lvh2pl66Mlxaei5uFixWcwGs7pQE',
   authDomain: 'rfconsultoria-c8f44.firebaseapp.com',
   projectId: 'rfconsultoria-c8f44',
   storageBucket: 'rfconsultoria-c8f44.firebasestorage.app',
