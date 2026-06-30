@@ -110,3 +110,6 @@ verify_jwt = false
 [functions.start-onboarding]
 verify_jwt = false
 
+
+[functions.send-adjustment-notifications]
+verify_jwt = false

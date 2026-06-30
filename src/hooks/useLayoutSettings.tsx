@@ -25,6 +25,7 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItemConfig[] = [
   { key: '/tasks', label: 'Tarefas', visible: true },
   { key: '/clients', label: 'Atletas', visible: true },
   { key: '/checkin-hub', label: 'Check-ins', visible: true },
+  { key: '/adjustments', label: 'Ajustes', visible: true },
   { key: '/financial', label: 'Financeiro', visible: true },
   { key: '/calendar', label: 'Calendário', visible: true },
   { key: '/scheduling', label: 'Agendamento', visible: true },
