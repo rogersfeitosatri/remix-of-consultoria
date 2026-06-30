@@ -18,7 +18,8 @@
 // (o pacote 'firebase' é instalado no ambiente de produção).
 
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
+  // A Web API key do Firebase não é secreta (fica no cliente). Restrinja-a por domínio no Google Cloud.
+  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string | undefined) ?? 'AIzaSyDG1k8Lvh2pl66Mlxaei5uFixWcwGs7pQE',
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined,

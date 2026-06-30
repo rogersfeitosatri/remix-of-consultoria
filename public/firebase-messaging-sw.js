@@ -8,10 +8,10 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-  apiKey: 'COLE_AQUI',
-  authDomain: 'COLE_AQUI',
-  projectId: 'COLE_AQUI',
-  storageBucket: 'COLE_AQUI',
+  apiKey: 'AIzaSyDG1k8Lvh2pl66Mlxaei5uFixWcwGs7pQE',
+  authDomain: 'COLE_AQUI',      // ex: SEU-PROJETO.firebaseapp.com
+  projectId: 'COLE_AQUI',       // ex: seu-projeto
+  storageBucket: 'COLE_AQUI',   // ex: SEU-PROJETO.appspot.com
   messagingSenderId: 'COLE_AQUI',
   appId: 'COLE_AQUI',
 };
