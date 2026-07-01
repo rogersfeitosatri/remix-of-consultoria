@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { notifyUser } from "../_shared/fcm.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,12 +99,13 @@ Deno.serve(async (req) => {
 
     const { data: client } = await supabase
       .from('clients')
-      .select('name, phone')
+      .select('name, phone, user_id')
       .eq('id', clientId)
       .single();
 
     const athleteName = client?.name || 'Atleta';
     const athletePhone = client?.phone ?? null;
+    const ownerUserId = client?.user_id ?? null;
 
     const { data: allQuestions } = await supabase
       .from('checkin_questions')
@@ -154,6 +156,20 @@ Deno.serve(async (req) => {
 
     const zapiResult = await zapiResponse.json();
     console.log('[notify-checkin-response] ZAPI response:', zapiResult);
+
+    // Push (respeitando preferência 'checkin_submitted')
+    if (ownerUserId) {
+      try {
+        await notifyUser(supabase, ownerUserId, {
+          prefKey: 'checkin_submitted',
+          title: '✅ Check-in recebido',
+          body: `${athleteName} respondeu um check-in.`,
+          url: checkinResponseId ? `/checkin-review/${checkinResponseId}` : '/checkin-hub',
+        });
+      } catch (e) {
+        console.warn('Push checkin falhou:', e);
+      }
+    }
 
     return new Response(
       JSON.stringify({ success: true }),

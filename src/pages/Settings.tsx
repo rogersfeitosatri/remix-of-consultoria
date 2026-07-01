@@ -21,6 +21,8 @@ import { ScanAnamneseTargetRaces } from '@/components/admin/ScanAnamneseTargetRa
 import { PlanTemplatesSection } from '@/components/settings/PlanTemplatesSection';
 import { OnboardingSettingsSection } from '@/components/settings/OnboardingSettingsSection';
 import { AiWhatsAppAssistantSection } from '@/components/settings/AiWhatsAppAssistantSection';
+import { NotificationsSettingsSection } from '@/components/settings/NotificationsSettingsSection';
+import { Bell } from 'lucide-react';
 import { Bot } from 'lucide-react';
 
 const CHECKIN_LABELS: Record<string, string> = {
@@ -597,6 +599,24 @@ export default function Settings() {
             </AccordionTrigger>
             <AccordionContent className="pb-4">
               <LayoutCustomizationSection />
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Notificações */}
+          <AccordionItem value="notifications" className="border border-border rounded-lg bg-card px-4">
+            <AccordionTrigger className="hover:no-underline py-4">
+              <div className="flex items-center gap-2 text-left">
+                <Bell className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <div className="font-semibold">Notificações</div>
+                  <div className="text-sm text-muted-foreground font-normal">
+                    Escolha quais eventos você quer receber (anamnese, check-in, ajustes do mês…)
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              <NotificationsSettingsSection />
             </AccordionContent>
           </AccordionItem>
 

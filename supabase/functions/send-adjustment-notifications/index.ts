@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { notifyUser } from "../_shared/fcm.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,75 +23,6 @@ function isAdjustmentCheckin(freq: string | null, n: number): boolean {
     default:
       return true;
   }
-}
-
-// ── FCM HTTP v1 (service account) ──────────────────────────────────────────────
-function b64url(data: ArrayBuffer | string): string {
-  let str: string;
-  if (typeof data === 'string') {
-    str = btoa(unescape(encodeURIComponent(data)));
-  } else {
-    const bytes = new Uint8Array(data);
-    let bin = '';
-    for (const b of bytes) bin += String.fromCharCode(b);
-    str = btoa(bin);
-  }
-  return str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const body = pem.replace(/-----BEGIN [^-]+-----/, '').replace(/-----END [^-]+-----/, '').replace(/\s+/g, '');
-  const bin = atob(body);
-  const buf = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-  return buf.buffer;
-}
-
-async function getAccessToken(sa: any): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const claim = {
-    iss: sa.client_email,
-    scope: 'https://www.googleapis.com/auth/firebase.messaging',
-    aud: sa.token_uri || 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  };
-  const unsigned = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(claim))}`;
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    pemToArrayBuffer(sa.private_key),
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned));
-  const jwt = `${unsigned}.${b64url(sig)}`;
-
-  const res = await fetch(sa.token_uri || 'https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
-  });
-  if (!res.ok) throw new Error(`OAuth token error: ${res.status} ${await res.text()}`);
-  const json = await res.json();
-  return json.access_token as string;
-}
-
-async function sendFcm(accessToken: string, projectId: string, token: string, title: string, body: string, url: string) {
-  const res = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: {
-        token,
-        notification: { title, body },
-        data: { url },
-        webpush: { fcm_options: { link: url } },
-      },
-    }),
-  });
-  return { ok: res.ok, status: res.status, body: res.ok ? null : await res.text() };
 }
 
 Deno.serve(async (req) => {
@@ -167,30 +99,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 4) Envia push via FCM (se configurado).
-    const saRaw = Deno.env.get('FCM_SERVICE_ACCOUNT');
-    if (!saRaw) {
-      return new Response(JSON.stringify({
-        ok: true, due: totalDue, date: targetDate, sent: 0,
-        note: 'FCM_SERVICE_ACCOUNT não configurado — ajustes calculados mas push não enviado.',
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    const sa = JSON.parse(saRaw);
-    const accessToken = await getAccessToken(sa);
-    const projectId = sa.project_id;
-
+    // 4) Envia push por usuário (respeitando preferência 'adjustment_due').
     let sent = 0, failed = 0;
     for (const [userId, athletes] of dueByUser) {
-      const { data: tokens } = await supabase.from('push_tokens').select('token').eq('user_id', userId);
-      if (!tokens || tokens.length === 0) continue;
       const title = '📣 Ajustes do mês';
       const body = athletes.length === 1
         ? `${athletes[0].name} fecha o bloco mensal hoje — hora de ajustar o plano.`
         : `${athletes.length} atletas fecham o bloco mensal hoje — hora de ajustar os planos.`;
-      for (const t of tokens) {
-        const r = await sendFcm(accessToken, projectId, t.token, title, body, '/adjustments');
-        if (r.ok) sent++; else { failed++; console.error('FCM falhou:', r.status, r.body); }
-      }
+      const r = await notifyUser(supabase, userId, { prefKey: 'adjustment_due', title, body, url: '/adjustments' });
+      sent += r.sent; failed += r.failed;
     }
 
     return new Response(JSON.stringify({ ok: true, date: targetDate, due: totalDue, sent, failed }), {
