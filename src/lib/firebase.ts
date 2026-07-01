@@ -17,18 +17,28 @@
 // credenciais ainda não estão configuradas. Os @ts-ignore evitam erro de tsc local
 // (o pacote 'firebase' é instalado no ambiente de produção).
 
+// Usa o valor do .env apenas se for real; ignora placeholders "__PREENCHER..." e vazios.
+function envOr(value: unknown, fallback: string): string {
+  const v = typeof value === 'string' ? value.trim() : '';
+  if (!v || v.startsWith('__') || v.includes('PREENCHER')) return fallback;
+  return v;
+}
+
 export const firebaseConfig = {
   // Config do projeto rfconsultoria-c8f44. A Web API key não é secreta (fica no cliente);
   // restrinja-a por domínio no Google Cloud Console.
-  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string | undefined) ?? 'AIzaSyDG1k8Lvh2pl66Mlxaei5uFixWcwGs7pQE',
-  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined) ?? 'rfconsultoria-c8f44.firebaseapp.com',
-  projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined) ?? 'rfconsultoria-c8f44',
-  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined) ?? 'rfconsultoria-c8f44.firebasestorage.app',
-  messagingSenderId: (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined) ?? '520882593280',
-  appId: (import.meta.env.VITE_FIREBASE_APP_ID as string | undefined) ?? '1:520882593280:web:ecf57d2aa8eba6534d02e5',
+  apiKey: envOr(import.meta.env.VITE_FIREBASE_API_KEY, 'AIzaSyDG1k8Lvh2pl66Mlxaei5uFixWcwGs7pQE'),
+  authDomain: envOr(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, 'rfconsultoria-c8f44.firebaseapp.com'),
+  projectId: envOr(import.meta.env.VITE_FIREBASE_PROJECT_ID, 'rfconsultoria-c8f44'),
+  storageBucket: envOr(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, 'rfconsultoria-c8f44.firebasestorage.app'),
+  messagingSenderId: envOr(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, '520882593280'),
+  appId: envOr(import.meta.env.VITE_FIREBASE_APP_ID, '1:520882593280:web:ecf57d2aa8eba6534d02e5'),
 };
 
-export const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;
+export const VAPID_KEY = envOr(
+  import.meta.env.VITE_FIREBASE_VAPID_KEY,
+  'BO-QWqWZ0NKHWJC6_-AX2JYJGopSYg18B2jDX6t8lxQBfpYyAain4q_M_RizTX3F3IYDFy_5FsA3ppMA_x5qnVQ',
+);
 
 export function isFirebaseConfigured(): boolean {
   return Boolean(
