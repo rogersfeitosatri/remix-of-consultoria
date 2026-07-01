@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { notifyUser } from "../_shared/fcm.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -272,6 +273,18 @@ Deno.serve(async (req) => {
       }
     } catch (notifyError) {
       console.warn("Could not notify admin via WhatsApp:", notifyError);
+    }
+
+    // Push (respeitando preferência 'anamnese_submitted')
+    try {
+      await notifyUser(supabaseAdmin, adminUserId, {
+        prefKey: 'anamnese_submitted',
+        title: '📋 Anamnese recebida',
+        body: `${name} enviou a anamnese.`,
+        url: `/clients/${clientId}`,
+      });
+    } catch (e) {
+      console.warn("Push anamnese falhou:", e);
     }
 
     return new Response(
