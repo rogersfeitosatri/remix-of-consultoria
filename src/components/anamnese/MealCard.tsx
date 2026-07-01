@@ -157,8 +157,11 @@ export function MealCard({
           <CardContent className="pt-0 pb-4 space-y-4">
             <MealFields
               data={data}
+              itens={itens}
               onFieldChange={handleFieldChange}
-              onItemChange={handleItemChange}
+              onOptionChange={handleOptionChange}
+              onAddOption={handleAddOption}
+              onRemoveOption={handleRemoveOption}
               onAddItem={handleAddItem}
               onRemoveItem={handleRemoveItem}
               errors={errors}
