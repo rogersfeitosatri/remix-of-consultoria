@@ -27,6 +27,7 @@ export const SERVICE_TYPE_LABELS: Record<string, string> = {
 export const PLAN_TYPE_LABELS: Record<string, string> = {
   consultoria: 'Consultoria',
   premium: 'Premium',
+  zona_nutri_diet: 'Zona Nutri Diet',
 };
 
 export function getClientDurationMonths(client: Client): number {

@@ -11,7 +11,7 @@ export interface Client {
   email: string | null;
   phone: string | null;
   service_type: 'nutrition' | 'training' | 'both';
-  plan_type: 'consultoria' | 'premium';
+  plan_type: 'consultoria' | 'premium' | 'zona_nutri_diet';
   plan_duration: 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'six_weeks' | 'custom';
   checkin_frequency: 'daily' | 'weekly' | 'biweekly' | 'three_weeks' | 'monthly' | 'bimonthly' | 'quarterly' | null;
   has_checkin: boolean;

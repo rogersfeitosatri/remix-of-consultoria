@@ -27,7 +27,7 @@ function businessDaysSince(fromDate: Date): number {
   return count;
 }
 
-const DEADLINE_DAYS = 4;
+const DEADLINE_DAYS = 3;
 
 function getDeadlineInfoForPlan(plan: MealPlanStatusWithClient) {
   const referenceDate = plan.anamnese_submitted_at
@@ -160,7 +160,7 @@ export function PendingMealPlansAlert() {
         <CollapsibleContent>
           <CardContent className="space-y-2">
             <p className="text-xs text-muted-foreground mb-2">
-              Prazo: 4 dias úteis a partir da resposta da anamnese
+              Prazo: 3 dias úteis a partir da resposta da anamnese
             </p>
             {combined.slice(0, 8).map((item) => {
               if (item.type === 'linked') {

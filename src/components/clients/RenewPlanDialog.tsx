@@ -42,6 +42,7 @@ const SERVICE_OPTIONS = [
 const PLAN_TYPE_OPTIONS = [
   { value: 'consultoria', label: 'Consultoria' },
   { value: 'premium', label: 'Premium' },
+  { value: 'zona_nutri_diet', label: 'Zona Nutri Diet' },
 ];
 
 const CHECKIN_FREQ_OPTIONS = [
