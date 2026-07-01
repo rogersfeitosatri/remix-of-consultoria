@@ -1,5 +1,5 @@
 export type ServiceType = 'nutrition' | 'training' | 'both';
-export type PlanType = 'consultoria' | 'premium';
+export type PlanType = 'consultoria' | 'premium' | 'zona_nutri_diet';
 export type CheckinFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly';
 
 export interface Client {
@@ -38,6 +38,7 @@ export const SERVICE_LABELS: Record<ServiceType, string> = {
 export const PLAN_LABELS: Record<PlanType, string> = {
   consultoria: 'Consultoria',
   premium: 'Premium',
+  zona_nutri_diet: 'Zona Nutri Diet',
 };
 
 export const CHECKIN_LABELS: Record<CheckinFrequency, string> = {

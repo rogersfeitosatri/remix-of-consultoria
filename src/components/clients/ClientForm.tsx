@@ -97,7 +97,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
     email: client?.email || '',
     phone: client?.phone || '',
     service_type: client?.service_type || 'nutrition' as 'nutrition' | 'training' | 'both',
-    plan_type: client?.plan_type || 'consultoria' as 'consultoria' | 'premium',
+    plan_type: client?.plan_type || 'consultoria' as 'consultoria' | 'premium' | 'zona_nutri_diet',
     plan_duration: client?.plan_duration || 'monthly' as 'six_weeks' | 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'custom',
     has_checkin: client?.has_checkin ?? true,
     has_agenda_access: client?.has_agenda_access ?? false,
@@ -517,7 +517,7 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
               <Label>Tipo de Plano</Label>
               <Select
                 value={formData.plan_type}
-                onValueChange={(v) => setFormData({ ...formData, plan_type: v as 'consultoria' | 'premium' })}
+                onValueChange={(v) => setFormData({ ...formData, plan_type: v as 'consultoria' | 'premium' | 'zona_nutri_diet' })}
               >
                 <SelectTrigger>
                   <SelectValue />

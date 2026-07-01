@@ -348,9 +348,11 @@ export default function Settings() {
 
     // Plan type mapping
     const planTypeRaw = String(row['Tipo de Plano'] || 'consultoria').toLowerCase().trim();
-    const planTypeMap: Record<string, 'consultoria' | 'premium'> = {
+    const planTypeMap: Record<string, 'consultoria' | 'premium' | 'zona_nutri_diet'> = {
       'consultoria': 'consultoria',
       'premium': 'premium',
+      'zona nutri diet': 'zona_nutri_diet',
+      'zona_nutri_diet': 'zona_nutri_diet',
     };
     const planType = planTypeMap[planTypeRaw] || 'consultoria';
 

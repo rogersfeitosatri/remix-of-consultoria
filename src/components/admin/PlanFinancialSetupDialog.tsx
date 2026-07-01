@@ -217,6 +217,7 @@ export function PlanFinancialSetupDialog({ client, trigger }: Props) {
                 <SelectContent>
                   <SelectItem value="consultoria">Consultoria</SelectItem>
                   <SelectItem value="premium">Premium</SelectItem>
+                  <SelectItem value="zona_nutri_diet">Zona Nutri Diet</SelectItem>
                 </SelectContent>
               </Select>
             </div>

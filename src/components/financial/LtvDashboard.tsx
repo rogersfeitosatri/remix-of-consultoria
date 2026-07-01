@@ -874,6 +874,7 @@ export function LtvDashboard() {
                 <SelectItem value="all">Todos os planos</SelectItem>
                 <SelectItem value="consultoria">Consultoria</SelectItem>
                 <SelectItem value="premium">Premium</SelectItem>
+                <SelectItem value="zona_nutri_diet">Zona Nutri Diet</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
