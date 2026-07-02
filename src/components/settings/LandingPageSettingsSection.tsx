@@ -206,15 +206,17 @@ export function LandingPageSettingsSection() {
               </Button>
             </div>
             <OfferItemsEditor
-              label="Plano Consultas"
+              label={texts.consultas_card_title || 'Plano Consultas'}
               items={texts.consultas_offers || []}
               onChange={(items) => { setTexts(prev => ({ ...prev, consultas_offers: items })); setIsDirty(true); }}
+              onLabelChange={(v) => { update('consultas_card_title', v); }}
             />
             <div className="border-t pt-4">
               <OfferItemsEditor
-                label="Plano Consultoria"
+                label={texts.consultoria_card_title || 'Plano Consultoria'}
                 items={texts.consultoria_offers || []}
                 onChange={(items) => { setTexts(prev => ({ ...prev, consultoria_offers: items })); setIsDirty(true); }}
+                onLabelChange={(v) => { update('consultoria_card_title', v); }}
               />
             </div>
           </TabsContent>

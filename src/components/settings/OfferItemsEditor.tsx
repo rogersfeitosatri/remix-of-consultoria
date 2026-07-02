@@ -17,9 +17,10 @@ interface OfferItemsEditorProps {
   label: string;
   items: OfferItem[];
   onChange: (items: OfferItem[]) => void;
+  onLabelChange?: (value: string) => void;
 }
 
-export function OfferItemsEditor({ label, items, onChange }: OfferItemsEditorProps) {
+export function OfferItemsEditor({ label, items, onChange, onLabelChange }: OfferItemsEditorProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const updateItem = (index: number, field: keyof OfferItem, value: string) => {
@@ -61,9 +62,17 @@ export function OfferItemsEditor({ label, items, onChange }: OfferItemsEditorPro
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">{label}</p>
-        <Button variant="outline" size="sm" onClick={addItem} className="text-xs h-7">
+      <div className="flex items-center justify-between gap-2">
+        {onLabelChange ? (
+          <Input
+            value={label}
+            onChange={(e) => onLabelChange(e.target.value)}
+            className="text-sm font-semibold h-8 max-w-[220px]"
+          />
+        ) : (
+          <p className="text-sm font-semibold">{label}</p>
+        )}
+        <Button variant="outline" size="sm" onClick={addItem} className="text-xs h-7 shrink-0">
           <Plus className="h-3 w-3 mr-1" /> Adicionar item
         </Button>
       </div>
