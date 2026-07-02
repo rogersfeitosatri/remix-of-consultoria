@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   CheckCircle, ChevronDown, ChevronUp, UtensilsCrossed,
-  MessageSquare, RefreshCw, ClipboardList, FileText,
+  MessageSquare, RefreshCw, ClipboardList, Check,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePendingMealPlans, useUnlinkedAnamneseForMealPlan } from '@/hooks/useMealPlanStatus';
 import { parseISO, addDays, isWeekend, differenceInCalendarDays, format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 
 function businessDaysSince(fromDate: Date): number {
   const today = new Date();
@@ -96,6 +98,32 @@ export function ActionCenterPanel() {
   const [expiringOpen, setExpiringOpen] = useState(true);
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || '';
+
+  // Dismiss system: items disappear for 24h after marking as done
+  const DISMISS_KEY = 'dashboard-dismissed-v2';
+  const DISMISS_TTL = 24 * 60 * 60 * 1000;
+  const [dismissed, setDismissed] = useState<Record<string, number>>(() => {
+    try {
+      const raw = localStorage.getItem(DISMISS_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      const now = Date.now();
+      const valid: Record<string, number> = {};
+      for (const [k, ts] of Object.entries(parsed)) {
+        if (now - ts < DISMISS_TTL) valid[k] = ts;
+      }
+      return valid;
+    } catch { return {}; }
+  });
+  const isDismissed = (key: string) => key in dismissed;
+  const dismiss = useCallback((key: string) => {
+    setDismissed(prev => {
+      const next = { ...prev, [key]: Date.now() };
+      try { localStorage.setItem(DISMISS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    toast.success('Concluído!');
+  }, []);
 
   // All clients for registration progress
   const { data: allClients = [], isLoading: loadingClients } = useQuery({
@@ -327,8 +355,13 @@ export function ActionCenterPanel() {
     return items;
   }, [pendingPlans, unlinkedAnamnese, allClients]);
 
+  const visibleMealPlans = mealPlanItems.filter(i => !isDismissed(`mp:${i.id}`));
+  const visibleAnamneses = recentAnamneses.filter((i: any) => !isDismissed(`an:${i.id}`));
+  const visibleCheckins = unansweredCheckins.filter((i: any) => !isDismissed(`ck:${i.id}`));
+  const visibleExpiring = expiringAthletes.filter((i: any) => !isDismissed(`ex:${i.id}`));
+
   const isLoading = loadingPlans || loadingUnlinked || loadingCheckins || loadingExpiring || loadingClients || loadingAnamneses;
-  const totalActions = mealPlanItems.length + recentAnamneses.length + unansweredCheckins.length + expiringAthletes.length;
+  const totalActions = visibleMealPlans.length + visibleAnamneses.length + visibleCheckins.length + visibleExpiring.length;
 
   if (isLoading) {
     return (
@@ -368,16 +401,16 @@ export function ActionCenterPanel() {
       )}
 
       {/* Section: Planos Alimentares */}
-      {mealPlanItems.length > 0 && (
+      {visibleMealPlans.length > 0 && (
         <Section
           icon={<UtensilsCrossed className="h-4 w-4" />}
           title="Planos Alimentares"
-          count={mealPlanItems.length}
+          count={visibleMealPlans.length}
           open={mealPlansOpen}
           onToggle={() => setMealPlansOpen(v => !v)}
         >
           <div className="space-y-3">
-            {mealPlanItems.map(item => {
+            {visibleMealPlans.map(item => {
               const pb = priorityBadge[item.priority];
               return (
                 <div
@@ -416,7 +449,7 @@ export function ActionCenterPanel() {
                         </div>
                       </div>
                     </div>
-                    <div className="shrink-0">
+                    <div className="shrink-0 flex items-center gap-1">
                       {item.isRegistrationIncomplete ? (
                         <Button
                           size="sm"
@@ -441,6 +474,7 @@ export function ActionCenterPanel() {
                           Criar plano alimentar
                         </Button>
                       )}
+                      <DoneButton onClick={() => dismiss(`mp:${item.id}`)} />
                     </div>
                   </div>
                 </div>
@@ -451,16 +485,16 @@ export function ActionCenterPanel() {
       )}
 
       {/* Section: Anamneses Pendentes */}
-      {recentAnamneses.length > 0 && (
+      {visibleAnamneses.length > 0 && (
         <Section
           icon={<ClipboardList className="h-4 w-4" />}
           title="Anamneses Pendentes"
-          count={recentAnamneses.length}
+          count={visibleAnamneses.length}
           open={anamnesesOpen}
           onToggle={() => setAnamnesesOpen(v => !v)}
         >
           <div className="space-y-3">
-            {recentAnamneses.map((item: any) => {
+            {visibleAnamneses.map((item: any) => {
               const pb = priorityBadge[item.priority as PriorityLevel];
               return (
                 <div
@@ -479,13 +513,16 @@ export function ActionCenterPanel() {
                         </Badge>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      className="text-xs h-8 shrink-0"
-                      onClick={() => navigate(`/anamnese-response/${item.id}`)}
-                    >
-                      Ver anamnese
-                    </Button>
+                    <div className="shrink-0 flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        className="text-xs h-8"
+                        onClick={() => navigate(`/anamnese-response/${item.id}`)}
+                      >
+                        Ver anamnese
+                      </Button>
+                      <DoneButton onClick={() => dismiss(`an:${item.id}`)} />
+                    </div>
                   </div>
                 </div>
               );
@@ -495,16 +532,16 @@ export function ActionCenterPanel() {
       )}
 
       {/* Section: Check-ins sem Resposta */}
-      {unansweredCheckins.length > 0 && (
+      {visibleCheckins.length > 0 && (
         <Section
           icon={<MessageSquare className="h-4 w-4" />}
           title="Check-ins sem Resposta"
-          count={unansweredCheckins.length}
+          count={visibleCheckins.length}
           open={checkinsOpen}
           onToggle={() => setCheckinsOpen(v => !v)}
         >
           <div className="space-y-3">
-            {unansweredCheckins.map((item: any) => (
+            {visibleCheckins.map((item: any) => (
               <div
                 key={item.id}
                 className={`rounded-lg border border-border/60 bg-card p-4 border-l-4 ${
@@ -524,13 +561,16 @@ export function ActionCenterPanel() {
                         : `Aguardando há ${item.daysSince} dia${item.daysSince > 1 ? 's' : ''}`}
                     </span>
                   </div>
-                  <Button
-                    size="sm"
-                    className="text-xs h-8 shrink-0"
-                    onClick={() => navigate(`/checkin-review/${item.id}`)}
-                  >
-                    Responder
-                  </Button>
+                  <div className="shrink-0 flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      className="text-xs h-8"
+                      onClick={() => navigate(`/checkin-review/${item.id}`)}
+                    >
+                      Responder
+                    </Button>
+                    <DoneButton onClick={() => dismiss(`ck:${item.id}`)} />
+                  </div>
                 </div>
               </div>
             ))}
@@ -539,16 +579,16 @@ export function ActionCenterPanel() {
       )}
 
       {/* Section: Planos vencendo */}
-      {expiringAthletes.length > 0 && (
+      {visibleExpiring.length > 0 && (
         <Section
           icon={<RefreshCw className="h-4 w-4" />}
           title="Planos vencendo"
-          count={expiringAthletes.length}
+          count={visibleExpiring.length}
           open={expiringOpen}
           onToggle={() => setExpiringOpen(v => !v)}
         >
           <div className="space-y-3">
-            {expiringAthletes.map((a: any) => (
+            {visibleExpiring.map((a: any) => (
               <div
                 key={a.id}
                 className={`rounded-lg border border-border/60 bg-card p-4 border-l-4 ${
@@ -568,13 +608,16 @@ export function ActionCenterPanel() {
                         : `${a.days_left} dia${a.days_left > 1 ? 's' : ''} restante${a.days_left > 1 ? 's' : ''}`}
                     </span>
                   </div>
-                  <Button
-                    size="sm"
-                    className="text-xs h-8 shrink-0"
-                    onClick={() => navigate(`/clients/${a.id}`)}
-                  >
-                    Renovar
-                  </Button>
+                  <div className="shrink-0 flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      className="text-xs h-8"
+                      onClick={() => navigate(`/clients/${a.id}`)}
+                    >
+                      Renovar
+                    </Button>
+                    <DoneButton onClick={() => dismiss(`ex:${a.id}`)} />
+                  </div>
                 </div>
               </div>
             ))}
@@ -582,6 +625,26 @@ export function ActionCenterPanel() {
         </Section>
       )}
     </div>
+  );
+}
+
+function DoneButton({ onClick }: { onClick: () => void }) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
+            onClick={(e) => { e.stopPropagation(); onClick(); }}
+          >
+            <Check className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top"><p className="text-xs">Marcar como feito</p></TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
