@@ -3,18 +3,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   CheckCircle, ChevronDown, ChevronUp, UtensilsCrossed,
-  MessageSquare, RefreshCw, Loader2,
+  MessageSquare, RefreshCw, ClipboardList, FileText,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { usePendingMealPlans, useUnlinkedAnamneseForMealPlan, useMarkMealPlanSent, MealPlanStatusWithClient } from '@/hooks/useMealPlanStatus';
+import { usePendingMealPlans, useUnlinkedAnamneseForMealPlan } from '@/hooks/useMealPlanStatus';
 import { parseISO, addDays, isWeekend, differenceInCalendarDays, format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
-import { PLAN_LABELS } from '@/types/client';
 
 function businessDaysSince(fromDate: Date): number {
   const today = new Date();
@@ -45,13 +42,12 @@ interface RegistrationStep {
 }
 
 function getRegistrationSteps(client: any, hasAnamnese: boolean): RegistrationStep[] {
-  const steps: RegistrationStep[] = [
+  return [
     { label: 'Dados pessoais', done: Boolean(client.name && client.phone) },
     { label: 'Anamnese', done: hasAnamnese },
     { label: 'Financeiro', done: Boolean(client.monthly_value && Number(client.monthly_value) > 0 && client.payment_type) },
     { label: 'Plano alimentar', done: false },
   ];
-  return steps;
 }
 
 function getProgressPercent(steps: RegistrationStep[]): number {
@@ -91,49 +87,143 @@ const priorityBadge: Record<PriorityLevel, { className: string; label: (n: numbe
 export function ActionCenterPanel() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const { data: pendingPlans = [], isLoading: loadingPlans } = usePendingMealPlans();
   const { data: unlinkedAnamnese = [], isLoading: loadingUnlinked } = useUnlinkedAnamneseForMealPlan();
-  const markAsSent = useMarkMealPlanSent();
 
   const [mealPlansOpen, setMealPlansOpen] = useState(true);
+  const [anamnesesOpen, setAnamnesesOpen] = useState(true);
   const [checkinsOpen, setCheckinsOpen] = useState(true);
   const [expiringOpen, setExpiringOpen] = useState(true);
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || '';
 
-  // Pending registrations (incomplete setup after anamnese)
-  const { data: pendingRegistrations = [], isLoading: loadingRegistrations } = useQuery({
-    queryKey: ['pending-registrations', user?.id],
+  // All clients for registration progress
+  const { data: allClients = [], isLoading: loadingClients } = useQuery({
+    queryKey: ['dashboard-clients', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const { data: clients } = await supabase
+      const { data } = await supabase
         .from('clients')
-        .select('id, name, email, phone, created_at, plan_type, service_type, monthly_value, payment_type, registration_source')
+        .select('id, name, phone, monthly_value, payment_type')
         .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-      return (clients || []) as any[];
+        .eq('is_active', true);
+      return (data || []) as any[];
     },
     enabled: !!user?.id,
     refetchInterval: 60000,
   });
 
-  // Checkin feedbacks pending admin review
-  const { data: pendingCheckinFeedbacks = [], isLoading: loadingCheckins } = useQuery({
-    queryKey: ['pending_checkins_dashboard'],
+  // Recent anamnese responses (within deadline window) for admin's clients
+  const { data: recentAnamneses = [], isLoading: loadingAnamneses } = useQuery({
+    queryKey: ['dashboard-anamneses', user?.id],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('checkin_feedbacks')
-        .select('id, checkin_response_id, status, created_at, clients!inner(id, name, is_active, is_frozen), checkin_responses(submitted_at)')
-        .in('status', ['pending', 'approved'])
-        .eq('clients.is_active', true)
-        .eq('clients.is_frozen', false)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      return (data || []) as any[];
+      if (!user?.id) return [];
+      // Get admin's client IDs
+      const { data: clients } = await supabase
+        .from('clients')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+      if (!clients?.length) return [];
+
+      const clientMap = new Map(clients.map(c => [c.id, c.name]));
+      const clientIds = clients.map(c => c.id);
+
+      // Get anamnese responses for these clients, recent ones
+      const cutoff = format(addDays(new Date(), -10), 'yyyy-MM-dd');
+      const { data: responses } = await supabase
+        .from('anamnese_responses')
+        .select('id, client_id, respondent_name, submitted_at')
+        .in('client_id', clientIds)
+        .gte('submitted_at', cutoff)
+        .order('submitted_at', { ascending: false });
+
+      // Also get unlinked ones (no client_id)
+      const { data: unlinkedResponses } = await supabase
+        .from('anamnese_responses')
+        .select('id, client_id, respondent_name, respondent_email, submitted_at')
+        .is('client_id', null)
+        .gte('submitted_at', cutoff)
+        .order('submitted_at', { ascending: false });
+
+      const items = [
+        ...(responses || []).map(r => ({
+          id: r.id,
+          name: clientMap.get(r.client_id!) || r.respondent_name || 'Sem nome',
+          clientId: r.client_id,
+          submittedAt: r.submitted_at,
+        })),
+        ...(unlinkedResponses || []).map(r => ({
+          id: r.id,
+          name: r.respondent_name || r.respondent_email || 'Sem nome',
+          clientId: null as string | null,
+          submittedAt: r.submitted_at,
+        })),
+      ];
+
+      return items.map(item => {
+        const refDate = parseISO(item.submittedAt);
+        const elapsed = businessDaysSince(refDate);
+        const remaining = DEADLINE_DAYS - elapsed;
+        return { ...item, remaining, priority: getPriority(remaining), refDate };
+      }).sort((a, b) => a.remaining - b.remaining);
     },
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
+
+  // Checkin responses without admin feedback
+  const { data: unansweredCheckins = [], isLoading: loadingCheckins } = useQuery({
+    queryKey: ['dashboard-unanswered-checkins', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      // Get admin's active clients
+      const { data: clients } = await supabase
+        .from('clients')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .eq('is_frozen', false);
+      if (!clients?.length) return [];
+
+      const clientMap = new Map(clients.map(c => [c.id, c.name]));
+      const clientIds = clients.map(c => c.id);
+
+      // Get recent checkin responses
+      const { data: responses } = await supabase
+        .from('checkin_responses')
+        .select('id, client_id, submitted_at')
+        .in('client_id', clientIds)
+        .order('submitted_at', { ascending: false })
+        .limit(100);
+
+      if (!responses?.length) return [];
+
+      // Get feedback IDs to find which responses already have feedback
+      const responseIds = responses.map(r => r.id);
+      const { data: feedbacks } = await supabase
+        .from('checkin_feedbacks')
+        .select('checkin_response_id')
+        .in('checkin_response_id', responseIds);
+
+      const answeredIds = new Set((feedbacks || []).map(f => f.checkin_response_id));
+
+      return responses
+        .filter(r => !answeredIds.has(r.id))
+        .map(r => {
+          const daysSince = differenceInCalendarDays(new Date(), parseISO(r.submitted_at));
+          return {
+            id: r.id,
+            name: clientMap.get(r.client_id) || 'N/A',
+            clientId: r.client_id,
+            daysSince,
+            submittedAt: r.submitted_at,
+          };
+        })
+        .sort((a, b) => b.daysSince - a.daysSince);
+    },
+    enabled: !!user?.id,
     refetchInterval: 30000,
   });
 
@@ -165,7 +255,7 @@ export function ActionCenterPanel() {
     refetchInterval: 300000,
   });
 
-  // Build meal plan items with priority
+  // Build meal plan items
   const mealPlanItems = useMemo(() => {
     const items: Array<{
       id: string;
@@ -178,7 +268,6 @@ export function ActionCenterPanel() {
       steps: RegistrationStep[];
       progressPercent: number;
       isRegistrationIncomplete: boolean;
-      referenceDate: Date;
       type: 'linked' | 'unlinked';
     }> = [];
 
@@ -189,7 +278,7 @@ export function ActionCenterPanel() {
       const elapsed = businessDaysSince(refDate);
       const remaining = DEADLINE_DAYS - elapsed;
 
-      const clientData = pendingRegistrations.find((c: any) => c.id === plan.client_id);
+      const clientData = allClients.find((c: any) => c.id === plan.client_id);
       const steps = getRegistrationSteps(clientData || {}, Boolean(plan.anamnese_submitted_at));
       const progressPercent = getProgressPercent(steps);
       const isIncomplete = !steps[0].done || !steps[2].done;
@@ -205,7 +294,6 @@ export function ActionCenterPanel() {
         steps,
         progressPercent,
         isRegistrationIncomplete: isIncomplete,
-        referenceDate: refDate,
         type: 'linked',
       });
     }
@@ -231,33 +319,16 @@ export function ActionCenterPanel() {
         ],
         progressPercent: 25,
         isRegistrationIncomplete: true,
-        referenceDate: refDate,
         type: 'unlinked',
       });
     }
 
     items.sort((a, b) => a.remaining - b.remaining);
     return items;
-  }, [pendingPlans, unlinkedAnamnese, pendingRegistrations]);
+  }, [pendingPlans, unlinkedAnamnese, allClients]);
 
-  const checkinItems = useMemo(() => {
-    return pendingCheckinFeedbacks.map((f: any) => {
-      const submittedAt = f.checkin_responses?.submitted_at
-        ? parseISO(f.checkin_responses.submitted_at)
-        : parseISO(f.created_at);
-      const daysSince = differenceInCalendarDays(new Date(), submittedAt);
-      return {
-        id: f.id,
-        responseId: f.checkin_response_id,
-        name: f.clients?.name || 'N/A',
-        daysSince,
-        submittedAt,
-      };
-    }).sort((a: any, b: any) => b.daysSince - a.daysSince);
-  }, [pendingCheckinFeedbacks]);
-
-  const isLoading = loadingPlans || loadingUnlinked || loadingCheckins || loadingExpiring || loadingRegistrations;
-  const totalActions = mealPlanItems.length + checkinItems.length + expiringAthletes.length;
+  const isLoading = loadingPlans || loadingUnlinked || loadingCheckins || loadingExpiring || loadingClients || loadingAnamneses;
+  const totalActions = mealPlanItems.length + recentAnamneses.length + unansweredCheckins.length + expiringAthletes.length;
 
   if (isLoading) {
     return (
@@ -321,8 +392,6 @@ export function ActionCenterPanel() {
                           {pb.label(item.remaining)}
                         </Badge>
                       </div>
-
-                      {/* Progress bar */}
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
@@ -347,7 +416,6 @@ export function ActionCenterPanel() {
                         </div>
                       </div>
                     </div>
-
                     <div className="shrink-0">
                       {item.isRegistrationIncomplete ? (
                         <Button
@@ -382,17 +450,61 @@ export function ActionCenterPanel() {
         </Section>
       )}
 
-      {/* Section: Check-ins */}
-      {checkinItems.length > 0 && (
+      {/* Section: Anamneses Pendentes */}
+      {recentAnamneses.length > 0 && (
+        <Section
+          icon={<ClipboardList className="h-4 w-4" />}
+          title="Anamneses Pendentes"
+          count={recentAnamneses.length}
+          open={anamnesesOpen}
+          onToggle={() => setAnamnesesOpen(v => !v)}
+        >
+          <div className="space-y-3">
+            {recentAnamneses.map((item: any) => {
+              const pb = priorityBadge[item.priority as PriorityLevel];
+              return (
+                <div
+                  key={item.id}
+                  className={`rounded-lg border border-border/60 bg-card p-4 border-l-4 ${priorityColors[item.priority as PriorityLevel]} transition-all hover:shadow-sm`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 space-y-0.5">
+                      <span className="font-medium text-sm block">{item.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          Preenchida há {businessDaysSince(item.refDate)} dia{businessDaysSince(item.refDate) !== 1 ? 's' : ''} útei{businessDaysSince(item.refDate) !== 1 ? 's' : 'l'}
+                        </span>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${pb.className}`}>
+                          {pb.label(item.remaining)}
+                        </Badge>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="text-xs h-8 shrink-0"
+                      onClick={() => navigate(`/anamnese-response/${item.id}`)}
+                    >
+                      Ver anamnese
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
+
+      {/* Section: Check-ins sem Resposta */}
+      {unansweredCheckins.length > 0 && (
         <Section
           icon={<MessageSquare className="h-4 w-4" />}
-          title="Check-ins"
-          count={checkinItems.length}
+          title="Check-ins sem Resposta"
+          count={unansweredCheckins.length}
           open={checkinsOpen}
           onToggle={() => setCheckinsOpen(v => !v)}
         >
           <div className="space-y-3">
-            {checkinItems.map((item: any) => (
+            {unansweredCheckins.map((item: any) => (
               <div
                 key={item.id}
                 className={`rounded-lg border border-border/60 bg-card p-4 border-l-4 ${
@@ -415,7 +527,7 @@ export function ActionCenterPanel() {
                   <Button
                     size="sm"
                     className="text-xs h-8 shrink-0"
-                    onClick={() => navigate(`/checkin-review/${item.responseId}`)}
+                    onClick={() => navigate(`/checkin-review/${item.id}`)}
                   >
                     Responder
                   </Button>
