@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   CheckCircle, ChevronDown, ChevronUp, UtensilsCrossed,
-  MessageSquare, RefreshCw, ClipboardList, Check,
+  MessageSquare, RefreshCw, ClipboardList, Check, UserPlus,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNavigate } from 'react-router-dom';
@@ -96,6 +96,7 @@ export function ActionCenterPanel() {
   const [anamnesesOpen, setAnamnesesOpen] = useState(true);
   const [checkinsOpen, setCheckinsOpen] = useState(true);
   const [expiringOpen, setExpiringOpen] = useState(true);
+  const [pendingRegOpen, setPendingRegOpen] = useState(true);
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || '';
 
@@ -283,6 +284,37 @@ export function ActionCenterPanel() {
     refetchInterval: 300000,
   });
 
+  // Clients auto-created from anamnese with incomplete registration
+  const { data: pendingRegistrations = [], isLoading: loadingPendingReg } = useQuery({
+    queryKey: ['dashboard-pending-registrations', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data: clients } = await supabase
+        .from('clients')
+        .select('id, name, email, phone, monthly_value, payment_type, plan_type, service_type, plan_duration, created_at')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .eq('registration_source', 'anamnese_auto');
+      if (!clients?.length) return [];
+
+      return clients
+        .map((c: any) => {
+          const missing: string[] = [];
+          if (!c.phone) missing.push('Telefone');
+          if (!c.monthly_value || Number(c.monthly_value) <= 0) missing.push('Valor mensal');
+          if (!c.plan_type) missing.push('Tipo de plano');
+          if (!c.service_type) missing.push('Tipo de serviço');
+          if (!c.plan_duration) missing.push('Duração do plano');
+          if (!c.payment_type) missing.push('Forma de pagamento');
+          if (missing.length === 0) return null;
+          return { ...c, missingFields: missing };
+        })
+        .filter(Boolean) as any[];
+    },
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
+
   // Build meal plan items
   const mealPlanItems = useMemo(() => {
     const items: Array<{
@@ -359,9 +391,10 @@ export function ActionCenterPanel() {
   const visibleAnamneses = recentAnamneses.filter((i: any) => !isDismissed(`an:${i.id}`));
   const visibleCheckins = unansweredCheckins.filter((i: any) => !isDismissed(`ck:${i.id}`));
   const visibleExpiring = expiringAthletes.filter((i: any) => !isDismissed(`ex:${i.id}`));
+  const visiblePendingReg = pendingRegistrations.filter((i: any) => !isDismissed(`pr:${i.id}`));
 
-  const isLoading = loadingPlans || loadingUnlinked || loadingCheckins || loadingExpiring || loadingClients || loadingAnamneses;
-  const totalActions = visibleMealPlans.length + visibleAnamneses.length + visibleCheckins.length + visibleExpiring.length;
+  const isLoading = loadingPlans || loadingUnlinked || loadingCheckins || loadingExpiring || loadingClients || loadingAnamneses || loadingPendingReg;
+  const totalActions = visibleMealPlans.length + visibleAnamneses.length + visibleCheckins.length + visibleExpiring.length + visiblePendingReg.length;
 
   if (isLoading) {
     return (
@@ -570,6 +603,51 @@ export function ActionCenterPanel() {
                       Responder
                     </Button>
                     <DoneButton onClick={() => dismiss(`ck:${item.id}`)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Section: Cadastros Pendentes */}
+      {visiblePendingReg.length > 0 && (
+        <Section
+          icon={<UserPlus className="h-4 w-4" />}
+          title="Cadastros Pendentes"
+          count={visiblePendingReg.length}
+          open={pendingRegOpen}
+          onToggle={() => setPendingRegOpen(v => !v)}
+        >
+          <div className="space-y-3">
+            {visiblePendingReg.map((item: any) => (
+              <div
+                key={item.id}
+                className="rounded-lg border border-border/60 bg-card p-4 border-l-4 border-l-yellow-500 transition-all hover:shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <span className="font-medium text-sm block">{item.name}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {item.missingFields.map((f: string) => (
+                        <Badge key={f} variant="outline" className="text-[10px] px-1.5 py-0 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                          {f}
+                        </Badge>
+                      ))}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">Cadastrado automaticamente via anamnese</span>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-8"
+                      onClick={() => navigate(`/clients/${item.id}`)}
+                    >
+                      Completar cadastro
+                    </Button>
+                    <DoneButton onClick={() => dismiss(`pr:${item.id}`)} />
                   </div>
                 </div>
               </div>

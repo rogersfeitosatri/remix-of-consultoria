@@ -38,6 +38,44 @@ Deno.serve(async (req) => {
     const email = respondent_email.toLowerCase().trim();
     const name = respondent_name.trim();
 
+    // Extract phone from anamnese responses (search for phone/telefone/whatsapp/celular fields)
+    const parsedResponses = typeof responses === 'string' ? JSON.parse(responses) : (responses || {});
+    let extractedPhone: string | null = null;
+    try {
+      for (const [_key, val] of Object.entries(parsedResponses)) {
+        const answer = typeof val === 'object' && val !== null && 'answer' in (val as any)
+          ? String((val as any).answer || '')
+          : String(val || '');
+        const digits = answer.replace(/\D/g, '');
+        if (digits.length >= 10 && digits.length <= 13 && /^\d+$/.test(digits)) {
+          extractedPhone = digits;
+          break;
+        }
+      }
+      if (!extractedPhone) {
+        // Try matching question IDs by fetching question texts
+        const { data: questions } = await supabaseAdmin
+          .from("anamnese_questions")
+          .select("id, question_text")
+          .eq("form_id", form_id);
+        if (questions) {
+          const phoneQuestion = questions.find(q =>
+            /telefone|whatsapp|celular|phone/i.test(q.question_text)
+          );
+          if (phoneQuestion) {
+            const val = parsedResponses[phoneQuestion.id];
+            const answer = typeof val === 'object' && val !== null && 'answer' in (val as any)
+              ? String((val as any).answer || '')
+              : String(val || '');
+            const digits = answer.replace(/\D/g, '');
+            if (digits.length >= 10) extractedPhone = digits;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not extract phone from anamnese:", e);
+    }
+
     // 1. Get form to find admin user_id
     const { data: form, error: formError } = await supabaseAdmin
       .from("anamnese_forms")
@@ -69,6 +107,14 @@ Deno.serve(async (req) => {
       // Client already exists — auto-link
       clientId = existingClients[0].id;
       console.log(`Auto-linked anamnese to existing client: ${clientId} (${existingClients[0].name})`);
+      // Update phone if client has none and we extracted one
+      if (extractedPhone) {
+        await supabaseAdmin
+          .from("clients")
+          .update({ phone: extractedPhone })
+          .eq("id", clientId)
+          .is("phone", null);
+      }
     } else {
       // Client doesn't exist — create automatically
       const today = new Date().toISOString().split("T")[0];
@@ -83,7 +129,7 @@ Deno.serve(async (req) => {
           user_id: adminUserId,
           name: name,
           email: email,
-          phone: null,
+          phone: extractedPhone,
           service_type: "nutrition",
           plan_type: "consultoria",
           start_date: today,
