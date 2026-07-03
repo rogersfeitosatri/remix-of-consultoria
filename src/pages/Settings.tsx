@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useClients, usePayments, useAddClient, Client } from '@/hooks/useClients';
-import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, Users, Lock, ExternalLink, Palette, Flag, PhoneCall, Link as LinkIcon, Activity, Network, CalendarPlus } from 'lucide-react';
+import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, Users, Lock, ExternalLink, Palette, Flag, PhoneCall, Link as LinkIcon, Activity, Network, CalendarPlus, CreditCard, Database, HardDrive, Wrench, Shield, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
@@ -46,6 +46,26 @@ const PAYMENT_TYPE_LABELS: Record<string, string> = {
   card: 'Cartão de Crédito',
 };
 
+interface CategoryDef {
+  key: string;
+  name: string;
+  description: string;
+  icon: React.ElementType;
+  itemCount: number;
+}
+
+const CATEGORIES: CategoryDef[] = [
+  { key: 'aparencia', name: 'Aparência & Layout', description: 'Personalização visual e organização do menu', icon: Palette, itemCount: 1 },
+  { key: 'notificacoes', name: 'Notificações', description: 'Controle de alertas e eventos do sistema', icon: Bell, itemCount: 1 },
+  { key: 'ia', name: 'Inteligência Artificial', description: 'Assistente automático via WhatsApp', icon: Bot, itemCount: 1 },
+  { key: 'paginas', name: 'Páginas Públicas', description: 'Landing page e link da bio', icon: ExternalLink, itemCount: 2 },
+  { key: 'onboarding', name: 'Onboarding & Pagamentos', description: 'Fluxo de novos atletas e Mercado Pago', icon: CreditCard, itemCount: 1 },
+  { key: 'dados', name: 'Dados & Importação', description: 'Exportar, importar e planilhas modelo', icon: Database, itemCount: 3 },
+  { key: 'backup', name: 'Backup & Restauração', description: 'Backup completo e restauração de dados', icon: HardDrive, itemCount: 2 },
+  { key: 'ferramentas', name: 'Ferramentas Avançadas', description: 'Varredura, migração, periodização e mais', icon: Wrench, itemCount: 5 },
+  { key: 'seguranca', name: 'Segurança', description: 'Alterar senha de acesso', icon: Shield, itemCount: 1 },
+];
+
 export default function Settings() {
   const navigate = useNavigate();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
@@ -57,6 +77,7 @@ export default function Settings() {
   const [isImporting, setIsImporting] = useState(false);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const isLoading = clientsLoading || paymentsLoading;
 
@@ -78,17 +99,17 @@ export default function Settings() {
     const clientPayments = payments
       .filter(p => p.client_id === clientId && p.status === 'paid')
       .sort((a, b) => new Date(b.paid_at || b.due_date).getTime() - new Date(a.paid_at || a.due_date).getTime());
-    
+
     return clientPayments[0] || null;
   };
 
   const handleExportCSV = () => {
     setIsExporting(true);
-    
+
     try {
       const exportData = clients.map(client => {
         const lastPayment = getLastPaymentForClient(client.id);
-        
+
         return {
           'Nome Completo': client.name,
           'E-mail': client.email || '-',
@@ -99,8 +120,8 @@ export default function Settings() {
           'Tipo de Plano': PLAN_DURATION_LABELS[client.plan_duration] || client.plan_duration || '-',
           'Data de Início': formatDate(client.start_date),
           'Data de Término': formatDate(client.end_date),
-          'Frequência de Check-in': client.has_checkin && client.checkin_frequency 
-            ? CHECKIN_LABELS[client.checkin_frequency] 
+          'Frequência de Check-in': client.has_checkin && client.checkin_frequency
+            ? CHECKIN_LABELS[client.checkin_frequency]
             : '-',
         };
       });
@@ -109,7 +130,7 @@ export default function Settings() {
       const headers = Object.keys(exportData[0] || {});
       const csvContent = [
         headers.join(','),
-        ...exportData.map(row => 
+        ...exportData.map(row =>
           headers.map(header => {
             const value = row[header as keyof typeof row] || '';
             // Escape commas and quotes in CSV
@@ -122,7 +143,7 @@ export default function Settings() {
       ].join('\n');
 
       // Download file
-      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = `atletas_export_${format(new Date(), 'yyyy-MM-dd')}.csv`;
@@ -139,11 +160,11 @@ export default function Settings() {
 
   const handleExportXLSX = () => {
     setIsExporting(true);
-    
+
     try {
       const exportData = clients.map(client => {
         const lastPayment = getLastPaymentForClient(client.id);
-        
+
         return {
           'Nome Completo': client.name,
           'E-mail': client.email || '-',
@@ -154,8 +175,8 @@ export default function Settings() {
           'Tipo de Plano': PLAN_DURATION_LABELS[client.plan_duration] || client.plan_duration || '-',
           'Data de Início': formatDate(client.start_date),
           'Data de Término': formatDate(client.end_date),
-          'Frequência de Check-in': client.has_checkin && client.checkin_frequency 
-            ? CHECKIN_LABELS[client.checkin_frequency] 
+          'Frequência de Check-in': client.has_checkin && client.checkin_frequency
+            ? CHECKIN_LABELS[client.checkin_frequency]
             : '-',
         };
       });
@@ -163,11 +184,11 @@ export default function Settings() {
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Atletas');
-      
+
       // Auto-size columns
       const maxWidth = 30;
       const colWidths = Object.keys(exportData[0] || {}).map(key => ({
-        wch: Math.min(maxWidth, Math.max(key.length, ...exportData.map(row => 
+        wch: Math.min(maxWidth, Math.max(key.length, ...exportData.map(row =>
           String(row[key as keyof typeof row] || '').length
         )))
       }));
@@ -214,7 +235,7 @@ export default function Settings() {
       const worksheet = XLSX.utils.json_to_sheet(templateData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Modelo Importação');
-      
+
       // Auto-size columns
       const headers = Object.keys(templateData[0]);
       const colWidths = headers.map(key => ({
@@ -244,7 +265,7 @@ export default function Settings() {
         { 'Instruções de Preenchimento': 'FORMATO DE DATAS: dd/mm/yyyy (ex: 15/01/2026)' },
         { 'Instruções de Preenchimento': 'CAMPOS SIM/NÃO: Use "sim" ou "não"' },
       ];
-      
+
       const instructionsSheet = XLSX.utils.json_to_sheet(instructions);
       instructionsSheet['!cols'] = [{ wch: 100 }];
       XLSX.utils.book_append_sheet(workbook, instructionsSheet, 'Instruções');
@@ -261,7 +282,7 @@ export default function Settings() {
   // Parse date from dd/mm/yyyy format
   const parseDateBR = (dateStr: string | number | null | undefined): string | null => {
     if (!dateStr) return null;
-    
+
     // If it's an Excel serial date number
     if (typeof dateStr === 'number') {
       // Excel serial date to JS Date
@@ -271,22 +292,22 @@ export default function Settings() {
       }
       return null;
     }
-    
+
     const str = String(dateStr).trim();
     if (!str) return null;
-    
+
     // Try dd/mm/yyyy format
     const parsed = parse(str, 'dd/MM/yyyy', new Date());
     if (isValid(parsed)) {
       return format(parsed, 'yyyy-MM-dd');
     }
-    
+
     // Try yyyy-mm-dd format
     const parsedISO = parseISO(str);
     if (isValid(parsedISO)) {
       return format(parsedISO, 'yyyy-MM-dd');
     }
-    
+
     return null;
   };
 
@@ -299,7 +320,7 @@ export default function Settings() {
       semiannual: 6,
       annual: 12,
     }[planDuration] || 1;
-    
+
     return format(addMonths(start, monthsToAdd), 'yyyy-MM-dd');
   };
 
@@ -477,15 +498,15 @@ export default function Settings() {
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
-      
+
       // Get the first sheet (ignore instructions sheet)
-      const sheetName = workbook.SheetNames.find(name => 
-        !name.toLowerCase().includes('instrução') && 
+      const sheetName = workbook.SheetNames.find(name =>
+        !name.toLowerCase().includes('instrução') &&
         !name.toLowerCase().includes('instrucao') &&
         !name.toLowerCase().includes('instruções') &&
         !name.toLowerCase().includes('instrucoes')
       ) || workbook.SheetNames[0];
-      
+
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
 
@@ -570,6 +591,722 @@ export default function Settings() {
     );
   }
 
+  const activeCategoryDef = CATEGORIES.find(c => c.key === activeCategory);
+
+  const renderCategoryContent = () => {
+    switch (activeCategory) {
+      case 'aparencia':
+        return (
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="layout" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <Palette className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Personalização do Layout</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Reordene o menu, oculte abas, renomeie títulos e altere logo/avatar
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <LayoutCustomizationSection />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        );
+
+      case 'notificacoes':
+        return (
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="notifications" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <Bell className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Notificações</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Escolha quais eventos você quer receber (anamnese, check-in, ajustes do mês...)
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <NotificationsSettingsSection />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        );
+
+      case 'ia':
+        return (
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="ai-whatsapp" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <Bot className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">IA Assistente WhatsApp</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Atendimento automático aos atletas via WhatsApp com base no plano deles
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <AiWhatsAppAssistantSection />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        );
+
+      case 'paginas':
+        return (
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="landing-plans" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <ExternalLink className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Landing Page - Plans</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Configure os links dos botões de WhatsApp da página /plans
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <LandingPageSettingsSection />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="link-bio" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <LinkIcon className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Link da Bio</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Configure sua página de links públicos
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <Button onClick={() => navigate('/link-bio')} variant="outline" className="gap-2">
+                  <LinkIcon className="h-4 w-4" />
+                  Gerenciar Link da Bio
+                </Button>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        );
+
+      case 'onboarding':
+        return (
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="onboarding-mp" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <SettingsIcon className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Onboarding · Mercado Pago</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Planos, links de pagamento e configurações do novo fluxo de novos atletas
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <OnboardingSettingsSection />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        );
+
+      case 'dados':
+        return (
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="export" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <FileSpreadsheet className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Exportar Dados do CRM</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Exporte uma lista completa de todos os atletas cadastrados
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-muted/50 p-4">
+                    <h4 className="font-medium text-foreground mb-2">Campos incluídos na exportação:</h4>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Nome Completo do Atleta
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        E-mail
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Telefone
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Último Valor Pago
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Tipo de Pagamento
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Data do Último Pagamento
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Tipo de Plano
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Data de Início do Plano
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Data de Término do Plano
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Frequência de Check-in
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
+                      onClick={handleExportCSV}
+                      disabled={isExporting || clients.length === 0}
+                      className="gap-2"
+                      variant="outline"
+                    >
+                      {isExporting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                      Exportar CSV
+                    </Button>
+                    <Button
+                      onClick={handleExportXLSX}
+                      disabled={isExporting || clients.length === 0}
+                      className="gap-2"
+                    >
+                      {isExporting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileSpreadsheet className="h-4 w-4" />
+                      )}
+                      Exportar Excel (.xlsx)
+                    </Button>
+                  </div>
+
+                  {clients.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum atleta cadastrado para exportar.
+                    </p>
+                  )}
+
+                  {clients.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Total de {clients.length} atleta{clients.length !== 1 ? 's' : ''} será{clients.length !== 1 ? 'ão' : ''} exportado{clients.length !== 1 ? 's' : ''}.
+                    </p>
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="template" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <FileDown className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Planilha Modelo para Importação</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Baixe uma planilha modelo Excel para preencher e importar dados de atletas
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-muted/50 p-4">
+                    <h4 className="font-medium text-foreground mb-2">Campos incluídos no modelo:</h4>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm text-muted-foreground">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Nome Completo
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        E-mail
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Telefone
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Valor Pago (R$)
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Tipo de Pagamento
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Data de Pagamento
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Tipo de Serviço
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Tipo de Plano
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Duração do Plano
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Possui Check-in
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Frequência Check-in
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Data de Início
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Data de Término
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Possui Consultas
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Qtd. de Consultas
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Periodicidade Consultas
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Data da 1ª Consulta
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Atleta Ativo
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Observações
+                      </li>
+                    </ul>
+                  </div>
+
+                  <Button
+                    onClick={handleDownloadTemplate}
+                    className="gap-2"
+                    variant="outline"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Baixar Planilha Modelo (.xlsx)
+                  </Button>
+
+                  <p className="text-sm text-muted-foreground">
+                    A planilha inclui uma aba com instruções detalhadas de preenchimento.
+                  </p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="import" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <Upload className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Importar Atletas</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Importe atletas em massa usando a planilha modelo preenchida
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-muted/50 p-4">
+                    <h4 className="font-medium text-foreground mb-2">Como importar:</h4>
+                    <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                      <li>Baixe a planilha modelo acima</li>
+                      <li>Preencha os dados dos atletas seguindo as instruções</li>
+                      <li>Salve o arquivo e faça o upload abaixo</li>
+                    </ol>
+                  </div>
+
+                  {importErrors.length > 0 && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <div className="font-medium mb-2">Erros encontrados na planilha:</div>
+                        <ul className="list-disc list-inside space-y-1 text-sm max-h-40 overflow-y-auto">
+                          {importErrors.map((error, index) => (
+                            <li key={index}>{error}</li>
+                          ))}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImportFile}
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                  />
+
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isImporting}
+                    className="gap-2"
+                  >
+                    {isImporting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    {isImporting ? 'Importando...' : 'Selecionar Planilha para Importar'}
+                  </Button>
+
+                  <p className="text-sm text-muted-foreground">
+                    Formatos aceitos: .xlsx, .xls
+                  </p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        );
+
+      case 'backup':
+        return (
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="backup" className="border border-primary/30 rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <FileDown className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Backup Completo do Sistema</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Exporte todos os dados do sistema para backup
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-muted/50 p-4">
+                    <h4 className="font-medium text-foreground mb-2">Dados incluídos no backup:</h4>
+                    <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm text-muted-foreground">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Atletas
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Pagamentos
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Perfis de Atleta
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Check-ins
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Anamneses
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Agendamentos
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Consultas
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Materiais de Suporte
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-success" />
+                        Contas a Pagar
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
+                      onClick={async () => {
+                        try {
+                          const { exportFullBackup } = await import('@/hooks/useBackup');
+                          await exportFullBackup();
+                          toast.success('Backup exportado com sucesso!');
+                        } catch (error) {
+                          toast.error('Erro ao exportar backup');
+                          console.error(error);
+                        }
+                      }}
+                      className="gap-2"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Baixar Backup Completo
+                    </Button>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="restore" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <Upload className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Restaurar Backup</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Restaure dados a partir de um arquivo de backup (.xlsx)
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <div className="space-y-4">
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>Atenção:</strong> Esta função irá adicionar novos registros ao sistema.
+                      Dados existentes não serão sobrescritos. Use com cuidado.
+                    </AlertDescription>
+                  </Alert>
+
+                  <input
+                    type="file"
+                    id="backup-file-input"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      try {
+                        const { importFullBackup } = await import('@/hooks/useBackup');
+                        const results = await importFullBackup(file);
+                        const totalImported = results.reduce((sum, r) => sum + r.count, 0);
+                        toast.success(`Backup restaurado! ${totalImported} registros importados.`);
+                      } catch (error) {
+                        toast.error('Erro ao restaurar backup');
+                        console.error(error);
+                      } finally {
+                        e.target.value = '';
+                      }
+                    }}
+                    accept=".xlsx"
+                    className="hidden"
+                  />
+
+                  <Button
+                    variant="outline"
+                    onClick={() => document.getElementById('backup-file-input')?.click()}
+                    className="gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Selecionar Arquivo de Backup
+                  </Button>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        );
+
+      case 'ferramentas':
+        return (
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="scan-races" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <Flag className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Varredura de Provas Alvo</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Escaneia anamneses preenchidas e preenche automaticamente a prova alvo dos atletas
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <ScanAnamneseTargetRaces />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="migration" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <Users className="h-5 w-5 text-amber-500 shrink-0" />
+                  <div>
+                    <div className="font-semibold">Modo de Migração</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Configuração temporária para atletas em continuação
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <div className="space-y-4">
+                  <Alert className="border-amber-500/30 bg-amber-500/5">
+                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                    <AlertDescription>
+                      <strong>Funcionalidade temporária:</strong> Use para migrar atletas que já estavam em acompanhamento.
+                      Quando desativado, a opção "Continuação" não aparece mais no cadastro.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <Label htmlFor="continuationMode" className="font-medium">
+                        Habilitar modo de continuação
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Permite cadastrar atletas como "Continuação (migração)" no formulário
+                      </p>
+                    </div>
+                    <Switch
+                      id="continuationMode"
+                      checked={adminSettings?.enable_continuation_mode ?? true}
+                      onCheckedChange={handleToggleContinuationMode}
+                      disabled={saveAdminSettings.isPending}
+                    />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="periodization" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <Activity className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Periodização Nutricional</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Planejamento e controle de periodização dos atletas
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <Button onClick={() => navigate('/periodization')} variant="outline" className="gap-2">
+                  <Activity className="h-4 w-4" />
+                  Acessar Periodização
+                </Button>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="metabolic" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <Network className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Interconexão Metabólica</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Análise de interconexão metabólica dos atletas
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <Button onClick={() => navigate('/metabolic-web')} variant="outline" className="gap-2">
+                  <Network className="h-4 w-4" />
+                  Acessar Interconexão Metabólica
+                </Button>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="calls" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <PhoneCall className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Calls Estratégicas</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Gerencie formulários de call e links de agendamento
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <div className="flex flex-wrap gap-3">
+                  <Button onClick={() => navigate('/calls')} variant="outline" className="gap-2">
+                    <PhoneCall className="h-4 w-4" />
+                    Formulários de Call
+                  </Button>
+                  <Button onClick={() => navigate('/scheduling-links')} variant="outline" className="gap-2">
+                    <CalendarPlus className="h-4 w-4" />
+                    Agendamento de Call
+                  </Button>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        );
+
+      case 'seguranca':
+        return (
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="password" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <Lock className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Alterar Senha</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Atualize sua senha de acesso ao sistema
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <ChangePasswordForm />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6">
@@ -584,686 +1321,56 @@ export default function Settings() {
           </p>
         </div>
 
-        {/* Accordion for all sections */}
-        <Accordion type="single" collapsible className="space-y-4">
-          {/* Layout Customization - First item */}
-          <AccordionItem value="layout" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <Palette className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Personalização do Layout</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Reordene o menu, oculte abas, renomeie títulos e altere logo/avatar
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <LayoutCustomizationSection />
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Notificações */}
-          <AccordionItem value="notifications" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <Bell className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Notificações</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Escolha quais eventos você quer receber (anamnese, check-in, ajustes do mês…)
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <NotificationsSettingsSection />
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* IA WhatsApp Assistente */}
-          <AccordionItem value="ai-whatsapp" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <Bot className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">IA Assistente WhatsApp</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Atendimento automático aos atletas via WhatsApp com base no plano deles
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <AiWhatsAppAssistantSection />
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Export Card */}
-          <AccordionItem value="export" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <FileSpreadsheet className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Exportar Dados do CRM</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Exporte uma lista completa de todos os atletas cadastrados
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <div className="space-y-4">
-                <div className="rounded-lg bg-muted/50 p-4">
-                  <h4 className="font-medium text-foreground mb-2">Campos incluídos na exportação:</h4>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Nome Completo do Atleta
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      E-mail
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Telefone
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Último Valor Pago
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Tipo de Pagamento
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Data do Último Pagamento
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Tipo de Plano
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Data de Início do Plano
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Data de Término do Plano
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Frequência de Check-in
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button 
-                    onClick={handleExportCSV} 
-                    disabled={isExporting || clients.length === 0}
-                    className="gap-2"
-                    variant="outline"
-                  >
-                    {isExporting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    Exportar CSV
-                  </Button>
-                  <Button 
-                    onClick={handleExportXLSX} 
-                    disabled={isExporting || clients.length === 0}
-                    className="gap-2"
-                  >
-                    {isExporting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <FileSpreadsheet className="h-4 w-4" />
-                    )}
-                    Exportar Excel (.xlsx)
-                  </Button>
-                </div>
-
-                {clients.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum atleta cadastrado para exportar.
-                  </p>
-                )}
-
-                {clients.length > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Total de {clients.length} atleta{clients.length !== 1 ? 's' : ''} será{clients.length !== 1 ? 'ão' : ''} exportado{clients.length !== 1 ? 's' : ''}.
-                  </p>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Template Download */}
-          <AccordionItem value="template" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <FileDown className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Planilha Modelo para Importação</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Baixe uma planilha modelo Excel para preencher e importar dados de atletas
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <div className="space-y-4">
-                <div className="rounded-lg bg-muted/50 p-4">
-                  <h4 className="font-medium text-foreground mb-2">Campos incluídos no modelo:</h4>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm text-muted-foreground">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Nome Completo
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      E-mail
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Telefone
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Valor Pago (R$)
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Tipo de Pagamento
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Data de Pagamento
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Tipo de Serviço
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Tipo de Plano
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Duração do Plano
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Possui Check-in
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Frequência Check-in
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Data de Início
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Data de Término
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Possui Consultas
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Qtd. de Consultas
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Periodicidade Consultas
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Data da 1ª Consulta
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Atleta Ativo
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Observações
-                    </li>
-                  </ul>
-                </div>
-
-                <Button 
-                  onClick={handleDownloadTemplate} 
-                  className="gap-2"
-                  variant="outline"
+        {activeCategory === null ? (
+          /* Gallery View */
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <div
+                  key={cat.key}
+                  onClick={() => setActiveCategory(cat.key)}
+                  className="cursor-pointer rounded-xl border border-border bg-card p-5 hover:border-primary/50 transition-all hover:shadow-md"
                 >
-                  <FileDown className="h-4 w-4" />
-                  Baixar Planilha Modelo (.xlsx)
-                </Button>
-
-                <p className="text-sm text-muted-foreground">
-                  A planilha inclui uma aba com instruções detalhadas de preenchimento.
-                </p>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Import Athletes */}
-          <AccordionItem value="import" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <Upload className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Importar Atletas</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Importe atletas em massa usando a planilha modelo preenchida
+                  <div className="flex items-start gap-4">
+                    <div className="rounded-lg bg-primary/10 p-2.5 shrink-0">
+                      <Icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-foreground">{cat.name}</div>
+                      <div className="text-sm text-muted-foreground mt-0.5">{cat.description}</div>
+                      <div className="text-xs text-muted-foreground mt-2">
+                        {cat.itemCount} {cat.itemCount === 1 ? 'item' : 'itens'}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <div className="space-y-4">
-                <div className="rounded-lg bg-muted/50 p-4">
-                  <h4 className="font-medium text-foreground mb-2">Como importar:</h4>
-                  <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-                    <li>Baixe a planilha modelo acima</li>
-                    <li>Preencha os dados dos atletas seguindo as instruções</li>
-                    <li>Salve o arquivo e faça o upload abaixo</li>
-                  </ol>
+              );
+            })}
+          </div>
+        ) : (
+          /* Category Detail View */
+          <div className="space-y-4">
+            <button
+              onClick={() => setActiveCategory(null)}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para categorias
+            </button>
+
+            {activeCategoryDef && (
+              <div className="flex items-center gap-3 mb-2">
+                <div className="rounded-lg bg-primary/10 p-2.5">
+                  <activeCategoryDef.icon className="h-5 w-5 text-primary" />
                 </div>
-
-                {importErrors.length > 0 && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      <div className="font-medium mb-2">Erros encontrados na planilha:</div>
-                      <ul className="list-disc list-inside space-y-1 text-sm max-h-40 overflow-y-auto">
-                        {importErrors.map((error, index) => (
-                          <li key={index}>{error}</li>
-                        ))}
-                      </ul>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImportFile}
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                />
-
-                <Button 
-                  onClick={() => fileInputRef.current?.click()} 
-                  disabled={isImporting}
-                  className="gap-2"
-                >
-                  {isImporting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  {isImporting ? 'Importando...' : 'Selecionar Planilha para Importar'}
-                </Button>
-
-                <p className="text-sm text-muted-foreground">
-                  Formatos aceitos: .xlsx, .xls
-                </p>
+                <h2 className="text-xl font-semibold text-foreground">{activeCategoryDef.name}</h2>
               </div>
-            </AccordionContent>
-          </AccordionItem>
+            )}
 
-          {/* Scan Anamnese Target Races */}
-          <AccordionItem value="scan-races" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <Flag className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Varredura de Provas Alvo</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Escaneia anamneses preenchidas e preenche automaticamente a prova alvo dos atletas
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <ScanAnamneseTargetRaces />
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem value="backup" className="border border-primary/30 rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <FileDown className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Backup Completo do Sistema</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Exporte todos os dados do sistema para backup
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <div className="space-y-4">
-                <div className="rounded-lg bg-muted/50 p-4">
-                  <h4 className="font-medium text-foreground mb-2">Dados incluídos no backup:</h4>
-                  <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm text-muted-foreground">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Atletas
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Pagamentos
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Perfis de Atleta
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Check-ins
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Anamneses
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Agendamentos
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Consultas
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Materiais de Suporte
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-success" />
-                      Contas a Pagar
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button 
-                    onClick={async () => {
-                      try {
-                        const { exportFullBackup } = await import('@/hooks/useBackup');
-                        await exportFullBackup();
-                        toast.success('Backup exportado com sucesso!');
-                      } catch (error) {
-                        toast.error('Erro ao exportar backup');
-                        console.error(error);
-                      }
-                    }}
-                    className="gap-2"
-                  >
-                    <FileDown className="h-4 w-4" />
-                    Baixar Backup Completo
-                  </Button>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Migration Mode Toggle */}
-          <AccordionItem value="migration" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <Users className="h-5 w-5 text-amber-500 shrink-0" />
-                <div>
-                  <div className="font-semibold">Modo de Migração</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Configuração temporária para atletas em continuação
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <div className="space-y-4">
-                <Alert className="border-amber-500/30 bg-amber-500/5">
-                  <AlertCircle className="h-4 w-4 text-amber-500" />
-                  <AlertDescription>
-                    <strong>Funcionalidade temporária:</strong> Use para migrar atletas que já estavam em acompanhamento. 
-                    Quando desativado, a opção "Continuação" não aparece mais no cadastro.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <Label htmlFor="continuationMode" className="font-medium">
-                      Habilitar modo de continuação
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Permite cadastrar atletas como "Continuação (migração)" no formulário
-                    </p>
-                  </div>
-                  <Switch
-                    id="continuationMode"
-                    checked={adminSettings?.enable_continuation_mode ?? true}
-                    onCheckedChange={handleToggleContinuationMode}
-                    disabled={saveAdminSettings.isPending}
-                  />
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Restore Backup Card */}
-          <AccordionItem value="restore" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <Upload className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Restaurar Backup</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Restaure dados a partir de um arquivo de backup (.xlsx)
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <div className="space-y-4">
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Atenção:</strong> Esta função irá adicionar novos registros ao sistema. 
-                    Dados existentes não serão sobrescritos. Use com cuidado.
-                  </AlertDescription>
-                </Alert>
-
-                <input
-                  type="file"
-                  id="backup-file-input"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    
-                    try {
-                      const { importFullBackup } = await import('@/hooks/useBackup');
-                      const results = await importFullBackup(file);
-                      const totalImported = results.reduce((sum, r) => sum + r.count, 0);
-                      toast.success(`Backup restaurado! ${totalImported} registros importados.`);
-                    } catch (error) {
-                      toast.error('Erro ao restaurar backup');
-                      console.error(error);
-                    } finally {
-                      e.target.value = '';
-                    }
-                  }}
-                  accept=".xlsx"
-                  className="hidden"
-                />
-
-                <Button 
-                  variant="outline"
-                  onClick={() => document.getElementById('backup-file-input')?.click()}
-                  className="gap-2"
-                >
-                  <Upload className="h-4 w-4" />
-                  Selecionar Arquivo de Backup
-                </Button>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-
-          {/* Landing Page Plans */}
-          <AccordionItem value="landing-plans" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <ExternalLink className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Landing Page - Plans</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Configure os links dos botões de WhatsApp da página /plans
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <LandingPageSettingsSection />
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Onboarding · Mercado Pago */}
-          <AccordionItem value="onboarding-mp" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <SettingsIcon className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Onboarding · Mercado Pago</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Planos, links de pagamento e configurações do novo fluxo de novos atletas
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <OnboardingSettingsSection />
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Change Password */}
-          <AccordionItem value="password" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <Lock className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Alterar Senha</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Atualize sua senha de acesso ao sistema
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <ChangePasswordForm />
-            </AccordionContent>
-          </AccordionItem>
-          {/* Strategic Calls */}
-          <AccordionItem value="calls" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <PhoneCall className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Calls Estratégicas</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Gerencie formulários de call e links de agendamento
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={() => navigate('/calls')} variant="outline" className="gap-2">
-                  <PhoneCall className="h-4 w-4" />
-                  Formulários de Call
-                </Button>
-                <Button onClick={() => navigate('/scheduling-links')} variant="outline" className="gap-2">
-                  <CalendarPlus className="h-4 w-4" />
-                  Agendamento de Call
-                </Button>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Link da Bio */}
-          <AccordionItem value="link-bio" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <LinkIcon className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Link da Bio</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Configure sua página de links públicos
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <Button onClick={() => navigate('/link-bio')} variant="outline" className="gap-2">
-                <LinkIcon className="h-4 w-4" />
-                Gerenciar Link da Bio
-              </Button>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Periodização */}
-          <AccordionItem value="periodization" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <Activity className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Periodização Nutricional</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Planejamento e controle de periodização dos atletas
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <Button onClick={() => navigate('/periodization')} variant="outline" className="gap-2">
-                <Activity className="h-4 w-4" />
-                Acessar Periodização
-              </Button>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Interconexão Metabólica */}
-          <AccordionItem value="metabolic" className="border border-border rounded-lg bg-card px-4">
-            <AccordionTrigger className="hover:no-underline py-4">
-              <div className="flex items-center gap-2 text-left">
-                <Network className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-semibold">Interconexão Metabólica</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    Análise de interconexão metabólica dos atletas
-                  </div>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pb-4">
-              <Button onClick={() => navigate('/metabolic-web')} variant="outline" className="gap-2">
-                <Network className="h-4 w-4" />
-                Acessar Interconexão Metabólica
-              </Button>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+            {renderCategoryContent()}
+          </div>
+        )}
       </div>
     </Layout>
   );
