@@ -29,7 +29,7 @@ function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
-export default function EditableMealPlan({ analysis, clientId, onUpdated }: EditableMealPlanProps) {
+export function EditableMealPlan({ analysis, clientId, onUpdated }: EditableMealPlanProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -310,62 +310,38 @@ export default function EditableMealPlan({ analysis, clientId, onUpdated }: Edit
               Totais Diarios Aproximados
             </h4>
             {isEditing ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">Calorias (kcal)</label>
-                  <Input
-                    type="number"
-                    value={dailyTotals?.kcal ?? ''}
-                    onChange={(e) => updateDailyTotal('kcal', e.target.value)}
-                    className="text-sm"
-                  />
+                  <Input type="number" value={dailyTotals?.kcal ?? ''} onChange={(e) => updateDailyTotal('kcal', e.target.value)} className="text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">kcal/kg</label>
+                  <Input type="number" step="0.1" value={dailyTotals?.kcal_kg ?? ''} onChange={(e) => updateDailyTotal('kcal_kg', e.target.value)} className="text-sm" />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">CHO (g)</label>
-                  <Input
-                    type="number"
-                    value={dailyTotals?.cho_g ?? ''}
-                    onChange={(e) => updateDailyTotal('cho_g', e.target.value)}
-                    className="text-sm"
-                  />
+                  <Input type="number" value={dailyTotals?.cho_g ?? ''} onChange={(e) => updateDailyTotal('cho_g', e.target.value)} className="text-sm" />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">CHO (g/kg)</label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={dailyTotals?.cho_gkg ?? ''}
-                    onChange={(e) => updateDailyTotal('cho_gkg', e.target.value)}
-                    className="text-sm"
-                  />
+                  <Input type="number" step="0.1" value={dailyTotals?.cho_gkg ?? ''} onChange={(e) => updateDailyTotal('cho_gkg', e.target.value)} className="text-sm" />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">PTN (g)</label>
-                  <Input
-                    type="number"
-                    value={dailyTotals?.protein_g ?? ''}
-                    onChange={(e) => updateDailyTotal('protein_g', e.target.value)}
-                    className="text-sm"
-                  />
+                  <Input type="number" value={dailyTotals?.protein_g ?? ''} onChange={(e) => updateDailyTotal('protein_g', e.target.value)} className="text-sm" />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">PTN (g/kg)</label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={dailyTotals?.protein_gkg ?? ''}
-                    onChange={(e) => updateDailyTotal('protein_gkg', e.target.value)}
-                    className="text-sm"
-                  />
+                  <Input type="number" step="0.1" value={dailyTotals?.protein_gkg ?? ''} onChange={(e) => updateDailyTotal('protein_gkg', e.target.value)} className="text-sm" />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground block mb-1">LIP (g)</label>
-                  <Input
-                    type="number"
-                    value={dailyTotals?.fat_g ?? ''}
-                    onChange={(e) => updateDailyTotal('fat_g', e.target.value)}
-                    className="text-sm"
-                  />
+                  <Input type="number" value={dailyTotals?.fat_g ?? ''} onChange={(e) => updateDailyTotal('fat_g', e.target.value)} className="text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">LIP (g/kg)</label>
+                  <Input type="number" step="0.1" value={dailyTotals?.fat_gkg ?? ''} onChange={(e) => updateDailyTotal('fat_gkg', e.target.value)} className="text-sm" />
                 </div>
               </div>
             ) : (
@@ -373,20 +349,22 @@ export default function EditableMealPlan({ analysis, clientId, onUpdated }: Edit
                 <div>
                   <span className="text-muted-foreground">Calorias:</span>{' '}
                   <span className="font-semibold">~{dailyTotals.kcal} kcal</span>
+                  {dailyTotals.kcal_kg && <span className="text-xs text-muted-foreground ml-1">({dailyTotals.kcal_kg} kcal/kg)</span>}
                 </div>
                 <div>
                   <span className="text-muted-foreground">CHO:</span>{' '}
-                  <span className="font-semibold">
-                    ~{dailyTotals.cho_g}g ({dailyTotals.cho_gkg} g/kg)
-                  </span>
+                  <span className="font-semibold">~{dailyTotals.cho_g}g</span>
+                  {dailyTotals.cho_gkg && <span className="text-xs text-muted-foreground ml-1">({dailyTotals.cho_gkg} g/kg)</span>}
                 </div>
                 <div>
                   <span className="text-muted-foreground">PTN:</span>{' '}
                   <span className="font-semibold">~{dailyTotals.protein_g}g</span>
+                  {dailyTotals.protein_gkg && <span className="text-xs text-muted-foreground ml-1">({dailyTotals.protein_gkg} g/kg)</span>}
                 </div>
                 <div>
                   <span className="text-muted-foreground">LIP:</span>{' '}
                   <span className="font-semibold">~{dailyTotals.fat_g}g</span>
+                  {dailyTotals.fat_gkg && <span className="text-xs text-muted-foreground ml-1">({dailyTotals.fat_gkg} g/kg)</span>}
                 </div>
               </div>
             )}
