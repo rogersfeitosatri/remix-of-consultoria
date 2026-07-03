@@ -24,6 +24,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { formatStructuredAnswer } from '@/lib/formatAnamneseAnswer';
+import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 
 interface AnamneseQuestion {
   id: string;
@@ -914,57 +915,16 @@ export default function AnamneseResponseDetail() {
                   </Card>
                 )}
 
-                {/* 4. PLANO ALIMENTAR */}
-                {structuredAnalysis.meal_plan?.meals && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Utensils className="h-4 w-4 text-primary" />
-                        4. Plano Alimentar Estruturado
-                      </CardTitle>
-                      <CardDescription>Baseado nos alimentos que o atleta já consome</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {structuredAnalysis.meal_plan.meals.map((meal: any, i: number) => (
-                          <div key={i} className="p-4 rounded-lg border bg-card">
-                            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                              <UtensilsCrossed className="h-3.5 w-3.5 text-primary" />
-                              {meal.meal_name}
-                            </h4>
-                            <div className="space-y-1.5">
-                              {(meal.food_groups || []).map((fg: any, j: number) => (
-                                <div key={j} className="flex gap-2 text-sm">
-                                  <span className="font-medium text-primary min-w-[90px]">{fg.group}:</span>
-                                  <span className="text-muted-foreground">{fg.options}</span>
-                                </div>
-                              ))}
-                            </div>
-                            {meal.meal_macros && (
-                              <p className="text-xs text-green-600 mt-2 font-medium">📊 {meal.meal_macros}</p>
-                            )}
-                            {meal.timing_note && (
-                              <p className="text-xs text-muted-foreground mt-1 italic">⏰ {meal.timing_note}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      {structuredAnalysis.meal_plan.daily_totals && (
-                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                          <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                            <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                            Totais Diários Aproximados
-                          </h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                            <div><span className="text-muted-foreground">Calorias:</span> <span className="font-semibold">~{structuredAnalysis.meal_plan.daily_totals.kcal} kcal</span></div>
-                            <div><span className="text-muted-foreground">CHO:</span> <span className="font-semibold">~{structuredAnalysis.meal_plan.daily_totals.cho_g}g ({structuredAnalysis.meal_plan.daily_totals.cho_gkg} g/kg)</span></div>
-                            <div><span className="text-muted-foreground">PTN:</span> <span className="font-semibold">~{structuredAnalysis.meal_plan.daily_totals.protein_g}g</span></div>
-                            <div><span className="text-muted-foreground">LIP:</span> <span className="font-semibold">~{structuredAnalysis.meal_plan.daily_totals.fat_g}g</span></div>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                {/* 4. PLANO ALIMENTAR (Editável) */}
+                {structuredAnalysis.meal_plan?.meals && responseData?.client_id && (
+                  <EditableMealPlan
+                    analysis={structuredAnalysis}
+                    clientId={responseData.client_id}
+                    onUpdated={() => {
+                      queryClient.invalidateQueries({ queryKey: ['ai_analysis', responseData?.client_id] });
+                      queryClient.invalidateQueries({ queryKey: ['anamnese_response_detail', responseId] });
+                    }}
+                  />
                 )}
 
                 {/* 5. ORIENTAÇÕES ESTRATÉGICAS */}
