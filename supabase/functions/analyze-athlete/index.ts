@@ -61,10 +61,27 @@ Deno.serve(async (req) => {
 
     const prompt = buildAnalysisPrompt(profile, client, anamneseResponses, anamneseQuestions, adminGuidance);
 
+    // Try to load custom prompt from ai_prompts table
+    let systemPrompt = SYSTEM_PROMPT;
+    try {
+      const { data: customPrompt } = await supabase
+        .from('ai_prompts')
+        .select('prompt_text')
+        .eq('user_id', client.user_id)
+        .eq('context_key', 'meal_plan_generation')
+        .maybeSingle();
+      if (customPrompt?.prompt_text?.trim()) {
+        systemPrompt = customPrompt.prompt_text;
+        console.log('Using custom AI prompt from ai_prompts table');
+      }
+    } catch (e) {
+      console.warn('Could not fetch custom AI prompt, using default:', e);
+    }
+
     console.log('Sending request to Gemini (with fallback)...');
 
     const { data: analysisData, provider, model } = await callAiStructured({
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt,
       userPrompt: prompt,
       toolName: 'submit_athlete_analysis',
       toolDescription: 'Submit the complete structured nutritional analysis for the athlete',

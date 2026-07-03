@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       .select(`
         *,
         checkin_forms (title, description),
-        clients (id, name, email)
+        clients (id, name, email, user_id)
       `)
       .eq('id', checkinResponseId)
       .single();
@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
 
     console.log('Sending request to Gemini (with fallback)...');
 
-    const CHECKIN_SYSTEM_PROMPT = `Você é um nutricionista esportivo funcional especializado em corredores, baseando suas análises no Tratado de Nutrição Esportiva Funcional (Paschoal & Naves).
+    const DEFAULT_CHECKIN_PROMPT = `Você é um nutricionista esportivo funcional especializado em corredores, baseando suas análises no Tratado de Nutrição Esportiva Funcional (Paschoal & Naves).
 
 ## BASE DE CONHECIMENTO
 Princípios: Individualidade bioquímica, Teia de Interconexões Metabólicas (8 sistemas: Assimilação, Defesa/Reparo, Energia, Biotransformação, Transporte, Comunicação, Integridade Estrutural, Mental/Emocional), Sistema ATMS.
@@ -133,8 +133,28 @@ IMPORTANTE:
 - Nunca invente informações que não estão nos dados
 - Foque no essencial para o momento do atleta`;
 
+    // Try to load custom prompt from ai_prompts table
+    let checkinSystemPrompt = DEFAULT_CHECKIN_PROMPT;
+    try {
+      const adminUserId = (checkinResponse.clients as any)?.user_id;
+      if (adminUserId) {
+        const { data: customPrompt } = await supabase
+          .from('ai_prompts')
+          .select('prompt_text')
+          .eq('user_id', adminUserId)
+          .eq('context_key', 'checkin_analysis')
+          .maybeSingle();
+        if (customPrompt?.prompt_text?.trim()) {
+          checkinSystemPrompt = customPrompt.prompt_text;
+          console.log('Using custom AI prompt from ai_prompts table');
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch custom AI prompt, using default:', e);
+    }
+
     const { data: analysisData, provider, model } = await callAiJson({
-      systemPrompt: CHECKIN_SYSTEM_PROMPT,
+      systemPrompt: checkinSystemPrompt,
       userPrompt: prompt,
       maxTokens: 2000,
       fallback: 'openai-gpt4o',
