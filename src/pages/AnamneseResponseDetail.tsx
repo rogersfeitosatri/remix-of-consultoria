@@ -381,57 +381,141 @@ export default function AnamneseResponseDetail() {
         addSpace(6);
       }
 
-      // 4. Meal plan
+      // 4. Meal plan — redesigned for clarity
       if (sa.meal_plan?.meals) {
         addSectionHeader('4. Plano Alimentar');
+
         for (const meal of sa.meal_plan.meals) {
-          ensureSpace(14);
-          // Meal name pill
-          doc.setFillColor(245, 248, 245);
-          doc.setDrawColor(210, 225, 210);
-          const pillH = 8;
-          doc.roundedRect(margin, y - 1, maxWidth, pillH, 1.5, 1.5, 'FD');
+          // Meal header — bold bar
+          ensureSpace(20);
+          const headerH = 10;
+          doc.setFillColor(30, 80, 60);
+          doc.roundedRect(margin, y, maxWidth, headerH, 2, 2, 'F');
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10.5);
-          doc.setTextColor(30, 80, 60);
-          doc.text(clean(meal.meal_name), margin + 3, y + 5);
-          y += pillH + 3;
-          for (const fg of meal.food_groups || []) {
-            addText(`${fg.group}: ${fg.options}`, 9.5, false, [40, 40, 40], { indent: 4 });
+          doc.setFontSize(11);
+          doc.setTextColor(255, 255, 255);
+          doc.text(clean(meal.meal_name).toUpperCase(), margin + 5, y + 7);
+          if (meal.timing_note) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            const tw = doc.getTextWidth(clean(meal.timing_note));
+            doc.text(clean(meal.timing_note), pageWidth - margin - 5 - tw, y + 7);
           }
-          if (meal.meal_macros) addText(`Macros: ${meal.meal_macros}`, 8.5, true, [60, 120, 70], { indent: 4 });
-          if (meal.timing_note) addText(`Timing: ${meal.timing_note}`, 8.5, false, [110, 110, 110], { indent: 4 });
-          addSpace(4);
+          y += headerH + 4;
+
+          // Food groups as structured rows
+          for (const fg of meal.food_groups || []) {
+            ensureSpace(12);
+            // Group label
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(30, 80, 60);
+            doc.text(clean(fg.group), margin + 4, y);
+
+            // Options — split by "ou" for readability, each on its own line
+            const optionsText = clean(fg.options);
+            const optionItems = optionsText.split(/\s+ou\s+/i);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(40, 40, 40);
+
+            if (optionItems.length > 1) {
+              y += 5;
+              for (let oi = 0; oi < optionItems.length; oi++) {
+                const bullet = oi === 0 ? '' : 'ou  ';
+                const lines = doc.splitTextToSize(`${bullet}${optionItems[oi].trim()}`, maxWidth - 16);
+                for (const line of lines) {
+                  ensureSpace(5);
+                  doc.text(line, margin + 14, y);
+                  y += 4.8;
+                }
+              }
+            } else {
+              const lines = doc.splitTextToSize(optionsText, maxWidth - 50);
+              const labelW = doc.getTextWidth(clean(fg.group)) + 8;
+              if (lines.length === 1 && doc.getTextWidth(optionsText) < maxWidth - labelW - 10) {
+                doc.text(optionsText, margin + 4 + labelW, y);
+                y += 5;
+              } else {
+                y += 5;
+                for (const line of lines) {
+                  ensureSpace(5);
+                  doc.text(line, margin + 14, y);
+                  y += 4.8;
+                }
+              }
+            }
+            y += 1;
+          }
+
+          // Meal macros summary
+          if (meal.meal_macros) {
+            ensureSpace(8);
+            doc.setFillColor(240, 248, 240);
+            doc.setDrawColor(200, 220, 200);
+            const macroLines = doc.splitTextToSize(clean(meal.meal_macros), maxWidth - 14);
+            const mh = macroLines.length * 4.5 + 4;
+            doc.roundedRect(margin + 4, y, maxWidth - 8, mh, 1.5, 1.5, 'FD');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(8.5);
+            doc.setTextColor(50, 110, 60);
+            doc.text(macroLines, margin + 8, y + 4);
+            y += mh + 2;
+          }
+
+          y += 5;
         }
+
+        // Daily totals — prominent summary box
         if (sa.meal_plan.daily_totals) {
-          addSpace(2);
-          ensureSpace(28);
-          // Totals box
-          const boxH = 22;
-          doc.setFillColor(245, 250, 247);
-          doc.setDrawColor(180, 210, 190);
-          doc.roundedRect(margin, y, maxWidth, boxH, 2, 2, 'FD');
+          const dt = sa.meal_plan.daily_totals;
+          ensureSpace(40);
+          addSpace(4);
+
+          // Title bar
+          doc.setFillColor(30, 80, 60);
+          doc.roundedRect(margin, y, maxWidth, 9, 2, 2, 'F');
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(10);
-          doc.setTextColor(30, 80, 60);
-          doc.text('TOTAIS DIÁRIOS APROXIMADOS', margin + 4, y + 6);
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(9);
-          doc.setTextColor(50, 50, 50);
-          const dt = sa.meal_plan.daily_totals;
-          const totals = [
-            `kcal: ~${dt.kcal}`,
-            `CHO: ~${dt.cho_g}g (${dt.cho_gkg} g/kg)`,
-            `PTN: ~${dt.protein_g}g${dt.protein_gkg ? ` (${dt.protein_gkg} g/kg)` : ''}`,
-            `LIP: ~${dt.fat_g}g`,
+          doc.setTextColor(255, 255, 255);
+          doc.text('RESUMO NUTRICIONAL DIARIO', margin + 5, y + 6.5);
+          y += 12;
+
+          // Macro cards in a row
+          const cardCount = 4;
+          const cardGap = 4;
+          const cardW = (maxWidth - cardGap * (cardCount - 1)) / cardCount;
+          const cardH = 24;
+
+          const macroCards = [
+            { label: 'CALORIAS', value: `${dt.kcal}`, sub: dt.kcal_kg ? `${dt.kcal_kg} kcal/kg` : '', fill: [255, 248, 235] as [number, number, number], border: [230, 190, 100] as [number, number, number], color: [180, 110, 20] as [number, number, number] },
+            { label: 'CARBOIDRATO', value: `${dt.cho_g}g`, sub: `${dt.cho_gkg} g/kg`, fill: [240, 248, 255] as [number, number, number], border: [150, 190, 230] as [number, number, number], color: [50, 100, 170] as [number, number, number] },
+            { label: 'PROTEINA', value: `${dt.protein_g}g`, sub: dt.protein_gkg ? `${dt.protein_gkg} g/kg` : '', fill: [245, 240, 250] as [number, number, number], border: [180, 150, 210] as [number, number, number], color: [120, 70, 160] as [number, number, number] },
+            { label: 'GORDURA', value: `${dt.fat_g}g`, sub: dt.fat_gkg ? `${dt.fat_gkg} g/kg` : '', fill: [255, 245, 240] as [number, number, number], border: [220, 160, 140] as [number, number, number], color: [170, 90, 60] as [number, number, number] },
           ];
-          const colW = maxWidth / 4;
-          totals.forEach((t, i) => {
-            doc.text(clean(t), margin + 4 + i * colW, y + 16);
-          });
-          y += boxH + 6;
+
+          for (let ci = 0; ci < macroCards.length; ci++) {
+            const mc = macroCards[ci];
+            const cx = margin + ci * (cardW + cardGap);
+            doc.setFillColor(mc.fill[0], mc.fill[1], mc.fill[2]);
+            doc.setDrawColor(mc.border[0], mc.border[1], mc.border[2]);
+            doc.roundedRect(cx, y, cardW, cardH, 2, 2, 'FD');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(13);
+            doc.setTextColor(mc.color[0], mc.color[1], mc.color[2]);
+            doc.text(clean(mc.value), cx + cardW / 2, y + 10, { align: 'center' });
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(100, 100, 100);
+            doc.text(clean(mc.label), cx + cardW / 2, y + 16, { align: 'center' });
+            if (mc.sub) {
+              doc.setFontSize(7.5);
+              doc.setTextColor(mc.color[0], mc.color[1], mc.color[2]);
+              doc.text(clean(mc.sub), cx + cardW / 2, y + 21, { align: 'center' });
+            }
+          }
+          y += cardH + 8;
         }
-        addSpace(2);
       }
 
       // 5. Orientations
