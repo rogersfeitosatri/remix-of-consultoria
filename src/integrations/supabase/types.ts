@@ -319,6 +319,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_prompts: {
+        Row: {
+          context_key: string
+          created_at: string
+          id: string
+          prompt_text: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          context_key: string
+          created_at?: string
+          id?: string
+          prompt_text?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          context_key?: string
+          created_at?: string
+          id?: string
+          prompt_text?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       anamnese_forms: {
         Row: {
           created_at: string
