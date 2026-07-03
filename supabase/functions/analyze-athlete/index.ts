@@ -256,6 +256,8 @@ const ANALYSIS_SCHEMA = {
             protein_g: { type: "number", description: "Total de proteína em gramas" },
             protein_gkg: { type: "number", description: "Proteína em g/kg" },
             fat_g: { type: "number", description: "Total de gordura em gramas" },
+            fat_gkg: { type: "number", description: "Gordura em g/kg" },
+            kcal_kg: { type: "number", description: "Calorias por kg de peso corporal" },
           },
           required: ["kcal", "cho_g", "cho_gkg", "protein_g", "fat_g"],
         },
