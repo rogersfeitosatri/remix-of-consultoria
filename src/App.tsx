@@ -31,6 +31,7 @@ import NutritionalPeriodization from "./pages/NutritionalPeriodization";
 import MetabolicWeb from "./pages/MetabolicWeb";
 import StrategicCalls from "./pages/StrategicCalls";
 import CallScheduling from "./pages/CallScheduling";
+import AiTrainingCenter from "./pages/AiTrainingCenter";
 
 // Eager load frequently accessed detail pages
 import AthleteHistory from "./pages/AthleteHistory";
@@ -185,6 +186,7 @@ function AppRoutes() {
         <Route path="/calls/:callId/responses" element={<ProtectedRoute adminOnly><StrategicCallResponses /></ProtectedRoute>} />
         <Route path="/scheduling-links" element={<ProtectedRoute adminOnly><CallScheduling /></ProtectedRoute>} />
         <Route path="/scheduling-links/:linkId" element={<ProtectedRoute adminOnly><CallSchedulingConfig /></ProtectedRoute>} />
+        <Route path="/ai-training" element={<ProtectedRoute adminOnly><AiTrainingCenter /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
         <Route path="/nutriperiodiza/protocols" element={<ProtectedRoute adminOnly><NutriPeriodizaProtocols /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
