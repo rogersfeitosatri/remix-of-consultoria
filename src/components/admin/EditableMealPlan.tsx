@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import {
   Pencil,
@@ -15,9 +14,12 @@ import {
   TrendingUp,
   Utensils,
   Loader2,
+  GripVertical,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import FoodSearchAutocomplete from './FoodSearchAutocomplete';
+import { type SelectedFood } from '@/hooks/useFoodSearch';
 
 interface EditableMealPlanProps {
   analysis: any;
@@ -27,6 +29,18 @@ interface EditableMealPlanProps {
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
+}
+
+function sumFoods(foods: SelectedFood[]) {
+  return foods.reduce(
+    (acc, f) => ({
+      calories: Math.round((acc.calories + f.calories) * 10) / 10,
+      protein_g: Math.round((acc.protein_g + f.protein_g) * 10) / 10,
+      carbs_g: Math.round((acc.carbs_g + f.carbs_g) * 10) / 10,
+      fat_g: Math.round((acc.fat_g + f.fat_g) * 10) / 10,
+    }),
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
+  );
 }
 
 export function EditableMealPlan({ analysis, clientId, onUpdated }: EditableMealPlanProps) {
@@ -40,7 +54,21 @@ export function EditableMealPlan({ analysis, clientId, onUpdated }: EditableMeal
     ? editedAnalysis.meal_plan?.daily_totals
     : analysis.meal_plan?.daily_totals;
 
-  // -- Helpers to update nested state immutably --
+  // Compute real-time totals from structured foods
+  const computedTotals = useMemo(() => {
+    if (!isEditing) return null;
+    const allFoods: SelectedFood[] = meals.flatMap((m: any) => m.foods ?? []);
+    if (allFoods.length === 0) return null;
+    return sumFoods(allFoods);
+  }, [isEditing, meals]);
+
+  const computedMealTotals = useCallback((meal: any) => {
+    const foods: SelectedFood[] = meal.foods ?? [];
+    if (foods.length === 0) return null;
+    return sumFoods(foods);
+  }, []);
+
+  // -- Meal-level operations --
 
   const updateMealField = (mealIdx: number, field: string, value: string) => {
     setEditedAnalysis((prev: any) => {
@@ -50,36 +78,13 @@ export function EditableMealPlan({ analysis, clientId, onUpdated }: EditableMeal
     });
   };
 
-  const updateFoodGroup = (mealIdx: number, fgIdx: number, field: string, value: string) => {
-    setEditedAnalysis((prev: any) => {
-      const next = deepClone(prev);
-      next.meal_plan.meals[mealIdx].food_groups[fgIdx][field] = value;
-      return next;
-    });
-  };
-
-  const addFoodGroup = (mealIdx: number) => {
-    setEditedAnalysis((prev: any) => {
-      const next = deepClone(prev);
-      next.meal_plan.meals[mealIdx].food_groups.push({ group: '', options: '' });
-      return next;
-    });
-  };
-
-  const removeFoodGroup = (mealIdx: number, fgIdx: number) => {
-    setEditedAnalysis((prev: any) => {
-      const next = deepClone(prev);
-      next.meal_plan.meals[mealIdx].food_groups.splice(fgIdx, 1);
-      return next;
-    });
-  };
-
   const addMeal = () => {
     setEditedAnalysis((prev: any) => {
       const next = deepClone(prev);
       next.meal_plan.meals.push({
         meal_name: '',
-        food_groups: [{ group: '', options: '' }],
+        foods: [],
+        food_groups: [],
         meal_macros: '',
         timing_note: '',
       });
@@ -95,6 +100,48 @@ export function EditableMealPlan({ analysis, clientId, onUpdated }: EditableMeal
     });
   };
 
+  // -- Structured food operations --
+
+  const addFoodToMeal = (mealIdx: number, food: SelectedFood) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      if (!next.meal_plan.meals[mealIdx].foods) {
+        next.meal_plan.meals[mealIdx].foods = [];
+      }
+      next.meal_plan.meals[mealIdx].foods.push(food);
+      return next;
+    });
+  };
+
+  const removeFoodFromMeal = (mealIdx: number, foodTempId: string) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      next.meal_plan.meals[mealIdx].foods = (next.meal_plan.meals[mealIdx].foods || [])
+        .filter((f: SelectedFood) => f.temp_id !== foodTempId);
+      return next;
+    });
+  };
+
+  // -- Legacy food_groups operations (backward compat) --
+
+  const updateFoodGroup = (mealIdx: number, fgIdx: number, field: string, value: string) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      next.meal_plan.meals[mealIdx].food_groups[fgIdx][field] = value;
+      return next;
+    });
+  };
+
+  const removeFoodGroup = (mealIdx: number, fgIdx: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      next.meal_plan.meals[mealIdx].food_groups.splice(fgIdx, 1);
+      return next;
+    });
+  };
+
+  // -- Daily totals --
+
   const updateDailyTotal = (field: string, value: string) => {
     setEditedAnalysis((prev: any) => {
       const next = deepClone(prev);
@@ -108,13 +155,45 @@ export function EditableMealPlan({ analysis, clientId, onUpdated }: EditableMeal
 
   // -- Save logic --
 
+  const buildSaveData = () => {
+    const data = deepClone(editedAnalysis);
+    // Auto-generate meal_macros from structured foods
+    for (const meal of data.meal_plan?.meals ?? []) {
+      if (meal.foods?.length > 0) {
+        const totals = sumFoods(meal.foods);
+        meal.meal_macros = `~${Math.round(totals.calories)} kcal | ${Math.round(totals.carbs_g)}g CHO | ${Math.round(totals.protein_g)}g PTN | ${Math.round(totals.fat_g)}g LIP`;
+        // Also generate food_groups from structured foods for backward compat
+        const groups: Record<string, string[]> = {};
+        for (const f of meal.foods) {
+          const g = f.group || 'Alimento';
+          if (!groups[g]) groups[g] = [];
+          groups[g].push(`${f.name} - ${f.quantity} ${f.measure_name} (${Math.round(f.weight_g)}g)`);
+        }
+        meal.food_groups = Object.entries(groups).map(([group, items]) => ({
+          group,
+          options: items.join(' | '),
+        }));
+      }
+    }
+    // Update daily totals from computed if structured foods exist
+    if (computedTotals) {
+      if (!data.meal_plan.daily_totals) data.meal_plan.daily_totals = {};
+      data.meal_plan.daily_totals.kcal = Math.round(computedTotals.calories);
+      data.meal_plan.daily_totals.cho_g = Math.round(computedTotals.carbs_g);
+      data.meal_plan.daily_totals.protein_g = Math.round(computedTotals.protein_g);
+      data.meal_plan.daily_totals.fat_g = Math.round(computedTotals.fat_g);
+    }
+    return data;
+  };
+
   const saveDirectly = async () => {
-    const updatedRaw = JSON.stringify({ ...editedAnalysis, _isNewFormat: true });
+    const data = buildSaveData();
+    const updatedRaw = JSON.stringify({ ...data, _isNewFormat: true });
     const { error } = await supabase
       .from('ai_analyses')
       .update({
         raw_response: updatedRaw,
-        caloric_deficit: { meal_plan: editedAnalysis.meal_plan } as any,
+        caloric_deficit: { meal_plan: data.meal_plan } as any,
         updated_at: new Date().toISOString(),
       })
       .eq('client_id', clientId);
@@ -122,12 +201,13 @@ export function EditableMealPlan({ analysis, clientId, onUpdated }: EditableMeal
   };
 
   const auditWithAI = async () => {
-    const { data, error } = await supabase.functions.invoke('audit-meal-plan', {
-      body: { clientId, editedAnalysis },
+    const data = buildSaveData();
+    const { data: result, error } = await supabase.functions.invoke('audit-meal-plan', {
+      body: { clientId, editedAnalysis: data },
     });
     if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-    return data;
+    if (result?.error) throw new Error(result.error);
+    return result;
   };
 
   const handleSaveDirectly = async () => {
@@ -189,110 +269,161 @@ export function EditableMealPlan({ analysis, clientId, onUpdated }: EditableMeal
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {meals.map((meal: any, i: number) => (
-            <div key={i} className="p-4 rounded-lg border bg-card">
-              {/* Meal header */}
-              <div className="flex items-center justify-between mb-2">
-                {isEditing ? (
-                  <Input
-                    value={meal.meal_name}
-                    onChange={(e) => updateMealField(i, 'meal_name', e.target.value)}
-                    placeholder="Nome da refeicao"
-                    className="font-semibold text-sm max-w-xs"
-                  />
-                ) : (
-                  <h4 className="font-semibold text-sm flex items-center gap-2">
-                    <UtensilsCrossed className="h-3.5 w-3.5 text-primary" />
-                    {meal.meal_name}
-                  </h4>
-                )}
-                {isEditing && meals.length > 1 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive h-7 w-7 p-0"
-                    onClick={() => removeMeal(i)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
+          {meals.map((meal: any, i: number) => {
+            const mealTotals = isEditing ? computedMealTotals(meal) : null;
+            const hasFoods = (meal.foods?.length ?? 0) > 0;
 
-              {/* Food groups */}
-              <div className="space-y-1.5">
-                {(meal.food_groups || []).map((fg: any, j: number) =>
-                  isEditing ? (
-                    <div key={j} className="flex items-start gap-2">
-                      <Input
-                        value={fg.group}
-                        onChange={(e) => updateFoodGroup(i, j, 'group', e.target.value)}
-                        placeholder="Grupo"
-                        className="w-[120px] text-sm"
-                      />
-                      <Textarea
-                        value={fg.options}
-                        onChange={(e) => updateFoodGroup(i, j, 'options', e.target.value)}
-                        placeholder="Opcoes"
-                        className="text-sm min-h-[36px]"
-                        rows={1}
-                      />
+            return (
+              <div key={i} className="p-4 rounded-lg border bg-card">
+                {/* Meal header */}
+                <div className="flex items-center justify-between mb-3">
+                  {isEditing ? (
+                    <Input
+                      value={meal.meal_name}
+                      onChange={(e) => updateMealField(i, 'meal_name', e.target.value)}
+                      placeholder="Ex: 07:00 - Cafe da manha"
+                      className="font-semibold text-sm max-w-xs"
+                    />
+                  ) : (
+                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                      <UtensilsCrossed className="h-3.5 w-3.5 text-primary" />
+                      {meal.meal_name}
+                    </h4>
+                  )}
+                  <div className="flex items-center gap-1">
+                    {/* Real-time meal macro badge */}
+                    {isEditing && mealTotals && (
+                      <Badge variant="secondary" className="text-[10px] font-normal">
+                        {Math.round(mealTotals.calories)} kcal | C:{Math.round(mealTotals.carbs_g)}g P:{Math.round(mealTotals.protein_g)}g G:{Math.round(mealTotals.fat_g)}g
+                      </Badge>
+                    )}
+                    {isEditing && meals.length > 1 && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-destructive h-7 w-7 p-0 shrink-0"
-                        onClick={() => removeFoodGroup(i, j)}
+                        className="text-destructive h-7 w-7 p-0"
+                        onClick={() => removeMeal(i)}
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Structured foods list (edit mode) */}
+                {isEditing && (
+                  <div className="space-y-1">
+                    {(meal.foods || []).map((food: SelectedFood) => (
+                      <div
+                        key={food.temp_id}
+                        className="flex items-center gap-2 py-1.5 px-2 rounded bg-muted/40 group"
+                      >
+                        <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0" />
+                        <span className="text-sm font-medium flex-1 min-w-0 truncate">{food.name}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {food.quantity} {food.measure_name}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground shrink-0">
+                          ({Math.round(food.weight_g)}g)
+                        </span>
+                        <div className="flex gap-1.5 text-[11px] text-muted-foreground shrink-0">
+                          <span className="font-medium text-foreground">{Math.round(food.calories)} kcal</span>
+                          <span>C:{Math.round(food.carbs_g)}g</span>
+                          <span>P:{Math.round(food.protein_g)}g</span>
+                          <span>G:{Math.round(food.fat_g)}g</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive shrink-0"
+                          onClick={() => removeFoodFromMeal(i, food.temp_id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+
+                    {/* Food search autocomplete */}
+                    <div className="pt-2">
+                      <FoodSearchAutocomplete
+                        onAddFood={(food) => addFoodToMeal(i, food)}
+                      />
                     </div>
-                  ) : (
-                    <div key={j} className="flex gap-2 text-sm">
-                      <span className="font-medium text-primary min-w-[90px]">{fg.group}:</span>
-                      <span className="text-muted-foreground">{fg.options}</span>
-                    </div>
-                  ),
+                  </div>
+                )}
+
+                {/* Legacy food groups (view mode OR edit mode for old data) */}
+                {!isEditing && (
+                  <div className="space-y-1.5">
+                    {(meal.food_groups || []).map((fg: any, j: number) => (
+                      <div key={j} className="flex gap-2 text-sm">
+                        <span className="font-medium text-primary min-w-[90px]">{fg.group}:</span>
+                        <span className="text-muted-foreground">{fg.options}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Legacy food groups in edit mode (if no structured foods yet) */}
+                {isEditing && !hasFoods && (meal.food_groups?.length ?? 0) > 0 && (
+                  <div className="space-y-1.5 mb-2 pt-2 border-t mt-2">
+                    <p className="text-[11px] text-muted-foreground italic">
+                      Alimentos do plano original (texto livre):
+                    </p>
+                    {(meal.food_groups || []).map((fg: any, j: number) => (
+                      <div key={j} className="flex items-start gap-2">
+                        <Input
+                          value={fg.group}
+                          onChange={(e) => updateFoodGroup(i, j, 'group', e.target.value)}
+                          placeholder="Grupo"
+                          className="w-[120px] text-sm"
+                        />
+                        <Input
+                          value={fg.options}
+                          onChange={(e) => updateFoodGroup(i, j, 'options', e.target.value)}
+                          placeholder="Opcoes"
+                          className="text-sm flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive h-7 w-7 p-0 shrink-0"
+                          onClick={() => removeFoodGroup(i, j)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Timing note */}
+                {isEditing ? (
+                  <div className="mt-3">
+                    <Input
+                      value={meal.timing_note || ''}
+                      onChange={(e) => updateMealField(i, 'timing_note', e.target.value)}
+                      placeholder="Nota de horario/timing"
+                      className="text-xs"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {meal.meal_macros && (
+                      <p className="text-xs text-green-600 mt-2 font-medium">
+                        {'\u{1F4CA}'} {meal.meal_macros}
+                      </p>
+                    )}
+                    {meal.timing_note && (
+                      <p className="text-xs text-muted-foreground mt-1 italic">
+                        {'⏰'} {meal.timing_note}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
-
-              {isEditing && (
-                <Button variant="ghost" size="sm" className="mt-2 h-7 text-xs" onClick={() => addFoodGroup(i)}>
-                  <Plus className="h-3 w-3 mr-1" />
-                  Grupo alimentar
-                </Button>
-              )}
-
-              {/* Macros & timing */}
-              {isEditing ? (
-                <div className="mt-3 space-y-2">
-                  <Input
-                    value={meal.meal_macros || ''}
-                    onChange={(e) => updateMealField(i, 'meal_macros', e.target.value)}
-                    placeholder="Macros da refeicao (ex: ~450kcal | 50g CHO | 30g PTN | 15g LIP)"
-                    className="text-xs"
-                  />
-                  <Input
-                    value={meal.timing_note || ''}
-                    onChange={(e) => updateMealField(i, 'timing_note', e.target.value)}
-                    placeholder="Nota de horario/timing"
-                    className="text-xs"
-                  />
-                </div>
-              ) : (
-                <>
-                  {meal.meal_macros && (
-                    <p className="text-xs text-green-600 mt-2 font-medium">
-                      {'\u{1F4CA}'} {meal.meal_macros}
-                    </p>
-                  )}
-                  {meal.timing_note && (
-                    <p className="text-xs text-muted-foreground mt-1 italic">
-                      {'⏰'} {meal.timing_note}
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
+            );
+          })}
 
           {isEditing && (
             <Button variant="outline" size="sm" className="w-full" onClick={addMeal}>
@@ -307,7 +438,12 @@ export function EditableMealPlan({ analysis, clientId, onUpdated }: EditableMeal
           <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/20">
             <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
               <TrendingUp className="h-3.5 w-3.5 text-primary" />
-              Totais Diarios Aproximados
+              Totais Diarios
+              {isEditing && computedTotals && (
+                <Badge variant="default" className="text-[10px] ml-auto font-normal">
+                  Calculado: {Math.round(computedTotals.calories)} kcal | C:{Math.round(computedTotals.carbs_g)}g | P:{Math.round(computedTotals.protein_g)}g | G:{Math.round(computedTotals.fat_g)}g
+                </Badge>
+              )}
             </h4>
             {isEditing ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
