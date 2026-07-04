@@ -26,10 +26,25 @@ const CATEGORY_TO_GROUP: Record<string, string> = {
   'Outros': 'Outros',
 };
 
-interface FoodSearchAutocompleteProps {
+const GROUP_TO_CATEGORIES: Record<string, string[]> = {
+  'Carboidratos': ['Cereais', 'Leguminosas'],
+  'Proteinas': ['Carnes', 'Laticínios', 'Suplementos'],
+  'Gorduras': ['Gorduras'],
+  'Frutas': ['Frutas'],
+  'Vegetais': ['Vegetais'],
+  'Outros': ['Outros'],
+};
+
+export interface FoodSearchAutoCompleteProps {
   onAddFood: (food: SelectedFood) => void;
   defaultGroup?: string;
   placeholder?: string;
+  /** When set, auto-calculate portion to match these calories */
+  targetCalories?: number;
+  /** Filter results to these food categories */
+  filterCategories?: string[];
+  /** Compact mode for inline substitution search */
+  compact?: boolean;
 }
 
 let _tempIdCounter = 0;
@@ -37,7 +52,14 @@ function nextTempId() {
   return `food_${Date.now()}_${++_tempIdCounter}`;
 }
 
-export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeholder }: FoodSearchAutocompleteProps) {
+export default function FoodSearchAutocomplete({
+  onAddFood,
+  defaultGroup,
+  placeholder,
+  targetCalories,
+  filterCategories,
+  compact,
+}: FoodSearchAutoCompleteProps) {
   const [query, setQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
@@ -47,16 +69,32 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeh
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { data: results = [], isLoading: searching } = useFoodSearch(query);
+  const { data: rawResults = [], isLoading: searching } = useFoodSearch(query);
   const { data: measures = [] } = useFoodMeasures(selectedFood?.id ?? null);
   const { lookupFood, isLooking } = useLookupCustomFood();
 
+  // Filter results by category if specified
+  const results = filterCategories
+    ? rawResults.filter(f => filterCategories.includes(f.category))
+    : rawResults;
+
+  // Auto-select best measure and calculate equivalent quantity when targetCalories is set
   useEffect(() => {
     if (measures.length > 0 && !selectedMeasure) {
       const defaultMeasure = measures.find(m => m.measure_name !== 'Gramas') || measures[0];
       setSelectedMeasure(defaultMeasure);
+
+      // Auto-calc portion for target calories
+      if (targetCalories && targetCalories > 0 && selectedFood && defaultMeasure) {
+        const calPer100g = selectedFood.calories_per_100g;
+        if (calPer100g > 0) {
+          const targetWeightG = (targetCalories / calPer100g) * 100;
+          const autoQty = Math.round((targetWeightG / defaultMeasure.measure_weight_g) * 10) / 10;
+          setQuantity(Math.max(0.5, autoQty));
+        }
+      }
     }
-  }, [measures, selectedMeasure]);
+  }, [measures, selectedMeasure, targetCalories, selectedFood]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -85,7 +123,7 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeh
         handleSelectFood(food);
         toast.success(`"${food.name}" encontrado via IA e salvo no banco.`);
       } else {
-        toast.error('Não foi possível encontrar dados para esse alimento.');
+        toast.error('Nao foi possivel encontrar dados para esse alimento.');
       }
     } catch (err: any) {
       toast.error(`Erro: ${err.message}`);
@@ -122,7 +160,7 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeh
   const preview = selectedFood && weightG > 0 ? calcNutrients(selectedFood, weightG) : null;
 
   return (
-    <div ref={containerRef} className="space-y-2">
+    <div ref={containerRef} className={compact ? 'space-y-1' : 'space-y-2'}>
       {/* Search input */}
       <div className="relative">
         <Input
@@ -138,40 +176,38 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeh
           }}
           onFocus={() => query.length >= 2 && setShowDropdown(true)}
           placeholder={placeholder ?? "Digite o nome do alimento..."}
-          className="text-sm pr-8"
+          className={`text-sm pr-8 ${compact ? 'h-7 text-xs' : ''}`}
         />
         {(searching || isLooking) && (
-          <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+          <Loader2 className={`absolute right-2.5 animate-spin text-muted-foreground ${compact ? 'top-1.5 h-3.5 w-3.5' : 'top-2.5 h-4 w-4'}`} />
         )}
 
         {/* Dropdown results */}
         {showDropdown && query.length >= 2 && !selectedFood && (
           <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-lg shadow-lg max-h-[280px] overflow-y-auto">
             {results.length > 0 ? (
-              <>
-                {results.map((food) => (
-                  <button
-                    key={food.id}
-                    type="button"
-                    className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-b-0"
-                    onClick={() => handleSelectFood(food)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{food.name}</span>
-                      <Badge variant="outline" className="text-[10px] shrink-0 ml-2">
-                        {food.category}
-                      </Badge>
-                    </div>
-                    <div className="flex gap-3 mt-0.5 text-[11px] text-muted-foreground">
-                      <span>{food.calories_per_100g} kcal</span>
-                      <span>P: {food.protein_per_100g}g</span>
-                      <span>C: {food.carbs_per_100g}g</span>
-                      <span>G: {food.fat_per_100g}g</span>
-                      <span className="text-muted-foreground/60">por 100g</span>
-                    </div>
-                  </button>
-                ))}
-              </>
+              results.map((food) => (
+                <button
+                  key={food.id}
+                  type="button"
+                  className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-b-0"
+                  onClick={() => handleSelectFood(food)}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{food.name}</span>
+                    <Badge variant="outline" className="text-[10px] shrink-0 ml-2">
+                      {food.category}
+                    </Badge>
+                  </div>
+                  <div className="flex gap-3 mt-0.5 text-[11px] text-muted-foreground">
+                    <span>{food.calories_per_100g} kcal</span>
+                    <span>P: {food.protein_per_100g}g</span>
+                    <span>C: {food.carbs_per_100g}g</span>
+                    <span>G: {food.fat_per_100g}g</span>
+                    <span className="text-muted-foreground/60">por 100g</span>
+                  </div>
+                </button>
+              ))
             ) : !searching ? (
               <div className="p-3 text-center text-sm text-muted-foreground">
                 Nenhum alimento encontrado.
@@ -207,9 +243,9 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeh
 
       {/* Measure selector + quantity + preview */}
       {selectedFood && (
-        <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg border bg-muted/30">
+        <div className={`flex flex-wrap items-center gap-2 ${compact ? 'p-1.5' : 'p-2.5'} rounded-lg border bg-muted/30`}>
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-sm font-medium truncate">{selectedFood.name}</span>
+            <span className={`font-medium truncate ${compact ? 'text-xs' : 'text-sm'}`}>{selectedFood.name}</span>
             <button
               type="button"
               onClick={() => { setSelectedFood(null); setSelectedMeasure(null); setQuery(''); }}
@@ -227,7 +263,7 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeh
               step={0.5}
               value={quantity}
               onChange={(e) => setQuantity(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
-              className="w-[65px] h-8 text-sm text-center"
+              className={`w-[60px] text-sm text-center ${compact ? 'h-7' : 'h-8'}`}
             />
 
             {/* Measure picker */}
@@ -235,7 +271,7 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeh
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 text-xs gap-1 max-w-[200px]"
+                className={`text-xs gap-1 max-w-[200px] ${compact ? 'h-7' : 'h-8'}`}
                 onClick={() => setShowMeasures(!showMeasures)}
               >
                 <span className="truncate">{selectedMeasure?.measure_name ?? 'Medida'}</span>
@@ -264,7 +300,7 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeh
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">{m.measure_name}</span>
                           <span className="text-xs text-muted-foreground">
-                            {quantity > 1 ? `${quantity} × ` : ''}{m.measure_weight_g}g
+                            {quantity > 1 ? `${quantity} x ` : ''}{m.measure_weight_g}g
                             {quantity > 1 ? ` = ${Math.round(mWeight)}g` : ''}
                           </span>
                         </div>
@@ -294,12 +330,12 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeh
             {/* Add button */}
             <Button
               size="sm"
-              className="h-8 gap-1"
+              className={`gap-1 ${compact ? 'h-7 text-xs' : 'h-8'}`}
               onClick={handleAdd}
               disabled={!selectedMeasure}
             >
               <Plus className="h-3.5 w-3.5" />
-              Adicionar
+              {compact ? 'Add' : 'Adicionar'}
             </Button>
           </div>
         </div>
@@ -307,3 +343,5 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeh
     </div>
   );
 }
+
+export { GROUP_TO_CATEGORIES, CATEGORY_TO_GROUP };
