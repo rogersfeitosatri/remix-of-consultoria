@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import FoodSearchAutocomplete from './FoodSearchAutocomplete';
+import { Textarea } from '@/components/ui/textarea';
+import FoodSearchAutocomplete, { GROUP_TO_CATEGORIES } from './FoodSearchAutocomplete';
 import { type SelectedFood } from '@/hooks/useFoodSearch';
 
 interface MealScheduleData {
@@ -348,6 +349,18 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     });
   };
 
+  const updateLegacyFoodGroup = (mealIdx: number, fgIdx: number, field: string, value: string, optIdx?: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      if (optIdx !== undefined && next.meal_plan.meals[mealIdx].options) {
+        next.meal_plan.meals[mealIdx].options[optIdx].food_groups[fgIdx][field] = value;
+      } else {
+        next.meal_plan.meals[mealIdx].food_groups[fgIdx][field] = value;
+      }
+      return next;
+    });
+  };
+
   // -- Daily totals --
 
   const updateDailyTotal = (field: string, value: string) => {
@@ -473,108 +486,153 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
 
   const busy = isAuditing || isSaving;
 
+  // Toggle substitution search for a food
+  const toggleSubSearch = (mealIdx: number, foodTempId: string, show: boolean, optIdx?: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      const foods = optIdx !== undefined
+        ? next.meal_plan.meals[mealIdx].options[optIdx].foods
+        : next.meal_plan.meals[mealIdx].foods;
+      const f = foods?.find((x: any) => x.temp_id === foodTempId);
+      if (f) f._showSubSearch = show;
+      return next;
+    });
+  };
+
   // -- Render food item row --
-  const renderFoodRow = (food: any, mealIdx: number, optIdx?: number) => (
-    <div key={food.temp_id}>
-      <div className="flex items-center gap-2 py-1.5 px-2 rounded bg-muted/40 group">
-        <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0" />
-        {/* Editable group badge */}
-        <select
-          value={food.group || 'Outros'}
-          onChange={(e) => updateFoodGroup(mealIdx, food.temp_id, e.target.value, optIdx)}
-          className={`text-[10px] px-1.5 py-0.5 rounded-full border-0 cursor-pointer font-medium shrink-0 ${GROUP_COLORS[food.group] || GROUP_COLORS['Outros']}`}
-        >
-          {GROUP_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-        </select>
-        <span className="text-sm font-medium flex-1 min-w-0 truncate">{food.name}</span>
-        <span className="text-xs text-muted-foreground shrink-0">
-          {food.quantity} {food.measure_name}
-        </span>
-        <span className="text-[11px] text-muted-foreground shrink-0">({Math.round(food.weight_g)}g)</span>
-        <div className="flex gap-1.5 text-[11px] text-muted-foreground shrink-0">
-          <span className="font-medium text-foreground">{Math.round(food.calories)} kcal</span>
-          <span>C:{Math.round(food.carbs_g)}g</span>
-          <span>P:{Math.round(food.protein_g)}g</span>
-          <span>G:{Math.round(food.fat_g)}g</span>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive shrink-0"
-          onClick={() => removeFoodFromMeal(mealIdx, food.temp_id, optIdx)}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
-      </div>
-      {/* Substitutions */}
-      {(food.substitutions || []).map((sub: any) => (
-        <div key={sub.temp_id} className="flex items-center gap-2 py-1 px-2 pl-8 group text-muted-foreground">
-          <ArrowRightLeft className="h-3 w-3 shrink-0 text-blue-500" />
-          <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium shrink-0">ou</span>
-          <span className="text-sm flex-1 min-w-0 truncate">{sub.name}</span>
-          <span className="text-xs shrink-0">{sub.quantity} {sub.measure_name} ({Math.round(sub.weight_g)}g)</span>
-          <div className="flex gap-1.5 text-[11px] shrink-0">
-            <span>{Math.round(sub.calories)} kcal</span>
-            <span>C:{Math.round(sub.carbs_g)}g</span>
-            <span>P:{Math.round(sub.protein_g)}g</span>
-            <span>G:{Math.round(sub.fat_g)}g</span>
+  const renderFoodRow = (food: any, mealIdx: number, optIdx?: number) => {
+    const foodGroup = food.group || 'Outros';
+    const filterCats = GROUP_TO_CATEGORIES[foodGroup] || [];
+
+    return (
+      <div key={food.temp_id} className="group/food">
+        <div className="flex items-center gap-2 py-1.5 px-2 rounded bg-muted/40">
+          <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0" />
+          <select
+            value={foodGroup}
+            onChange={(e) => updateFoodGroup(mealIdx, food.temp_id, e.target.value, optIdx)}
+            className={`text-[10px] px-1.5 py-0.5 rounded-full border-0 cursor-pointer font-medium shrink-0 ${GROUP_COLORS[foodGroup] || GROUP_COLORS['Outros']}`}
+          >
+            {GROUP_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+          <span className="text-sm font-medium flex-1 min-w-0 truncate">{food.name}</span>
+          <span className="text-xs text-muted-foreground shrink-0">
+            {food.quantity} {food.measure_name}
+          </span>
+          <span className="text-[11px] text-muted-foreground shrink-0">({Math.round(food.weight_g)}g)</span>
+          <div className="flex gap-1.5 text-[11px] text-muted-foreground shrink-0">
+            <span className="font-medium text-foreground">{Math.round(food.calories)} kcal</span>
+            <span>C:{Math.round(food.carbs_g)}g</span>
+            <span>P:{Math.round(food.protein_g)}g</span>
+            <span>G:{Math.round(food.fat_g)}g</span>
           </div>
           <Button
             variant="ghost"
             size="sm"
-            className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 text-destructive shrink-0"
-            onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
+            className="h-6 w-6 p-0 opacity-0 group-hover/food:opacity-100 text-destructive shrink-0"
+            onClick={() => removeFoodFromMeal(mealIdx, food.temp_id, optIdx)}
           >
-            <X className="h-3 w-3" />
+            <Trash2 className="h-3 w-3" />
           </Button>
         </div>
-      ))}
-      {/* Add substitution */}
-      {food._showSubSearch ? (
-        <div className="pl-8 py-1">
-          <FoodSearchAutocomplete
-            placeholder="Buscar substituicao..."
-            onAddFood={(sub) => {
-              addSubstitution(mealIdx, food.temp_id, sub, optIdx);
-              // Hide search after adding
-              setEditedAnalysis((prev: any) => {
-                const next = deepClone(prev);
-                const foods = optIdx !== undefined
-                  ? next.meal_plan.meals[mealIdx].options[optIdx].foods
-                  : next.meal_plan.meals[mealIdx].foods;
-                const f = foods?.find((x: any) => x.temp_id === food.temp_id);
-                if (f) f._showSubSearch = false;
-                return next;
-              });
-            }}
-          />
-        </div>
-      ) : (
-        <button
-          type="button"
-          className="ml-8 mt-0.5 text-[11px] text-blue-500 hover:text-blue-700 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => {
-            setEditedAnalysis((prev: any) => {
-              const next = deepClone(prev);
-              const foods = optIdx !== undefined
-                ? next.meal_plan.meals[mealIdx].options[optIdx].foods
-                : next.meal_plan.meals[mealIdx].foods;
-              const f = foods?.find((x: any) => x.temp_id === food.temp_id);
-              if (f) f._showSubSearch = true;
-              return next;
-            });
-          }}
-        >
-          <ArrowRightLeft className="h-3 w-3" />
-          Substituicao
-        </button>
-      )}
-    </div>
-  );
+
+        {/* Substitutions */}
+        {(food.substitutions || []).map((sub: any) => (
+          <div key={sub.temp_id} className="flex items-center gap-2 py-1 px-2 pl-8 group/sub">
+            <span className="text-[11px] text-blue-600 dark:text-blue-400 font-bold shrink-0 bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded">ou</span>
+            <span className="text-sm flex-1 min-w-0 truncate text-muted-foreground">{sub.name}</span>
+            <span className="text-xs text-muted-foreground shrink-0">{sub.quantity} {sub.measure_name} ({Math.round(sub.weight_g)}g)</span>
+            <div className="flex gap-1.5 text-[11px] text-muted-foreground shrink-0">
+              <span>{Math.round(sub.calories)} kcal</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 opacity-0 group-hover/sub:opacity-100 text-destructive shrink-0"
+              onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ))}
+
+        {/* Always visible "ou" add substitution button + search */}
+        {food._showSubSearch ? (
+          <div className="pl-8 py-1 flex items-start gap-2">
+            <span className="text-[11px] text-blue-600 dark:text-blue-400 font-bold shrink-0 bg-blue-100 dark:bg-blue-900/40 px-1.5 py-1 rounded mt-1">ou</span>
+            <div className="flex-1">
+              <FoodSearchAutocomplete
+                placeholder="Buscar substituicao..."
+                compact
+                targetCalories={food.calories}
+                filterCategories={filterCats}
+                onAddFood={(sub) => {
+                  addSubstitution(mealIdx, food.temp_id, sub, optIdx);
+                  toggleSubSearch(mealIdx, food.temp_id, false, optIdx);
+                }}
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground shrink-0 mt-0.5"
+              onClick={() => toggleSubSearch(mealIdx, food.temp_id, false, optIdx)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="ml-8 mt-0.5 mb-1 text-[11px] text-blue-500 hover:text-blue-700 flex items-center gap-1"
+            onClick={() => toggleSubSearch(mealIdx, food.temp_id, true, optIdx)}
+          >
+            <Plus className="h-3 w-3" />
+            ou (substituicao)
+          </button>
+        )}
+      </div>
+    );
+  };
 
   // -- Render food list for a meal or option --
   const renderFoodList = (foods: any[], legacyGroups: any[], mealIdx: number, optIdx?: number) => (
     <div className="space-y-1">
+      {/* Legacy food groups (editable text) */}
+      {legacyGroups.length > 0 && (
+        <div className="space-y-2 pb-2">
+          {legacyGroups.map((fg: any, j: number) => (
+            <div key={j} className="rounded border bg-muted/20 overflow-hidden">
+              <div className={`flex items-center gap-2 px-2 py-1 ${GROUP_COLORS[fg.group] || 'bg-muted/40'}`}>
+                <select
+                  value={fg.group || ''}
+                  onChange={(e) => updateLegacyFoodGroup(mealIdx, j, 'group', e.target.value, optIdx)}
+                  className="text-[10px] font-semibold uppercase bg-transparent border-0 cursor-pointer"
+                >
+                  {GROUP_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+                  <option value={fg.group}>{fg.group}</option>
+                </select>
+                <div className="flex-1" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-5 w-5 p-0 text-destructive shrink-0"
+                  onClick={() => removeLegacyFoodGroup(mealIdx, j, optIdx)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              <Textarea
+                value={fg.options || ''}
+                onChange={(e) => updateLegacyFoodGroup(mealIdx, j, 'options', e.target.value, optIdx)}
+                className="text-xs border-0 rounded-none bg-transparent min-h-[32px] resize-y"
+                rows={2}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Structured foods grouped by category */}
       {foods.length > 0 && (() => {
         const grouped: Record<string, any[]> = {};
@@ -592,27 +650,6 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
           </div>
         ));
       })()}
-
-      {/* Legacy food groups (if no structured foods) */}
-      {foods.length === 0 && legacyGroups.length > 0 && (
-        <div className="space-y-1 pt-1">
-          <p className="text-[10px] text-muted-foreground italic px-2">Plano original (texto):</p>
-          {legacyGroups.map((fg: any, j: number) => (
-            <div key={j} className="flex items-center gap-2 px-2 py-1 text-sm bg-muted/20 rounded">
-              <span className="font-medium text-primary min-w-[80px] text-xs">{fg.group}:</span>
-              <span className="text-muted-foreground text-xs flex-1">{fg.options}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-5 w-5 p-0 text-destructive shrink-0"
-                onClick={() => removeLegacyFoodGroup(mealIdx, j, optIdx)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Food search */}
       <div className="pt-1.5">
