@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -72,8 +72,8 @@ export default function FoodSearchAutocomplete({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const measureButtonRef = useRef<HTMLButtonElement>(null);
   const measuresDropdownRef = useRef<HTMLDivElement>(null);
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
-  const [measuresStyle, setMeasuresStyle] = useState<React.CSSProperties>({});
+  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({});
+  const [measuresStyle, setMeasuresStyle] = useState<CSSProperties>({});
 
   const { data: rawResults = [], isLoading: searching } = useFoodSearch(query);
   const { data: measures = [] } = useFoodMeasures(selectedFood?.id ?? null);
@@ -119,7 +119,7 @@ export default function FoodSearchAutocomplete({
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const getFloatingStyle = useCallback((anchor: HTMLElement, desiredHeight: number, minWidth?: number): React.CSSProperties => {
+  const getFloatingStyle = useCallback((anchor: HTMLElement, desiredHeight: number, minWidth?: number): CSSProperties => {
     const rect = anchor.getBoundingClientRect();
     const margin = 8;
     const below = window.innerHeight - rect.bottom - margin;
@@ -131,7 +131,7 @@ export default function FoodSearchAutocomplete({
 
     return {
       position: 'fixed',
-      left: Math.min(rect.left, window.innerWidth - width - margin),
+      left: Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin)),
       top: shouldOpenUp ? Math.max(margin, rect.top - maxHeight - 4) : rect.bottom + 4,
       width,
       maxHeight,
