@@ -58,7 +58,7 @@ export default function AnamneseResponseDetail() {
         .from('anamnese_responses')
         .select(`
           id, client_id, form_id, responses, submitted_at, ai_analysis, ai_analyzed_at,
-          respondent_name, respondent_email,
+          respondent_name, respondent_email, current_weight,
           meal_breakfast, meal_morning_snack, meal_morning_snack_enabled,
           meal_lunch, meal_afternoon_snack, meal_afternoon_snack_enabled,
           meal_dinner, meal_supper, meal_supper_enabled,
@@ -1007,6 +1007,7 @@ export default function AnamneseResponseDetail() {
                   <EditableMealPlan
                     analysis={structuredAnalysis}
                     clientId={responseData.client_id}
+                    athleteWeightKg={(responseData as any)?.current_weight ?? null}
                     mealSchedule={{
                       cafe_da_manha: (responseData as any)?.meal_breakfast,
                       lanche_manha: (responseData as any)?.meal_morning_snack,

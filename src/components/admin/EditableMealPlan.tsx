@@ -40,6 +40,7 @@ interface MealScheduleData {
 interface EditableMealPlanProps {
   analysis: any;
   clientId: string;
+  athleteWeightKg?: number | null;
   mealSchedule?: MealScheduleData;
   onUpdated: () => void;
 }
@@ -96,7 +97,7 @@ function parseTimeFromMealName(name: string): string {
   return match ? match[1].replace('.', ':') : '';
 }
 
-export function EditableMealPlan({ analysis, clientId, mealSchedule, onUpdated }: EditableMealPlanProps) {
+export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSchedule, onUpdated }: EditableMealPlanProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -837,17 +838,61 @@ export function EditableMealPlan({ analysis, clientId, mealSchedule, onUpdated }
           )}
         </div>
 
-        {/* Daily totals */}
+        {/* Realizado - computed from actual foods (edit mode only) */}
+        {isEditing && computedTotals && (
+          <div className="mt-4 p-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+            <h4 className="font-semibold text-sm mb-3 flex items-center gap-2 text-green-800 dark:text-green-300">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Total Realizado (calculado dos alimentos)
+              {athleteWeightKg && <span className="text-[10px] font-normal text-muted-foreground ml-auto">Peso: {athleteWeightKg} kg</span>}
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="p-2 rounded bg-yellow-100 dark:bg-yellow-900/30 text-center">
+                <div className="text-lg font-bold text-yellow-800 dark:text-yellow-300">{Math.round(computedTotals.calories)}</div>
+                <div className="text-[10px] text-muted-foreground">kcal</div>
+                {athleteWeightKg && (
+                  <div className="text-[11px] font-medium text-yellow-700 dark:text-yellow-400">
+                    {(computedTotals.calories / athleteWeightKg).toFixed(1)} kcal/kg
+                  </div>
+                )}
+              </div>
+              <div className="p-2 rounded bg-blue-100 dark:bg-blue-900/30 text-center">
+                <div className="text-lg font-bold text-blue-800 dark:text-blue-300">{Math.round(computedTotals.carbs_g)}g</div>
+                <div className="text-[10px] text-muted-foreground">CHO ({Math.round(computedTotals.carbs_g * 4)} kcal)</div>
+                {athleteWeightKg && (
+                  <div className="text-[11px] font-medium text-blue-700 dark:text-blue-400">
+                    {(computedTotals.carbs_g / athleteWeightKg).toFixed(1)} g/kg
+                  </div>
+                )}
+              </div>
+              <div className="p-2 rounded bg-purple-100 dark:bg-purple-900/30 text-center">
+                <div className="text-lg font-bold text-purple-800 dark:text-purple-300">{Math.round(computedTotals.protein_g)}g</div>
+                <div className="text-[10px] text-muted-foreground">PTN ({Math.round(computedTotals.protein_g * 4)} kcal)</div>
+                {athleteWeightKg && (
+                  <div className="text-[11px] font-medium text-purple-700 dark:text-purple-400">
+                    {(computedTotals.protein_g / athleteWeightKg).toFixed(1)} g/kg
+                  </div>
+                )}
+              </div>
+              <div className="p-2 rounded bg-orange-100 dark:bg-orange-900/30 text-center">
+                <div className="text-lg font-bold text-orange-800 dark:text-orange-300">{Math.round(computedTotals.fat_g)}g</div>
+                <div className="text-[10px] text-muted-foreground">LIP ({Math.round(computedTotals.fat_g * 9)} kcal)</div>
+                {athleteWeightKg && (
+                  <div className="text-[11px] font-medium text-orange-700 dark:text-orange-400">
+                    {(computedTotals.fat_g / athleteWeightKg).toFixed(1)} g/kg
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Daily totals - Planejado */}
         {(dailyTotals || isEditing) && (
-          <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/20">
+          <div className="mt-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
             <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
               <TrendingUp className="h-3.5 w-3.5 text-primary" />
-              Totais Diarios
-              {isEditing && computedTotals && (
-                <Badge variant="default" className="text-[10px] ml-auto font-normal">
-                  Calculado: {Math.round(computedTotals.calories)} kcal | C:{Math.round(computedTotals.carbs_g)}g | P:{Math.round(computedTotals.protein_g)}g | G:{Math.round(computedTotals.fat_g)}g
-                </Badge>
-              )}
+              {isEditing ? 'Meta Planejada' : 'Totais Diarios'}
             </h4>
             {isEditing ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
