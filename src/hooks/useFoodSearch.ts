@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export interface FoodItem {
   id: string;
@@ -53,20 +54,22 @@ export function calcNutrients(food: FoodItem, weightG: number) {
 }
 
 export function useFoodSearch(query: string) {
+  const debouncedQuery = useDebounce(query, 300);
+
   return useQuery({
-    queryKey: ['food-search', query],
+    queryKey: ['food-search', debouncedQuery],
     queryFn: async () => {
-      if (!query || query.length < 2) return [];
+      if (!debouncedQuery || debouncedQuery.length < 2) return [];
       const { data, error } = await (supabase as any)
         .from('food_items')
         .select('*')
-        .ilike('name', `%${query}%`)
+        .ilike('name', `%${debouncedQuery}%`)
         .order('name')
         .limit(15);
       if (error) throw error;
       return (data ?? []) as FoodItem[];
     },
-    enabled: query.length >= 2,
+    enabled: debouncedQuery.length >= 2,
     staleTime: 60_000,
   });
 }
