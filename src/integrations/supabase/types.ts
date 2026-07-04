@@ -2891,6 +2891,80 @@ export type Database = {
         }
         Relationships: []
       }
+      food_items: {
+        Row: {
+          calories_per_100g: number
+          carbs_per_100g: number
+          category: string
+          created_at: string
+          created_by: string | null
+          fat_per_100g: number
+          fiber_per_100g: number
+          id: string
+          name: string
+          protein_per_100g: number
+          source: string
+        }
+        Insert: {
+          calories_per_100g?: number
+          carbs_per_100g?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          fat_per_100g?: number
+          fiber_per_100g?: number
+          id?: string
+          name: string
+          protein_per_100g?: number
+          source?: string
+        }
+        Update: {
+          calories_per_100g?: number
+          carbs_per_100g?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          fat_per_100g?: number
+          fiber_per_100g?: number
+          id?: string
+          name?: string
+          protein_per_100g?: number
+          source?: string
+        }
+        Relationships: []
+      }
+      food_measures: {
+        Row: {
+          created_at: string
+          food_item_id: string
+          id: string
+          measure_name: string
+          measure_weight_g: number
+        }
+        Insert: {
+          created_at?: string
+          food_item_id: string
+          id?: string
+          measure_name: string
+          measure_weight_g: number
+        }
+        Update: {
+          created_at?: string
+          food_item_id?: string
+          id?: string
+          measure_name?: string
+          measure_weight_g?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_measures_food_item_id_fkey"
+            columns: ["food_item_id"]
+            isOneToOne: false
+            referencedRelation: "food_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_calendar_connections: {
         Row: {
           calendar_id: string | null
