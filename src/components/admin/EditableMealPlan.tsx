@@ -96,25 +96,68 @@ function parseTimeFromMealName(name: string): string {
   return match ? match[1].replace('.', ':') : '';
 }
 
-function extractFoodInfo(text: string): { searchTerm: string; weightG: number; qty: number } | null {
+function cleanFoodName(name: string): string {
+  let n = name.trim();
+  n = n.replace(/^(?:fatias?\s+de|pedaços?\s+de|colheres?\s+(?:de\s+(?:sopa|cha|sobremesa)\s+(?:de\s+)?)?|xicaras?\s+de|porco?e?s?\s+de|files?\s+de|copos?\s+de|potes?\s+de|unidades?\s+de)\s*/i, '');
+  n = n.replace(/\s+(?:m[eé]dia|grande|pequena|m[eé]dio|pequeno|inteiro|inteira|cozida|cozido|grelhada|grelhado|light|zero\s*lactose)$/i, '');
+  n = n.replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  return n;
+}
+
+function extractFoodInfo(text: string): { searchTerm: string; weightG: number; qty: number } {
   text = text.trim();
-  if (!text) return null;
-  // "50g de queijo minas light"
-  let m = text.match(/^(\d+(?:[.,]\d+)?)\s*g\s+de\s+(.+)/i);
+  if (!text) return { searchTerm: '', weightG: 0, qty: 1 };
+  // "50g de queijo minas light" or "150 g macarrão"
+  let m = text.match(/^(\d+(?:[.,]\d+)?)\s*g\s+(?:de\s+)?(.+)/i);
   if (m) {
-    return { searchTerm: m[2].replace(/\s*\(.*\)/, '').trim(), weightG: parseFloat(m[1].replace(',', '.')), qty: 1 };
+    return { searchTerm: cleanFoodName(m[2]), weightG: parseFloat(m[1].replace(',', '.')), qty: 1 };
   }
   // "1 fatias de pão francês (100g)" or "1 banana média (100g)"
   m = text.match(/^(\d+(?:[.,]\d+)?)\s+(.+?)(?:\s*\((\d+(?:[.,]\d+)?)\s*g?\s*\))?$/i);
   if (m) {
-    let name = m[2].trim();
-    name = name.replace(/^(?:fatias?\s+de|pedaços?\s+de|colheres?\s+(?:de\s+(?:sopa|cha|sobremesa)\s+(?:de\s+)?)?|xicaras?\s+de|porco?e?s?\s+de|files?\s+de|copos?\s+de|potes?\s+de|unidades?\s+de)\s*/i, '');
-    name = name.replace(/\s+(?:m[eé]dia|grande|pequena|m[eé]dio|pequeno|inteiro|inteira|cozida|cozido|grelhada|grelhado|light|zero\s*lactose)$/i, '');
     const wg = m[3] ? parseFloat(m[3].replace(',', '.')) : 0;
-    return { searchTerm: name.trim(), weightG: wg, qty: parseFloat(m[1].replace(',', '.')) };
+    return { searchTerm: cleanFoodName(m[2]), weightG: wg, qty: parseFloat(m[1].replace(',', '.')) };
+  }
+  // Fallback: use whole text as name, extract any embedded (Ng)
+  const wgMatch = text.match(/\((\d+(?:[.,]\d+)?)\s*g\)/i);
+  return {
+    searchTerm: cleanFoodName(text),
+    weightG: wgMatch ? parseFloat(wgMatch[1].replace(',', '.')) : 0,
+    qty: 1,
+  };
+}
+
+async function searchFoodInDb(searchTerm: string): Promise<any | null> {
+  if (!searchTerm) return null;
+  // Try full term first, then progressively shorter (drop trailing words)
+  const words = searchTerm.split(/\s+/).filter(Boolean);
+  for (let end = words.length; end >= 1; end--) {
+    const term = words.slice(0, end).join(' ');
+    const { data } = await (supabase as any)
+      .from('food_items')
+      .select('*')
+      .ilike('name', `%${term}%`)
+      .limit(5);
+    if (data?.length) {
+      return data.sort((a: any, b: any) => a.name.length - b.name.length)[0];
+    }
   }
   return null;
 }
+
+async function lookupCustomFoodFallback(searchTerm: string): Promise<any | null> {
+  if (!searchTerm) return null;
+  try {
+    const { data, error } = await supabase.functions.invoke('lookup-custom-food', {
+      body: { foodName: searchTerm },
+    });
+    if (error || !data?.food) return null;
+    return data.food;
+  } catch {
+    return null;
+  }
+}
+
 
 function mapLegacyGroup(group: string): string {
   const n = group.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
