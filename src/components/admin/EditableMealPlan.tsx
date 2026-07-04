@@ -14,11 +14,9 @@ import {
   TrendingUp,
   Utensils,
   Loader2,
-  GripVertical,
   ChevronUp,
   ChevronDown,
   Copy,
-  ArrowRightLeft,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -335,6 +333,58 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     });
   };
 
+  const updateFoodQuantity = (mealIdx: number, foodTempId: string, newQty: number, optIdx?: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      let foods: any[];
+      if (optIdx !== undefined && next.meal_plan.meals[mealIdx].options) {
+        foods = next.meal_plan.meals[mealIdx].options[optIdx].foods || [];
+      } else {
+        foods = next.meal_plan.meals[mealIdx].foods || [];
+      }
+      const food = foods.find((f: any) => f.temp_id === foodTempId);
+      if (!food) return next;
+
+      const oldCalories = food.calories;
+      // Update primary food
+      food.quantity = newQty;
+      food.weight_g = Math.round(food.measure_weight_g * newQty * 10) / 10;
+      if (food.calories_per_100g && food.calories_per_100g > 0) {
+        const factor = food.weight_g / 100;
+        const ptnPer100 = oldCalories > 0 ? (food.protein_g / oldCalories) * food.calories_per_100g : 0;
+        const choPer100 = oldCalories > 0 ? (food.carbs_g / oldCalories) * food.calories_per_100g : 0;
+        const fatPer100 = oldCalories > 0 ? (food.fat_g / oldCalories) * food.calories_per_100g : 0;
+        food.calories = Math.round(food.calories_per_100g * factor * 10) / 10;
+        food.protein_g = Math.round(ptnPer100 * factor * 10) / 10;
+        food.carbs_g = Math.round(choPer100 * factor * 10) / 10;
+        food.fat_g = Math.round(fatPer100 * factor * 10) / 10;
+      }
+
+      // Recalculate substitutions proportionally
+      if (food.substitutions?.length > 0 && oldCalories > 0 && food.calories > 0) {
+        const ratio = food.calories / oldCalories;
+        for (const sub of food.substitutions) {
+          if (sub.calories_per_100g && sub.calories_per_100g > 0) {
+            const targetCal = sub.calories * ratio;
+            const targetWeight = (targetCal / sub.calories_per_100g) * 100;
+            const newSubQty = Math.round((targetWeight / sub.measure_weight_g) * 10) / 10;
+            sub.quantity = Math.max(0.1, newSubQty);
+            sub.weight_g = Math.round(sub.measure_weight_g * sub.quantity * 10) / 10;
+            const subFactor = sub.weight_g / 100;
+            const subPtnPer100 = sub.calories > 0 ? (sub.protein_g / sub.calories) * sub.calories_per_100g : 0;
+            const subChoPer100 = sub.calories > 0 ? (sub.carbs_g / sub.calories) * sub.calories_per_100g : 0;
+            const subFatPer100 = sub.calories > 0 ? (sub.fat_g / sub.calories) * sub.calories_per_100g : 0;
+            sub.calories = Math.round(sub.calories_per_100g * subFactor * 10) / 10;
+            sub.protein_g = Math.round(subPtnPer100 * subFactor * 10) / 10;
+            sub.carbs_g = Math.round(subChoPer100 * subFactor * 10) / 10;
+            sub.fat_g = Math.round(subFatPer100 * subFactor * 10) / 10;
+          }
+        }
+      }
+      return next;
+    });
+  };
+
   // -- Legacy food_groups operations --
 
   const removeLegacyFoodGroup = (mealIdx: number, fgIdx: number, optIdx?: number) => {
@@ -380,6 +430,13 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     const data = deepClone(editedAnalysis);
     for (const meal of data.meal_plan?.meals ?? []) {
       const processOption = (opt: any) => {
+        // Strip transient UI state from foods
+        for (const f of (opt.foods || [])) {
+          delete f._showSubSearch;
+          for (const s of (f.substitutions || [])) {
+            delete s._showSubSearch;
+          }
+        }
         if (opt.foods?.length > 0) {
           const totals = sumFoods(opt.foods);
           opt.meal_macros = `~${Math.round(totals.calories)} kcal | ${Math.round(totals.carbs_g)}g CHO | ${Math.round(totals.protein_g)}g PTN | ${Math.round(totals.fat_g)}g LIP`;
@@ -405,8 +462,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
 
       if (meal.options?.length > 0) {
         meal.options.forEach(processOption);
-        // Use first option macros as meal_macros
         meal.meal_macros = meal.options[0]?.meal_macros || '';
+        // Keep per-option food_groups; also set top-level for backward compat
         meal.food_groups = meal.options[0]?.food_groups || [];
       } else {
         processOption(meal);
@@ -507,7 +564,6 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     return (
       <div key={food.temp_id} className="group/food">
         <div className="flex items-center gap-2 py-1.5 px-2 rounded bg-muted/40">
-          <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0" />
           <select
             value={foodGroup}
             onChange={(e) => updateFoodGroup(mealIdx, food.temp_id, e.target.value, optIdx)}
@@ -516,8 +572,16 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             {GROUP_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
           <span className="text-sm font-medium flex-1 min-w-0 truncate">{food.name}</span>
+          <Input
+            type="number"
+            min={0.1}
+            step={0.5}
+            value={food.quantity}
+            onChange={(e) => updateFoodQuantity(mealIdx, food.temp_id, Math.max(0.1, parseFloat(e.target.value) || 0.1), optIdx)}
+            className="w-[50px] h-6 text-xs text-center shrink-0 px-1"
+          />
           <span className="text-xs text-muted-foreground shrink-0">
-            {food.quantity} {food.measure_name}
+            {food.measure_name}
           </span>
           <span className="text-[11px] text-muted-foreground shrink-0">({Math.round(food.weight_g)}g)</span>
           <div className="flex gap-1.5 text-[11px] text-muted-foreground shrink-0">
@@ -610,7 +674,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                   className="text-[10px] font-semibold uppercase bg-transparent border-0 cursor-pointer"
                 >
                   {GROUP_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-                  <option value={fg.group}>{fg.group}</option>
+                  {!GROUP_OPTIONS.includes(fg.group) && <option value={fg.group}>{fg.group}</option>}
                 </select>
                 <div className="flex-1" />
                 <Button
@@ -807,14 +871,34 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                     )
                   ) : (
                     // View mode
-                    <div className="space-y-1.5">
-                      {(meal.food_groups || []).map((fg: any, j: number) => (
-                        <div key={j} className="flex gap-2 text-sm">
-                          <span className="font-medium text-primary min-w-[90px]">{fg.group}:</span>
-                          <span className="text-muted-foreground">{fg.options}</span>
-                        </div>
-                      ))}
-                    </div>
+                    hasOptions ? (
+                      <div className="space-y-3">
+                        {meal.options.map((opt: any, oi: number) => (
+                          <div key={oi} className={oi > 0 ? 'border-t pt-2' : ''}>
+                            <Badge variant="outline" className="text-xs font-semibold mb-1.5">
+                              {opt.label}
+                            </Badge>
+                            <div className="space-y-1.5">
+                              {(opt.food_groups || []).map((fg: any, j: number) => (
+                                <div key={j} className="flex gap-2 text-sm">
+                                  <span className="font-medium text-primary min-w-[90px]">{fg.group}:</span>
+                                  <span className="text-muted-foreground">{fg.options}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {(meal.food_groups || []).map((fg: any, j: number) => (
+                          <div key={j} className="flex gap-2 text-sm">
+                            <span className="font-medium text-primary min-w-[90px]">{fg.group}:</span>
+                            <span className="text-muted-foreground">{fg.options}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )
                   )}
 
                   {/* Timing note */}
