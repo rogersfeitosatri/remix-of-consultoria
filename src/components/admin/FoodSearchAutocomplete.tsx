@@ -14,9 +14,22 @@ import {
 } from '@/hooks/useFoodSearch';
 import { toast } from 'sonner';
 
+const CATEGORY_TO_GROUP: Record<string, string> = {
+  'Cereais': 'Carboidratos',
+  'Leguminosas': 'Carboidratos',
+  'Carnes': 'Proteinas',
+  'Laticínios': 'Proteinas',
+  'Suplementos': 'Proteinas',
+  'Gorduras': 'Gorduras',
+  'Frutas': 'Frutas',
+  'Vegetais': 'Vegetais',
+  'Outros': 'Outros',
+};
+
 interface FoodSearchAutocompleteProps {
   onAddFood: (food: SelectedFood) => void;
   defaultGroup?: string;
+  placeholder?: string;
 }
 
 let _tempIdCounter = 0;
@@ -24,7 +37,7 @@ function nextTempId() {
   return `food_${Date.now()}_${++_tempIdCounter}`;
 }
 
-export default function FoodSearchAutocomplete({ onAddFood, defaultGroup = '' }: FoodSearchAutocompleteProps) {
+export default function FoodSearchAutocomplete({ onAddFood, defaultGroup, placeholder }: FoodSearchAutocompleteProps) {
   const [query, setQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
@@ -88,7 +101,7 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup = '' }:
       temp_id: nextTempId(),
       food_item_id: selectedFood.id,
       name: selectedFood.name,
-      group: defaultGroup,
+      group: defaultGroup ?? CATEGORY_TO_GROUP[selectedFood.category] ?? 'Outros',
       measure_id: selectedMeasure.id,
       measure_name: selectedMeasure.measure_name,
       measure_weight_g: selectedMeasure.measure_weight_g,
@@ -124,7 +137,7 @@ export default function FoodSearchAutocomplete({ onAddFood, defaultGroup = '' }:
             }
           }}
           onFocus={() => query.length >= 2 && setShowDropdown(true)}
-          placeholder="Digite o nome do alimento..."
+          placeholder={placeholder ?? "Digite o nome do alimento..."}
           className="text-sm pr-8"
         />
         {(searching || isLooking) && (
