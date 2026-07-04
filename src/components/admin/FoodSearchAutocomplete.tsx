@@ -232,7 +232,7 @@ export default function FoodSearchAutocomplete({
           }}
           onFocus={() => query.length >= 2 && setShowDropdown(true)}
           placeholder={placeholder ?? "Digite o nome do alimento..."}
-          className={`text-sm pr-8 ${compact ? 'h-7 text-xs' : ''}`}
+          className={`text-sm pr-8 h-10 ${compact ? 'h-9' : ''}`}
         />
         {(searching || isLooking) && (
           <Loader2 className={`absolute right-2.5 animate-spin text-muted-foreground ${compact ? 'top-1.5 h-3.5 w-3.5' : 'top-2.5 h-4 w-4'}`} />
@@ -300,45 +300,46 @@ export default function FoodSearchAutocomplete({
 
       {/* Measure selector + quantity + preview */}
       {selectedFood && (
-        <div className={`flex flex-wrap items-center gap-2 ${compact ? 'p-1.5' : 'p-2.5'} rounded-lg border bg-muted/30`}>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className={`font-medium truncate ${compact ? 'text-xs' : 'text-sm'}`}>{selectedFood.name}</span>
+        <div className="p-2.5 rounded-lg border bg-muted/30 space-y-2">
+          {/* Name + clear */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium text-sm truncate">{selectedFood.name}</span>
             <button
               type="button"
               onClick={() => { setSelectedFood(null); setSelectedMeasure(null); setQuery(''); }}
-              className="text-muted-foreground hover:text-foreground shrink-0"
+              className="text-muted-foreground hover:text-foreground shrink-0 p-1 -m-1"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
 
+          {/* Quantity + measure + add */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Quantity */}
             <Input
               type="number"
               min={0.1}
               step={0.5}
               value={quantity}
               onChange={(e) => setQuantity(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
-              className={`w-[60px] text-sm text-center ${compact ? 'h-7' : 'h-8'}`}
+              className="w-16 h-10 text-sm text-center font-medium shrink-0"
             />
 
             {/* Measure picker */}
-            <div className="relative">
+            <div className="relative flex-1 min-w-[130px]">
               <Button
                 ref={measureButtonRef}
                 variant="outline"
                 size="sm"
-                className={`text-xs gap-1 max-w-[200px] ${compact ? 'h-7' : 'h-8'}`}
+                className="text-xs gap-1 h-10 w-full justify-between"
                 onClick={() => setShowMeasures(!showMeasures)}
               >
-                <span className="truncate">{selectedMeasure?.measure_name ?? 'Medida'}</span>
-                {selectedMeasure && (
-                  <span className="text-muted-foreground shrink-0">
-                    = {Math.round(selectedMeasure.measure_weight_g * quantity)}g
-                  </span>
-                )}
-                <ChevronDown className="h-3 w-3 shrink-0" />
+                <span className="truncate">{selectedMeasure?.measure_name ?? 'Medida caseira'}</span>
+                <span className="flex items-center gap-1 shrink-0">
+                  {selectedMeasure && (
+                    <span className="text-muted-foreground">= {Math.round(selectedMeasure.measure_weight_g * quantity)}g</span>
+                  )}
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </span>
               </Button>
 
               {showMeasures && measures.length > 0 && (
@@ -350,7 +351,7 @@ export default function FoodSearchAutocomplete({
                       <button
                         key={m.id}
                         type="button"
-                        className={`w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-b-0 ${
+                        className={`w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-b last:border-b-0 ${
                           selectedMeasure?.id === m.id ? 'bg-accent' : ''
                         }`}
                         onClick={() => { setSelectedMeasure(m); setShowMeasures(false); }}
@@ -363,10 +364,10 @@ export default function FoodSearchAutocomplete({
                           </span>
                         </div>
                         <div className="flex gap-2 mt-0.5 text-[11px] text-muted-foreground">
-                          <span>C: {mNutrients.carbs_g}g</span>
-                          <span>P: {mNutrients.protein_g}g</span>
-                          <span>G: {mNutrients.fat_g}g</span>
                           <span>{mNutrients.calories} kcal</span>
+                          <span>C {mNutrients.carbs_g}g</span>
+                          <span>P {mNutrients.protein_g}g</span>
+                          <span>G {mNutrients.fat_g}g</span>
                         </div>
                       </button>
                     );
@@ -375,27 +376,26 @@ export default function FoodSearchAutocomplete({
               )}
             </div>
 
-            {/* Macro preview */}
-            {preview && (
-              <div className="flex gap-2 text-[11px] text-muted-foreground items-center">
-                <span className="font-medium text-foreground">{preview.calories} kcal</span>
-                <span>C: {preview.carbs_g}g</span>
-                <span>P: {preview.protein_g}g</span>
-                <span>G: {preview.fat_g}g</span>
-              </div>
-            )}
-
             {/* Add button */}
             <Button
-              size="sm"
-              className={`gap-1 ${compact ? 'h-7 text-xs' : 'h-8'}`}
+              className="gap-1 h-10 shrink-0"
               onClick={handleAdd}
               disabled={!selectedMeasure}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               {compact ? 'Add' : 'Adicionar'}
             </Button>
           </div>
+
+          {/* Macro preview */}
+          {preview && (
+            <div className="flex gap-2.5 text-[11px] text-muted-foreground items-center">
+              <span className="font-semibold text-foreground">{preview.calories} kcal</span>
+              <span>C {preview.carbs_g}g</span>
+              <span>P {preview.protein_g}g</span>
+              <span>G {preview.fat_g}g</span>
+            </div>
+          )}
         </div>
       )}
     </div>
