@@ -60,16 +60,6 @@ function sumFoods(foods: SelectedFood[]) {
   );
 }
 
-const GROUP_COLORS: Record<string, string> = {
-  'Carboidratos': 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-  'Proteinas': 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-  'Gorduras': 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
-  'Vegetais': 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-  'Frutas': 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
-  'Outros': 'bg-gray-100 text-gray-800 dark:bg-gray-800/40 dark:text-gray-300',
-};
-
-const GROUP_OPTIONS = ['Carboidratos', 'Proteinas', 'Gorduras', 'Vegetais', 'Frutas', 'Outros'];
 
 function extractMealTimes(schedule?: MealScheduleData): string[] {
   if (!schedule) return [];
@@ -338,6 +328,16 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     return sumFoods(foods);
   }, []);
 
+  // Compact, wrap-friendly totals row for a meal/option
+  const mealTotalChips = (t: { calories: number; carbs_g: number; protein_g: number; fat_g: number }) => (
+    <div className="flex items-center gap-1.5 text-[11px] flex-wrap justify-end">
+      <span className="font-bold text-foreground">{Math.round(t.calories)} kcal</span>
+      <span className="text-muted-foreground">C {Math.round(t.carbs_g)}g</span>
+      <span className="text-muted-foreground">P {Math.round(t.protein_g)}g</span>
+      <span className="text-muted-foreground">G {Math.round(t.fat_g)}g</span>
+    </div>
+  );
+
   // -- Meal-level operations --
 
   const updateMealField = (mealIdx: number, field: string, value: string) => {
@@ -486,21 +486,6 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         next.meal_plan.meals[mealIdx].foods = (next.meal_plan.meals[mealIdx].foods || [])
           .filter((f: SelectedFood) => f.temp_id !== foodTempId);
       }
-      return next;
-    });
-  };
-
-  const updateFoodGroup = (mealIdx: number, foodTempId: string, newGroup: string, optIdx?: number) => {
-    setEditedAnalysis((prev: any) => {
-      const next = deepClone(prev);
-      let foods: SelectedFood[];
-      if (optIdx !== undefined && next.meal_plan.meals[mealIdx].options) {
-        foods = next.meal_plan.meals[mealIdx].options[optIdx].foods || [];
-      } else {
-        foods = next.meal_plan.meals[mealIdx].foods || [];
-      }
-      const food = foods.find((f: SelectedFood) => f.temp_id === foodTempId);
-      if (food) food.group = newGroup;
       return next;
     });
   };
@@ -877,63 +862,57 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     }
   };
 
-  // -- Render food item row --
+  // -- Render food item row (clean, mobile-first) --
   const renderFoodRow = (food: any, mealIdx: number, optIdx?: number) => {
-    const foodGroup = food.group || 'Outros';
-    const filterCats = GROUP_TO_CATEGORIES[foodGroup] || [];
+    const filterCats = GROUP_TO_CATEGORIES[food.group || 'Outros'] || [];
 
     return (
-      <div key={food.temp_id} className="group/food">
-        <div className="flex items-center gap-2 py-1.5 px-2 rounded bg-muted/40">
-          <select
-            value={foodGroup}
-            onChange={(e) => updateFoodGroup(mealIdx, food.temp_id, e.target.value, optIdx)}
-            className={`text-[10px] px-1.5 py-0.5 rounded-full border-0 cursor-pointer font-medium shrink-0 ${GROUP_COLORS[foodGroup] || GROUP_COLORS['Outros']}`}
-          >
-            {GROUP_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-          </select>
-          <span className="text-sm font-medium flex-1 min-w-0 truncate">{food.name}</span>
-          <button
-            type="button"
-            title="Trocar alimento"
-            className="opacity-0 group-hover/food:opacity-100 text-muted-foreground hover:text-primary shrink-0"
-            onClick={() => toggleReplace(mealIdx, food.temp_id, !food._showReplace, optIdx)}
-          >
-            <Pencil className="h-3 w-3" />
-          </button>
-          <Input
-            type="number"
-            min={0.1}
-            step={0.5}
-            value={food.quantity}
-            onChange={(e) => updateFoodQuantity(mealIdx, food.temp_id, Math.max(0.1, parseFloat(e.target.value) || 0.1), optIdx)}
-            className="w-[50px] h-6 text-xs text-center shrink-0 px-1"
-          />
-          <span className="text-xs text-muted-foreground shrink-0">
-            {food.measure_name}
-          </span>
-          <span className="text-[11px] text-muted-foreground shrink-0">({Math.round(food.weight_g)}g)</span>
-          <div className="flex gap-1.5 text-[11px] text-muted-foreground shrink-0">
-            <span className="font-medium text-foreground">{Math.round(food.calories)} kcal</span>
-            <span>C:{Math.round(food.carbs_g)}g</span>
-            <span>P:{Math.round(food.protein_g)}g</span>
-            <span>G:{Math.round(food.fat_g)}g</span>
+      <div key={food.temp_id} className="rounded-xl border bg-card overflow-hidden">
+        {/* Main food */}
+        <div className="flex items-start gap-2 p-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold leading-snug break-words">{food.name}</p>
+            <div className="flex items-center flex-wrap gap-1.5 mt-2">
+              <Input
+                type="number"
+                min={0.1}
+                step={0.5}
+                value={food.quantity}
+                onChange={(e) => updateFoodQuantity(mealIdx, food.temp_id, Math.max(0.1, parseFloat(e.target.value) || 0.1), optIdx)}
+                className="w-14 h-9 text-sm text-center px-1 font-medium"
+              />
+              <span className="text-sm text-foreground">{food.measure_name}</span>
+              <span className="text-xs text-muted-foreground">· {Math.round(food.weight_g)}g</span>
+              <Badge variant="secondary" className="ml-auto text-xs font-bold">{Math.round(food.calories)} kcal</Badge>
+            </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 opacity-0 group-hover/food:opacity-100 text-destructive shrink-0"
-            onClick={() => removeFoodFromMeal(mealIdx, food.temp_id, optIdx)}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+          <div className="flex flex-col gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-primary"
+              title="Trocar alimento"
+              onClick={() => toggleReplace(mealIdx, food.temp_id, !food._showReplace, optIdx)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              title="Remover alimento"
+              onClick={() => removeFoodFromMeal(mealIdx, food.temp_id, optIdx)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Inline replace search */}
         {food._showReplace && (
-          <div className="pl-8 py-1 flex items-start gap-2">
-            <span className="text-[11px] text-primary font-semibold shrink-0 mt-2">trocar por:</span>
+          <div className="px-3 pb-2.5 flex items-start gap-2 border-t pt-2.5 bg-muted/20">
             <div className="flex-1">
+              <p className="text-[11px] text-primary font-semibold mb-1">Trocar por outro alimento:</p>
               <FoodSearchAutocomplete
                 placeholder="Buscar novo alimento..."
                 compact
@@ -942,42 +921,41 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             </div>
             <Button
               variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground shrink-0 mt-0.5"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground shrink-0 mt-4"
               onClick={() => toggleReplace(mealIdx, food.temp_id, false, optIdx)}
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         )}
 
         {/* Substitutions */}
         {(food.substitutions || []).map((sub: any) => (
-          <div key={sub.temp_id} className="flex items-center gap-2 py-1 px-2 pl-8 group/sub">
-            <span className="text-[11px] text-blue-600 dark:text-blue-400 font-bold shrink-0 bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded">ou</span>
-            <span className="text-sm flex-1 min-w-0 truncate text-muted-foreground">{sub.name}</span>
-            <span className="text-xs text-muted-foreground shrink-0">{sub.quantity} {sub.measure_name} ({Math.round(sub.weight_g)}g)</span>
-            <div className="flex gap-1.5 text-[11px] text-muted-foreground shrink-0">
-              <span>{Math.round(sub.calories)} kcal</span>
+          <div key={sub.temp_id} className="flex items-center gap-2 px-3 py-2 border-t bg-muted/20">
+            <Badge className="text-[10px] shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0">ou</Badge>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm truncate">{sub.name}</p>
+              <p className="text-[11px] text-muted-foreground">{sub.quantity} {sub.measure_name} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</p>
             </div>
             <Button
               variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 opacity-0 group-hover/sub:opacity-100 text-destructive shrink-0"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
               onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         ))}
 
-        {/* Always visible "ou" add substitution button + search */}
+        {/* Add substitution */}
         {food._showSubSearch ? (
-          <div className="pl-8 py-1 flex items-start gap-2">
-            <span className="text-[11px] text-blue-600 dark:text-blue-400 font-bold shrink-0 bg-blue-100 dark:bg-blue-900/40 px-1.5 py-1 rounded mt-1">ou</span>
+          <div className="px-3 pb-2.5 flex items-start gap-2 border-t pt-2.5 bg-blue-50/50 dark:bg-blue-950/20">
             <div className="flex-1">
+              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mb-1">Substituição equivalente:</p>
               <FoodSearchAutocomplete
-                placeholder="Buscar substituicao..."
+                placeholder="Buscar substituição..."
                 compact
                 targetCalories={food.calories}
                 filterCategories={filterCats}
@@ -989,21 +967,21 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             </div>
             <Button
               variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground shrink-0 mt-0.5"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground shrink-0 mt-4"
               onClick={() => toggleSubSearch(mealIdx, food.temp_id, false, optIdx)}
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
         ) : (
           <button
             type="button"
-            className="ml-8 mt-0.5 mb-1 text-[11px] text-blue-500 hover:text-blue-700 flex items-center gap-1"
+            className="w-full text-left px-3 py-2 border-t text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20 flex items-center gap-1.5 font-medium"
             onClick={() => toggleSubSearch(mealIdx, food.temp_id, true, optIdx)}
           >
-            <Plus className="h-3 w-3" />
-            ou (substituicao)
+            <Plus className="h-3.5 w-3.5" />
+            Adicionar substituição
           </button>
         )}
       </div>
@@ -1024,33 +1002,24 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             disabled={isConverting}
           >
             {isConverting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Utensils className="h-3.5 w-3.5" />}
-            Converter para formato estruturado (habilita edicao inteligente)
+            Converter para edição inteligente
           </Button>
           {legacyGroups.map((fg: any, j: number) => (
-            <div key={j} className="rounded border bg-muted/20 overflow-hidden">
-              <div className={`flex items-center gap-2 px-2 py-1 ${GROUP_COLORS[fg.group] || 'bg-muted/40'}`}>
-                <select
-                  value={fg.group || ''}
-                  onChange={(e) => updateLegacyFoodGroup(mealIdx, j, 'group', e.target.value, optIdx)}
-                  className="text-[10px] font-semibold uppercase bg-transparent border-0 cursor-pointer"
-                >
-                  {GROUP_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-                  {!GROUP_OPTIONS.includes(fg.group) && <option value={fg.group}>{fg.group}</option>}
-                </select>
-                <div className="flex-1" />
+            <div key={j} className="rounded-lg border bg-muted/20 overflow-hidden">
+              <div className="flex items-center justify-end px-2 py-1 border-b bg-muted/30">
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 text-destructive shrink-0"
+                  size="icon"
+                  className="h-6 w-6 text-destructive shrink-0"
                   onClick={() => removeLegacyFoodGroup(mealIdx, j, optIdx)}
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
               <Textarea
                 value={fg.options || ''}
                 onChange={(e) => updateLegacyFoodGroup(mealIdx, j, 'options', e.target.value, optIdx)}
-                className="text-xs border-0 rounded-none bg-transparent min-h-[32px] resize-y"
+                className="text-sm border-0 rounded-none bg-transparent min-h-[44px] resize-y"
                 rows={2}
               />
             </div>
@@ -1058,32 +1027,55 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         </div>
       )}
 
-      {/* Structured foods grouped by category */}
-      {foods.length > 0 && (() => {
-        const grouped: Record<string, any[]> = {};
-        for (const f of foods) {
-          const g = f.group || 'Outros';
-          if (!grouped[g]) grouped[g] = [];
-          grouped[g].push(f);
-        }
-        return Object.entries(grouped).map(([group, groupFoods]) => (
-          <div key={group}>
-            <div className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-t ${GROUP_COLORS[group] || ''}`}>
-              {group}
-            </div>
-            {groupFoods.map((f) => renderFoodRow(f, mealIdx, optIdx))}
-          </div>
-        ));
-      })()}
+      {/* Structured foods — clean flat list */}
+      {foods.length > 0 && (
+        <div className="space-y-2">
+          {foods.map((f) => renderFoodRow(f, mealIdx, optIdx))}
+        </div>
+      )}
 
       {/* Food search */}
-      <div className="pt-1.5">
+      <div className="pt-1">
         <FoodSearchAutocomplete
+          placeholder="+ Adicionar alimento..."
           onAddFood={(food) => addFoodToMeal(mealIdx, food, optIdx)}
         />
       </div>
     </div>
   );
+
+  // -- View mode: clean flat food list (no category labels) --
+  const renderViewFoods = (foods: any[], legacyGroups: any[]) => {
+    if (foods.length > 0) {
+      return (
+        <div className="space-y-2">
+          {foods.map((f: any) => (
+            <div key={f.temp_id} className="text-sm">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-medium">{f.name}</span>
+                <span className="text-muted-foreground text-xs whitespace-nowrap">
+                  {f.quantity} {f.measure_name} · {Math.round(f.weight_g)}g
+                </span>
+              </div>
+              {(f.substitutions || []).length > 0 && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  ou {f.substitutions.map((s: any) => `${s.name} (${s.quantity} ${s.measure_name})`).join(' ou ')}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    // Legacy fallback — plain lines without category emphasis
+    return (
+      <div className="space-y-1.5">
+        {(legacyGroups || []).map((fg: any, j: number) => (
+          <p key={j} className="text-sm text-muted-foreground">{fg.options}</p>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <Card>
@@ -1091,12 +1083,12 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Utensils className="h-4 w-4 text-primary" />
-            4. Plano Alimentar Estruturado
+            Plano Alimentar
           </CardTitle>
           {!isEditing && (
-            <Button variant="ghost" size="sm" onClick={handleStartEditing}>
-              <Pencil className="h-3.5 w-3.5 mr-1.5" />
-              Editar Plano
+            <Button variant="default" size="sm" onClick={handleStartEditing} className="gap-1.5">
+              <Pencil className="h-3.5 w-3.5" />
+              Editar
             </Button>
           )}
         </div>
@@ -1151,8 +1143,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                     <Input
                       value={meal.meal_name}
                       onChange={(e) => updateMealField(i, 'meal_name', e.target.value)}
-                      placeholder="Ex: 07:00 - Cafe da manha"
-                      className="font-semibold text-sm max-w-[250px] h-8"
+                      placeholder="Ex: 07:00 - Café da manhã"
+                      className="font-semibold text-sm flex-1 min-w-0 h-9"
                     />
                   ) : (
                     <h4 className="font-semibold text-sm flex items-center gap-2">
@@ -1161,27 +1153,27 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                     </h4>
                   )}
 
-                  <div className="flex items-center gap-1 ml-auto">
+                  <div className="flex items-center gap-1 ml-auto shrink-0">
                     {isEditing && (
                       <>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 text-xs gap-1"
+                          className="h-8 text-xs gap-1 px-2"
                           onClick={() => addOptionToMeal(i)}
-                          title="Adicionar opcao de refeicao"
+                          title="Adicionar opção de refeição"
                         >
-                          <Copy className="h-3 w-3" />
-                          Opcao
+                          <Copy className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Opção</span>
                         </Button>
                         {meals.length > 1 && (
                           <Button
                             variant="ghost"
-                            size="sm"
-                            className="text-destructive h-7 w-7 p-0"
+                            size="icon"
+                            className="text-destructive h-8 w-8"
                             onClick={() => removeMeal(i)}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
                       </>
@@ -1199,25 +1191,23 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                           const optTotals = computedMealOptionTotals(optFoods);
                           return (
                             <div key={oi} className="border rounded-lg p-3 bg-background">
-                              <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center justify-between gap-2 mb-2">
                                 <Badge variant="outline" className="text-xs font-semibold">
                                   {opt.label}
                                 </Badge>
-                                {optTotals && (
-                                  <span className="text-[11px] text-muted-foreground">
-                                    {Math.round(optTotals.calories)} kcal | C:{Math.round(optTotals.carbs_g)}g P:{Math.round(optTotals.protein_g)}g G:{Math.round(optTotals.fat_g)}g
-                                  </span>
-                                )}
-                                {meal.options.length > 1 && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 text-destructive"
-                                    onClick={() => removeOption(i, oi)}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                )}
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {optTotals && mealTotalChips(optTotals)}
+                                  {meal.options.length > 1 && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-destructive shrink-0"
+                                      onClick={() => removeOption(i, oi)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                               {renderFoodList(optFoods, opt.food_groups || [], i, oi)}
                             </div>
@@ -1234,9 +1224,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                             <>
                               {optTotals && (
                                 <div className="flex justify-end mb-2">
-                                  <Badge variant="secondary" className="text-[10px] font-normal">
-                                    {Math.round(optTotals.calories)} kcal | C:{Math.round(optTotals.carbs_g)}g P:{Math.round(optTotals.protein_g)}g G:{Math.round(optTotals.fat_g)}g
-                                  </Badge>
+                                  {mealTotalChips(optTotals)}
                                 </div>
                               )}
                               {renderFoodList(foods, meal.food_groups || [], i)}
@@ -1246,34 +1234,20 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                       </>
                     )
                   ) : (
-                    // View mode
+                    // View mode — clean flat list, no category labels
                     hasOptions ? (
                       <div className="space-y-3">
                         {meal.options.map((opt: any, oi: number) => (
-                          <div key={oi} className={oi > 0 ? 'border-t pt-2' : ''}>
-                            <Badge variant="outline" className="text-xs font-semibold mb-1.5">
+                          <div key={oi} className={oi > 0 ? 'border-t pt-2.5' : ''}>
+                            <Badge variant="outline" className="text-xs font-semibold mb-2">
                               {opt.label}
                             </Badge>
-                            <div className="space-y-1.5">
-                              {(opt.food_groups || []).map((fg: any, j: number) => (
-                                <div key={j} className="flex gap-2 text-sm">
-                                  <span className="font-medium text-primary min-w-[90px]">{fg.group}:</span>
-                                  <span className="text-muted-foreground">{fg.options}</span>
-                                </div>
-                              ))}
-                            </div>
+                            {renderViewFoods(opt.foods || [], opt.food_groups || [])}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="space-y-1.5">
-                        {(meal.food_groups || []).map((fg: any, j: number) => (
-                          <div key={j} className="flex gap-2 text-sm">
-                            <span className="font-medium text-primary min-w-[90px]">{fg.group}:</span>
-                            <span className="text-muted-foreground">{fg.options}</span>
-                          </div>
-                        ))}
-                      </div>
+                      renderViewFoods(meal.foods || [], meal.food_groups || [])
                     )
                   )}
 
@@ -1453,24 +1427,24 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
           </div>
         )}
 
-        {/* Action buttons */}
+        {/* Action buttons — sticky bar for easy access on mobile while scrolling */}
         {isEditing && (
-          <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t">
-            <Button onClick={handleAuditAndSave} disabled={busy} className="gap-1.5">
+          <div className="sticky bottom-0 -mx-6 px-4 sm:px-6 py-3 mt-4 border-t bg-background/95 backdrop-blur-sm z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <Button onClick={handleSaveDirectly} disabled={busy} className="gap-1.5 flex-1">
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Salvar Plano
+            </Button>
+            <Button variant="outline" onClick={handleAuditAndSave} disabled={busy} className="gap-1.5 flex-1">
               {isAuditing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Brain className="h-4 w-4" />
               )}
               Salvar e Auditar com IA
-            </Button>
-            <Button variant="outline" onClick={handleSaveDirectly} disabled={busy} className="gap-1.5">
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Salvar sem Auditoria
             </Button>
             <Button variant="ghost" onClick={handleCancel} disabled={busy} className="gap-1.5">
               <X className="h-4 w-4" />
