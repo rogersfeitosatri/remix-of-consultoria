@@ -36,6 +36,9 @@ export interface SelectedFood {
   carbs_g: number;
   fat_g: number;
   fiber_g: number;
+  calories_per_100g?: number;
+  substitutions?: SelectedFood[];
+  _showSubSearch?: boolean;
 }
 
 export function calcNutrients(food: FoodItem, weightG: number) {

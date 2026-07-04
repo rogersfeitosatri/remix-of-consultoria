@@ -145,6 +145,7 @@ export default function FoodSearchAutocomplete({
       measure_weight_g: selectedMeasure.measure_weight_g,
       quantity,
       weight_g: Math.round(weightG * 10) / 10,
+      calories_per_100g: selectedFood.calories_per_100g,
       ...nutrients,
     });
 
