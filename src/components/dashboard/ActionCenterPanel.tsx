@@ -100,20 +100,13 @@ export function ActionCenterPanel() {
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || '';
 
-  // Dismiss system: items disappear for 24h after marking as done
-  const DISMISS_KEY = 'dashboard-dismissed-v2';
-  const DISMISS_TTL = 24 * 60 * 60 * 1000;
+  // Dismiss system: items stay dismissed permanently
+  const DISMISS_KEY = 'dashboard-dismissed-v3';
   const [dismissed, setDismissed] = useState<Record<string, number>>(() => {
     try {
       const raw = localStorage.getItem(DISMISS_KEY);
       if (!raw) return {};
-      const parsed = JSON.parse(raw) as Record<string, number>;
-      const now = Date.now();
-      const valid: Record<string, number> = {};
-      for (const [k, ts] of Object.entries(parsed)) {
-        if (now - ts < DISMISS_TTL) valid[k] = ts;
-      }
-      return valid;
+      return JSON.parse(raw) as Record<string, number>;
     } catch { return {}; }
   });
   const isDismissed = (key: string) => key in dismissed;
