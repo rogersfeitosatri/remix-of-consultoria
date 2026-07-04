@@ -58,10 +58,7 @@ export default function AnamneseResponseDetail() {
         .from('anamnese_responses')
         .select(`
           id, client_id, form_id, responses, submitted_at, ai_analysis, ai_analyzed_at,
-          respondent_name, respondent_email, current_weight,
-          meal_breakfast, meal_morning_snack, meal_morning_snack_enabled,
-          meal_lunch, meal_afternoon_snack, meal_afternoon_snack_enabled,
-          meal_dinner, meal_supper, meal_supper_enabled,
+          respondent_name, respondent_email,
           clients (id, name, email, phone),
           anamnese_forms (id, title)
         `)
@@ -73,6 +70,26 @@ export default function AnamneseResponseDetail() {
     enabled: !!responseId,
     retry: 2,
     staleTime: 30000,
+  });
+
+  // Separate query for meal schedule fields (non-blocking if columns don't exist)
+  const { data: mealScheduleData } = useQuery({
+    queryKey: ['anamnese_meal_schedule', responseId],
+    queryFn: async () => {
+      try {
+        const { data } = await (supabase as any)
+          .from('anamnese_responses')
+          .select('current_weight, meal_breakfast, meal_morning_snack, meal_morning_snack_enabled, meal_lunch, meal_afternoon_snack, meal_afternoon_snack_enabled, meal_dinner, meal_supper, meal_supper_enabled')
+          .eq('id', responseId)
+          .maybeSingle();
+        return data;
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!responseId,
+    retry: 0,
+    staleTime: 300000,
   });
 
   const { data: aiAnalysisFromTable, isLoading: loadingAiAnalysis } = useQuery({
@@ -1007,18 +1024,18 @@ export default function AnamneseResponseDetail() {
                   <EditableMealPlan
                     analysis={structuredAnalysis}
                     clientId={responseData.client_id}
-                    athleteWeightKg={(responseData as any)?.current_weight ?? null}
-                    mealSchedule={{
-                      cafe_da_manha: (responseData as any)?.meal_breakfast,
-                      lanche_manha: (responseData as any)?.meal_morning_snack,
-                      lanche_manha_enabled: (responseData as any)?.meal_morning_snack_enabled,
-                      almoco: (responseData as any)?.meal_lunch,
-                      lanche_tarde: (responseData as any)?.meal_afternoon_snack,
-                      lanche_tarde_enabled: (responseData as any)?.meal_afternoon_snack_enabled,
-                      jantar: (responseData as any)?.meal_dinner,
-                      ceia: (responseData as any)?.meal_supper,
-                      ceia_enabled: (responseData as any)?.meal_supper_enabled,
-                    }}
+                    athleteWeightKg={mealScheduleData?.current_weight ?? null}
+                    mealSchedule={mealScheduleData ? {
+                      cafe_da_manha: mealScheduleData.meal_breakfast,
+                      lanche_manha: mealScheduleData.meal_morning_snack,
+                      lanche_manha_enabled: mealScheduleData.meal_morning_snack_enabled,
+                      almoco: mealScheduleData.meal_lunch,
+                      lanche_tarde: mealScheduleData.meal_afternoon_snack,
+                      lanche_tarde_enabled: mealScheduleData.meal_afternoon_snack_enabled,
+                      jantar: mealScheduleData.meal_dinner,
+                      ceia: mealScheduleData.meal_supper,
+                      ceia_enabled: mealScheduleData.meal_supper_enabled,
+                    } : undefined}
                     onUpdated={() => {
                       queryClient.invalidateQueries({ queryKey: ['ai_analysis', responseData?.client_id] });
                       queryClient.invalidateQueries({ queryKey: ['anamnese_response_detail', responseId] });
