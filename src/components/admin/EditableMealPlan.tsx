@@ -8,6 +8,7 @@ import {
   Save,
   Brain,
   Plus,
+  Minus,
   Trash2,
   X,
   UtensilsCrossed,
@@ -21,8 +22,9 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import FoodSearchAutocomplete, { GROUP_TO_CATEGORIES } from './FoodSearchAutocomplete';
-import { type SelectedFood } from '@/hooks/useFoodSearch';
+import { type SelectedFood, useFoodMeasures } from '@/hooks/useFoodSearch';
 
 interface MealScheduleData {
   cafe_da_manha?: { horario?: string } | null;
@@ -216,6 +218,57 @@ async function lookupAndBuildFood(
     fiber_g: Math.round((food.fiber_per_100g || 0) * factor * 10) / 10,
     calories_per_100g: food.calories_per_100g,
   };
+}
+
+// Recompute a food's calories/macros from its (already updated) weight_g, deriving
+// per-100g macro values from the previous state. Used by quantity and measure edits.
+function recalcFoodFromWeight(food: any, oldCalories: number) {
+  if (!(food.calories_per_100g > 0)) return;
+  const factor = food.weight_g / 100;
+  const ptnPer100 = oldCalories > 0 ? (food.protein_g / oldCalories) * food.calories_per_100g : 0;
+  const choPer100 = oldCalories > 0 ? (food.carbs_g / oldCalories) * food.calories_per_100g : 0;
+  const fatPer100 = oldCalories > 0 ? (food.fat_g / oldCalories) * food.calories_per_100g : 0;
+  food.calories = Math.round(food.calories_per_100g * factor * 10) / 10;
+  food.protein_g = Math.round(ptnPer100 * factor * 10) / 10;
+  food.carbs_g = Math.round(choPer100 * factor * 10) / 10;
+  food.fat_g = Math.round(fatPer100 * factor * 10) / 10;
+}
+
+// Inline measure picker — tap the measure to switch it (colher, xícara, gramas…).
+// Loads measures lazily on first open; falls back to plain text if food has no id.
+function InlineMeasurePicker({ food, onSelect }: { food: any; onSelect: (m: any) => void }) {
+  const [touched, setTouched] = useState(false);
+  const { data: measures = [] } = useFoodMeasures(touched && food.food_item_id ? food.food_item_id : null);
+
+  if (!food.food_item_id) {
+    return <span className="text-sm text-foreground">{food.measure_name}</span>;
+  }
+
+  return (
+    <Select
+      value={food.measure_id}
+      onValueChange={(id) => {
+        const m = measures.find((x: any) => x.id === id);
+        if (m) onSelect(m);
+      }}
+      onOpenChange={(o) => { if (o) setTouched(true); }}
+    >
+      <SelectTrigger className="h-9 w-auto min-w-0 max-w-[160px] gap-1 text-sm">
+        <span className="truncate">{food.measure_name}</span>
+      </SelectTrigger>
+      <SelectContent>
+        {measures.length === 0 ? (
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">Carregando…</div>
+        ) : (
+          measures.map((m: any) => (
+            <SelectItem key={m.id} value={m.id} className="text-sm">
+              {m.measure_name} · {m.measure_weight_g}g
+            </SelectItem>
+          ))
+        )}
+      </SelectContent>
+    </Select>
+  );
 }
 
 // Re-scale a food's substitutions so each stays caloric-equivalent to the primary food
@@ -539,21 +592,33 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       if (!food) return next;
 
       const oldCalories = food.calories;
-      // Update primary food
       food.quantity = newQty;
       food.weight_g = Math.round(food.measure_weight_g * newQty * 10) / 10;
-      if (food.calories_per_100g && food.calories_per_100g > 0) {
-        const factor = food.weight_g / 100;
-        const ptnPer100 = oldCalories > 0 ? (food.protein_g / oldCalories) * food.calories_per_100g : 0;
-        const choPer100 = oldCalories > 0 ? (food.carbs_g / oldCalories) * food.calories_per_100g : 0;
-        const fatPer100 = oldCalories > 0 ? (food.fat_g / oldCalories) * food.calories_per_100g : 0;
-        food.calories = Math.round(food.calories_per_100g * factor * 10) / 10;
-        food.protein_g = Math.round(ptnPer100 * factor * 10) / 10;
-        food.carbs_g = Math.round(choPer100 * factor * 10) / 10;
-        food.fat_g = Math.round(fatPer100 * factor * 10) / 10;
-      }
+      recalcFoodFromWeight(food, oldCalories);
+      adjustSubstitutions(food, oldCalories);
+      return next;
+    });
+  };
 
-      // Recalculate substitutions proportionally
+  // Change a food's household measure (colher, xícara, gramas…), keeping the quantity
+  const updateFoodMeasure = (mealIdx: number, foodTempId: string, measure: any, optIdx?: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      let foods: any[];
+      if (optIdx !== undefined && next.meal_plan.meals[mealIdx].options) {
+        foods = next.meal_plan.meals[mealIdx].options[optIdx].foods || [];
+      } else {
+        foods = next.meal_plan.meals[mealIdx].foods || [];
+      }
+      const food = foods.find((f: any) => f.temp_id === foodTempId);
+      if (!food) return next;
+
+      const oldCalories = food.calories;
+      food.measure_id = measure.id;
+      food.measure_name = measure.measure_name;
+      food.measure_weight_g = measure.measure_weight_g;
+      food.weight_g = Math.round(measure.measure_weight_g * food.quantity * 10) / 10;
+      recalcFoodFromWeight(food, oldCalories);
       adjustSubstitutions(food, oldCalories);
       return next;
     });
@@ -866,40 +931,19 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
   const renderFoodRow = (food: any, mealIdx: number, optIdx?: number) => {
     const filterCats = GROUP_TO_CATEGORIES[food.group || 'Outros'] || [];
 
+    const setQty = (q: number) => updateFoodQuantity(mealIdx, food.temp_id, Math.max(0.1, Math.round(q * 10) / 10), optIdx);
+
     return (
       <div key={food.temp_id} className="rounded-xl border bg-card overflow-hidden">
-        {/* Main food */}
-        <div className="flex items-start gap-2 p-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-snug break-words">{food.name}</p>
-            <div className="flex items-center flex-wrap gap-1.5 mt-2">
-              <Input
-                type="number"
-                min={0.1}
-                step={0.5}
-                value={food.quantity}
-                onChange={(e) => updateFoodQuantity(mealIdx, food.temp_id, Math.max(0.1, parseFloat(e.target.value) || 0.1), optIdx)}
-                className="w-14 h-9 text-sm text-center px-1 font-medium"
-              />
-              <span className="text-sm text-foreground">{food.measure_name}</span>
-              <span className="text-xs text-muted-foreground">· {Math.round(food.weight_g)}g</span>
-              <Badge variant="secondary" className="ml-auto text-xs font-bold">{Math.round(food.calories)} kcal</Badge>
-            </div>
-          </div>
-          <div className="flex flex-col gap-1 shrink-0">
+        {/* Name + delete */}
+        <div className="flex items-start gap-2 px-3 pt-3">
+          <p className="text-sm font-semibold leading-snug break-words flex-1">{food.name}</p>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Badge variant="secondary" className="text-xs font-bold">{Math.round(food.calories)} kcal</Badge>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-primary"
-              title="Trocar alimento"
-              onClick={() => toggleReplace(mealIdx, food.temp_id, !food._showReplace, optIdx)}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              className="h-8 w-8 -mr-1 text-muted-foreground hover:text-destructive"
               title="Remover alimento"
               onClick={() => removeFoodFromMeal(mealIdx, food.temp_id, optIdx)}
             >
@@ -908,27 +952,35 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
           </div>
         </div>
 
-        {/* Inline replace search */}
-        {food._showReplace && (
-          <div className="px-3 pb-2.5 flex items-start gap-2 border-t pt-2.5 bg-muted/20">
-            <div className="flex-1">
-              <p className="text-[11px] text-primary font-semibold mb-1">Trocar por outro alimento:</p>
-              <FoodSearchAutocomplete
-                placeholder="Buscar novo alimento..."
-                compact
-                onAddFood={(newFood) => replaceFood(mealIdx, food.temp_id, newFood, optIdx)}
-              />
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground shrink-0 mt-4"
-              onClick={() => toggleReplace(mealIdx, food.temp_id, false, optIdx)}
+        {/* Quantity stepper + measure */}
+        <div className="flex items-center gap-2 flex-wrap px-3 pt-2 pb-3">
+          <div className="flex items-center rounded-lg border overflow-hidden h-10">
+            <button
+              type="button"
+              className="h-full w-10 flex items-center justify-center text-muted-foreground active:bg-muted"
+              onClick={() => setQty(food.quantity - 0.5)}
             >
-              <X className="h-4 w-4" />
-            </Button>
+              <Minus className="h-4 w-4" />
+            </button>
+            <Input
+              type="number"
+              min={0.1}
+              step={0.5}
+              value={food.quantity}
+              onChange={(e) => setQty(parseFloat(e.target.value) || 0.1)}
+              className="w-12 h-full text-center px-0 border-0 border-x rounded-none font-semibold text-sm focus-visible:ring-0"
+            />
+            <button
+              type="button"
+              className="h-full w-10 flex items-center justify-center text-muted-foreground active:bg-muted"
+              onClick={() => setQty(food.quantity + 0.5)}
+            >
+              <Plus className="h-4 w-4" />
+            </button>
           </div>
-        )}
+          <InlineMeasurePicker food={food} onSelect={(m) => updateFoodMeasure(mealIdx, food.temp_id, m, optIdx)} />
+          <span className="text-xs text-muted-foreground">{Math.round(food.weight_g)}g</span>
+        </div>
 
         {/* Substitutions */}
         {(food.substitutions || []).map((sub: any) => (
@@ -941,7 +993,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
               onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
             >
               <X className="h-4 w-4" />
@@ -949,41 +1001,54 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
           </div>
         ))}
 
-        {/* Add substitution */}
-        {food._showSubSearch ? (
-          <div className="px-3 pb-2.5 flex items-start gap-2 border-t pt-2.5 bg-blue-50/50 dark:bg-blue-950/20">
-            <div className="flex-1">
-              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mb-1">Substituição equivalente:</p>
-              <FoodSearchAutocomplete
-                placeholder="Buscar substituição..."
-                compact
-                targetCalories={food.calories}
-                filterCategories={filterCats}
-                onAddFood={(sub) => {
-                  addSubstitution(mealIdx, food.temp_id, sub, optIdx);
-                  toggleSubSearch(mealIdx, food.temp_id, false, optIdx);
-                }}
-              />
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground shrink-0 mt-4"
-              onClick={() => toggleSubSearch(mealIdx, food.temp_id, false, optIdx)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+        {/* Inline replace search */}
+        {food._showReplace && (
+          <div className="px-3 pb-3 border-t pt-2.5 bg-muted/20">
+            <p className="text-[11px] text-primary font-semibold mb-1.5">Trocar por outro alimento:</p>
+            <FoodSearchAutocomplete
+              placeholder="Buscar novo alimento..."
+              compact
+              onAddFood={(newFood) => replaceFood(mealIdx, food.temp_id, newFood, optIdx)}
+            />
           </div>
-        ) : (
+        )}
+
+        {/* Inline add-substitution search */}
+        {food._showSubSearch && (
+          <div className="px-3 pb-3 border-t pt-2.5 bg-blue-50/50 dark:bg-blue-950/20">
+            <p className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mb-1.5">Substituição equivalente:</p>
+            <FoodSearchAutocomplete
+              placeholder="Buscar substituição..."
+              compact
+              targetCalories={food.calories}
+              filterCategories={filterCats}
+              onAddFood={(sub) => {
+                addSubstitution(mealIdx, food.temp_id, sub, optIdx);
+                toggleSubSearch(mealIdx, food.temp_id, false, optIdx);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Action footer — big tappable buttons */}
+        <div className="flex border-t divide-x text-xs">
           <button
             type="button"
-            className="w-full text-left px-3 py-2 border-t text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20 flex items-center gap-1.5 font-medium"
-            onClick={() => toggleSubSearch(mealIdx, food.temp_id, true, optIdx)}
+            className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 font-medium active:bg-muted ${food._showReplace ? 'text-primary bg-muted/40' : 'text-muted-foreground'}`}
+            onClick={() => { toggleReplace(mealIdx, food.temp_id, !food._showReplace, optIdx); if (food._showSubSearch) toggleSubSearch(mealIdx, food.temp_id, false, optIdx); }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Trocar
+          </button>
+          <button
+            type="button"
+            className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 font-medium active:bg-blue-50 ${food._showSubSearch ? 'text-blue-700 bg-blue-50 dark:bg-blue-950/20' : 'text-blue-600 dark:text-blue-400'}`}
+            onClick={() => { toggleSubSearch(mealIdx, food.temp_id, !food._showSubSearch, optIdx); if (food._showReplace) toggleReplace(mealIdx, food.temp_id, false, optIdx); }}
           >
             <Plus className="h-3.5 w-3.5" />
-            Adicionar substituição
+            Substituição
           </button>
-        )}
+        </div>
       </div>
     );
   };
