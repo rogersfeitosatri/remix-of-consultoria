@@ -186,10 +186,86 @@ async function lookupAndBuildFood(
   };
 }
 
+// Re-scale a food's substitutions so each stays caloric-equivalent to the primary food
+// after the primary's calories changed from `oldCalories` to `food.calories`.
+function adjustSubstitutions(food: any, oldCalories: number) {
+  if (!(food.substitutions?.length > 0) || oldCalories <= 0 || food.calories <= 0) return;
+  const ratio = food.calories / oldCalories;
+  for (const sub of food.substitutions) {
+    if (!(sub.calories_per_100g > 0)) continue;
+    const targetCal = sub.calories * ratio;
+    const targetWeight = (targetCal / sub.calories_per_100g) * 100;
+    const newSubQty = Math.round((targetWeight / sub.measure_weight_g) * 10) / 10;
+    const subPtnPer100 = sub.calories > 0 ? (sub.protein_g / sub.calories) * sub.calories_per_100g : 0;
+    const subChoPer100 = sub.calories > 0 ? (sub.carbs_g / sub.calories) * sub.calories_per_100g : 0;
+    const subFatPer100 = sub.calories > 0 ? (sub.fat_g / sub.calories) * sub.calories_per_100g : 0;
+    sub.quantity = Math.max(0.1, newSubQty);
+    sub.weight_g = Math.round(sub.measure_weight_g * sub.quantity * 10) / 10;
+    const subFactor = sub.weight_g / 100;
+    sub.calories = Math.round(sub.calories_per_100g * subFactor * 10) / 10;
+    sub.protein_g = Math.round(subPtnPer100 * subFactor * 10) / 10;
+    sub.carbs_g = Math.round(subChoPer100 * subFactor * 10) / 10;
+    sub.fat_g = Math.round(subFatPer100 * subFactor * 10) / 10;
+  }
+}
+
+// Convert a single meal/option's legacy food_groups into structured foods, in place.
+// Returns counts so callers can report results.
+async function convertTargetInPlace(target: any): Promise<{ converted: number; unconverted: number }> {
+  const foodGroups = target?.food_groups || [];
+  if (foodGroups.length === 0) return { converted: 0, unconverted: 0 };
+
+  const newFoods: SelectedFood[] = [...(target.foods || [])];
+  const unconvertedGroups: any[] = [];
+  let converted = 0;
+
+  for (const fg of foodGroups) {
+    const groupName = mapLegacyGroup(fg.group || 'Outros');
+    const text = (fg.options || '') as string;
+    const items = text.split(/\s*\|\s*/);
+    let groupHadFailure = false;
+
+    for (const itemText of items) {
+      if (!itemText.trim()) continue;
+      const alternatives = itemText.split(/\s+ou\s+/i);
+      let primaryFood: SelectedFood | null = null;
+      const subs: SelectedFood[] = [];
+      let failed = false;
+
+      for (let ai = 0; ai < alternatives.length; ai++) {
+        const alt = alternatives[ai].trim().replace(/\s*\(ex:.*\)/i, '');
+        if (!alt) continue;
+        const built = await lookupAndBuildFood(alt, groupName);
+        if (!built) { if (ai === 0) { failed = true; break; } continue; }
+        if (ai === 0) primaryFood = built; else subs.push(built);
+      }
+
+      if (failed) { groupHadFailure = true; break; }
+      if (primaryFood) {
+        if (subs.length > 0) primaryFood.substitutions = subs;
+        newFoods.push(primaryFood);
+        converted++;
+      }
+    }
+
+    if (groupHadFailure) unconvertedGroups.push(fg);
+  }
+
+  target.foods = newFoods;
+  target.food_groups = unconvertedGroups;
+  return { converted, unconverted: unconvertedGroups.length };
+}
+
+// Whether a meal/option still holds unconverted legacy text (and no structured foods yet).
+function targetIsPureLegacy(target: any): boolean {
+  return (!target?.foods || target.foods.length === 0) && (target?.food_groups?.length > 0);
+}
+
 export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSchedule, onUpdated }: EditableMealPlanProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
   const [editedAnalysis, setEditedAnalysis] = useState(() => deepClone(analysis));
 
   const meals = isEditing ? editedAnalysis.meal_plan?.meals ?? [] : analysis.meal_plan?.meals ?? [];
@@ -199,9 +275,9 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
 
   const mealTimes = useMemo(() => extractMealTimes(mealSchedule), [mealSchedule]);
 
-  // Compute real-time totals from structured foods across all meals and options
+  // Compute real-time totals from structured foods across all meals and options.
+  // Works in both view and edit mode so AI plans show caloric data once converted.
   const computedTotals = useMemo(() => {
-    if (!isEditing) return null;
     // Use only Opção 1 of each meal for daily total calculation
     const allFoods: SelectedFood[] = [];
     for (const meal of meals) {
@@ -213,7 +289,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     }
     if (allFoods.length === 0) return null;
     return sumFoods(allFoods);
-  }, [isEditing, meals]);
+  }, [meals]);
 
   const computedMealOptionTotals = useCallback((foods: SelectedFood[]) => {
     if (foods.length === 0) return null;
@@ -451,26 +527,46 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       }
 
       // Recalculate substitutions proportionally
-      if (food.substitutions?.length > 0 && oldCalories > 0 && food.calories > 0) {
-        const ratio = food.calories / oldCalories;
-        for (const sub of food.substitutions) {
-          if (sub.calories_per_100g && sub.calories_per_100g > 0) {
-            const targetCal = sub.calories * ratio;
-            const targetWeight = (targetCal / sub.calories_per_100g) * 100;
-            const newSubQty = Math.round((targetWeight / sub.measure_weight_g) * 10) / 10;
-            sub.quantity = Math.max(0.1, newSubQty);
-            sub.weight_g = Math.round(sub.measure_weight_g * sub.quantity * 10) / 10;
-            const subFactor = sub.weight_g / 100;
-            const subPtnPer100 = sub.calories > 0 ? (sub.protein_g / sub.calories) * sub.calories_per_100g : 0;
-            const subChoPer100 = sub.calories > 0 ? (sub.carbs_g / sub.calories) * sub.calories_per_100g : 0;
-            const subFatPer100 = sub.calories > 0 ? (sub.fat_g / sub.calories) * sub.calories_per_100g : 0;
-            sub.calories = Math.round(sub.calories_per_100g * subFactor * 10) / 10;
-            sub.protein_g = Math.round(subPtnPer100 * subFactor * 10) / 10;
-            sub.carbs_g = Math.round(subChoPer100 * subFactor * 10) / 10;
-            sub.fat_g = Math.round(subFatPer100 * subFactor * 10) / 10;
-          }
-        }
+      adjustSubstitutions(food, oldCalories);
+      return next;
+    });
+  };
+
+  // Replace a food's identity (keep its group + substitutions, re-scale substitutions)
+  const replaceFood = (mealIdx: number, foodTempId: string, newFood: SelectedFood, optIdx?: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      let foods: any[];
+      if (optIdx !== undefined && next.meal_plan.meals[mealIdx].options) {
+        foods = next.meal_plan.meals[mealIdx].options[optIdx].foods || [];
+      } else {
+        foods = next.meal_plan.meals[mealIdx].foods || [];
       }
+      const idx = foods.findIndex((f: any) => f.temp_id === foodTempId);
+      if (idx < 0) return next;
+      const old = foods[idx];
+      const oldCalories = old.calories;
+      const replaced: any = {
+        ...newFood,
+        temp_id: old.temp_id,
+        group: old.group,
+        substitutions: old.substitutions || [],
+        _showReplace: false,
+      };
+      adjustSubstitutions(replaced, oldCalories);
+      foods[idx] = replaced;
+      return next;
+    });
+  };
+
+  const toggleReplace = (mealIdx: number, foodTempId: string, show: boolean, optIdx?: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      const foods = optIdx !== undefined
+        ? next.meal_plan.meals[mealIdx].options[optIdx].foods
+        : next.meal_plan.meals[mealIdx].foods;
+      const f = foods?.find((x: any) => x.temp_id === foodTempId);
+      if (f) f._showReplace = show;
       return next;
     });
   };
@@ -523,8 +619,10 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         // Strip transient UI state from foods
         for (const f of (opt.foods || [])) {
           delete f._showSubSearch;
+          delete f._showReplace;
           for (const s of (f.substitutions || [])) {
             delete s._showSubSearch;
+            delete s._showReplace;
           }
         }
         if (opt.foods?.length > 0) {
@@ -626,12 +724,43 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     setIsEditing(false);
   };
 
-  const handleStartEditing = () => {
-    setEditedAnalysis(deepClone(analysis));
+  const handleStartEditing = async () => {
+    const base = deepClone(analysis);
+    setEditedAnalysis(base);
     setIsEditing(true);
+
+    // Auto-convert pure-legacy meals (AI-generated text) into structured foods so
+    // inline editing, substitution auto-adjust and real-time totals work immediately.
+    const mealsArr = base.meal_plan?.meals ?? [];
+    const legacyTargets: any[] = [];
+    for (const meal of mealsArr) {
+      const targets = meal.options?.length > 0 ? meal.options : [meal];
+      for (const t of targets) if (targetIsPureLegacy(t)) legacyTargets.push(t);
+    }
+    if (legacyTargets.length === 0) return;
+
+    setIsConverting(true);
+    try {
+      const results = await Promise.all(legacyTargets.map(convertTargetInPlace));
+      const totalConverted = results.reduce((a, r) => a + r.converted, 0);
+      const totalUnconverted = results.reduce((a, r) => a + r.unconverted, 0);
+      setEditedAnalysis(deepClone(base));
+
+      if (totalConverted === 0) {
+        toast.warning('Banco de alimentos indisponivel. Editando em modo texto.');
+      } else if (totalUnconverted > 0) {
+        toast.info(`${totalConverted} alimento(s) prontos para edicao inteligente. ${totalUnconverted} em modo texto.`);
+      } else {
+        toast.success('Plano pronto para edicao inteligente!');
+      }
+    } catch {
+      // Fall back to text editing silently
+    } finally {
+      setIsConverting(false);
+    }
   };
 
-  const busy = isAuditing || isSaving;
+  const busy = isAuditing || isSaving || isConverting;
 
   // Toggle substitution search for a food
   const toggleSubSearch = (mealIdx: number, foodTempId: string, show: boolean, optIdx?: number) => {
@@ -647,7 +776,6 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
   };
 
   // -- Convert legacy food_groups to structured foods --
-  const [isConverting, setIsConverting] = useState(false);
 
   const convertMealToStructured = async (mealIdx: number, optIdx?: number) => {
     setIsConverting(true);
@@ -658,55 +786,13 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         : next.meal_plan.meals[mealIdx];
       if (!target) return;
 
-      const foodGroups = target.food_groups || [];
-      if (foodGroups.length === 0) return;
-
-      const newFoods: SelectedFood[] = [...(target.foods || [])];
-      const unconverted: any[] = [];
-
-      for (const fg of foodGroups) {
-        const groupName = mapLegacyGroup(fg.group || 'Outros');
-        const text = (fg.options || '') as string;
-        const items = text.split(/\s*\|\s*/);
-
-        for (const itemText of items) {
-          if (!itemText.trim()) continue;
-          const alternatives = itemText.split(/\s+ou\s+/i);
-
-          let primaryFood: SelectedFood | null = null;
-          const subs: SelectedFood[] = [];
-          let failed = false;
-
-          for (let ai = 0; ai < alternatives.length; ai++) {
-            const alt = alternatives[ai].trim().replace(/\s*\(ex:.*\)/i, '');
-            if (!alt) continue;
-
-            const built = await lookupAndBuildFood(alt, groupName);
-            if (!built) {
-              if (ai === 0) { failed = true; break; }
-              continue;
-            }
-            if (ai === 0) primaryFood = built;
-            else subs.push(built);
-          }
-
-          if (failed) {
-            unconverted.push(fg);
-            break;
-          }
-          if (primaryFood) {
-            if (subs.length > 0) primaryFood.substitutions = subs;
-            newFoods.push(primaryFood);
-          }
-        }
-      }
-
-      target.foods = newFoods;
-      target.food_groups = unconverted;
+      const { converted, unconverted } = await convertTargetInPlace(target);
       setEditedAnalysis(next);
 
-      if (unconverted.length > 0) {
-        toast.info(`Convertido! ${unconverted.length} grupo(s) nao encontrado(s) no banco.`);
+      if (converted === 0) {
+        toast.warning('Nenhum alimento encontrado no banco. Verifique se o banco de alimentos foi carregado.');
+      } else if (unconverted > 0) {
+        toast.info(`Convertido! ${unconverted} grupo(s) nao encontrado(s) no banco.`);
       } else {
         toast.success('Alimentos convertidos para formato estruturado!');
       }
@@ -722,46 +808,26 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     try {
       const next = deepClone(editedAnalysis);
       const mealsArr = next.meal_plan?.meals ?? [];
+      let totalConverted = 0;
+      let totalUnconverted = 0;
 
-      for (let mi = 0; mi < mealsArr.length; mi++) {
-        const meal = mealsArr[mi];
+      for (const meal of mealsArr) {
         const targets = meal.options?.length > 0 ? meal.options : [meal];
         for (const t of targets) {
-          const foodGroups = t.food_groups || [];
-          if (foodGroups.length === 0) continue;
-          const newFoods: SelectedFood[] = [...(t.foods || [])];
-          const unconverted: any[] = [];
-          for (const fg of foodGroups) {
-            const groupName = mapLegacyGroup(fg.group || 'Outros');
-            const text = (fg.options || '') as string;
-            const items = text.split(/\s*\|\s*/);
-            for (const itemText of items) {
-              if (!itemText.trim()) continue;
-              const alternatives = itemText.split(/\s+ou\s+/i);
-              let primaryFood: SelectedFood | null = null;
-              const subs: SelectedFood[] = [];
-              let failed = false;
-              for (let ai = 0; ai < alternatives.length; ai++) {
-                const alt = alternatives[ai].trim().replace(/\s*\(ex:.*\)/i, '');
-                if (!alt) continue;
-                const built = await lookupAndBuildFood(alt, groupName);
-                if (!built) { if (ai === 0) { failed = true; break; } continue; }
-                if (ai === 0) primaryFood = built; else subs.push(built);
-              }
-              if (failed) { unconverted.push(fg); break; }
-              if (primaryFood) {
-                if (subs.length > 0) primaryFood.substitutions = subs;
-                newFoods.push(primaryFood);
-              }
-            }
-          }
-          t.foods = newFoods;
-          t.food_groups = unconverted;
+          const res = await convertTargetInPlace(t);
+          totalConverted += res.converted;
+          totalUnconverted += res.unconverted;
         }
       }
 
       setEditedAnalysis(next);
-      toast.success('Alimentos convertidos para formato estruturado!');
+      if (totalConverted === 0) {
+        toast.warning('Nenhum alimento encontrado no banco. Verifique se o banco de alimentos foi carregado.');
+      } else if (totalUnconverted > 0) {
+        toast.info(`${totalConverted} alimento(s) convertido(s). ${totalUnconverted} grupo(s) nao encontrado(s) no banco.`);
+      } else {
+        toast.success('Alimentos convertidos para formato estruturado!');
+      }
     } catch (err: any) {
       toast.error(`Erro: ${err.message}`);
     } finally {
@@ -785,6 +851,14 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             {GROUP_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
           <span className="text-sm font-medium flex-1 min-w-0 truncate">{food.name}</span>
+          <button
+            type="button"
+            title="Trocar alimento"
+            className="opacity-0 group-hover/food:opacity-100 text-muted-foreground hover:text-primary shrink-0"
+            onClick={() => toggleReplace(mealIdx, food.temp_id, !food._showReplace, optIdx)}
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
           <Input
             type="number"
             min={0.1}
@@ -812,6 +886,28 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             <Trash2 className="h-3 w-3" />
           </Button>
         </div>
+
+        {/* Inline replace search */}
+        {food._showReplace && (
+          <div className="pl-8 py-1 flex items-start gap-2">
+            <span className="text-[11px] text-primary font-semibold shrink-0 mt-2">trocar por:</span>
+            <div className="flex-1">
+              <FoodSearchAutocomplete
+                placeholder="Buscar novo alimento..."
+                compact
+                onAddFood={(newFood) => replaceFood(mealIdx, food.temp_id, newFood, optIdx)}
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground shrink-0 mt-0.5"
+              onClick={() => toggleReplace(mealIdx, food.temp_id, false, optIdx)}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
 
         {/* Substitutions */}
         {(food.substitutions || []).map((sub: any) => (
@@ -1198,7 +1294,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         </div>
 
         {/* Realizado - computed from actual foods (edit mode only) */}
-        {isEditing && computedTotals && (
+        {computedTotals && (
           <div className="mt-4 p-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
             <h4 className="font-semibold text-sm mb-3 flex items-center gap-2 text-green-800 dark:text-green-300">
               <TrendingUp className="h-3.5 w-3.5" />
