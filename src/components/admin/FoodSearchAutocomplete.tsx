@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -68,6 +69,11 @@ export default function FoodSearchAutocomplete({
   const [showMeasures, setShowMeasures] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const measureButtonRef = useRef<HTMLButtonElement>(null);
+  const measuresDropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const [measuresStyle, setMeasuresStyle] = useState<React.CSSProperties>({});
 
   const { data: rawResults = [], isLoading: searching } = useFoodSearch(query);
   const { data: measures = [] } = useFoodMeasures(selectedFood?.id ?? null);
@@ -98,7 +104,13 @@ export default function FoodSearchAutocomplete({
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !dropdownRef.current?.contains(target) &&
+        !measuresDropdownRef.current?.contains(target)
+      ) {
         setShowDropdown(false);
         setShowMeasures(false);
       }
@@ -106,6 +118,49 @@ export default function FoodSearchAutocomplete({
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  const getFloatingStyle = useCallback((anchor: HTMLElement, desiredHeight: number, minWidth?: number): React.CSSProperties => {
+    const rect = anchor.getBoundingClientRect();
+    const margin = 8;
+    const below = window.innerHeight - rect.bottom - margin;
+    const above = rect.top - margin;
+    const shouldOpenUp = below < 160 && above > below;
+    const available = Math.max(120, shouldOpenUp ? above : below);
+    const maxHeight = Math.min(desiredHeight, available);
+    const width = Math.max(rect.width, minWidth ?? rect.width);
+
+    return {
+      position: 'fixed',
+      left: Math.min(rect.left, window.innerWidth - width - margin),
+      top: shouldOpenUp ? Math.max(margin, rect.top - maxHeight - 4) : rect.bottom + 4,
+      width,
+      maxHeight,
+      zIndex: 9999,
+    };
+  }, []);
+
+  const updateFloatingPositions = useCallback(() => {
+    if (showDropdown && inputRef.current) {
+      setDropdownStyle(getFloatingStyle(inputRef.current, 280));
+    }
+    if (showMeasures && measureButtonRef.current) {
+      setMeasuresStyle(getFloatingStyle(measureButtonRef.current, 200, 260));
+    }
+  }, [getFloatingStyle, showDropdown, showMeasures]);
+
+  useEffect(() => {
+    updateFloatingPositions();
+  }, [updateFloatingPositions, query, results.length, searching, selectedFood, measures.length]);
+
+  useEffect(() => {
+    if (!showDropdown && !showMeasures) return;
+    window.addEventListener('scroll', updateFloatingPositions, true);
+    window.addEventListener('resize', updateFloatingPositions);
+    return () => {
+      window.removeEventListener('scroll', updateFloatingPositions, true);
+      window.removeEventListener('resize', updateFloatingPositions);
+    };
+  }, [showDropdown, showMeasures, updateFloatingPositions]);
 
   const handleSelectFood = useCallback((food: FoodItem) => {
     setSelectedFood(food);
@@ -184,8 +239,8 @@ export default function FoodSearchAutocomplete({
         )}
 
         {/* Dropdown results */}
-        {showDropdown && query.length >= 2 && !selectedFood && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border rounded-lg shadow-lg max-h-[280px] overflow-y-auto">
+        {showDropdown && query.length >= 2 && !selectedFood && createPortal(
+          <div ref={dropdownRef} style={dropdownStyle} className="bg-popover border rounded-lg shadow-lg overflow-y-auto">
             {results.length > 0 ? (
               results.map((food) => (
                 <button
@@ -238,7 +293,8 @@ export default function FoodSearchAutocomplete({
                 </p>
               </button>
             )}
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
 
@@ -270,6 +326,7 @@ export default function FoodSearchAutocomplete({
             {/* Measure picker */}
             <div className="relative">
               <Button
+                ref={measureButtonRef}
                 variant="outline"
                 size="sm"
                 className={`text-xs gap-1 max-w-[200px] ${compact ? 'h-7' : 'h-8'}`}
@@ -285,7 +342,7 @@ export default function FoodSearchAutocomplete({
               </Button>
 
               {showMeasures && measures.length > 0 && (
-                <div className="absolute z-50 top-full left-0 mt-1 bg-popover border rounded-lg shadow-lg min-w-[260px] max-h-[200px] overflow-y-auto">
+                createPortal(<div ref={measuresDropdownRef} style={measuresStyle} className="bg-popover border rounded-lg shadow-lg overflow-y-auto">
                   {measures.map((m) => {
                     const mWeight = m.measure_weight_g * quantity;
                     const mNutrients = calcNutrients(selectedFood, mWeight);
@@ -314,7 +371,7 @@ export default function FoodSearchAutocomplete({
                       </button>
                     );
                   })}
-                </div>
+                </div>, document.body)
               )}
             </div>
 
