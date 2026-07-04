@@ -87,6 +87,18 @@ function todayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// Monday of the week of the given date (same day if already Monday). Matches the
+// DB rule `(1 - DOW + 7) % 7`, keeping send dates consistent with the pipeline triggers.
+function mondayOfWeekStr(yyyyMmDd: string): string {
+  if (!yyyyMmDd) return '';
+  const [y, m, d] = yyyyMmDd.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const dt = new Date(y, m - 1, d);
+  const add = (1 - dt.getDay() + 7) % 7;
+  dt.setDate(dt.getDate() + add);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
 function fmtBR(yyyyMmDd: string): string {
   if (!yyyyMmDd) return '—';
   const [y, m, d] = yyyyMmDd.split('-');
@@ -237,9 +249,9 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
 
       if (updateError) throw updateError;
 
-      // 4. Reset consultation pipeline — clear future (non-completed) schedules
-      //    so the next consultations are only generated after the athlete books
-      //    (via link) or the admin schedules manually.
+      // 4. Reset consultation pipeline — clear future (non-completed) schedules.
+      //    (The clients update above may also trigger sync_pipeline_on_plan_change,
+      //    which cancels/clears pendings; this ensures a clean slate either way.)
       const { error: clearSchedulesError } = await supabase
         .from('consultation_schedules')
         .delete()
@@ -249,8 +261,67 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
         console.warn('[RenewPlan] failed to clear future schedules:', clearSchedulesError);
       }
 
-      // 5. Reset the schedule rule trigger so the cron does not pre-fire a link
-      //    before the athlete actually books the first consultation of the new plan.
+      // 5. If a first consultation date was provided, generate the pipeline of the
+      //    next consultations right away so it shows in "Consultas & Tarefas".
+      //    Otherwise, leave the pipeline empty (wait for the athlete to book).
+      let generatedCount = 0;
+      if (hasConsultations && firstConsultationDate && consultationFrequency !== 'once') {
+        const isMonthly = consultationFrequency === 'monthly';
+        const cadenceWeeks = consultationFrequency === 'six_weeks' ? 6 : 4;
+        const total = Math.max(1, computedConsultationCount);
+        const anchor = firstConsultationDate;
+        const firstIsPast = diffDays(todayStr(), anchor) <= 0; // anchor <= today
+
+        const rows: Array<{ client_id: string; user_id: string; scheduled_date: string; send_link_date: string; status: string }> = [];
+
+        // Consultation #1 (the anchor). If already attended, mark completed; else pending.
+        rows.push({
+          client_id: client.id,
+          user_id: user.id,
+          scheduled_date: anchor,
+          send_link_date: anchor,
+          status: firstIsPast ? 'completed' : 'pending',
+        });
+
+        // Consultations #2..#N at cadence, capped by the plan end date.
+        let currentBase = anchor;
+        for (let i = 1; i < total; i++) {
+          const intervalEnd = isMonthly
+            ? addMonthsStr(anchor, i)          // fixed anchor for monthly (matches DB)
+            : addDaysStr(currentBase, cadenceWeeks * 7); // accumulate for weeks
+          const sendDate = mondayOfWeekStr(intervalEnd);
+          if (diffDays(sendDate, newEndDate) < 0) break; // sendDate > end_date → stop
+          rows.push({
+            client_id: client.id,
+            user_id: user.id,
+            scheduled_date: sendDate,
+            send_link_date: sendDate,
+            status: 'pending',
+          });
+          currentBase = intervalEnd;
+        }
+
+        const { error: insertError } = await supabase
+          .from('consultation_schedules')
+          .insert(rows);
+        if (insertError) {
+          console.warn('[RenewPlan] failed to generate pipeline:', insertError);
+        } else {
+          generatedCount = rows.filter(r => r.status === 'pending').length;
+          // Re-assert first_consultation_date in case sync_pipeline_on_plan_change
+          // nulled it (it only touches this column, so the trigger body is skipped).
+          await supabase
+            .from('clients')
+            .update({
+              first_consultation_date: anchor,
+              remaining_consultations: Math.max(0, total - rows.filter(r => r.status === 'completed').length),
+            } as any)
+            .eq('id', client.id);
+        }
+      }
+
+      // 6. Reset the schedule rule trigger so the cron does not pre-fire a link
+      //    before the intended send dates of the new plan.
       const { error: clearRuleError } = await supabase
         .from('consultation_schedule_rules')
         .update({
@@ -267,9 +338,15 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
       await queryClient.invalidateQueries({ queryKey: ['clients'] });
       await queryClient.invalidateQueries({ queryKey: ['client-plan-history', client.id] });
       await queryClient.invalidateQueries({ queryKey: ['athlete-summary', client.id] });
-      await queryClient.invalidateQueries({ queryKey: ['consultation-schedules', client.id] });
+      await queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
+      await queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      await queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
       await queryClient.invalidateQueries({ queryKey: ['consultations'] });
-      toast.success('Plano renovado! Pipeline zerada — aguardando agendamento da próxima consulta.');
+      toast.success(
+        generatedCount > 0
+          ? `Plano renovado! ${generatedCount} próxima(s) consulta(s) planejada(s) na pipeline.`
+          : 'Plano renovado! Pipeline aguardando agendamento da próxima consulta.',
+      );
       onOpenChange(false);
     } catch (err: any) {
       toast.error('Erro ao renovar plano: ' + (err.message || 'Tente novamente'));
@@ -428,7 +505,9 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
                   <Label>Data da 1ª consulta / 1º envio do link</Label>
                   <DateInputBR value={firstConsultationDate} onChange={setFirstConsultationDate} />
                   <p className="text-[11px] text-muted-foreground">
-                    Âncora para a geração das próximas consultas.
+                    Ao preencher, a pipeline das próximas consultas é gerada automaticamente
+                    a partir desta data (cadência de {consultationFrequency === 'six_weeks' ? '6 semanas' : consultationFrequency === 'monthly' ? '4 semanas' : 'consulta única'}).
+                    Se vazio, a pipeline aguarda o agendamento do atleta.
                   </p>
                 </div>
               )}
