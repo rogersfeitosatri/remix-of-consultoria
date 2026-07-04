@@ -96,6 +96,96 @@ function parseTimeFromMealName(name: string): string {
   return match ? match[1].replace('.', ':') : '';
 }
 
+function extractFoodInfo(text: string): { searchTerm: string; weightG: number; qty: number } | null {
+  text = text.trim();
+  if (!text) return null;
+  // "50g de queijo minas light"
+  let m = text.match(/^(\d+(?:[.,]\d+)?)\s*g\s+de\s+(.+)/i);
+  if (m) {
+    return { searchTerm: m[2].replace(/\s*\(.*\)/, '').trim(), weightG: parseFloat(m[1].replace(',', '.')), qty: 1 };
+  }
+  // "1 fatias de pão francês (100g)" or "1 banana média (100g)"
+  m = text.match(/^(\d+(?:[.,]\d+)?)\s+(.+?)(?:\s*\((\d+(?:[.,]\d+)?)\s*g?\s*\))?$/i);
+  if (m) {
+    let name = m[2].trim();
+    name = name.replace(/^(?:fatias?\s+de|pedaços?\s+de|colheres?\s+(?:de\s+(?:sopa|cha|sobremesa)\s+(?:de\s+)?)?|xicaras?\s+de|porco?e?s?\s+de|files?\s+de|copos?\s+de|potes?\s+de|unidades?\s+de)\s*/i, '');
+    name = name.replace(/\s+(?:m[eé]dia|grande|pequena|m[eé]dio|pequeno|inteiro|inteira|cozida|cozido|grelhada|grelhado|light|zero\s*lactose)$/i, '');
+    const wg = m[3] ? parseFloat(m[3].replace(',', '.')) : 0;
+    return { searchTerm: name.trim(), weightG: wg, qty: parseFloat(m[1].replace(',', '.')) };
+  }
+  return null;
+}
+
+function mapLegacyGroup(group: string): string {
+  const n = group.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (n.includes('carboidrato') || n.includes('cereal')) return 'Carboidratos';
+  if (n.includes('proteina')) return 'Proteinas';
+  if (n.includes('gordura') || n.includes('lipid')) return 'Gorduras';
+  if (n.includes('fruta')) return 'Frutas';
+  if (n.includes('vegetal') || n.includes('legume') || n.includes('verdura') || n.includes('salada')) return 'Vegetais';
+  return 'Outros';
+}
+
+let _convId = 0;
+function nextConvId() { return `conv_${Date.now()}_${++_convId}`; }
+
+async function lookupAndBuildFood(
+  text: string,
+  group: string,
+): Promise<SelectedFood | null> {
+  const parsed = extractFoodInfo(text);
+  if (!parsed) return null;
+
+  const { data: foods } = await (supabase as any)
+    .from('food_items')
+    .select('*')
+    .ilike('name', `%${parsed.searchTerm}%`)
+    .limit(5);
+  if (!foods?.length) return null;
+
+  const food = foods.sort((a: any, b: any) => a.name.length - b.name.length)[0];
+
+  const { data: measures } = await (supabase as any)
+    .from('food_measures')
+    .select('*')
+    .eq('food_item_id', food.id)
+    .order('measure_weight_g', { ascending: false });
+  const measureList = (measures || []) as any[];
+  if (measureList.length === 0) return null;
+
+  let bestMeasure = measureList[0];
+  if (parsed.weightG > 0) {
+    bestMeasure = measureList.reduce((best: any, m: any) =>
+      Math.abs(m.measure_weight_g - parsed.weightG) < Math.abs(best.measure_weight_g - parsed.weightG) ? m : best,
+      measureList[0],
+    );
+  }
+
+  const qty = parsed.weightG > 0
+    ? Math.round((parsed.weightG / bestMeasure.measure_weight_g) * 10) / 10
+    : parsed.qty;
+  const weightG = bestMeasure.measure_weight_g * qty;
+  const factor = weightG / 100;
+
+  return {
+    temp_id: nextConvId(),
+    food_item_id: food.id,
+    name: food.name,
+    group,
+    measure_id: bestMeasure.id,
+    measure_name: bestMeasure.measure_name,
+    measure_weight_g: bestMeasure.measure_weight_g,
+    quantity: Math.max(0.1, qty),
+    weight_g: Math.round(weightG * 10) / 10,
+    calories: Math.round(food.calories_per_100g * factor * 10) / 10,
+    protein_g: Math.round(food.protein_per_100g * factor * 10) / 10,
+    carbs_g: Math.round(food.carbs_per_100g * factor * 10) / 10,
+    fat_g: Math.round(food.fat_per_100g * factor * 10) / 10,
+    fiber_g: Math.round((food.fiber_per_100g || 0) * factor * 10) / 10,
+    calories_per_100g: food.calories_per_100g,
+  };
+}
+
 export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSchedule, onUpdated }: EditableMealPlanProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
@@ -556,6 +646,129 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     });
   };
 
+  // -- Convert legacy food_groups to structured foods --
+  const [isConverting, setIsConverting] = useState(false);
+
+  const convertMealToStructured = async (mealIdx: number, optIdx?: number) => {
+    setIsConverting(true);
+    try {
+      const next = deepClone(editedAnalysis);
+      const target = optIdx !== undefined
+        ? next.meal_plan.meals[mealIdx].options?.[optIdx]
+        : next.meal_plan.meals[mealIdx];
+      if (!target) return;
+
+      const foodGroups = target.food_groups || [];
+      if (foodGroups.length === 0) return;
+
+      const newFoods: SelectedFood[] = [...(target.foods || [])];
+      const unconverted: any[] = [];
+
+      for (const fg of foodGroups) {
+        const groupName = mapLegacyGroup(fg.group || 'Outros');
+        const text = (fg.options || '') as string;
+        const items = text.split(/\s*\|\s*/);
+
+        for (const itemText of items) {
+          if (!itemText.trim()) continue;
+          const alternatives = itemText.split(/\s+ou\s+/i);
+
+          let primaryFood: SelectedFood | null = null;
+          const subs: SelectedFood[] = [];
+          let failed = false;
+
+          for (let ai = 0; ai < alternatives.length; ai++) {
+            const alt = alternatives[ai].trim().replace(/\s*\(ex:.*\)/i, '');
+            if (!alt) continue;
+
+            const built = await lookupAndBuildFood(alt, groupName);
+            if (!built) {
+              if (ai === 0) { failed = true; break; }
+              continue;
+            }
+            if (ai === 0) primaryFood = built;
+            else subs.push(built);
+          }
+
+          if (failed) {
+            unconverted.push(fg);
+            break;
+          }
+          if (primaryFood) {
+            if (subs.length > 0) primaryFood.substitutions = subs;
+            newFoods.push(primaryFood);
+          }
+        }
+      }
+
+      target.foods = newFoods;
+      target.food_groups = unconverted;
+      setEditedAnalysis(next);
+
+      if (unconverted.length > 0) {
+        toast.info(`Convertido! ${unconverted.length} grupo(s) nao encontrado(s) no banco.`);
+      } else {
+        toast.success('Alimentos convertidos para formato estruturado!');
+      }
+    } catch (err: any) {
+      toast.error(`Erro: ${err.message}`);
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
+  const convertAllMeals = async () => {
+    setIsConverting(true);
+    try {
+      const next = deepClone(editedAnalysis);
+      const mealsArr = next.meal_plan?.meals ?? [];
+
+      for (let mi = 0; mi < mealsArr.length; mi++) {
+        const meal = mealsArr[mi];
+        const targets = meal.options?.length > 0 ? meal.options : [meal];
+        for (const t of targets) {
+          const foodGroups = t.food_groups || [];
+          if (foodGroups.length === 0) continue;
+          const newFoods: SelectedFood[] = [...(t.foods || [])];
+          const unconverted: any[] = [];
+          for (const fg of foodGroups) {
+            const groupName = mapLegacyGroup(fg.group || 'Outros');
+            const text = (fg.options || '') as string;
+            const items = text.split(/\s*\|\s*/);
+            for (const itemText of items) {
+              if (!itemText.trim()) continue;
+              const alternatives = itemText.split(/\s+ou\s+/i);
+              let primaryFood: SelectedFood | null = null;
+              const subs: SelectedFood[] = [];
+              let failed = false;
+              for (let ai = 0; ai < alternatives.length; ai++) {
+                const alt = alternatives[ai].trim().replace(/\s*\(ex:.*\)/i, '');
+                if (!alt) continue;
+                const built = await lookupAndBuildFood(alt, groupName);
+                if (!built) { if (ai === 0) { failed = true; break; } continue; }
+                if (ai === 0) primaryFood = built; else subs.push(built);
+              }
+              if (failed) { unconverted.push(fg); break; }
+              if (primaryFood) {
+                if (subs.length > 0) primaryFood.substitutions = subs;
+                newFoods.push(primaryFood);
+              }
+            }
+          }
+          t.foods = newFoods;
+          t.food_groups = unconverted;
+        }
+      }
+
+      setEditedAnalysis(next);
+      toast.success('Alimentos convertidos para formato estruturado!');
+    } catch (err: any) {
+      toast.error(`Erro: ${err.message}`);
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
   // -- Render food item row --
   const renderFoodRow = (food: any, mealIdx: number, optIdx?: number) => {
     const foodGroup = food.group || 'Outros';
@@ -662,9 +875,19 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
   // -- Render food list for a meal or option --
   const renderFoodList = (foods: any[], legacyGroups: any[], mealIdx: number, optIdx?: number) => (
     <div className="space-y-1">
-      {/* Legacy food groups (editable text) */}
+      {/* Legacy food groups with convert button */}
       {legacyGroups.length > 0 && (
         <div className="space-y-2 pb-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5 text-xs border-primary/50 text-primary hover:bg-primary/10"
+            onClick={() => convertMealToStructured(mealIdx, optIdx)}
+            disabled={isConverting}
+          >
+            {isConverting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Utensils className="h-3.5 w-3.5" />}
+            Converter para formato estruturado (habilita edicao inteligente)
+          </Button>
           {legacyGroups.map((fg: any, j: number) => (
             <div key={j} className="rounded border bg-muted/20 overflow-hidden">
               <div className={`flex items-center gap-2 px-2 py-1 ${GROUP_COLORS[fg.group] || 'bg-muted/40'}`}>
@@ -743,6 +966,21 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
+          {isEditing && meals.some((m: any) => {
+            if (m.options?.length > 0) return m.options.some((o: any) => o.food_groups?.length > 0);
+            return m.food_groups?.length > 0;
+          }) && (
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full gap-2"
+              onClick={convertAllMeals}
+              disabled={isConverting}
+            >
+              {isConverting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Utensils className="h-4 w-4" />}
+              Converter todos os alimentos para formato estruturado
+            </Button>
+          )}
           {meals.map((meal: any, i: number) => {
             const hasOptions = meal.options?.length > 0;
 
