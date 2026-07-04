@@ -332,8 +332,14 @@ export function AthleteSummaryConsultCard({
       const planEndDate = parseISO(client.end_date);
       const anchor = parseISO(anchorDate);
 
+      // Only consider schedules from the current plan period (ignore previous cycles)
+      const planStartStr = client.start_date || null;
+      const currentPlanSchedules = schedules.filter(
+        s => !planStartStr || (s.scheduled_date && s.scheduled_date >= planStartStr)
+      );
+
       // 1. Mark existing first schedule as completed, or create one
-      const existingFirst = schedules.find(s => s.status === 'pending');
+      const existingFirst = currentPlanSchedules.find(s => s.status === 'pending');
       if (existingFirst) {
         await supabase
           .from('consultation_schedules')
@@ -352,7 +358,7 @@ export function AthleteSummaryConsultCard({
       }
 
       // 2. Generate remaining schedules
-      const existingCompleted = schedules.filter(s => s.status === 'completed').length;
+      const existingCompleted = currentPlanSchedules.filter(s => s.status === 'completed').length;
       const alreadyCompletedCount = existingCompleted + (existingFirst ? 0 : 1); // +1 for the one we just created/updated
       const remaining = totalConsultations - alreadyCompletedCount;
       
@@ -382,7 +388,7 @@ export function AthleteSummaryConsultCard({
       }
 
       // Delete any remaining pending schedules that aren't the first one
-      const pendingIds = schedules
+      const pendingIds = currentPlanSchedules
         .filter(s => ['pending', 'sent', 'link_sent'].includes(s.status) && s.id !== existingFirst?.id)
         .map(s => s.id);
       
@@ -441,19 +447,30 @@ export function AthleteSummaryConsultCard({
   };
 
   const today = new Date();
-  const completedAppointments = appointments.filter(a => a.status === 'completed');
-  const upcomingAppointments = appointments.filter(a => 
+
+  // Scope schedules/appointments to the CURRENT plan period so that, after a
+  // renewal (which advances start_date), the pipeline resets: consultations from
+  // the previous plan cycle no longer count. This also re-enables the manual
+  // "Confirmar Consulta 1" flow, which is hidden while completed schedules exist.
+  const planStart = client.start_date || null;
+  const inCurrentPlan = (dateStr?: string | null) => !planStart || (!!dateStr && dateStr >= planStart);
+
+  const planSchedules = schedules.filter(s => inCurrentPlan(s.scheduled_date));
+  const planAppointments = appointments.filter(a => inCurrentPlan(a.appointment_date));
+
+  const completedAppointments = planAppointments.filter(a => a.status === 'completed');
+  const upcomingAppointments = planAppointments.filter(a =>
     ['scheduled', 'confirmed'].includes(a.status) && !isPast(parseISO(a.appointment_date))
   );
-  const nextAppointment = upcomingAppointments.length > 0 
-    ? upcomingAppointments[upcomingAppointments.length - 1] 
+  const nextAppointment = upcomingAppointments.length > 0
+    ? upcomingAppointments[upcomingAppointments.length - 1]
     : null;
 
-  // Pipeline: future/pending schedules
-  const pendingSchedules = schedules.filter(s => ['pending', 'sent', 'link_sent'].includes(s.status));
-  const scheduledSchedules = schedules.filter(s => s.status === 'scheduled');
-  const completedSchedules = schedules.filter(s => s.status === 'completed' && s.confirmation_status !== 'nao_realizada');
-  const notRealizedSchedules = schedules.filter(s => s.confirmation_status === 'nao_realizada');
+  // Pipeline: future/pending schedules (scoped to the current plan)
+  const pendingSchedules = planSchedules.filter(s => ['pending', 'sent', 'link_sent'].includes(s.status));
+  const scheduledSchedules = planSchedules.filter(s => s.status === 'scheduled');
+  const completedSchedules = planSchedules.filter(s => s.status === 'completed' && s.confirmation_status !== 'nao_realizada');
+  const notRealizedSchedules = planSchedules.filter(s => s.confirmation_status === 'nao_realizada');
 
   // Last completed consultation date (from appointments)
   const lastCompletedAppointment = completedAppointments.length > 0 ? completedAppointments[0] : null;
@@ -602,9 +619,9 @@ export function AthleteSummaryConsultCard({
                 <span className="flex items-center gap-1.5">
                   <Send className="h-3 w-3 text-primary" />
                   Pipeline de Consultas
-                  {schedules.length > 0 && (
+                  {planSchedules.length > 0 && (
                     <Badge variant="secondary" className="text-[10px] h-4 px-1">
-                      {completedSchedules.length}/{schedules.length}
+                      {completedSchedules.length}/{planSchedules.length}
                     </Badge>
                   )}
                 </span>
@@ -629,14 +646,14 @@ export function AthleteSummaryConsultCard({
               </div>
 
               {/* Show confirm + generate button when pipeline is incomplete */}
-              {completedSchedules.length === 0 && schedules.length < (client.consultation_count || 1) && client.consultation_frequency !== 'once' && (
+              {completedSchedules.length === 0 && planSchedules.length < (client.consultation_count || 1) && client.consultation_frequency !== 'once' && (
                 <div className="p-3 rounded-md border border-amber-500/30 bg-amber-500/5 space-y-2">
                   <div className="flex items-center gap-2 text-xs">
                     <Zap className="h-4 w-4 text-amber-500 shrink-0" />
                     <div>
                       <p className="font-medium text-foreground">Pipeline incompleto</p>
                       <p className="text-muted-foreground">
-                        {schedules.length}/{client.consultation_count} consultas no cronograma. Confirme a consulta 1 para gerar as demais automaticamente.
+                        {planSchedules.length}/{client.consultation_count} consultas no cronograma. Confirme a consulta 1 para gerar as demais automaticamente.
                       </p>
                     </div>
                   </div>
@@ -689,7 +706,7 @@ export function AthleteSummaryConsultCard({
                 </div>
               )}
 
-              {schedules.length === 0 && completedSchedules.length === 0 && (client.consultation_frequency === 'once' || (client.consultation_count || 0) <= 1) ? (
+              {planSchedules.length === 0 && completedSchedules.length === 0 && (client.consultation_frequency === 'once' || (client.consultation_count || 0) <= 1) ? (
                 <div className="p-3 text-center text-xs text-muted-foreground border border-dashed rounded-md">
                   <AlertTriangle className="h-4 w-4 mx-auto mb-1 text-amber-500" />
                   <p>Nenhum cronograma gerado.</p>
@@ -698,7 +715,7 @@ export function AthleteSummaryConsultCard({
               ) : (
                 <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1">
                   {/* Note: with action buttons, schedules need more vertical room */}
-                  {schedules.map((schedule, index) => {
+                  {planSchedules.map((schedule, index) => {
                     const isEditingThis = editingScheduleId === schedule.id;
                     const canManage = ['pending', 'sent', 'link_sent'].includes(schedule.status);
                     const canResend = ['pending', 'sent', 'link_sent'].includes(schedule.status);
