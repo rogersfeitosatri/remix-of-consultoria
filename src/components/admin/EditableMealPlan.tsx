@@ -177,16 +177,14 @@ async function lookupAndBuildFood(
   group: string,
 ): Promise<SelectedFood | null> {
   const parsed = extractFoodInfo(text);
-  if (!parsed) return null;
+  if (!parsed.searchTerm) return null;
 
-  const { data: foods } = await (supabase as any)
-    .from('food_items')
-    .select('*')
-    .ilike('name', `%${parsed.searchTerm}%`)
-    .limit(5);
-  if (!foods?.length) return null;
-
-  const food = foods.sort((a: any, b: any) => a.name.length - b.name.length)[0];
+  let food = await searchFoodInDb(parsed.searchTerm);
+  if (!food) {
+    // Fallback: ask AI to look up nutritional data and register the food
+    food = await lookupCustomFoodFallback(parsed.searchTerm);
+    if (!food) return null;
+  }
 
   const { data: measures } = await (supabase as any)
     .from('food_measures')
@@ -195,6 +193,7 @@ async function lookupAndBuildFood(
     .order('measure_weight_g', { ascending: false });
   const measureList = (measures || []) as any[];
   if (measureList.length === 0) return null;
+
 
   let bestMeasure = measureList[0];
   if (parsed.weightG > 0) {
