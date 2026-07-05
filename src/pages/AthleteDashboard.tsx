@@ -36,14 +36,12 @@ export default function AthleteDashboard() {
   const firstFormId = checkinResponses[0]?.form_id;
   const { data: checkinQuestions = [] } = useCheckinQuestions(firstFormId);
 
+  const { data: athleteWeight } = useAthleteWeight(client?.id);
   const athleteWeightKg =
+    athleteWeight?.weightKg ??
     (athleteProfile as any)?.current_weight ??
     (client as any)?.current_weight ??
-    (() => {
-      const found: any = checkinResponses.find((c: any) => c?.responses?.peso);
-      const p = found?.responses?.peso;
-      return p ? parseFloat(String(p).replace(',', '.')) : null;
-    })();
+    null;
 
   const anamneseCompleted =
     (athleteProfile as any)?.anamnese_completed === true || (athleteProfile as any)?.anamnese_submitted_at != null;
