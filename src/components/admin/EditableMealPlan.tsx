@@ -962,13 +962,10 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             >
               <Minus className="h-4 w-4" />
             </button>
-            <Input
-              type="number"
-              min={0.1}
-              step={0.5}
+            <QuantityInput
               value={food.quantity}
-              onChange={(e) => setQty(parseFloat(e.target.value) || 0.1)}
-              className="w-12 h-full text-center px-0 border-0 border-x rounded-none font-semibold text-sm focus-visible:ring-0"
+              onCommit={(v) => setQty(v)}
+              className="w-14 h-full text-center px-0 border-0 border-x rounded-none font-semibold text-sm focus-visible:ring-0"
             />
             <button
               type="button"
