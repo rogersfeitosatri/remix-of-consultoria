@@ -7,6 +7,7 @@ export interface AdminSettings {
   user_id: string;
   enable_continuation_mode: boolean;
   admin_whatsapp_number?: string | null;
+  nutrition_support_whatsapp?: string | null;
   created_at: string;
   updated_at: string;
 }
