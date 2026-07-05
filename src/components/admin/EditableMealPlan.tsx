@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -962,13 +962,10 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             >
               <Minus className="h-4 w-4" />
             </button>
-            <Input
-              type="number"
-              min={0.1}
-              step={0.5}
+            <QuantityInput
               value={food.quantity}
-              onChange={(e) => setQty(parseFloat(e.target.value) || 0.1)}
-              className="w-12 h-full text-center px-0 border-0 border-x rounded-none font-semibold text-sm focus-visible:ring-0"
+              onCommit={(v) => setQty(v)}
+              className="w-14 h-full text-center px-0 border-0 border-x rounded-none font-semibold text-sm focus-visible:ring-0"
             />
             <button
               type="button"
@@ -1521,3 +1518,55 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     </Card>
   );
 }
+
+/**
+ * Numeric input that keeps a local string so the user can clear the field
+ * and type freely (e.g. "0." or ""). Commits on blur / Enter, ignoring
+ * empty or invalid values (reverts to the last valid prop value).
+ */
+function QuantityInput({
+  value,
+  onCommit,
+  className,
+}: {
+  value: number;
+  onCommit: (v: number) => void;
+  className?: string;
+}) {
+  const [text, setText] = useState<string>(String(value));
+
+  // Sync when the external value changes (e.g. stepper buttons).
+  useEffect(() => {
+    setText((prev) => (parseFloat(prev.replace(',', '.')) === value ? prev : String(value)));
+  }, [value]);
+
+  const commit = () => {
+    const parsed = parseFloat(text.replace(',', '.'));
+    if (!isFinite(parsed) || parsed <= 0) {
+      setText(String(value));
+      return;
+    }
+    const rounded = Math.round(parsed * 10) / 10;
+    if (rounded !== value) onCommit(rounded);
+    setText(String(rounded));
+  };
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          (e.currentTarget as HTMLInputElement).blur();
+        }
+      }}
+      className={className}
+    />
+  );
+}
+
