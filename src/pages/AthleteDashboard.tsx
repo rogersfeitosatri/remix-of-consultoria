@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole, useAthleteClient, useCheckinResponses, useCheckinQuestions, useAthleteProfile } from '@/hooks/useUserRole';
 import { useAthleteAnalysis } from '@/hooks/useAthleteAnalysis';
+import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { AthleteApp } from '@/components/athlete/app/AthleteApp';
 import { Button } from '@/components/ui/button';
 import { Home, Eye } from 'lucide-react';
