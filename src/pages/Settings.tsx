@@ -1213,6 +1213,48 @@ export default function Settings() {
               </AccordionContent>
             </AccordionItem>
 
+            <AccordionItem value="nutrition-support" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <PhoneCall className="h-5 w-5 text-emerald-500 shrink-0" />
+                  <div>
+                    <div className="font-semibold">Suporte via WhatsApp (Dieta)</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Número que aparecerá no app do atleta para tirar dúvidas do plano
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <div className="space-y-3 p-4 border rounded-lg">
+                  <Label htmlFor="nutritionSupportWhatsapp" className="font-medium">
+                    Número do assistente nutricional (WhatsApp)
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Formato internacional com DDI e DDD, ex.: <code>+5599999999999</code>.
+                    O botão de suporte no app do atleta abrirá uma conversa com este número.
+                  </p>
+                  <Input
+                    id="nutritionSupportWhatsapp"
+                    type="tel"
+                    placeholder="+5599999999999"
+                    defaultValue={adminSettings?.nutrition_support_whatsapp || ''}
+                    onBlur={async (e) => {
+                      const value = e.target.value.trim() || null;
+                      if ((adminSettings?.nutrition_support_whatsapp || null) === value) return;
+                      try {
+                        await saveAdminSettings.mutateAsync({ nutrition_support_whatsapp: value });
+                        toast.success('Número de suporte atualizado');
+                      } catch {
+                        toast.error('Erro ao salvar número');
+                      }
+                    }}
+                  />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+
             <AccordionItem value="periodization" className="border border-border rounded-lg bg-card px-4">
               <AccordionTrigger className="hover:no-underline py-4">
                 <div className="flex items-center gap-2 text-left">
