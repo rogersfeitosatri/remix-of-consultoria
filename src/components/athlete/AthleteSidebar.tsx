@@ -3,15 +3,15 @@ import logoRF from '@/assets/logo-rf.jpg';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Menu, 
+import {
+  Menu,
   LogOut,
   PersonStanding,
   Utensils,
+  Target,
+  Trophy,
   ClipboardCheck,
-  MessageSquare,
   FileText,
-  History,
   User,
   HelpCircle
 } from 'lucide-react';
@@ -27,8 +27,10 @@ interface AthleteSidebarProps {
 
 const menuItems = [
   { id: 'inicio', label: 'Início', icon: PersonStanding },
-  { id: 'dieta', label: 'Dieta', icon: Utensils },
-  { id: 'historico', label: 'Histórico', icon: History },
+  { id: 'plano', label: 'Plano Alimentar', icon: Utensils },
+  { id: 'orientacoes', label: 'Estratégia', icon: Target },
+  { id: 'evolucao', label: 'Evolução', icon: ClipboardCheck },
+  { id: 'provas', label: 'Provas', icon: Trophy },
   { id: 'materiais', label: 'Materiais', icon: FileText },
   { id: 'perfil', label: 'Perfil', icon: User },
 ];

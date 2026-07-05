@@ -1,7 +1,13 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole, useAthleteClient, useCheckinResponses, useCheckinQuestions, useAthleteProfile } from '@/hooks/useUserRole';
+import { useAthleteAnalysis } from '@/hooks/useAthleteAnalysis';
+import { AthleteMealPlanView } from '@/components/athlete/AthleteMealPlanView';
+import { AthleteStrategicView } from '@/components/athlete/AthleteStrategicView';
+import { AthleteRaceView } from '@/components/athlete/AthleteRaceView';
 import { useAthleteSupportMaterials, useAthleteDietAppConfig } from '@/hooks/useSupportMaterials';
 import { useIsClientContinuation } from '@/hooks/useAthleteFirstConsult';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Home, LogOut, ArrowLeft, Eye, ClipboardCheck, Utensils, FileText, User } from 'lucide-react';
+import { Home, LogOut, ArrowLeft, Eye, ClipboardCheck, Utensils, FileText, User, Target, Trophy } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
@@ -39,11 +45,29 @@ function getYouTubeEmbedUrl(url: string): string | null {
 
 export default function AthleteDashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, signOut, loading: authLoading } = useAuth();
   const { isAdmin, isLoading: roleLoading } = useUserRole();
-  const { data: client, isLoading: clientLoading } = useAthleteClient();
+  const { data: ownClient, isLoading: clientLoading } = useAthleteClient();
+
+  // Admin "Visualizar como atleta": when an admin opens /athlete?clientId=<id>,
+  // render THAT athlete's real app (read-only) instead of the admin's own client.
+  const viewClientId = isAdmin ? searchParams.get('clientId') : null;
+  const { data: adminViewClient, isLoading: adminViewLoading } = useQuery({
+    queryKey: ['admin-view-client', viewClientId],
+    enabled: !!viewClientId,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('clients').select('*').eq('id', viewClientId!).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const isAdminViewing = !!viewClientId && !!adminViewClient;
+  const client = isAdminViewing ? adminViewClient : ownClient;
   const { data: continuationStatus } = useIsClientContinuation(client?.id);
   const { data: athleteProfile } = useAthleteProfile(client?.id);
+  const { data: analysis } = useAthleteAnalysis(client?.id);
+  const athleteWeightKg = (athleteProfile as any)?.current_weight ?? (client as any)?.current_weight ?? null;
   const { data: checkinResponses = [], isLoading: responsesLoading } = useCheckinResponses(client?.id);
   const firstFormId = checkinResponses[0]?.form_id;
   const { data: checkinQuestions = [] } = useCheckinQuestions(firstFormId);
@@ -79,7 +103,7 @@ export default function AthleteDashboard() {
   const handleFillAnamnese = () => { navigate('/athlete/anamnese'); };
   const handleContactSupport = () => { window.open('https://wa.me/5511999999999?text=Olá! Preciso de ajuda com a área do atleta.', '_blank'); };
 
-  if (authLoading || clientLoading || roleLoading) {
+  if (authLoading || clientLoading || roleLoading || (viewClientId && adminViewLoading)) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[hsl(43,74%,49%)]"></div>
@@ -91,8 +115,8 @@ export default function AthleteDashboard() {
 
   const serviceTypeLabel = { nutrition: 'Nutrição', training: 'Treinamento', both: 'Nutrição + Treinamento' }[client?.service_type || 'both'];
 
-  // Admin preview mode - show the same content as athletes
-  if (isAdmin && !client) {
+  // Admin preview mode (no specific athlete selected) - static preview of the app
+  if (isAdmin && !client && !viewClientId) {
     return (
       <div className="min-h-screen bg-black text-white">
         <div className="bg-[hsl(43,74%,49%)] text-primary-foreground py-2 px-4 flex items-center justify-center gap-2">
@@ -213,6 +237,15 @@ export default function AthleteDashboard() {
 
   return (
     <div className="min-h-screen bg-black text-white">
+      {isAdminViewing && (
+        <div className="bg-[hsl(43,74%,49%)] text-primary-foreground py-2 px-4 flex items-center justify-center gap-2">
+          <Eye className="h-4 w-4" />
+          <span className="text-sm font-medium">Vendo como: {client.name}</span>
+          <Button variant="secondary" size="sm" className="ml-4 h-7 bg-black text-white hover:bg-gray-800" onClick={handleBackToAdmin}>
+            <ArrowLeft className="h-3 w-3 mr-1" />Voltar ao admin
+          </Button>
+        </div>
+      )}
       <header className="border-b border-gray-800 bg-black sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -274,12 +307,14 @@ export default function AthleteDashboard() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-gray-900 border border-gray-800 p-1">
-            <TabsTrigger value="inicio" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><Home className="h-4 w-4" /><span className="hidden lg:inline">Início</span></TabsTrigger>
-            <TabsTrigger value="dieta" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><Utensils className="h-4 w-4" /><span className="hidden lg:inline">Dieta</span></TabsTrigger>
-            <TabsTrigger value="historico" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><ClipboardCheck className="h-4 w-4" /><span className="hidden lg:inline">Histórico</span></TabsTrigger>
-            <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><FileText className="h-4 w-4" /><span className="hidden lg:inline">Materiais</span></TabsTrigger>
-            <TabsTrigger value="perfil" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><User className="h-4 w-4" /><span className="hidden lg:inline">Perfil</span></TabsTrigger>
+          <TabsList className="grid w-full grid-cols-7 bg-gray-900 border border-gray-800 p-1">
+            <TabsTrigger value="inicio" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><Home className="h-4 w-4" /><span className="hidden xl:inline">Início</span></TabsTrigger>
+            <TabsTrigger value="plano" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><Utensils className="h-4 w-4" /><span className="hidden xl:inline">Plano</span></TabsTrigger>
+            <TabsTrigger value="orientacoes" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><Target className="h-4 w-4" /><span className="hidden xl:inline">Estratégia</span></TabsTrigger>
+            <TabsTrigger value="evolucao" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><ClipboardCheck className="h-4 w-4" /><span className="hidden xl:inline">Evolução</span></TabsTrigger>
+            <TabsTrigger value="provas" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><Trophy className="h-4 w-4" /><span className="hidden xl:inline">Provas</span></TabsTrigger>
+            <TabsTrigger value="materiais" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><FileText className="h-4 w-4" /><span className="hidden xl:inline">Materiais</span></TabsTrigger>
+            <TabsTrigger value="perfil" className="gap-1 data-[state=active]:bg-[hsl(43,74%,49%)] data-[state=active]:text-primary-foreground text-white text-xs"><User className="h-4 w-4" /><span className="hidden xl:inline">Perfil</span></TabsTrigger>
           </TabsList>
 
           <TabsContent value="inicio">
@@ -288,7 +323,7 @@ export default function AthleteDashboard() {
               <CardContent>
                 {/* Aviso informativo de próxima consulta */}
                 <NextConsultInfo clientId={client.id} />
-                
+
                 {allInicioMaterials.length === 0 ? <p className="text-gray-400 text-center py-8">Conteúdo de boas-vindas em breve...</p> : (
                   <div className="space-y-4">{allInicioMaterials.map((m) => (
                     <div key={m.id} className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
@@ -301,12 +336,30 @@ export default function AthleteDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="dieta">
-            <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Acesso à Dieta</CardTitle></CardHeader><CardContent>{dietConfig?.app_download_instructions ? <p className="text-gray-300 whitespace-pre-wrap"><LinkifiedText text={dietConfig.app_download_instructions} /></p> : <p className="text-gray-400 text-center py-8">Instruções em breve...</p>}</CardContent></Card>
-            {dietConfig?.app_code && <Card className="bg-gray-900 border-gray-800 border-[hsl(43,74%,49%)]/30 mt-4"><CardContent className="py-6 text-center"><p className="text-sm text-gray-400 mb-2">Seu código</p><p className="text-3xl font-bold text-[hsl(43,74%,49%)] font-mono">{dietConfig.app_code}</p></CardContent></Card>}
+          {/* Plano Alimentar — visual, somente leitura */}
+          <TabsContent value="plano">
+            <AthleteMealPlanView analysis={analysis} weightKg={athleteWeightKg} />
+            {dietConfig?.app_code && (
+              <Card className="bg-gray-900 border-gray-800 border-[hsl(43,74%,49%)]/30 mt-4">
+                <CardContent className="py-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Código do App de Dieta</p>
+                  <p className="text-2xl font-bold text-[hsl(43,74%,49%)] font-mono">{dietConfig.app_code}</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
-          <TabsContent value="historico">
+          {/* Orientações Estratégicas */}
+          <TabsContent value="orientacoes">
+            <AthleteStrategicView analysis={analysis} />
+          </TabsContent>
+
+          {/* Planejamento de Prova */}
+          <TabsContent value="provas">
+            <AthleteRaceView clientId={client.id} />
+          </TabsContent>
+
+          <TabsContent value="evolucao">
             <Card className="bg-gray-900 border-gray-800"><CardHeader><CardTitle className="text-white">Histórico de Check-ins</CardTitle></CardHeader><CardContent>
               {checkinResponses.length === 0 ? <p className="text-gray-400 text-center py-8">Nenhum check-in realizado</p> : (
                 <div className="space-y-3">{checkinResponses.map((r: any) => (
