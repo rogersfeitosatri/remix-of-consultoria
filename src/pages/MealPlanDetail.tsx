@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
+import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2 } from 'lucide-react';
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
@@ -180,7 +181,13 @@ export default function MealPlanDetail() {
     onError: (e: any) => toast.error(e.message || 'Erro ao criar plano'),
   });
 
-  const athleteWeightKg = (anamnese as any)?.current_weight ?? (client as any)?.current_weight ?? null;
+  // Peso de referência para g/kg: último checkin com peso → anamnese (fallback)
+  const { data: weightInfo } = useAthleteWeight(clientId);
+  const athleteWeightKg =
+    weightInfo?.weightKg ??
+    (anamnese as any)?.current_weight ??
+    (client as any)?.current_weight ??
+    null;
   const mealSchedule = anamnese ? {
     cafe_da_manha: (anamnese as any).meal_breakfast,
     lanche_manha: (anamnese as any).meal_morning_snack,
@@ -221,7 +228,13 @@ export default function MealPlanDetail() {
               {client && <Badge variant="outline" className="text-[10px]">{PLAN_LABEL[(client as any).plan_type] || (client as any).plan_type}</Badge>}
               {hasPlan ? <Badge className="text-[10px] bg-emerald-500/15 text-emerald-600 border-emerald-500/30">Plano criado</Badge>
                        : <Badge className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30">Sem plano</Badge>}
-              {athleteWeightKg && <span className="text-xs text-muted-foreground">Peso: {athleteWeightKg} kg</span>}
+              {athleteWeightKg && (
+                <span className="text-xs text-muted-foreground">
+                  Peso: {athleteWeightKg} kg
+                  {weightInfo?.source === 'checkin' && ' (último check-in)'}
+                  {weightInfo?.source === 'anamnese' && ' (anamnese)'}
+                </span>
+              )}
             </div>
           </div>
         </div>
