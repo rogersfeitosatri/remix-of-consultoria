@@ -1,0 +1,136 @@
+// Normaliza o plano alimentar (estruturado do editor OU texto gerado pela IA)
+// para uma forma pronta para a UI do atleta, com substituições em "Outras opções".
+
+import type { AthleteAnalysis, MealPlanMeal } from '@/hooks/useAthleteAnalysis';
+
+export interface PlanFood {
+  name: string;
+  amount?: string; // "2", "100 g", "1 fatia"...
+  measure?: string; // medida caseira
+  weight?: string; // "100g"
+  raw: string;
+}
+
+export interface PlanFoodGroup {
+  primary: PlanFood;
+  alternatives: PlanFood[];
+}
+
+export interface PlanMeal {
+  key: string;
+  name: string;
+  time?: string;
+  observation?: string;
+  macros?: string;
+  foods: PlanFoodGroup[];
+}
+
+const EMOJI: [RegExp, string][] = [
+  [/café|cafe|manhã|manha/i, '☕'],
+  [/almo/i, '🍽️'],
+  [/jantar|noite/i, '🌙'],
+  [/ceia/i, '🥛'],
+  [/pré|pre|pós|pos|treino/i, '💪'],
+  [/lanche|tarde/i, '🍎'],
+];
+
+export function mealEmoji(name: string): string {
+  for (const [re, e] of EMOJI) if (re.test(name || '')) return e;
+  return '🍴';
+}
+
+// Extrai horário do nome ("07:00 - Café") ou do timing_note.
+function extractTime(name: string, timingNote?: string): { time?: string; cleanName: string } {
+  const m = (name || '').match(/^\s*(\d{1,2}[:h.]\d{0,2})\s*[-–—]?\s*(.*)$/);
+  if (m && m[2]) {
+    return { time: m[1].replace(/[h.]/, ':').replace(/:$/, ':00'), cleanName: m[2].trim() };
+  }
+  const tn = (timingNote || '').match(/(\d{1,2}[:h.]\d{2})/);
+  return { time: tn ? tn[1].replace(/[h.]/, ':') : undefined, cleanName: (name || '').trim() };
+}
+
+// Divide um item em [principal, ...alternativas] usando OU / ou / "/".
+function splitAlternatives(text: string): string[] {
+  return text
+    .split(/\s+ou\s+|\s+OU\s+|\s*\/\s*/g)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Faz um parse leve de "2 ovos", "100 g arroz", "4 fatias pão integral".
+function parseFoodText(text: string): PlanFood {
+  const raw = text.replace(/\s*\(ex:.*?\)/i, '').trim();
+  // quantidade + unidade opcional no início
+  const m = raw.match(/^(\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|un)?)\s+(?:de\s+)?(.+)$/i);
+  if (m) {
+    // peso entre parênteses no fim, se houver
+    const w = m[2].match(/\((\d+(?:[.,]\d+)?\s*g?)\)/i);
+    return {
+      name: m[2].replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim(),
+      amount: m[1].trim(),
+      weight: w ? w[1].replace(/\s+/g, '') : undefined,
+      raw,
+    };
+  }
+  return { name: raw, raw };
+}
+
+function structuredToFood(f: any): PlanFood {
+  return {
+    name: f.name,
+    amount: f.quantity != null ? `${f.quantity} ${f.measure_name || ''}`.trim() : undefined,
+    measure: f.measure_name,
+    weight: f.weight_g != null ? `${Math.round(f.weight_g)}g` : undefined,
+    raw: f.name,
+  };
+}
+
+function buildFoodsFromMeal(meal: MealPlanMeal): PlanFoodGroup[] {
+  // 1) Estruturado (editor): já tem substitutions.
+  const structured = (meal as any).foods as any[] | undefined;
+  if (structured && structured.length > 0) {
+    return structured.map((f) => ({
+      primary: structuredToFood(f),
+      alternatives: Array.isArray(f.substitutions) ? f.substitutions.map(structuredToFood) : [],
+    }));
+  }
+  // 2) Opções de refeição inteira → usa a Opção 1 como base.
+  const options = (meal as any).options as any[] | undefined;
+  if (options && options.length > 0) {
+    return buildFoodsFromMeal({ ...meal, foods: options[0]?.foods, food_groups: options[0]?.food_groups } as MealPlanMeal);
+  }
+  // 3) Texto legado (food_groups): separa "OU" em alternativas.
+  const groups = meal.food_groups || [];
+  const out: PlanFoodGroup[] = [];
+  for (const g of groups) {
+    const items = (g.options || '').split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean);
+    for (const item of items) {
+      const parts = splitAlternatives(item);
+      if (parts.length === 0) continue;
+      out.push({
+        primary: parseFoodText(parts[0]),
+        alternatives: parts.slice(1).map(parseFoodText),
+      });
+    }
+  }
+  return out;
+}
+
+export function normalizeMeals(analysis: AthleteAnalysis | null | undefined): PlanMeal[] {
+  const meals = analysis?.meal_plan?.meals || [];
+  return meals.map((meal, i) => {
+    const { time, cleanName } = extractTime(meal.meal_name || `Refeição ${i + 1}`, meal.timing_note);
+    // timing_note vira observação quando não é só o horário
+    const obs = meal.timing_note && !/^\s*\d{1,2}[:h.]\d{0,2}\s*$/.test(meal.timing_note.trim())
+      ? meal.timing_note
+      : undefined;
+    return {
+      key: `meal_${i}`,
+      name: cleanName,
+      time,
+      observation: obs,
+      macros: meal.meal_macros,
+      foods: buildFoodsFromMeal(meal),
+    };
+  });
+}
