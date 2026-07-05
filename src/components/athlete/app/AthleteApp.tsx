@@ -139,7 +139,7 @@ export function AthleteApp({
             <ProfileScreen
               client={client}
               profile={profile}
-              email={email}
+              email={profileEmail}
               weightKg={weightKg}
               readOnly={readOnly}
               onSignOut={onSignOut}
