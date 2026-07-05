@@ -57,22 +57,31 @@ function splitAlternatives(text: string): string[] {
     .filter(Boolean);
 }
 
-// Faz um parse leve de "2 ovos", "100 g arroz", "4 fatias pão integral".
+// Separa nome e quantidade. Aceita:
+//  "pão francês (80g, 2 fatias)"  → nome "pão francês", qtd "80g, 2 fatias"
+//  "100 g arroz" / "2 ovos"       → qtd "100 g", nome "arroz"
 function parseFoodText(text: string): PlanFood {
   const raw = text.replace(/\s*\(ex:.*?\)/i, '').trim();
-  // quantidade + unidade opcional no início
-  const m = raw.match(/^(\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|un)?)\s+(?:de\s+)?(.+)$/i);
+  // parênteses no fim → quantidade
+  let m = raw.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
   if (m) {
-    // peso entre parênteses no fim, se houver
-    const w = m[2].match(/\((\d+(?:[.,]\d+)?\s*g?)\)/i);
-    return {
-      name: m[2].replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim(),
-      amount: m[1].trim(),
-      weight: w ? w[1].replace(/\s+/g, '') : undefined,
-      raw,
-    };
+    return { name: m[1].trim(), amount: m[2].trim(), raw };
+  }
+  // quantidade + unidade opcional no início
+  m = raw.match(/^(\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|un)?)\s+(?:de\s+)?(.+)$/i);
+  if (m) {
+    return { name: m[2].trim(), amount: m[1].trim(), raw };
   }
   return { name: raw, raw };
+}
+
+// Linha de quantidade única para exibição (fonte menor).
+export function foodQuantityLine(food: PlanFood): string {
+  const parts = [food.amount];
+  if (food.weight && !(food.amount || '').toLowerCase().includes(food.weight.toLowerCase())) {
+    parts.push(food.weight);
+  }
+  return parts.filter(Boolean).join(' · ');
 }
 
 function structuredToFood(f: any): PlanFood {
@@ -120,15 +129,21 @@ export function normalizeMeals(analysis: AthleteAnalysis | null | undefined): Pl
   const meals = analysis?.meal_plan?.meals || [];
   return meals.map((meal, i) => {
     const { time, cleanName } = extractTime(meal.meal_name || `Refeição ${i + 1}`, meal.timing_note);
+    // Remove um parêntese no fim do nome ("Café da Manhã (pré-treino…)") para
+    // deixar o título curto; vira observação se ainda não houver uma.
+    let name = cleanName;
+    let noteFromName: string | undefined;
+    const pm = name.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+    if (pm) { name = pm[1].trim(); noteFromName = pm[2].trim(); }
     // timing_note vira observação quando não é só o horário
     const obs = meal.timing_note && !/^\s*\d{1,2}[:h.]\d{0,2}\s*$/.test(meal.timing_note.trim())
       ? meal.timing_note
       : undefined;
     return {
       key: `meal_${i}`,
-      name: cleanName,
+      name,
       time,
-      observation: obs,
+      observation: obs || noteFromName,
       macros: meal.meal_macros,
       foods: buildFoodsFromMeal(meal),
     };
