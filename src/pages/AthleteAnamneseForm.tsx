@@ -520,6 +520,11 @@ export default function AthleteAnamneseForm() {
         await autoFillTargetRace(client.id, formData.meta_especifica, null);
       }
 
+      // Fire-and-forget: push notification para o nutricionista dono
+      supabase.functions
+        .invoke('notify-anamnese-submitted', { body: { client_id: client.id } })
+        .catch((e) => console.warn('notify-anamnese-submitted falhou:', e));
+
       toast({
         title: 'Anamnese enviada com sucesso!',
         description: 'Seus dados foram salvos. Aguarde a análise.',
