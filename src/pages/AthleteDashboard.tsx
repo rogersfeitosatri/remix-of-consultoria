@@ -38,9 +38,11 @@ export default function AthleteDashboard() {
   const athleteWeightKg =
     (athleteProfile as any)?.current_weight ??
     (client as any)?.current_weight ??
-    (checkinResponses.find((c: any) => c?.responses?.peso)?.responses?.peso
-      ? parseFloat(String(checkinResponses.find((c: any) => c?.responses?.peso)!.responses.peso).replace(',', '.'))
-      : null);
+    (() => {
+      const found: any = checkinResponses.find((c: any) => c?.responses?.peso);
+      const p = found?.responses?.peso;
+      return p ? parseFloat(String(p).replace(',', '.')) : null;
+    })();
 
   const anamneseCompleted =
     (athleteProfile as any)?.anamnese_completed === true || (athleteProfile as any)?.anamnese_submitted_at != null;
