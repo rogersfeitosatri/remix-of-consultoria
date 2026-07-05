@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { useAdminSettings, useSaveAdminSettings } from '@/hooks/useAdminSettings';
 import { ChangePasswordForm } from '@/components/athlete/ChangePasswordForm';
 import { MessageTemplatesSection } from '@/components/settings/MessageTemplatesSection';
