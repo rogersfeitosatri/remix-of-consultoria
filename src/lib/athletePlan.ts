@@ -50,37 +50,11 @@ function extractTime(name: string, timingNote?: string): { time?: string; cleanN
 }
 
 // Divide um item em [principal, ...alternativas] usando OU / ou / "/".
-// IMPORTANTE: nunca quebra dentro de parênteses (ex.: "quinoa (70g, 1/2 xícara)"
-// não pode ser cortado no "/").
 function splitAlternatives(text: string): string[] {
-  const parts: string[] = [];
-  let buf = '';
-  let depth = 0;
-  const s = text;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (ch === '(' || ch === '[' || ch === '{') { depth++; buf += ch; continue; }
-    if (ch === ')' || ch === ']' || ch === '}') { depth = Math.max(0, depth - 1); buf += ch; continue; }
-    if (depth === 0) {
-      // " ou " / " OU "
-      if ((ch === ' ' || ch === '\t') && /^\s+(ou|OU)\s+/.test(s.slice(i))) {
-        const m = s.slice(i).match(/^\s+(ou|OU)\s+/)!;
-        parts.push(buf.trim());
-        buf = '';
-        i += m[0].length - 1;
-        continue;
-      }
-      // "/" cercado por espaços opcionais
-      if (ch === '/') {
-        parts.push(buf.trim());
-        buf = '';
-        continue;
-      }
-    }
-    buf += ch;
-  }
-  if (buf.trim()) parts.push(buf.trim());
-  return parts.filter(Boolean);
+  return text
+    .split(/\s+ou\s+|\s+OU\s+|\s*\/\s*/g)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 // Separa nome e quantidade. Aceita:
