@@ -883,6 +883,16 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       const totalUnconverted = results.reduce((a, r) => a + r.unconverted, 0);
       setEditedAnalysis(deepClone(base));
 
+      // Persist the conversion silently so it's not re-done every time the
+      // plan is reopened. Only saves if the DB round-trip succeeds; errors
+      // are swallowed to keep the edit UX unchanged.
+      if (totalConverted > 0) {
+        try {
+          await saveDirectly(base);
+          onUpdated();
+        } catch { /* silent */ }
+      }
+
       if (totalConverted === 0) {
         toast.warning('Banco de alimentos indisponivel. Editando em modo texto.');
       } else if (totalUnconverted > 0) {
