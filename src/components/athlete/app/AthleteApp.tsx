@@ -101,16 +101,14 @@ export function AthleteApp({
             <DashboardScreen
               firstName={firstName}
               meals={meals}
-              completedMeals={completedMeals}
-              waterMl={waterMl}
-              waterGoalMl={waterGoalMl}
-              onAddWater={addWater}
               race={race}
               checkins={checkins}
-              readOnly={readOnly}
+              weightKg={weightKg}
+              supportWhatsapp={supportWhatsapp}
               onOpenRace={() => setScreen('provas')}
               onGoPlano={() => setScreen('plano')}
               onGoEvolucao={() => setScreen('evolucao')}
+              onGoOrientacoes={() => setScreen('orientacoes')}
             />
           )}
 
