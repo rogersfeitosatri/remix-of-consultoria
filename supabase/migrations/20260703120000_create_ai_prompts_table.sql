@@ -10,6 +10,10 @@ create table if not exists ai_prompts (
 
 alter table ai_prompts enable row level security;
 
+-- Guard against the policy already existing (an earlier migration may have created it),
+-- otherwise CREATE POLICY errors and blocks the deploy.
+drop policy if exists "Users can manage their own prompts" on ai_prompts;
+
 create policy "Users can manage their own prompts"
   on ai_prompts for all
   using (auth.uid() = user_id)

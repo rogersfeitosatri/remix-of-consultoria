@@ -270,17 +270,18 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
         const cadenceWeeks = consultationFrequency === 'six_weeks' ? 6 : 4;
         const total = Math.max(1, computedConsultationCount);
         const anchor = firstConsultationDate;
-        const firstIsPast = diffDays(todayStr(), anchor) <= 0; // anchor <= today
 
         const rows: Array<{ client_id: string; user_id: string; scheduled_date: string; send_link_date: string; status: string }> = [];
 
-        // Consultation #1 (the anchor). If already attended, mark completed; else pending.
+        // Consultation #1 (the anchor) — always created as PENDING, never auto-completed.
+        // The admin explicitly confirms it as done later ("Confirmar Consulta 1"), so a
+        // renewal never silently consumes a consultation from the new plan.
         rows.push({
           client_id: client.id,
           user_id: user.id,
           scheduled_date: anchor,
           send_link_date: anchor,
-          status: firstIsPast ? 'completed' : 'pending',
+          status: 'pending',
         });
 
         // Consultations #2..#N at cadence, capped by the plan end date.
@@ -307,14 +308,15 @@ export function RenewPlanDialog({ open, onOpenChange, client }: RenewPlanDialogP
         if (insertError) {
           console.warn('[RenewPlan] failed to generate pipeline:', insertError);
         } else {
-          generatedCount = rows.filter(r => r.status === 'pending').length;
+          generatedCount = rows.length;
           // Re-assert first_consultation_date in case sync_pipeline_on_plan_change
           // nulled it (it only touches this column, so the trigger body is skipped).
+          // No consultation is auto-completed, so the full count remains available.
           await supabase
             .from('clients')
             .update({
               first_consultation_date: anchor,
-              remaining_consultations: Math.max(0, total - rows.filter(r => r.status === 'completed').length),
+              remaining_consultations: total,
             } as any)
             .eq('id', client.id);
         }

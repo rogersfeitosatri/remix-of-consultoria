@@ -177,6 +177,34 @@ export interface JsonOpts {
   fallback?: FallbackKind;
 }
 
+// Saída de texto livre (sem parsing) — usada pelo playground de teste de prompts.
+export async function callAiText(opts: JsonOpts): Promise<AiResult> {
+  const providers = providersFor(opts.fallback ?? 'none');
+  if (!providers.length) {
+    throw new Error('Nenhuma chave de IA configurada. Defina GEMINI_API_KEY nas secrets.');
+  }
+  let lastErr: any;
+  for (const p of providers) {
+    try {
+      const data = await postChat(p, {
+        model: p.model,
+        messages: [
+          { role: 'system', content: opts.systemPrompt },
+          { role: 'user', content: opts.userPrompt },
+        ],
+        max_tokens: opts.maxTokens ?? 1500,
+      });
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error(`${p.name}: resposta vazia`);
+      return { data: content, provider: p.name, model: p.model };
+    } catch (e) {
+      lastErr = e;
+      console.error(`[aiClient] provedor ${p.name} falhou:`, e instanceof Error ? e.message : e);
+    }
+  }
+  throw lastErr ?? new Error('Falha em todos os provedores de IA');
+}
+
 // Saída JSON simples no conteúdo da mensagem (tolerante a cercas markdown ```json).
 export async function callAiJson(opts: JsonOpts): Promise<AiResult> {
   const providers = providersFor(opts.fallback ?? 'none');
