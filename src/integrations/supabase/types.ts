@@ -56,6 +56,7 @@ export type Database = {
           created_at: string | null
           enable_continuation_mode: boolean | null
           id: string
+          nutrition_support_whatsapp: string | null
           updated_at: string | null
           user_id: string
         }
@@ -64,6 +65,7 @@ export type Database = {
           created_at?: string | null
           enable_continuation_mode?: boolean | null
           id?: string
+          nutrition_support_whatsapp?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -72,6 +74,7 @@ export type Database = {
           created_at?: string | null
           enable_continuation_mode?: boolean | null
           id?: string
+          nutrition_support_whatsapp?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -6583,6 +6586,10 @@ export type Database = {
           race_date: string
           race_name: string
         }[]
+      }
+      get_nutrition_support_whatsapp: {
+        Args: { _client_id: string }
+        Returns: string
       }
       get_pending_booking_invites: {
         Args: never

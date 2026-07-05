@@ -1,8 +1,8 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Utensils, Droplets, ChevronRight, Flag, Plus, TrendingUp, TrendingDown, Clock, Shuffle } from 'lucide-react';
+import { MessageCircle, BookOpen, ChevronRight, Flag, TrendingUp, TrendingDown, Clock, Shuffle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { PlanMeal, PlanFood } from '@/lib/athletePlan';
+import type { PlanMeal } from '@/lib/athletePlan';
 import { foodQuantityLine } from '@/lib/athletePlan';
 import type { ActiveRace } from '@/hooks/useNutriPeriodiza';
 
@@ -20,117 +20,75 @@ function pickNextMealIndexByTime(meals: PlanMeal[]): number {
   if (meals.length === 0) return -1;
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  // First meal whose time >= now
   for (let i = 0; i < meals.length; i++) {
     const mm = timeToMinutes(meals[i].time);
     if (mm != null && mm >= nowMin) return i;
   }
-  // Otherwise last meal of the day (already passed all) — or first
   return meals.length - 1;
 }
 
 function NextMealHero({ meals, onGoPlano }: { meals: PlanMeal[]; onGoPlano: () => void }) {
   const initialIdx = useMemo(() => pickNextMealIndexByTime(meals), [meals]);
-  const [selectedIdx, setSelectedIdx] = useState(initialIdx);
+  const [idx, setIdx] = useState(initialIdx);
 
-  // Re-sync when meals load or every minute
-  useEffect(() => { setSelectedIdx(pickNextMealIndexByTime(meals)); }, [meals]);
+  useEffect(() => { setIdx(pickNextMealIndexByTime(meals)); }, [meals]);
   useEffect(() => {
-    const t = setInterval(() => setSelectedIdx(pickNextMealIndexByTime(meals)), 60_000);
+    const t = setInterval(() => setIdx(pickNextMealIndexByTime(meals)), 60_000);
     return () => clearInterval(t);
   }, [meals]);
 
-  if (meals.length === 0 || selectedIdx < 0) return null;
-  const meal = meals[selectedIdx];
+  if (meals.length === 0 || idx < 0) return null;
+  const meal = meals[idx];
 
   return (
-    <div className="space-y-3">
-      {/* Meal tabs */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
-        {meals.map((m, i) => {
-          const active = i === selectedIdx;
-          return (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => setSelectedIdx(i)}
-              className={`shrink-0 px-4 h-10 rounded-full border text-sm font-semibold transition-colors ${
-                active
-                  ? 'bg-[hsl(43,74%,49%)] text-black border-transparent'
-                  : 'bg-[#131417] text-gray-300 border-gray-800'
-              }`}
-            >
-              {m.name}
-              {m.time && <span className={`ml-2 font-normal ${active ? 'text-black/70' : 'text-gray-500'}`}>{m.time}</span>}
-            </button>
-          );
-        })}
+    <button
+      type="button"
+      onClick={onGoPlano}
+      className="w-full text-left rounded-3xl bg-[#131417] border border-gray-800 p-5 active:scale-[0.99] transition-transform"
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: GOLD }}>Próxima Refeição</span>
+        <Clock className="h-3.5 w-3.5" style={{ color: GOLD }} />
       </div>
+      <h3 className="text-xl font-extrabold text-white leading-tight mb-4">
+        {meal.name}{meal.time ? ` – ${meal.time}` : ''}
+      </h3>
 
-      {/* Next meal card */}
-      <button
-        type="button"
-        onClick={onGoPlano}
-        className="w-full text-left rounded-3xl bg-[#131417] border border-gray-800 p-4 active:scale-[0.99] transition-transform"
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: GOLD }}>Próxima Refeição</span>
-          <Clock className="h-3.5 w-3.5" style={{ color: GOLD }} />
-        </div>
-        <h3 className="text-lg font-extrabold text-white leading-tight mb-3">
-          {meal.name}{meal.time ? ` – ${meal.time}` : ''}
-        </h3>
-
-        {meal.foods.length === 0 ? (
-          <p className="text-sm text-gray-500">Sem itens cadastrados nessa refeição.</p>
-        ) : (
-          <div className="space-y-2.5">
-            {meal.foods.slice(0, 3).map((g, i) => (
-              <div key={i}>
-                <p className="text-sm text-gray-100">
-                  {g.primary.name}
-                  {(() => {
-                    const q = foodQuantityLine(g.primary);
-                    return q ? <span className="text-gray-400"> - {q}</span> : null;
-                  })()}
-                  {g.alternatives.length > 0 && <span className="text-gray-500"> ou</span>}
+      {meal.foods.length === 0 ? (
+        <p className="text-sm text-gray-500">Sem itens cadastrados nessa refeição.</p>
+      ) : (
+        <div className="space-y-2.5">
+          {meal.foods.slice(0, 4).map((g, i) => (
+            <div key={i}>
+              <p className="text-sm text-gray-100">
+                {g.primary.name}
+                {(() => {
+                  const q = foodQuantityLine(g.primary);
+                  return q ? <span className="text-gray-400"> - {q}</span> : null;
+                })()}
+                {g.alternatives.length > 0 && <span className="text-gray-500"> ou</span>}
+              </p>
+              {g.alternatives.length > 0 && (
+                <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+                  <Shuffle className="h-3 w-3 shrink-0" />
+                  <span className="truncate">
+                    {g.alternatives[0].name}
+                    {(() => {
+                      const q = foodQuantityLine(g.alternatives[0]);
+                      return q ? ` - ${q}` : '';
+                    })()}
+                    {g.alternatives.length > 1 && ` ou +${g.alternatives.length - 1} opções`}
+                  </span>
                 </p>
-                {g.alternatives.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
-                    <Shuffle className="h-3 w-3 shrink-0" />
-                    <span className="truncate">
-                      {g.alternatives[0].name}
-                      {(() => {
-                        const q = foodQuantityLine(g.alternatives[0]);
-                        return q ? ` - ${q}` : '';
-                      })()}
-                      {g.alternatives.length > 1 && ` ou +${g.alternatives.length - 1} opções`}
-                    </span>
-                  </p>
-                )}
-              </div>
-            ))}
-            {meal.foods.length > 3 && (
-              <p className="text-xs text-gray-500">+{meal.foods.length - 3} itens</p>
-            )}
-          </div>
-        )}
-
-        {/* Dots pagination */}
-        {meals.length > 1 && (
-          <div className="flex items-center justify-center gap-1.5 mt-4">
-            {meals.map((_, i) => (
-              <span
-                key={i}
-                className={`h-1.5 rounded-full transition-all ${
-                  i === selectedIdx ? 'w-4 bg-[hsl(43,74%,49%)]' : 'w-1.5 bg-gray-700'
-                }`}
-              />
-            ))}
-          </div>
-        )}
-      </button>
-    </div>
+              )}
+            </div>
+          ))}
+          {meal.foods.length > 4 && (
+            <p className="text-xs text-gray-500">+{meal.foods.length - 4} itens</p>
+          )}
+        </div>
+      )}
+    </button>
   );
 }
 
@@ -141,53 +99,48 @@ function greeting(): string {
   return 'Boa noite';
 }
 
-function Bar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
-  return (
-    <div className="h-1.5 w-full rounded-full bg-white/[0.08] overflow-hidden">
-      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
-    </div>
-  );
+function normalizeWhatsapp(raw?: string | null): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, '');
+  return digits.length >= 10 ? digits : null;
 }
 
 export function DashboardScreen({
   firstName,
   meals,
-  completedMeals,
-  waterMl,
-  waterGoalMl,
-  onAddWater,
   race,
   checkins,
-  readOnly,
+  weightKg,
+  supportWhatsapp,
   onOpenRace,
   onGoPlano,
   onGoEvolucao,
+  onGoOrientacoes,
 }: {
   firstName: string;
   meals: PlanMeal[];
-  completedMeals: string[];
-  waterMl: number;
-  waterGoalMl: number;
-  onAddWater: (ml: number) => void;
   race?: ActiveRace | null;
   checkins: any[];
-  readOnly?: boolean;
+  weightKg?: number | null;
+  supportWhatsapp?: string | null;
   onOpenRace: () => void;
   onGoPlano: () => void;
   onGoEvolucao: () => void;
+  onGoOrientacoes: () => void;
 }) {
-  const total = meals.length;
-  const done = meals.filter((m) => completedMeals.includes(m.key)).length;
-
   const weights = checkins
     .filter((c) => c?.responses?.peso)
     .map((c) => parseFloat(String(c.responses.peso).replace(',', '.')))
     .filter((w) => !isNaN(w));
-  const weight = weights[0];
-  const weightDelta = weight != null && weights[1] != null ? +(weight - weights[1]).toFixed(1) : null;
+  const displayWeight = weightKg ?? weights[0] ?? null;
+  const weightDelta = weights[0] != null && weights[1] != null ? +(weights[0] - weights[1]).toFixed(1) : null;
   const lastCheckin = checkins[0];
   const raceDays = race?.race_date ? Math.max(0, Math.ceil((parseISO(race.race_date).getTime() - Date.now()) / 86400000)) : null;
+
+  const waPhone = normalizeWhatsapp(supportWhatsapp);
+  const waHref = waPhone
+    ? `https://wa.me/${waPhone}?text=${encodeURIComponent(`Olá! Sou ${firstName} e preciso de suporte com meu plano alimentar.`)}`
+    : null;
 
   return (
     <div className="space-y-6">
@@ -218,44 +171,49 @@ export function DashboardScreen({
         <p className="text-gray-500 mt-1">Seu resumo de hoje</p>
       </div>
 
-      {/* Próxima refeição */}
+      {/* Próxima refeição — apenas uma, baseada no horário */}
       <NextMealHero meals={meals} onGoPlano={onGoPlano} />
 
-      {/* Resumo do dia */}
+      {/* Ações rápidas: Suporte + Orientações */}
       <div className="grid grid-cols-2 gap-3">
-        <button type="button" onClick={onGoPlano} className={`${CARD} p-4 text-left active:scale-[0.98] transition-transform`}>
-          <div className="flex items-center gap-2 text-gray-400 mb-3">
-            <Utensils className="h-4 w-4" />
-            <span className="text-sm">Refeições</span>
+        {waHref ? (
+          <a
+            href={waHref}
+            target="_blank"
+            rel="noreferrer"
+            className={`${CARD} p-4 text-left active:scale-[0.98] transition-transform block`}
+          >
+            <div className="flex items-center gap-2 text-emerald-400 mb-3">
+              <MessageCircle className="h-4 w-4" />
+              <span className="text-sm">Suporte</span>
+            </div>
+            <p className="text-base font-extrabold text-white leading-tight">Fale no WhatsApp</p>
+            <p className="text-xs text-gray-500 mt-1">Dúvidas do plano alimentar</p>
+          </a>
+        ) : (
+          <div className={`${CARD} p-4 opacity-60`}>
+            <div className="flex items-center gap-2 text-emerald-400 mb-3">
+              <MessageCircle className="h-4 w-4" />
+              <span className="text-sm">Suporte</span>
+            </div>
+            <p className="text-base font-extrabold text-white leading-tight">Em breve</p>
+            <p className="text-xs text-gray-500 mt-1">Seu nutricionista ainda não configurou o contato</p>
           </div>
-          <p className="text-3xl font-extrabold text-white leading-none mb-3">{done}<span className="text-lg text-gray-500">/{total}</span></p>
-          <Bar value={done} max={total} color={GOLD} />
+        )}
+
+        <button
+          type="button"
+          onClick={onGoOrientacoes}
+          className={`${CARD} p-4 text-left active:scale-[0.98] transition-transform`}
+        >
+          <div className="flex items-center gap-2 mb-3" style={{ color: GOLD }}>
+            <BookOpen className="h-4 w-4" />
+            <span className="text-sm">Orientações</span>
+          </div>
+          <p className="text-base font-extrabold text-white leading-tight">Ver suas orientações</p>
+          <p className="text-xs text-gray-500 mt-1">Estratégia, treinos, suplementos</p>
         </button>
-
-        <div className={`${CARD} p-4`}>
-          <div className="flex items-center gap-2 text-gray-400 mb-3">
-            <Droplets className="h-4 w-4 text-blue-400" />
-            <span className="text-sm">Água</span>
-          </div>
-          <p className="text-3xl font-extrabold text-white leading-none mb-3">{(waterMl / 1000).toFixed(1)}<span className="text-lg text-gray-500">/{(waterGoalMl / 1000).toFixed(1)}L</span></p>
-          <Bar value={waterMl} max={waterGoalMl} color="#3b82f6" />
-        </div>
       </div>
-
-      {/* Water quick add */}
-      {!readOnly && (
-        <div className="flex gap-2 -mt-3">
-          <button onClick={() => onAddWater(250)} className="flex-1 h-11 rounded-2xl bg-blue-500/10 text-blue-300 text-sm font-medium flex items-center justify-center gap-1 active:scale-95 transition-transform">
-            <Plus className="h-4 w-4" /> Copo
-          </button>
-          <button onClick={() => onAddWater(500)} className="flex-1 h-11 rounded-2xl bg-blue-500/10 text-blue-300 text-sm font-medium flex items-center justify-center gap-1 active:scale-95 transition-transform">
-            <Plus className="h-4 w-4" /> 500 ml
-          </button>
-          {waterMl > 0 && (
-            <button onClick={() => onAddWater(-250)} className="w-11 h-11 rounded-2xl bg-white/[0.04] text-gray-400 text-lg flex items-center justify-center active:scale-95 transition-transform">−</button>
-          )}
-        </div>
-      )}
 
       {/* Records */}
       <div>
@@ -263,7 +221,7 @@ export function DashboardScreen({
         <div className="grid grid-cols-2 gap-3">
           <button onClick={onGoEvolucao} className={`${CARD} p-4 text-left active:scale-[0.98] transition-transform`}>
             <p className="text-sm text-gray-400 mb-2">Peso</p>
-            <p className="text-2xl font-extrabold text-white leading-none">{weight != null ? `${weight}` : '—'}<span className="text-base text-gray-500"> kg</span></p>
+            <p className="text-2xl font-extrabold text-white leading-none">{displayWeight != null ? `${displayWeight}` : '—'}<span className="text-base text-gray-500"> kg</span></p>
             {weightDelta != null && (
               <p className={`text-xs mt-2 flex items-center gap-1 ${weightDelta <= 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
                 {weightDelta <= 0 ? <TrendingDown className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />}

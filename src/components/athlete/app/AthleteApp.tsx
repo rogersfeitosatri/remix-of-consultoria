@@ -10,6 +10,7 @@ import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCha
 import { normalizeMeals } from '@/lib/athletePlan';
 import { useAthleteDailyLog } from '@/hooks/useAthleteDailyLog';
 import { useActiveRace } from '@/hooks/useNutriPeriodiza';
+import { useNutritionSupportWhatsapp } from '@/hooks/useNutritionSupportWhatsapp';
 import type { AthleteAnalysis } from '@/hooks/useAthleteAnalysis';
 import logoRF from '@/assets/logo-rf.jpg';
 
@@ -53,11 +54,12 @@ export function AthleteApp({
 }) {
   const [screen, setScreen] = useState<AthleteScreen>('dashboard');
   const meals = useMemo(() => normalizeMeals(analysis), [analysis]);
-  const { waterMl, completedMeals, toggleMeal, addWater } = useAthleteDailyLog(client?.id, readOnly);
+  const { completedMeals, toggleMeal } = useAthleteDailyLog(client?.id, readOnly);
   const { data: race } = useActiveRace(client?.id);
+  const { data: supportWhatsapp } = useNutritionSupportWhatsapp(client?.id);
 
-  const waterGoalMl = weightKg ? Math.round((weightKg * 35) / 250) * 250 : 2500;
   const firstName = (client?.name || 'Atleta').split(' ')[0];
+  const profileEmail = client?.email || email;
 
   return (
     <div className="min-h-screen bg-[#0b0c0e] flex justify-center">
@@ -99,16 +101,14 @@ export function AthleteApp({
             <DashboardScreen
               firstName={firstName}
               meals={meals}
-              completedMeals={completedMeals}
-              waterMl={waterMl}
-              waterGoalMl={waterGoalMl}
-              onAddWater={addWater}
               race={race}
               checkins={checkins}
-              readOnly={readOnly}
+              weightKg={weightKg}
+              supportWhatsapp={supportWhatsapp}
               onOpenRace={() => setScreen('provas')}
               onGoPlano={() => setScreen('plano')}
               onGoEvolucao={() => setScreen('evolucao')}
+              onGoOrientacoes={() => setScreen('orientacoes')}
             />
           )}
 
@@ -139,7 +139,7 @@ export function AthleteApp({
             <ProfileScreen
               client={client}
               profile={profile}
-              email={email}
+              email={profileEmail}
               weightKg={weightKg}
               readOnly={readOnly}
               onSignOut={onSignOut}
