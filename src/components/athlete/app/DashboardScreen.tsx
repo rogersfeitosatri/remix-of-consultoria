@@ -110,7 +110,7 @@ function NextMealHero({ meals, onGoPlano }: { meals: PlanMeal[]; onGoPlano: () =
                 )}
               </div>
             ))}
-            {meal.foods.length > 3 && (
+            {meal.foods.length > 3 && meal.foods.some(g => g.alternatives.length > 0) && (
               <p className="text-xs text-gray-500">+{meal.foods.length - 3} itens</p>
             )}
           </div>
