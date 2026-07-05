@@ -91,7 +91,10 @@ export async function notifyUser(
       .eq('user_id', userId)
       .maybeSingle();
     const prefs = (pref?.preferences || {}) as Record<string, boolean>;
-    if (prefs[opts.prefKey] === false) return { sent: 0, failed: 0, skipped: true };
+    if (prefs[opts.prefKey] === false) {
+      console.warn(`[fcm] preferência '${opts.prefKey}' desativada para user ${userId} — push não enviado.`);
+      return { sent: 0, failed: 0, skipped: true };
+    }
 
     // 2) Service account
     const saRaw = Deno.env.get('FCM_SERVICE_ACCOUNT');
@@ -103,14 +106,32 @@ export async function notifyUser(
 
     // 3) Tokens do usuário
     const { data: tokens } = await supabase.from('push_tokens').select('token').eq('user_id', userId);
-    if (!tokens || tokens.length === 0) return { sent: 0, failed: 0, skipped: true };
+    if (!tokens || tokens.length === 0) {
+      console.warn(`[fcm] nenhum dispositivo registrado (push_tokens) para user ${userId} — push não enviado.`);
+      return { sent: 0, failed: 0, skipped: true };
+    }
+    console.log(`[fcm] enviando push para ${tokens.length} dispositivo(s) do user ${userId}.`);
 
     const accessToken = await getFcmAccessToken(sa);
     const url = opts.url || '/';
     let sent = 0, failed = 0;
+    const staleTokens: string[] = [];
     for (const t of tokens) {
       const r = await sendFcmMessage(accessToken, sa.project_id, t.token, opts.title, opts.body, url);
-      if (r.ok) sent++; else { failed++; console.error('[fcm] falha:', r.status, r.body); }
+      if (r.ok) {
+        sent++;
+      } else {
+        failed++;
+        console.error('[fcm] falha:', r.status, r.body);
+        // Token não registrado/inválido → remove para auto-limpeza (self-heal).
+        const isStale = r.status === 404 ||
+          (r.status === 400 && /UNREGISTERED|registration-token-not-registered|invalid|not a valid FCM/i.test(r.body || ''));
+        if (isStale) staleTokens.push(t.token);
+      }
+    }
+    if (staleTokens.length > 0) {
+      await supabase.from('push_tokens').delete().in('token', staleTokens);
+      console.warn(`[fcm] ${staleTokens.length} token(s) obsoleto(s) removido(s).`);
     }
     return { sent, failed, skipped: false };
   } catch (e) {
