@@ -63,6 +63,20 @@ function sumFoods(foods: SelectedFood[]) {
 }
 
 
+// Extrai kcal + macros de uma string de meal_macros gerada pela IA,
+// no formato "~367 kcal | ~42g CHO | ~27.6g PTN | ~9g LIP" (aceita variações).
+// Usado para somar refeições legadas (texto) no total diário até que sejam convertidas.
+function parseMealMacrosString(s: string | undefined | null): { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null {
+  if (!s) return null;
+  const kcal = s.match(/(\d+(?:[.,]\d+)?)\s*kcal/i);
+  const cho = s.match(/(\d+(?:[.,]\d+)?)\s*g?\s*CHO/i);
+  const ptn = s.match(/(\d+(?:[.,]\d+)?)\s*g?\s*(?:PTN|PROT)/i);
+  const lip = s.match(/(\d+(?:[.,]\d+)?)\s*g?\s*(?:LIP|GORD|FAT)/i);
+  if (!kcal && !cho && !ptn && !lip) return null;
+  const n = (m: RegExpMatchArray | null) => (m ? parseFloat(m[1].replace(',', '.')) : 0);
+  return { calories: n(kcal), carbs_g: n(cho), protein_g: n(ptn), fat_g: n(lip) };
+}
+
 function extractMealTimes(schedule?: MealScheduleData): string[] {
   if (!schedule) return [];
   const times: string[] = [];
@@ -360,26 +374,55 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
 
   const mealTimes = useMemo(() => extractMealTimes(mealSchedule), [mealSchedule]);
 
-  // Compute real-time totals from structured foods across all meals and options.
-  // Works in both view and edit mode so AI plans show caloric data once converted.
+  // Totais por refeição (Opção 1 se houver opções); soma alimentos estruturados
+  // OU, se ainda não convertida, extrai do meal_macros da IA.
+  const computedMealTotals = useCallback((meal: any) => {
+    const opt1 = meal.options?.[0];
+    const foods: SelectedFood[] = opt1?.foods ?? meal.foods ?? [];
+    if (foods.length > 0) return sumFoods(foods);
+    const macrosStr = opt1?.meal_macros || meal.meal_macros;
+    return parseMealMacrosString(macrosStr);
+  }, []);
+
+  // Total diário em tempo real, somando por refeição (funciona misto estruturado+legado).
   const computedTotals = useMemo(() => {
-    // Use only Opção 1 of each meal for daily total calculation
-    const allFoods: SelectedFood[] = [];
+    let any = false;
+    const acc = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
     for (const meal of meals) {
-      if (meal.options?.length > 0) {
-        allFoods.push(...(meal.options[0]?.foods ?? []));
-      } else {
-        allFoods.push(...(meal.foods ?? []));
-      }
+      const t = computedMealTotals(meal);
+      if (!t) continue;
+      any = true;
+      acc.calories += t.calories;
+      acc.protein_g += t.protein_g;
+      acc.carbs_g += t.carbs_g;
+      acc.fat_g += t.fat_g;
     }
-    if (allFoods.length === 0) return null;
-    return sumFoods(allFoods);
-  }, [meals]);
+    if (!any) return null;
+    return {
+      calories: Math.round(acc.calories * 10) / 10,
+      protein_g: Math.round(acc.protein_g * 10) / 10,
+      carbs_g: Math.round(acc.carbs_g * 10) / 10,
+      fat_g: Math.round(acc.fat_g * 10) / 10,
+    };
+  }, [meals, computedMealTotals]);
 
   const computedMealOptionTotals = useCallback((foods: SelectedFood[]) => {
     if (foods.length === 0) return null;
     return sumFoods(foods);
   }, []);
+
+  // Chip com g e g/kg para a barra sticky de totais diários.
+  const MacroChip = ({ color, label, g, gkg }: { color: 'blue' | 'purple' | 'orange'; label: string; g: number; gkg: number | null }) => {
+    const dot = color === 'blue' ? 'bg-blue-500' : color === 'purple' ? 'bg-purple-500' : 'bg-orange-500';
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-white/70 dark:bg-black/30 px-1.5 py-0.5">
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+        <span className="font-medium text-foreground">{label}</span>
+        <span className="text-foreground">{Math.round(g)}g</span>
+        {gkg != null && <span className="text-muted-foreground">({gkg.toFixed(1)} g/kg)</span>}
+      </span>
+    );
+  };
 
   // Compact, wrap-friendly totals row for a meal/option
   const mealTotalChips = (t: { calories: number; carbs_g: number; protein_g: number; fat_g: number }) => (
@@ -1175,6 +1218,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
           )}
           {meals.map((meal: any, i: number) => {
             const hasOptions = meal.options?.length > 0;
+            const mealTotals = computedMealTotals(meal);
 
             return (
               <div key={i} className="rounded-lg border bg-card overflow-hidden">
@@ -1244,6 +1288,20 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                 </div>
 
                 <div className="p-3">
+                  {/* Meal-level totals — sempre visível */}
+                  {mealTotals && (
+                    <div className="flex items-center gap-1.5 text-[11px] flex-wrap mb-2 pb-2 border-b border-dashed">
+                      <span className="font-bold text-foreground">{Math.round(mealTotals.calories)} kcal</span>
+                      <span className="text-blue-600 dark:text-blue-400">C {Math.round(mealTotals.carbs_g)}g</span>
+                      <span className="text-purple-600 dark:text-purple-400">P {Math.round(mealTotals.protein_g)}g</span>
+                      <span className="text-orange-600 dark:text-orange-400">G {Math.round(mealTotals.fat_g)}g</span>
+                      {athleteWeightKg && (
+                        <span className="text-muted-foreground ml-auto">
+                          {(mealTotals.carbs_g / athleteWeightKg).toFixed(1)} · {(mealTotals.protein_g / athleteWeightKg).toFixed(1)} · {(mealTotals.fat_g / athleteWeightKg).toFixed(1)} g/kg
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {isEditing ? (
                     hasOptions ? (
                       // Multiple options view
@@ -1489,9 +1547,33 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
           </div>
         )}
 
+        {/* Sticky live totals bar — sempre visível durante a edição */}
+        {isEditing && computedTotals && (
+          <div className="sticky bottom-[64px] sm:bottom-[60px] -mx-6 px-4 sm:px-6 py-2 border-t bg-green-50/95 dark:bg-green-950/90 backdrop-blur-sm z-10 border-green-200 dark:border-green-800">
+            <div className="flex items-center gap-3 flex-wrap text-xs">
+              <span className="font-bold text-sm text-green-900 dark:text-green-200">
+                {Math.round(computedTotals.calories)} kcal
+                {athleteWeightKg && (
+                  <span className="ml-1 text-[11px] font-normal text-green-700 dark:text-green-400">
+                    ({(computedTotals.calories / athleteWeightKg).toFixed(1)} kcal/kg)
+                  </span>
+                )}
+              </span>
+              <MacroChip color="blue" label="CHO" g={computedTotals.carbs_g} gkg={athleteWeightKg ? computedTotals.carbs_g / athleteWeightKg : null} />
+              <MacroChip color="purple" label="PTN" g={computedTotals.protein_g} gkg={athleteWeightKg ? computedTotals.protein_g / athleteWeightKg : null} />
+              <MacroChip color="orange" label="LIP" g={computedTotals.fat_g} gkg={athleteWeightKg ? computedTotals.fat_g / athleteWeightKg : null} />
+              {!athleteWeightKg && (
+                <span className="text-[10px] text-amber-700 dark:text-amber-400 ml-auto">
+                  Peso não registrado — g/kg indisponível
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Action buttons — sticky bar for easy access on mobile while scrolling */}
         {isEditing && (
-          <div className="sticky bottom-0 -mx-6 px-4 sm:px-6 py-3 mt-4 border-t bg-background/95 backdrop-blur-sm z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="sticky bottom-0 -mx-6 px-4 sm:px-6 py-3 border-t bg-background/95 backdrop-blur-sm z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <Button onClick={handleSaveDirectly} disabled={busy} className="gap-1.5 flex-1">
               {isSaving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
