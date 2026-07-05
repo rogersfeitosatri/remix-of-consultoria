@@ -244,6 +244,9 @@ export function DashboardScreen({
         <p className="text-gray-400 text-sm mt-0.5">Vamos fechar o dia com adesão total.</p>
       </div>
 
+      {/* Próxima refeição (hero baseado na hora local) */}
+      <NextMealHero meals={meals} onGoPlano={onGoPlano} />
+
       {/* Top cards */}
       <div className="grid grid-cols-2 gap-3">
         <StatTile
