@@ -264,6 +264,11 @@ export default function AthleteDynamicAnamneseForm() {
         console.error('Error auto-filling target race:', e);
       }
 
+      // Fire-and-forget: push notification para o nutricionista dono
+      supabase.functions
+        .invoke('notify-anamnese-submitted', { body: { client_id: client.id } })
+        .catch((e) => console.warn('notify-anamnese-submitted falhou:', e));
+
       toast.success('Anamnese enviada com sucesso!');
       navigate('/athlete');
     } catch (error) {
