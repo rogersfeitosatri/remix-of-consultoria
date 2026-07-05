@@ -1200,6 +1200,35 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         <CardDescription>Baseado nos alimentos que o atleta ja consome</CardDescription>
       </CardHeader>
       <CardContent>
+        {/* Sticky live totals — sempre visível no topo enquanto edita as refeições */}
+        {isEditing && computedTotals && (
+          <div className="sticky top-0 -mx-6 px-4 sm:px-6 py-2.5 mb-4 border-b bg-green-50/95 dark:bg-green-950/90 backdrop-blur-sm z-20 border-green-200 dark:border-green-800 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="h-3.5 w-3.5 text-green-700 dark:text-green-400" />
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-green-700 dark:text-green-400">Total do dia</span>
+              {athleteWeightKg && <span className="text-[10px] text-muted-foreground ml-auto">Peso: {athleteWeightKg} kg</span>}
+              {!athleteWeightKg && (
+                <span className="text-[10px] text-amber-700 dark:text-amber-400 ml-auto">
+                  Peso não registrado — g/kg indisponível
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              <span className="font-bold text-sm text-green-900 dark:text-green-200">
+                {Math.round(computedTotals.calories)} kcal
+                {athleteWeightKg && (
+                  <span className="ml-1 text-[11px] font-normal text-green-700 dark:text-green-400">
+                    ({(computedTotals.calories / athleteWeightKg).toFixed(1)} kcal/kg)
+                  </span>
+                )}
+              </span>
+              <MacroChip color="blue" label="CHO" g={computedTotals.carbs_g} gkg={athleteWeightKg ? computedTotals.carbs_g / athleteWeightKg : null} />
+              <MacroChip color="purple" label="PTN" g={computedTotals.protein_g} gkg={athleteWeightKg ? computedTotals.protein_g / athleteWeightKg : null} />
+              <MacroChip color="orange" label="LIP" g={computedTotals.fat_g} gkg={athleteWeightKg ? computedTotals.fat_g / athleteWeightKg : null} />
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           {isEditing && meals.some((m: any) => {
             if (m.options?.length > 0) return m.options.some((o: any) => o.food_groups?.length > 0);
@@ -1544,30 +1573,6 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Sticky live totals bar — sempre visível durante a edição */}
-        {isEditing && computedTotals && (
-          <div className="sticky bottom-[64px] sm:bottom-[60px] -mx-6 px-4 sm:px-6 py-2 border-t bg-green-50/95 dark:bg-green-950/90 backdrop-blur-sm z-10 border-green-200 dark:border-green-800">
-            <div className="flex items-center gap-3 flex-wrap text-xs">
-              <span className="font-bold text-sm text-green-900 dark:text-green-200">
-                {Math.round(computedTotals.calories)} kcal
-                {athleteWeightKg && (
-                  <span className="ml-1 text-[11px] font-normal text-green-700 dark:text-green-400">
-                    ({(computedTotals.calories / athleteWeightKg).toFixed(1)} kcal/kg)
-                  </span>
-                )}
-              </span>
-              <MacroChip color="blue" label="CHO" g={computedTotals.carbs_g} gkg={athleteWeightKg ? computedTotals.carbs_g / athleteWeightKg : null} />
-              <MacroChip color="purple" label="PTN" g={computedTotals.protein_g} gkg={athleteWeightKg ? computedTotals.protein_g / athleteWeightKg : null} />
-              <MacroChip color="orange" label="LIP" g={computedTotals.fat_g} gkg={athleteWeightKg ? computedTotals.fat_g / athleteWeightKg : null} />
-              {!athleteWeightKg && (
-                <span className="text-[10px] text-amber-700 dark:text-amber-400 ml-auto">
-                  Peso não registrado — g/kg indisponível
-                </span>
-              )}
-            </div>
           </div>
         )}
 
