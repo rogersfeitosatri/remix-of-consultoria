@@ -1,17 +1,15 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ArrowLeftRight } from 'lucide-react';
-import type { PlanFoodGroup, PlanFood } from '@/lib/athletePlan';
+import { foodQuantityLine, type PlanFoodGroup, type PlanFood } from '@/lib/athletePlan';
 
 const GOLD = 'hsl(43,74%,49%)';
 
 function FoodLine({ food, muted }: { food: PlanFood; muted?: boolean }) {
-  const detail = [food.amount, food.measure && !food.amount?.includes(food.measure) ? food.measure : null, food.weight]
-    .filter(Boolean)
-    .join(' · ');
+  const qty = foodQuantityLine(food);
   return (
-    <div className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-3.5 ${muted ? 'bg-white/[0.03]' : 'bg-white/[0.06]'}`}>
-      <span className="text-[15px] font-medium text-white">{food.name}</span>
-      {detail && <span className="text-xs text-gray-400 whitespace-nowrap">{detail}</span>}
+    <div className={`rounded-2xl px-4 py-3.5 ${muted ? 'bg-white/[0.03]' : 'bg-white/[0.06]'}`}>
+      <p className="text-[16px] font-medium text-white leading-tight">{food.name}</p>
+      {qty && <p className="text-sm text-gray-400 mt-0.5">{qty}</p>}
     </div>
   );
 }
