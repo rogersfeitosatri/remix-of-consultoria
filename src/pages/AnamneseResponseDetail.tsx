@@ -828,6 +828,21 @@ export default function AnamneseResponseDetail() {
 
           {/* AI Analysis Tab */}
           <TabsContent value="ia" className="mt-6 space-y-6">
+            {/* Atalho para a nova área dedicada de Plano Alimentar */}
+            {responseData?.client_id && (
+              <Card className="border-primary/40 bg-primary/[0.04]">
+                <CardContent className="py-3 flex items-center gap-3">
+                  <UtensilsCrossed className="h-5 w-5 text-primary shrink-0" />
+                  <p className="text-sm flex-1">
+                    O plano alimentar agora tem uma <span className="font-medium">área dedicada</span> — crie do zero ou pela IA, edite metas e orientações num só lugar.
+                  </p>
+                  <Button size="sm" onClick={() => navigate(`/meal-plans/${responseData.client_id}`)} className="gap-1.5 shrink-0">
+                    Abrir Plano Alimentar
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Admin guidance panel — always available so the admin can tune the AI before (re)analyzing */}
             <Card className="border-primary/30 bg-primary/[0.03]">
               <CardHeader className="pb-3">
