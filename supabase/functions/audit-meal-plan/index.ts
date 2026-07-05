@@ -174,8 +174,16 @@ Retorne o plano completo corrigido mantendo a mesma estrutura. Ajuste as porçõ
 
     console.log(`Audit completed via ${provider}/${model}`);
 
+    // IMPORTANT: preserve the admin's STRUCTURED meal plan (foods, options,
+    // substitutions, exact quantities/measures). The audit schema only returns
+    // legacy text food_groups, so without this merge the audit would silently
+    // discard all the structured detail the admin carefully edited.
+    if (editedAnalysis?.meal_plan?.meals?.length) {
+      auditedData.meal_plan = editedAnalysis.meal_plan;
+    }
+
     // Save the audited analysis
-    const updatedRaw = JSON.stringify(auditedData);
+    const updatedRaw = JSON.stringify({ ...auditedData, _isNewFormat: true });
     const { error: updateError } = await supabase
       .from('ai_analyses')
       .update({
