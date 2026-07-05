@@ -54,11 +54,12 @@ export function AthleteApp({
 }) {
   const [screen, setScreen] = useState<AthleteScreen>('dashboard');
   const meals = useMemo(() => normalizeMeals(analysis), [analysis]);
-  const { waterMl, completedMeals, toggleMeal, addWater } = useAthleteDailyLog(client?.id, readOnly);
+  const { completedMeals, toggleMeal } = useAthleteDailyLog(client?.id, readOnly);
   const { data: race } = useActiveRace(client?.id);
+  const { data: supportWhatsapp } = useNutritionSupportWhatsapp(client?.id);
 
-  const waterGoalMl = weightKg ? Math.round((weightKg * 35) / 250) * 250 : 2500;
   const firstName = (client?.name || 'Atleta').split(' ')[0];
+  const profileEmail = client?.email || email;
 
   return (
     <div className="min-h-screen bg-[#0b0c0e] flex justify-center">
