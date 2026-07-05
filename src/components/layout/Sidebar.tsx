@@ -1,9 +1,9 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Eye, Clock, FileText, Link, CheckSquare, Activity, Network, ClipboardCheck, PhoneCall, CalendarPlus, SlidersHorizontal, Brain } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, Wallet, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Clock, FileText, Link, CheckSquare, Activity, Network, ClipboardCheck, PhoneCall, CalendarPlus, SlidersHorizontal, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
 import { useLayoutSettings } from '@/hooks/useLayoutSettings';
+import { ViewAsAthleteSelector } from '@/components/layout/ViewAsAthleteSelector';
 import logoRFDefault from '@/assets/logo-rf.jpg';
 
 const iconMap: Record<string, any> = {
@@ -35,16 +35,11 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
-  const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { settings } = useLayoutSettings();
 
   const handleSignOut = async () => {
     await signOut();
-  };
-
-  const handleViewAsAthlete = () => {
-    navigate('/athlete');
   };
 
   const logoSrc = settings.logo_url || logoRFDefault;
@@ -129,20 +124,8 @@ export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse
 
           {/* Footer with user info and logout */}
           <div className="border-t border-sidebar-border p-4 space-y-3">
-            {/* View as Athlete Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleViewAsAthlete}
-              title={isCollapsed ? "Ver como atleta" : undefined}
-              className={cn(
-                "w-full gap-2 text-xs border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive",
-                isCollapsed && "lg:justify-center lg:px-2"
-              )}
-            >
-              <Eye className="h-4 w-4 flex-shrink-0" />
-              <span className={cn(isCollapsed && "lg:hidden")}>Ver como atleta</span>
-            </Button>
+            {/* View as Athlete — admin preview or a specific athlete */}
+            <ViewAsAthleteSelector isCollapsed={isCollapsed} />
             
             {user && !isCollapsed && (
               <div className="rounded-lg bg-sidebar-accent p-3 lg:block hidden">
