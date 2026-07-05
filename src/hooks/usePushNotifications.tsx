@@ -22,12 +22,33 @@ export function usePushNotifications() {
     'serviceWorker' in navigator &&
     isFirebaseConfigured();
 
+  // Salva/atualiza o token do dispositivo na tabela push_tokens.
+  const registerToken = useCallback(async () => {
+    if (!user) return false;
+    const token = await requestPushToken();
+    if (!token) return false;
+    const { error: upsertError } = await (supabase as any)
+      .from('push_tokens')
+      .upsert(
+        { user_id: user.id, token, platform: 'web', updated_at: new Date().toISOString() },
+        { onConflict: 'token' },
+      );
+    if (upsertError) throw upsertError;
+    return true;
+  }, [user]);
+
   // Estado inicial: já concedeu permissão antes?
+  // Se sim, re-registra o token silenciosamente — essencial após mudanças de
+  // configuração do Firebase (projeto/VAPID novos invalidam tokens antigos),
+  // caso contrário o aparelho mostra "ativado" mas guarda um token morto.
   useEffect(() => {
-    if (supported && Notification.permission === 'granted') {
-      setEnabled(true);
-    }
-  }, [supported]);
+    if (!supported || !user) return;
+    if (Notification.permission !== 'granted') return;
+    setEnabled(true);
+    registerToken().catch((e) => {
+      console.warn('[push] falha ao re-registrar token:', e);
+    });
+  }, [supported, user, registerToken]);
 
   // Mensagens em primeiro plano → toast com ação
   useEffect(() => {
@@ -50,16 +71,8 @@ export function usePushNotifications() {
     setStatus('loading');
     setError(null);
     try {
-      const token = await requestPushToken();
-      if (!token) throw new Error('Não foi possível obter o token do dispositivo.');
-
-      const { error: upsertError } = await (supabase as any)
-        .from('push_tokens')
-        .upsert(
-          { user_id: user.id, token, platform: 'web' },
-          { onConflict: 'token' },
-        );
-      if (upsertError) throw upsertError;
+      const ok = await registerToken();
+      if (!ok) throw new Error('Não foi possível obter o token do dispositivo.');
 
       setEnabled(true);
       setStatus('ready');
@@ -68,7 +81,7 @@ export function usePushNotifications() {
       setStatus('error');
       setError(e?.message || 'Erro ao ativar notificações.');
     }
-  }, [user, supported]);
+  }, [user, supported, registerToken]);
 
   return { enable, status, enabled, error, supported };
 }
