@@ -10,6 +10,7 @@ import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCha
 import { normalizeMeals } from '@/lib/athletePlan';
 import { useAthleteDailyLog } from '@/hooks/useAthleteDailyLog';
 import { useActiveRace } from '@/hooks/useNutriPeriodiza';
+import { useNutritionSupportWhatsapp } from '@/hooks/useNutritionSupportWhatsapp';
 import type { AthleteAnalysis } from '@/hooks/useAthleteAnalysis';
 import logoRF from '@/assets/logo-rf.jpg';
 
