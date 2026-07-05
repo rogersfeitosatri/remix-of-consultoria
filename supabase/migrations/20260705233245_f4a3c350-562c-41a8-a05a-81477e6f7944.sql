@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.get_nutrition_support_whatsapp(uuid) FROM PUBLIC, anon;
