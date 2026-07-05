@@ -145,10 +145,23 @@ export async function callAiStructured(opts: StructuredOpts): Promise<AiResult> 
         tool_choice: { type: 'function', function: { name: opts.toolName } },
       });
       const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-      if (!toolCall?.function?.arguments) {
-        throw new Error(`${p.name}: resposta sem tool_call estruturado`);
+      if (toolCall?.function?.arguments) {
+        return { data: JSON.parse(toolCall.function.arguments), provider: p.name, model: p.model };
       }
-      return { data: JSON.parse(toolCall.function.arguments), provider: p.name, model: p.model };
+      // Fallback: alguns provedores/modelos ignoram tool_choice e devolvem JSON no content
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        try {
+          return { data: parseJsonLoose(content), provider: p.name, model: p.model };
+        } catch {
+          // tenta extrair primeiro bloco {...}
+          const match = String(content).match(/\{[\s\S]*\}/);
+          if (match) {
+            return { data: JSON.parse(match[0]), provider: p.name, model: p.model };
+          }
+        }
+      }
+      throw new Error(`${p.name}: resposta sem tool_call estruturado`);
     } catch (e) {
       lastErr = e;
       console.error(`[aiClient] provedor ${p.name} falhou:`, e instanceof Error ? e.message : e);
