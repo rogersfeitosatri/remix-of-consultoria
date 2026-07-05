@@ -747,8 +747,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
 
   // -- Save logic --
 
-  const buildSaveData = () => {
-    const data = deepClone(editedAnalysis);
+  const buildSaveData = (source?: any) => {
+    const data = deepClone(source ?? editedAnalysis);
     for (const meal of data.meal_plan?.meals ?? []) {
       const processOption = (opt: any) => {
         // Strip transient UI state from foods
@@ -792,7 +792,9 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         processOption(meal);
       }
     }
-    if (computedTotals) {
+    // Only recompute daily totals from the live edit buffer, not from an
+    // arbitrary source (silent-save on open must preserve existing totals).
+    if (!source && computedTotals) {
       if (!data.meal_plan.daily_totals) data.meal_plan.daily_totals = {};
       data.meal_plan.daily_totals.kcal = Math.round(computedTotals.calories);
       data.meal_plan.daily_totals.cho_g = Math.round(computedTotals.carbs_g);
@@ -802,8 +804,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     return data;
   };
 
-  const saveDirectly = async () => {
-    const data = buildSaveData();
+  const saveDirectly = async (source?: any) => {
+    const data = buildSaveData(source);
     const updatedRaw = JSON.stringify({ ...data, _isNewFormat: true });
     const { error } = await supabase
       .from('ai_analyses')
@@ -880,6 +882,16 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       const totalConverted = results.reduce((a, r) => a + r.converted, 0);
       const totalUnconverted = results.reduce((a, r) => a + r.unconverted, 0);
       setEditedAnalysis(deepClone(base));
+
+      // Persist the conversion silently so it's not re-done every time the
+      // plan is reopened. Only saves if the DB round-trip succeeds; errors
+      // are swallowed to keep the edit UX unchanged.
+      if (totalConverted > 0) {
+        try {
+          await saveDirectly(base);
+          onUpdated();
+        } catch { /* silent */ }
+      }
 
       if (totalConverted === 0) {
         toast.warning('Banco de alimentos indisponivel. Editando em modo texto.');
