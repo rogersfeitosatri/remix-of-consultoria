@@ -1040,7 +1040,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             <Badge className="text-[10px] shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0">ou</Badge>
             <div className="flex-1 min-w-0">
               <p className="text-sm truncate">{sub.name}</p>
-              <p className="text-[11px] text-muted-foreground">{sub.quantity} {sub.measure_name} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</p>
+              <p className="text-[11px] text-muted-foreground">{sub.quantity} {stripMeasureRef(sub.measure_name)} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</p>
             </div>
             <Button
               variant="ghost"
@@ -1171,12 +1171,12 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-medium">{f.name}</span>
                 <span className="text-muted-foreground text-xs whitespace-nowrap">
-                  {f.quantity} {f.measure_name} · {Math.round(f.weight_g)}g
+                  {f.quantity} {stripMeasureRef(f.measure_name)} · {Math.round(f.weight_g)}g
                 </span>
               </div>
               {(f.substitutions || []).length > 0 && (
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  ou {f.substitutions.map((s: any) => `${s.name} (${s.quantity} ${s.measure_name})`).join(' ou ')}
+                  ou {f.substitutions.map((s: any) => `${s.name} (${s.quantity} ${stripMeasureRef(s.measure_name)})`).join(' ou ')}
                 </p>
               )}
             </div>

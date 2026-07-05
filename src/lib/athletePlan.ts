@@ -105,6 +105,13 @@ function parseFoodText(text: string): PlanFood {
 }
 
 // Linha de quantidade única para exibição (fonte menor).
+// Remove reference weight in parenthesis from measure_name (e.g. "Fatia média (80g)" → "Fatia média").
+// We show only the TOTAL weight (weight_g) to the user, so the per-unit reference
+// inside the measure name is redundant and confusing.
+export function stripMeasureRef(measure?: string): string {
+  return (measure || '').replace(/\s*\([^)]*\bg\b[^)]*\)\s*$/i, '').trim();
+}
+
 export function foodQuantityLine(food: PlanFood): string {
   const parts = [food.amount];
   if (food.weight && !(food.amount || '').toLowerCase().includes(food.weight.toLowerCase())) {
@@ -114,10 +121,11 @@ export function foodQuantityLine(food: PlanFood): string {
 }
 
 function structuredToFood(f: any): PlanFood {
+  const measure = stripMeasureRef(f.measure_name);
   return {
     name: f.name,
-    amount: f.quantity != null ? `${f.quantity} ${f.measure_name || ''}`.trim() : undefined,
-    measure: f.measure_name,
+    amount: f.quantity != null ? `${f.quantity} ${measure}`.trim() : undefined,
+    measure,
     weight: f.weight_g != null ? `${Math.round(f.weight_g)}g` : undefined,
     raw: f.name,
   };
