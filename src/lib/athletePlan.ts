@@ -51,10 +51,39 @@ function extractTime(name: string, timingNote?: string): { time?: string; cleanN
 
 // Divide um item em [principal, ...alternativas] usando OU / ou / "/".
 function splitAlternatives(text: string): string[] {
-  return text
-    .split(/\s+ou\s+|\s+OU\s+|\s*\/\s*/g)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  // IMPORTANT: only split on " / " with whitespace on BOTH sides. A bare "/"
+  // inside "1/2 xícara" is a fraction, not a separator, and splitting it would
+  // corrupt the food name (e.g. "quinoa cozida (70g, 1/2 xícara)" → two items).
+  // We also protect parenthesised groups: never split inside "(...)".
+  const parts: string[] = [];
+  let buf = '';
+  let depth = 0;
+  const src = text;
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (depth === 0) {
+      // " ou " / " OU " separator
+      const rest = src.slice(i);
+      const ouMatch = rest.match(/^\s+(?:ou|OU)\s+/);
+      if (ouMatch) {
+        parts.push(buf);
+        buf = '';
+        i += ouMatch[0].length - 1;
+        continue;
+      }
+      // " / " separator (spaces required to avoid matching fractions like 1/2)
+      if (ch === '/' && /\s/.test(src[i - 1] || '') && /\s/.test(src[i + 1] || '')) {
+        parts.push(buf);
+        buf = '';
+        continue;
+      }
+    }
+    buf += ch;
+  }
+  if (buf) parts.push(buf);
+  return parts.map((s) => s.trim()).filter(Boolean);
 }
 
 // Separa nome e quantidade. Aceita:
