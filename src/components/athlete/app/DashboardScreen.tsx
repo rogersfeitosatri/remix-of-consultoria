@@ -1,11 +1,138 @@
-import { Utensils, Droplets, Scale, ClipboardCheck, ChevronRight, Flag, Plus, TrendingUp, TrendingDown, Clock } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { Utensils, Droplets, Scale, ClipboardCheck, ChevronRight, Flag, Plus, TrendingUp, TrendingDown, Clock, Shuffle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import type { PlanMeal } from '@/lib/athletePlan';
+import type { PlanMeal, PlanFood } from '@/lib/athletePlan';
+import { foodQuantityLine } from '@/lib/athletePlan';
 import type { ActiveRace } from '@/hooks/useNutriPeriodiza';
 import { calculateWeeksToRace } from '@/lib/nutriperiodiza';
 
 const GOLD = 'hsl(43,74%,49%)';
+
+function timeToMinutes(t?: string): number | null {
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+function pickNextMealIndexByTime(meals: PlanMeal[]): number {
+  if (meals.length === 0) return -1;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  // First meal whose time >= now
+  for (let i = 0; i < meals.length; i++) {
+    const mm = timeToMinutes(meals[i].time);
+    if (mm != null && mm >= nowMin) return i;
+  }
+  // Otherwise last meal of the day (already passed all) — or first
+  return meals.length - 1;
+}
+
+function NextMealHero({ meals, onGoPlano }: { meals: PlanMeal[]; onGoPlano: () => void }) {
+  const initialIdx = useMemo(() => pickNextMealIndexByTime(meals), [meals]);
+  const [selectedIdx, setSelectedIdx] = useState(initialIdx);
+
+  // Re-sync when meals load or every minute
+  useEffect(() => { setSelectedIdx(pickNextMealIndexByTime(meals)); }, [meals]);
+  useEffect(() => {
+    const t = setInterval(() => setSelectedIdx(pickNextMealIndexByTime(meals)), 60_000);
+    return () => clearInterval(t);
+  }, [meals]);
+
+  if (meals.length === 0 || selectedIdx < 0) return null;
+  const meal = meals[selectedIdx];
+
+  return (
+    <div className="space-y-3">
+      {/* Meal tabs */}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
+        {meals.map((m, i) => {
+          const active = i === selectedIdx;
+          return (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => setSelectedIdx(i)}
+              className={`shrink-0 px-4 h-10 rounded-full border text-sm font-semibold transition-colors ${
+                active
+                  ? 'bg-[hsl(43,74%,49%)] text-black border-transparent'
+                  : 'bg-[#131417] text-gray-300 border-gray-800'
+              }`}
+            >
+              {m.name}
+              {m.time && <span className={`ml-2 font-normal ${active ? 'text-black/70' : 'text-gray-500'}`}>{m.time}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Next meal card */}
+      <button
+        type="button"
+        onClick={onGoPlano}
+        className="w-full text-left rounded-3xl bg-[#131417] border border-gray-800 p-4 active:scale-[0.99] transition-transform"
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[11px] uppercase tracking-wide font-semibold" style={{ color: GOLD }}>Próxima Refeição</span>
+          <Clock className="h-3.5 w-3.5" style={{ color: GOLD }} />
+        </div>
+        <h3 className="text-lg font-extrabold text-white leading-tight mb-3">
+          {meal.name}{meal.time ? ` – ${meal.time}` : ''}
+        </h3>
+
+        {meal.foods.length === 0 ? (
+          <p className="text-sm text-gray-500">Sem itens cadastrados nessa refeição.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {meal.foods.slice(0, 3).map((g, i) => (
+              <div key={i}>
+                <p className="text-sm text-gray-100">
+                  {g.primary.name}
+                  {(() => {
+                    const q = foodQuantityLine(g.primary);
+                    return q ? <span className="text-gray-400"> - {q}</span> : null;
+                  })()}
+                  {g.alternatives.length > 0 && <span className="text-gray-500"> ou</span>}
+                </p>
+                {g.alternatives.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+                    <Shuffle className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      {g.alternatives[0].name}
+                      {(() => {
+                        const q = foodQuantityLine(g.alternatives[0]);
+                        return q ? ` - ${q}` : '';
+                      })()}
+                      {g.alternatives.length > 1 && ` ou +${g.alternatives.length - 1} opções`}
+                    </span>
+                  </p>
+                )}
+              </div>
+            ))}
+            {meal.foods.length > 3 && (
+              <p className="text-xs text-gray-500">+{meal.foods.length - 3} itens</p>
+            )}
+          </div>
+        )}
+
+        {/* Dots pagination */}
+        {meals.length > 1 && (
+          <div className="flex items-center justify-center gap-1.5 mt-4">
+            {meals.map((_, i) => (
+              <span
+                key={i}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === selectedIdx ? 'w-4 bg-[hsl(43,74%,49%)]' : 'w-1.5 bg-gray-700'
+                }`}
+              />
+            ))}
+          </div>
+        )}
+      </button>
+    </div>
+  );
+}
 
 function greeting(): string {
   const h = new Date().getHours();
