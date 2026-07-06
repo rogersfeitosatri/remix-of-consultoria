@@ -1410,10 +1410,19 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                           size="sm"
                           className="h-8 text-xs gap-1 px-2"
                           onClick={() => addOptionToMeal(i)}
-                          title="Adicionar opção de refeição"
+                          title="Adicionar opção alternativa desta refeição"
                         >
                           <Copy className="h-3.5 w-3.5" />
                           <span className="hidden sm:inline">Opção</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground"
+                          onClick={() => duplicateMeal(i)}
+                          title="Duplicar refeição inteira"
+                        >
+                          <Plus className="h-4 w-4" />
                         </Button>
                         {meals.length > 1 && (
                           <Button
