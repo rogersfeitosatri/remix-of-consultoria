@@ -20,6 +20,7 @@ import {
   ChevronDown,
   Copy,
   Check,
+  Zap,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -446,6 +447,9 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
   const [isAuditing, setIsAuditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
+  const [quickText, setQuickText] = useState<Record<string, string>>({});
+  const [quickBusyKey, setQuickBusyKey] = useState<string | null>(null);
+  const [showQuickKey, setShowQuickKey] = useState<string | null>(null);
   const [editedAnalysis, setEditedAnalysis] = useState(() => deepClone(analysis));
   const [focusedMealIdx, setFocusedMealIdx] = useState<number | null>(null);
   const mealRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -698,6 +702,44 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       }
       return next;
     });
+  };
+
+  // Digitação rápida: cola/escreve vários alimentos (1 por linha, "ou" = substituição)
+  // e o sistema busca todos no banco e adiciona já na edição inteligente.
+  const quickAddFoods = async (mealIdx: number, optIdx?: number) => {
+    const key = `${mealIdx}:${optIdx ?? 'x'}`;
+    const lines = (quickText[key] || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+    setQuickBusyKey(key);
+    try {
+      // Cada linha vira seu próprio grupo, para que 1 alimento não reconhecido
+      // não interrompa os demais.
+      const temp: any = { foods: [], food_groups: lines.map((l) => ({ group: 'Outros', options: l })) };
+      await convertTargetInPlace(temp);
+      const added = temp.foods as SelectedFood[];
+      const failed = (temp.food_groups as any[]).length;
+      if (added.length === 0) {
+        toast.warning('Nenhum alimento reconhecido. Verifique os nomes (ex: "2 ovos", "100g arroz").');
+        return;
+      }
+      setEditedAnalysis((prev: any) => {
+        const next = deepClone(prev);
+        const target = optIdx !== undefined && next.meal_plan.meals[mealIdx].options
+          ? next.meal_plan.meals[mealIdx].options[optIdx]
+          : next.meal_plan.meals[mealIdx];
+        if (!target.foods) target.foods = [];
+        target.foods.push(...deepClone(added));
+        return next;
+      });
+      setQuickText((t) => ({ ...t, [key]: '' }));
+      setShowQuickKey(null);
+      if (failed > 0) toast.info(`${added.length} adicionado(s). ${failed} linha(s) não reconhecida(s).`);
+      else toast.success(`${added.length} alimento(s) adicionado(s)!`);
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message);
+    } finally {
+      setQuickBusyKey(null);
+    }
   };
 
   const removeFoodFromMeal = (mealIdx: number, foodTempId: string, optIdx?: number) => {
@@ -1335,13 +1377,63 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         </div>
       )}
 
-      {/* Food search */}
-      <div className="pt-1">
-        <FoodSearchAutocomplete
-          placeholder="+ Adicionar alimento..."
-          onAddFood={(food) => addFoodToMeal(mealIdx, food, optIdx)}
-        />
-      </div>
+      {/* Food search + digitação rápida */}
+      {(() => {
+        const qKey = `${mealIdx}:${optIdx ?? 'x'}`;
+        const isQuick = showQuickKey === qKey;
+        return (
+          <div className="pt-1 space-y-1.5">
+            {!isQuick ? (
+              <>
+                <FoodSearchAutocomplete
+                  placeholder="+ Adicionar alimento..."
+                  onAddFood={(food) => addFoodToMeal(mealIdx, food, optIdx)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowQuickKey(qKey)}
+                  className="w-full text-xs text-primary hover:underline flex items-center justify-center gap-1 py-1"
+                >
+                  <Zap className="h-3.5 w-3.5" />
+                  Digitação rápida (vários alimentos de uma vez)
+                </button>
+              </>
+            ) : (
+              <div className="rounded-lg border border-primary/40 bg-primary/[0.04] p-2.5 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                  <Zap className="h-3.5 w-3.5" />
+                  Digitação rápida
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  1 alimento por linha. Use <b>ou</b> para os substitutos. A próxima linha é outro alimento.
+                </p>
+                <Textarea
+                  value={quickText[qKey] || ''}
+                  onChange={(e) => setQuickText((t) => ({ ...t, [qKey]: e.target.value }))}
+                  rows={5}
+                  autoFocus
+                  className="text-sm font-mono"
+                  placeholder={"2 ovos\n100g arroz ou 120g batata doce ou 80g macarrão\n1 banana ou 1 fatia de mamão"}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1 gap-1.5"
+                    onClick={() => quickAddFoods(mealIdx, optIdx)}
+                    disabled={quickBusyKey === qKey}
+                  >
+                    {quickBusyKey === qKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                    Adicionar tudo
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowQuickKey(null)} disabled={quickBusyKey === qKey}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 
