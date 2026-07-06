@@ -1440,8 +1440,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                 </div>
 
                 <div className="p-3">
-                  {/* Meal-level totals — sempre visível */}
-                  {mealTotals && (
+                  {/* Meal-level totals — hide when the meal has options (each option shows its own totals) */}
+                  {mealTotals && !hasOptions && (
                     <div className="flex items-center gap-1.5 text-[11px] flex-wrap mb-2 pb-2 border-b border-dashed">
                       <span className="font-bold text-foreground">{Math.round(mealTotals.calories)} kcal</span>
                       <span className="text-blue-600 dark:text-blue-400">C {Math.round(mealTotals.carbs_g)}g</span>
