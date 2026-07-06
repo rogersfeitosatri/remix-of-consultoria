@@ -1487,23 +1487,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                         })}
                       </div>
                     ) : (
-                      // Single meal (no options)
-                      <>
-                        {(() => {
-                          const foods = meal.foods || [];
-                          const optTotals = computedMealOptionTotals(foods);
-                          return (
-                            <>
-                              {optTotals && (
-                                <div className="flex justify-end mb-2">
-                                  {mealTotalChips(optTotals)}
-                                </div>
-                              )}
-                              {renderFoodList(foods, meal.food_groups || [], i)}
-                            </>
-                          );
-                        })()}
-                      </>
+                      // Single meal (no options) — totals already shown in meal-level row above
+                      renderFoodList(meal.foods || [], meal.food_groups || [], i)
                     )
                   ) : (
                     // View mode — clean flat list, no category labels
