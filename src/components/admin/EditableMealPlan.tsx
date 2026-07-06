@@ -1100,27 +1100,36 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             </button>
           </div>
           <InlineMeasurePicker food={food} onSelect={(m) => updateFoodMeasure(mealIdx, food.temp_id, m, optIdx)} />
-          <span className="text-xs text-muted-foreground">{Math.round(food.weight_g)}g</span>
+          <EditableGramsChip
+            weightG={food.weight_g}
+            onCommit={(g) => updateFoodWeight(mealIdx, food.temp_id, g, optIdx)}
+          />
         </div>
 
-        {/* Substitutions */}
-        {(food.substitutions || []).map((sub: any) => (
-          <div key={sub.temp_id} className="flex items-center gap-2 px-3 py-2 border-t bg-muted/20">
-            <Badge className="text-[10px] shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0">ou</Badge>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm truncate">{sub.name}</p>
-              <p className="text-[11px] text-muted-foreground">{sub.quantity} {stripMeasureRef(sub.measure_name)} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-              onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+        {/* Substitutions — equivalências que o atleta pode escolher */}
+        {(food.substitutions || []).length > 0 && (
+          <div className="border-t bg-blue-50/40 dark:bg-blue-950/10">
+            <p className="px-3 pt-2 text-[10px] uppercase tracking-wide font-semibold text-blue-700/80 dark:text-blue-300/80">
+              Equivalentes (o atleta escolhe 1)
+            </p>
+            {(food.substitutions || []).map((sub: any) => (
+              <div key={sub.temp_id} className="flex items-center gap-2 px-3 py-2 border-l-2 border-blue-400/60 ml-3 my-1 rounded-r bg-white/60 dark:bg-black/20">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate">{sub.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{sub.quantity} {stripMeasureRef(sub.measure_name)} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                  onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
 
         {/* Inline replace search */}
         {food._showReplace && (
