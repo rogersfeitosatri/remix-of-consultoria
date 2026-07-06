@@ -1,9 +1,100 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Check, ChevronRight, ChevronDown } from 'lucide-react';
 import { FoodSwapBottomSheet } from './FoodSwapBottomSheet';
-import { mealEmoji, foodQuantityLine, type PlanMeal, type PlanFoodGroup } from '@/lib/athletePlan';
+import { mealEmoji, foodQuantityLine, type PlanMeal, type PlanFoodGroup, type PlanMealOption } from '@/lib/athletePlan';
 
 const GOLD = 'hsl(43,74%,49%)';
+
+function FoodRow({ food, onSwap }: { food: PlanFoodGroup; onSwap: () => void }) {
+  const qty = foodQuantityLine(food.primary);
+  const hasAlts = food.alternatives.length > 0;
+  return (
+    <button
+      type="button"
+      onClick={onSwap}
+      className="w-full flex items-center gap-3 px-2 py-4 text-left active:bg-white/[0.03] transition-colors"
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-[17px] text-white font-medium leading-tight">{food.primary.name}</p>
+        {qty && <p className="text-sm text-gray-500 mt-1">{qty}</p>}
+      </div>
+      <ChevronRight className={`h-5 w-5 shrink-0 ${hasAlts ? 'text-gray-500' : 'text-gray-700'}`} />
+    </button>
+  );
+}
+
+// Carrossel de opções da refeição: deslize para o lado ou toque nos chips.
+function OptionsSwiper({
+  options,
+  renderFoods,
+}: {
+  options: PlanMealOption[];
+  renderFoods: (foods: PlanFoodGroup[]) => React.ReactNode;
+}) {
+  const [idx, setIdx] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const scrollTo = (i: number) => {
+    const el = trackRef.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+    setIdx(i);
+  };
+
+  const onScroll = () => {
+    const el = trackRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    if (i !== idx) setIdx(Math.max(0, Math.min(options.length - 1, i)));
+  };
+
+  return (
+    <div className="border-t border-white/[0.06]">
+      {/* Chips */}
+      <div className="flex items-center gap-1.5 px-3 pt-2.5 flex-wrap">
+        {options.map((o, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => scrollTo(i)}
+            className={`px-3 h-7 rounded-full text-xs font-semibold transition-colors ${
+              i === idx ? 'text-black' : 'bg-white/[0.06] text-gray-400'
+            }`}
+            style={i === idx ? { background: GOLD } : undefined}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Trilho com snap horizontal */}
+      <div
+        ref={trackRef}
+        onScroll={onScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {options.map((o, i) => (
+          <div key={i} className="w-full shrink-0 snap-center min-w-0">
+            {renderFoods(o.foods)}
+          </div>
+        ))}
+      </div>
+
+      {/* Bolinhas */}
+      <div className="flex items-center justify-center gap-1.5 pb-1.5">
+        {options.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => scrollTo(i)}
+            className="h-1.5 rounded-full transition-all"
+            style={{ width: i === idx ? 16 : 6, background: i === idx ? GOLD : '#374151' }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function MealCard({
   meal,
@@ -22,6 +113,17 @@ export function MealCard({
 }) {
   const [swapFood, setSwapFood] = useState<PlanFoodGroup | null>(null);
   const [obsOpen, setObsOpen] = useState(false);
+  const hasOptions = !!meal.options && meal.options.length > 1;
+
+  const renderFoodRows = (foods: PlanFoodGroup[]) => (
+    <div className="px-2 pt-1 pb-2 divide-y divide-white/[0.05]">
+      {foods.length > 0 ? (
+        foods.map((f, i) => <FoodRow key={i} food={f} onSwap={() => setSwapFood(f)} />)
+      ) : (
+        <p className="text-sm text-gray-500 px-2 py-4">Itens em breve.</p>
+      )}
+    </div>
+  );
 
   return (
     <div className="rounded-2xl bg-[#131417] border border-white/[0.06] overflow-hidden">
@@ -64,31 +166,12 @@ export function MealCard({
             </div>
           )}
 
-          {/* Foods — each row fully tappable → swap sheet */}
-          <div className="px-2 pt-1 pb-2 divide-y divide-white/[0.05] border-t border-white/[0.06]">
-            {meal.foods.length > 0 ? (
-              meal.foods.map((f, i) => {
-                const qty = foodQuantityLine(f.primary);
-                const hasAlts = f.alternatives.length > 0;
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setSwapFood(f)}
-                    className="w-full flex items-center gap-3 px-2 py-4 text-left active:bg-white/[0.03] transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[17px] text-white font-medium leading-tight">{f.primary.name}</p>
-                      {qty && <p className="text-sm text-gray-500 mt-1">{qty}</p>}
-                    </div>
-                    <ChevronRight className={`h-5 w-5 shrink-0 ${hasAlts ? 'text-gray-500' : 'text-gray-700'}`} />
-                  </button>
-                );
-              })
-            ) : (
-              <p className="text-sm text-gray-500 px-2 py-4">Itens em breve.</p>
-            )}
-          </div>
+          {/* Foods — carrossel quando a refeição tem opções */}
+          {hasOptions ? (
+            <OptionsSwiper options={meal.options!} renderFoods={renderFoodRows} />
+          ) : (
+            <div className="border-t border-white/[0.06]">{renderFoodRows(meal.foods)}</div>
+          )}
 
           {/* Complete button */}
           {!readOnly && (

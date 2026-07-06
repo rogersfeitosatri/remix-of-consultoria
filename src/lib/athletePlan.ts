@@ -16,6 +16,11 @@ export interface PlanFoodGroup {
   alternatives: PlanFood[];
 }
 
+export interface PlanMealOption {
+  label: string;
+  foods: PlanFoodGroup[];
+}
+
 export interface PlanMeal {
   key: string;
   name: string;
@@ -23,6 +28,8 @@ export interface PlanMeal {
   observation?: string;
   macros?: string;
   foods: PlanFoodGroup[];
+  /** Opções alternativas da refeição (Opção 1, 2, …) — deslize para o lado no app */
+  options?: PlanMealOption[];
 }
 
 const EMOJI: [RegExp, string][] = [
@@ -176,6 +183,16 @@ export function normalizeMeals(analysis: AthleteAnalysis | null | undefined): Pl
     const obs = meal.timing_note && !/^\s*\d{1,2}[:h.]\d{0,2}\s*$/.test(meal.timing_note.trim())
       ? meal.timing_note
       : undefined;
+    // Opções alternativas da refeição → o atleta escolhe qual seguir (carrossel).
+    const rawOptions = (meal as any).options as any[] | undefined;
+    const options: PlanMealOption[] | undefined =
+      rawOptions && rawOptions.length > 1
+        ? rawOptions.map((o, oi) => ({
+            label: o.label || `Opção ${oi + 1}`,
+            foods: buildFoodsFromMeal({ ...meal, options: undefined, foods: o.foods, food_groups: o.food_groups } as MealPlanMeal),
+          }))
+        : undefined;
+
     return {
       key: `meal_${i}`,
       name,
@@ -183,6 +200,7 @@ export function normalizeMeals(analysis: AthleteAnalysis | null | undefined): Pl
       observation: obs || noteFromName,
       macros: meal.meal_macros,
       foods: buildFoodsFromMeal(meal),
+      options,
     };
   });
 }

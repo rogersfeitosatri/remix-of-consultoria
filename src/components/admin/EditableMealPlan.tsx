@@ -19,6 +19,7 @@ import {
   ChevronUp,
   ChevronDown,
   Copy,
+  Check,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -251,6 +252,85 @@ function recalcFoodFromWeight(food: any, oldCalories: number) {
 
 // Inline measure picker — tap the measure to switch it (colher, xícara, gramas…).
 // Loads measures lazily on first open; falls back to plain text if food has no id.
+// Carrossel de opções da refeição: deslize para o lado (snap) ou toque nos chips
+// "Opção 1 / Opção 2 / …" para alternar entre as opções.
+function OptionsCarousel({
+  options,
+  renderOption,
+}: {
+  options: any[];
+  renderOption: (opt: any, oi: number) => React.ReactNode;
+}) {
+  const [idx, setIdx] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const scrollTo = (i: number) => {
+    const el = trackRef.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
+    setIdx(i);
+  };
+
+  const onScroll = () => {
+    const el = trackRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    if (i !== idx) setIdx(Math.max(0, Math.min(options.length - 1, i)));
+  };
+
+  if (options.length <= 1) {
+    return <>{options.map((o, i) => <div key={i}>{renderOption(o, i)}</div>)}</>;
+  }
+
+  return (
+    <div>
+      {/* Chips das opções */}
+      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+        {options.map((o: any, i: number) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => scrollTo(i)}
+            className={`px-2.5 h-7 rounded-full text-xs font-semibold border transition-colors ${
+              i === idx
+                ? 'bg-primary text-primary-foreground border-transparent'
+                : 'bg-muted/40 text-muted-foreground border-border'
+            }`}
+          >
+            {o.label || `Opção ${i + 1}`}
+          </button>
+        ))}
+        <span className="text-[10px] text-muted-foreground ml-auto hidden sm:inline">deslize para o lado ↔</span>
+      </div>
+
+      {/* Trilho com snap horizontal */}
+      <div
+        ref={trackRef}
+        onScroll={onScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {options.map((o: any, i: number) => (
+          <div key={i} className="w-full shrink-0 snap-center min-w-0 pr-0.5">
+            {renderOption(o, i)}
+          </div>
+        ))}
+      </div>
+
+      {/* Bolinhas indicadoras */}
+      <div className="flex items-center justify-center gap-1.5 mt-2">
+        {options.map((_: any, i: number) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => scrollTo(i)}
+            className={`h-1.5 rounded-full transition-all ${i === idx ? 'w-4 bg-primary' : 'w-1.5 bg-muted-foreground/30'}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function InlineMeasurePicker({ food, onSelect }: { food: any; onSelect: (m: any) => void }) {
   const [touched, setTouched] = useState(false);
   const { data: measures = [] } = useFoodMeasures(touched && food.food_item_id ? food.food_item_id : null);
@@ -819,6 +899,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
   const buildSaveData = (source?: any) => {
     const data = deepClone(source ?? editedAnalysis);
     for (const meal of data.meal_plan?.meals ?? []) {
+      delete meal._collapsed;
       const processOption = (opt: any) => {
         // Strip transient UI state from foods
         for (const f of (opt.foods || [])) {
@@ -887,6 +968,33 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     if (error) throw error;
   };
 
+  // -- Per-meal edit/save (preview ↔ edição) --
+
+  const setMealCollapsed = (mealIdx: number, collapsed: boolean) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      next.meal_plan.meals[mealIdx]._collapsed = collapsed;
+      return next;
+    });
+  };
+
+  const [savingMealIdx, setSavingMealIdx] = useState<number | null>(null);
+  // Salva a refeição (persiste o plano inteiro em silêncio) e volta o card
+  // para o modo preview — SEM sair do modo de edição nem invalidar queries
+  // (invalidar mudaria updated_at e remontaria o editor, perdendo o estado).
+  const saveMeal = async (mealIdx: number) => {
+    setSavingMealIdx(mealIdx);
+    try {
+      await saveDirectly();
+      setMealCollapsed(mealIdx, true);
+      toast.success('Refeição salva.');
+    } catch (e: any) {
+      toast.error('Erro ao salvar refeição: ' + e.message);
+    } finally {
+      setSavingMealIdx(null);
+    }
+  };
+
   const auditWithAI = async () => {
     const data = buildSaveData();
     const { data: result, error } = await supabase.functions.invoke('audit-meal-plan', {
@@ -932,6 +1040,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
 
   const handleStartEditing = async () => {
     const base = deepClone(analysis);
+    // Refeições começam "salvas" (preview) — o admin abre uma por vez no lápis.
+    for (const m of base.meal_plan?.meals ?? []) m._collapsed = true;
     setEditedAnalysis(base);
     setIsEditing(true);
 
@@ -1116,56 +1226,32 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             </button>
           </div>
           <InlineMeasurePicker food={food} onSelect={(m) => updateFoodMeasure(mealIdx, food.temp_id, m, optIdx)} />
-<<<<<<< HEAD
           <EditableGramsChip
             weightG={food.weight_g}
             onCommit={(g) => updateFoodWeight(mealIdx, food.temp_id, g, optIdx)}
           />
         </div>
 
-        {/* Substitutions — equivalências que o atleta pode escolher */}
+        {/* Substituições — equivalentes, uma linha cada */}
         {(food.substitutions || []).length > 0 && (
-          <div className="border-t bg-blue-50/40 dark:bg-blue-950/10">
-            <p className="px-3 pt-2 text-[10px] uppercase tracking-wide font-semibold text-blue-700/80 dark:text-blue-300/80">
-              Equivalentes (o atleta escolhe 1)
-            </p>
+          <div className="border-t bg-muted/20">
             {(food.substitutions || []).map((sub: any) => (
-              <div key={sub.temp_id} className="flex items-center gap-2 px-3 py-2 border-l-2 border-blue-400/60 ml-3 my-1 rounded-r bg-white/60 dark:bg-black/20">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{sub.name}</p>
-                  <p className="text-[11px] text-muted-foreground">{sub.quantity} {stripMeasureRef(sub.measure_name)} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</p>
-                </div>
+              <div key={sub.temp_id} className="flex items-center gap-1.5 pl-2.5 pr-1 py-1">
+                <Badge className="text-[10px] px-1.5 shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0">ou</Badge>
+                <p className="text-xs flex-1 min-w-0 truncate">
+                  <span className="font-medium text-foreground">{sub.name}</span>
+                  <span className="text-muted-foreground"> · {sub.quantity} {stripMeasureRef(sub.measure_name)} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</span>
+                </p>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
                   onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
             ))}
-=======
-          <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">{Math.round(food.weight_g)}g</span>
-        </div>
-
-        {/* Substituições — uma linha cada */}
-        {(food.substitutions || []).map((sub: any) => (
-          <div key={sub.temp_id} className="flex items-center gap-1.5 pl-2.5 pr-1 py-1 border-t bg-muted/20">
-            <Badge className="text-[10px] px-1.5 shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0">ou</Badge>
-            <p className="text-xs flex-1 min-w-0 truncate">
-              <span className="font-medium text-foreground">{sub.name}</span>
-              <span className="text-muted-foreground"> · {sub.quantity} {sub.measure_name} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</span>
-            </p>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-              onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
->>>>>>> d8b46f3 (Compact meal-plan editor rows + stop iOS auto-zoom on input focus)
           </div>
         )}
 
@@ -1197,29 +1283,6 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             />
           </div>
         )}
-<<<<<<< HEAD
-
-        {/* Action footer — big tappable buttons */}
-        <div className="flex border-t divide-x text-xs">
-          <button
-            type="button"
-            className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 font-medium active:bg-muted ${food._showReplace ? 'text-primary bg-muted/40' : 'text-muted-foreground'}`}
-            onClick={() => { toggleReplace(mealIdx, food.temp_id, !food._showReplace, optIdx); if (food._showSubSearch) toggleSubSearch(mealIdx, food.temp_id, false, optIdx); }}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Trocar alimento
-          </button>
-          <button
-            type="button"
-            className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 font-medium active:bg-blue-50 ${food._showSubSearch ? 'text-blue-700 bg-blue-50 dark:bg-blue-950/20' : 'text-blue-600 dark:text-blue-400'}`}
-            onClick={() => { toggleSubSearch(mealIdx, food.temp_id, !food._showSubSearch, optIdx); if (food._showReplace) toggleReplace(mealIdx, food.temp_id, false, optIdx); }}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            + Equivalente
-          </button>
-        </div>
-=======
->>>>>>> d8b46f3 (Compact meal-plan editor rows + stop iOS auto-zoom on input focus)
       </div>
     );
   };
@@ -1227,8 +1290,10 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
   // -- Render food list for a meal or option --
   const renderFoodList = (foods: any[], legacyGroups: any[], mealIdx: number, optIdx?: number) => (
     <div className="space-y-1">
-      {/* Legacy food groups with convert button */}
-      {legacyGroups.length > 0 && (
+      {/* Texto legado: só aparece enquanto NÃO há alimentos estruturados.
+          Depois da conversão, os alimentos já estão na edição inteligente —
+          o campo de descrição é redundante e some. */}
+      {legacyGroups.length > 0 && foods.length === 0 && (
         <div className="space-y-2 pb-2">
           <Button
             variant="outline"
@@ -1398,13 +1463,16 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
           {meals.map((meal: any, i: number) => {
             const hasOptions = meal.options?.length > 0;
             const mealTotals = computedMealTotals(meal);
+            // Durante a edição do plano, cada refeição alterna entre "editando"
+            // e "salva" (preview igual ao app do atleta) via lápis / Salvar refeição.
+            const isMealEditing = isEditing && !meal._collapsed;
 
             return (
               <div
                 key={i}
                 ref={(el) => { mealRefs.current[i] = el; }}
                 data-meal-idx={i}
-                className={`rounded-lg border bg-card overflow-hidden transition-shadow ${isEditing && focusedMealIdx === i ? 'ring-2 ring-primary/40 shadow-sm' : ''}`}
+                className={`rounded-lg border bg-card overflow-hidden transition-shadow ${isMealEditing && focusedMealIdx === i ? 'ring-2 ring-primary/40 shadow-sm' : ''}`}
               >
                 {/* Meal header */}
                 <div className="flex items-center gap-2 p-3 bg-muted/30 border-b">
@@ -1429,7 +1497,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                     </div>
                   )}
 
-                  {isEditing ? (
+                  {isMealEditing ? (
                     <Input
                       value={meal.meal_name}
                       onChange={(e) => updateMealField(i, 'meal_name', e.target.value)}
@@ -1437,14 +1505,14 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                       className="font-semibold text-sm flex-1 min-w-0 h-9"
                     />
                   ) : (
-                    <h4 className="font-semibold text-sm flex items-center gap-2">
-                      <UtensilsCrossed className="h-3.5 w-3.5 text-primary" />
+                    <h4 className="font-semibold text-sm flex items-center gap-2 flex-1 min-w-0 truncate">
+                      <UtensilsCrossed className="h-3.5 w-3.5 text-primary shrink-0" />
                       {meal.meal_name}
                     </h4>
                   )}
 
                   <div className="flex items-center gap-1 ml-auto shrink-0">
-                    {isEditing && (
+                    {isMealEditing ? (
                       <>
                         <Button
                           variant="ghost"
@@ -1476,7 +1544,31 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                           </Button>
                         )}
                       </>
-                    )}
+                    ) : isEditing ? (
+                      <>
+                        {/* Refeição salva — pequenos botões: editar volta ao modo edição */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-primary"
+                          title="Editar refeição"
+                          onClick={() => setMealCollapsed(i, false)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        {meals.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive h-8 w-8"
+                            title="Excluir refeição"
+                            onClick={() => removeMeal(i)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </>
+                    ) : null}
                   </div>
                 </div>
 
@@ -1495,15 +1587,16 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                       )}
                     </div>
                   )}
-                  {isEditing ? (
+                  {isMealEditing ? (
                     hasOptions ? (
-                      // Multiple options view
-                      <div className="space-y-3">
-                        {meal.options.map((opt: any, oi: number) => {
+                      // Edição com opções — carrossel (deslize para o lado)
+                      <OptionsCarousel
+                        options={meal.options}
+                        renderOption={(opt: any, oi: number) => {
                           const optFoods = opt.foods || [];
                           const optTotals = computedMealOptionTotals(optFoods);
                           return (
-                            <div key={oi} className="border rounded-lg p-3 bg-background">
+                            <div className="border rounded-lg p-3 bg-background">
                               <div className="flex items-center justify-between gap-2 mb-2">
                                 <Badge variant="outline" className="text-xs font-semibold">
                                   {opt.label}
@@ -1525,36 +1618,29 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                               {renderFoodList(optFoods, opt.food_groups || [], i, oi)}
                             </div>
                           );
-                        })}
-                      </div>
+                        }}
+                      />
                     ) : (
-<<<<<<< HEAD
-                      // Single meal (no options) — totals already shown in meal-level row above
-=======
                       // Single meal (no options) — totais já aparecem na linha fixa acima
->>>>>>> d8b46f3 (Compact meal-plan editor rows + stop iOS auto-zoom on input focus)
                       renderFoodList(meal.foods || [], meal.food_groups || [], i)
                     )
                   ) : (
-                    // View mode — clean flat list, no category labels
+                    // Preview (refeição salva durante a edição) e View mode —
+                    // igual ao app do atleta; opções em carrossel deslizável
                     hasOptions ? (
-                      <div className="space-y-3">
-                        {meal.options.map((opt: any, oi: number) => (
-                          <div key={oi} className={oi > 0 ? 'border-t pt-2.5' : ''}>
-                            <Badge variant="outline" className="text-xs font-semibold mb-2">
-                              {opt.label}
-                            </Badge>
-                            {renderViewFoods(opt.foods || [], opt.food_groups || [])}
-                          </div>
-                        ))}
-                      </div>
+                      <OptionsCarousel
+                        options={meal.options}
+                        renderOption={(opt: any) => (
+                          <div>{renderViewFoods(opt.foods || [], opt.food_groups || [])}</div>
+                        )}
+                      />
                     ) : (
                       renderViewFoods(meal.foods || [], meal.food_groups || [])
                     )
                   )}
 
                   {/* Timing note */}
-                  {isEditing ? (
+                  {isMealEditing ? (
                     <div className="mt-3">
                       <Input
                         value={meal.timing_note || ''}
@@ -1576,6 +1662,18 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                         </p>
                       )}
                     </>
+                  )}
+
+                  {/* Salvar refeição — persiste e volta ao preview */}
+                  {isMealEditing && (
+                    <Button
+                      className="w-full mt-3 gap-1.5 h-9"
+                      onClick={() => saveMeal(i)}
+                      disabled={savingMealIdx === i || busy}
+                    >
+                      {savingMealIdx === i ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      Salvar refeição
+                    </Button>
                   )}
                 </div>
               </div>
