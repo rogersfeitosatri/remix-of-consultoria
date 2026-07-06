@@ -1316,6 +1316,25 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
               <MacroChip color="purple" label="PTN" g={computedTotals.protein_g} gkg={athleteWeightKg ? computedTotals.protein_g / athleteWeightKg : null} />
               <MacroChip color="orange" label="LIP" g={computedTotals.fat_g} gkg={athleteWeightKg ? computedTotals.fat_g / athleteWeightKg : null} />
             </div>
+            {/* Focused meal chip — updates as you scroll through the meals */}
+            {focusedMealIdx != null && meals[focusedMealIdx] && (() => {
+              const fm = meals[focusedMealIdx];
+              const ft = computedMealTotals(fm);
+              return (
+                <div className="mt-1.5 pt-1.5 border-t border-green-200/70 dark:border-green-800/50 flex items-center gap-2 flex-wrap text-[11px]">
+                  <span className="text-green-700/80 dark:text-green-400/80 uppercase tracking-wide font-semibold">Editando:</span>
+                  <span className="font-semibold text-foreground truncate max-w-[55%]">{fm.meal_name || `Refeição ${focusedMealIdx + 1}`}</span>
+                  {ft && (
+                    <span className="ml-auto flex items-center gap-1.5 text-muted-foreground">
+                      <span className="font-bold text-foreground">{Math.round(ft.calories)} kcal</span>
+                      <span className="text-blue-600 dark:text-blue-400">C {Math.round(ft.carbs_g)}</span>
+                      <span className="text-purple-600 dark:text-purple-400">P {Math.round(ft.protein_g)}</span>
+                      <span className="text-orange-600 dark:text-orange-400">G {Math.round(ft.fat_g)}</span>
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
