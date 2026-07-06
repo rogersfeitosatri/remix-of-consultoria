@@ -1747,3 +1747,53 @@ function QuantityInput({
   );
 }
 
+
+// Click-to-edit grams chip: tap the total weight (e.g. "94g") to type an
+// exact target — the food's quantity is recomputed from its current measure.
+function EditableGramsChip({ weightG, onCommit }: { weightG: number; onCommit: (g: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(String(Math.round(weightG)));
+
+  useEffect(() => {
+    if (!editing) setText(String(Math.round(weightG)));
+  }, [weightG, editing]);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="text-xs text-muted-foreground hover:text-foreground underline decoration-dotted underline-offset-2 px-1"
+        title="Clique para digitar o peso em gramas"
+      >
+        {Math.round(weightG)}g
+      </button>
+    );
+  }
+
+  const commit = () => {
+    const parsed = parseFloat(text.replace(',', '.'));
+    if (isFinite(parsed) && parsed > 0) onCommit(parsed);
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <Input
+        type="text"
+        inputMode="numeric"
+        autoFocus
+        value={text}
+        onChange={(e) => setText(e.target.value.replace(/[^0-9.,]/g, ''))}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
+        }}
+        className="h-8 w-16 text-xs text-center px-1"
+      />
+      <span className="text-xs text-muted-foreground">g</span>
+    </div>
+  );
+}
