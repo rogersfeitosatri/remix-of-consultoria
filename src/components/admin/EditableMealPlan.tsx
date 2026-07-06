@@ -715,6 +715,27 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     });
   };
 
+  // Set exact target weight (grams) — recomputes quantity from the current measure.
+  const updateFoodWeight = (mealIdx: number, foodTempId: string, targetGrams: number, optIdx?: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      const foods = optIdx !== undefined && next.meal_plan.meals[mealIdx].options
+        ? next.meal_plan.meals[mealIdx].options[optIdx].foods || []
+        : next.meal_plan.meals[mealIdx].foods || [];
+      const food = foods.find((f: any) => f.temp_id === foodTempId);
+      if (!food || !(food.measure_weight_g > 0)) return next;
+      const oldCalories = food.calories;
+      const g = Math.max(1, Math.round(targetGrams));
+      food.quantity = Math.max(0.1, Math.round((g / food.measure_weight_g) * 10) / 10);
+      food.weight_g = Math.round(food.measure_weight_g * food.quantity * 10) / 10;
+      recalcFoodFromWeight(food, oldCalories);
+      adjustSubstitutions(food, oldCalories);
+      return next;
+    });
+  };
+
+
+
   // Replace a food's identity (keep its group + substitutions, re-scale substitutions)
   const replaceFood = (mealIdx: number, foodTempId: string, newFood: SelectedFood, optIdx?: number) => {
     setEditedAnalysis((prev: any) => {
