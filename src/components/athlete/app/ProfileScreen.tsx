@@ -34,6 +34,7 @@ export function ProfileScreen({
   readOnly?: boolean;
   onSignOut: () => void;
 }) {
+  const push = usePushNotifications();
   const initials = (client?.name || '?')
     .split(' ')
     .slice(0, 2)
