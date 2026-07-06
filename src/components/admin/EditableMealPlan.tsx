@@ -1472,10 +1472,10 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                 key={i}
                 ref={(el) => { mealRefs.current[i] = el; }}
                 data-meal-idx={i}
-                className={`rounded-lg border bg-card overflow-hidden transition-shadow ${isMealEditing && focusedMealIdx === i ? 'ring-2 ring-primary/40 shadow-sm' : ''}`}
+                className={`rounded-xl border border-l-[3px] border-l-primary/50 bg-card overflow-hidden transition-shadow ${isMealEditing && focusedMealIdx === i ? 'ring-2 ring-primary/40 shadow-sm' : ''}`}
               >
-                {/* Meal header */}
-                <div className="flex items-center gap-2 p-3 bg-muted/30 border-b">
+                {/* Meal header — banda com destaque e número da refeição */}
+                <div className="flex items-center gap-2 p-2.5 bg-primary/[0.06] border-b">
                   {isEditing && (
                     <div className="flex flex-col shrink-0">
                       <button
@@ -1497,18 +1497,29 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                     </div>
                   )}
 
+                  {/* Número da refeição */}
+                  <span className="h-6 w-6 shrink-0 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                    {i + 1}
+                  </span>
+
                   {isMealEditing ? (
                     <Input
                       value={meal.meal_name}
                       onChange={(e) => updateMealField(i, 'meal_name', e.target.value)}
                       placeholder="Ex: 07:00 - Café da manhã"
-                      className="font-semibold text-sm flex-1 min-w-0 h-9"
+                      className="font-bold text-sm flex-1 min-w-0 h-9 bg-background"
                     />
                   ) : (
-                    <h4 className="font-semibold text-sm flex items-center gap-2 flex-1 min-w-0 truncate">
-                      <UtensilsCrossed className="h-3.5 w-3.5 text-primary shrink-0" />
-                      {meal.meal_name}
+                    <h4 className="font-bold text-[15px] flex items-center gap-2 flex-1 min-w-0 truncate">
+                      {meal.meal_name || `Refeição ${i + 1}`}
                     </h4>
+                  )}
+
+                  {hasOptions && (
+                    <Badge variant="outline" className="text-[10px] shrink-0 border-primary/40 text-primary gap-1">
+                      <Copy className="h-3 w-3" />
+                      {meal.options.length} opções
+                    </Badge>
                   )}
 
                   <div className="flex items-center gap-1 ml-auto shrink-0">

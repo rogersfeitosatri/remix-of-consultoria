@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
-import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2 } from 'lucide-react';
+import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check } from 'lucide-react';
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
 
@@ -200,6 +200,43 @@ export default function MealPlanDetail() {
     ceia_enabled: (anamnese as any).meal_supper_enabled,
   } : undefined;
 
+  // Peso manual (quando não há anamnese/check-in) + aviso ao atleta
+  const [weightInput, setWeightInput] = useState('');
+  const [savingWeight, setSavingWeight] = useState(false);
+  const saveManualWeight = async () => {
+    const w = parseFloat(weightInput.replace(',', '.'));
+    if (isNaN(w) || w < 20 || w > 300) { toast.error('Informe um peso válido (kg).'); return; }
+    setSavingWeight(true);
+    try {
+      const { error } = await (supabase as any).from('clients').update({ manual_weight_kg: w }).eq('id', clientId);
+      if (error) throw error;
+      toast.success('Peso salvo.');
+      setWeightInput('');
+      queryClient.invalidateQueries({ queryKey: ['athlete-weight', clientId] });
+    } catch (e: any) {
+      toast.error('Erro ao salvar peso: ' + e.message);
+    } finally {
+      setSavingWeight(false);
+    }
+  };
+
+  const notifyAthlete = useMutation({
+    mutationFn: async (firstTime: boolean) => {
+      const { data, error } = await supabase.functions.invoke('notify-meal-plan-ready', {
+        body: { client_id: clientId, is_first_time: firstTime },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data: any) => {
+      if (data?.skipped) toast.info('O atleta ainda não acessou o app — nada enviado.');
+      else if (data?.sent === 0) toast.info('Aviso registrado, mas o atleta não tem dispositivo com notificação ativa.');
+      else toast.success('Atleta avisado! 🔔');
+    },
+    onError: (e: any) => toast.error('Erro ao avisar: ' + e.message),
+  });
+
   const busy = analyzeMutation.isPending || createFromScratch.isPending;
 
   const GuidanceInputs = (
@@ -224,7 +261,7 @@ export default function MealPlanDetail() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/meal-plans')}><ArrowLeft className="h-5 w-5" /></Button>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold truncate">{client?.name || 'Atleta'}</h1>
-            <div className="flex items-center gap-1.5 mt-0.5">
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
               {client && <Badge variant="outline" className="text-[10px]">{PLAN_LABEL[(client as any).plan_type] || (client as any).plan_type}</Badge>}
               {hasPlan ? <Badge className="text-[10px] bg-emerald-500/15 text-emerald-600 border-emerald-500/30">Plano criado</Badge>
                        : <Badge className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30">Sem plano</Badge>}
@@ -233,11 +270,52 @@ export default function MealPlanDetail() {
                   Peso: {athleteWeightKg} kg
                   {weightInfo?.source === 'checkin' && ' (último check-in)'}
                   {weightInfo?.source === 'anamnese' && ' (anamnese)'}
+                  {weightInfo?.source === 'manual' && ' (manual)'}
                 </span>
               )}
             </div>
           </div>
+          {hasPlan && (
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-1.5 shrink-0"
+              onClick={() => notifyAthlete.mutate(false)}
+              disabled={notifyAthlete.isPending}
+              title="Enviar notificação ao atleta avisando que o plano foi atualizado"
+            >
+              {notifyAthlete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
+              <span className="hidden sm:inline">Avisar atleta</span>
+            </Button>
+          )}
         </div>
+
+        {/* Peso manual — quando não há anamnese/check-in com peso */}
+        {!athleteWeightKg && (
+          <Card className="border-amber-500/40 bg-amber-500/[0.04]">
+            <CardContent className="py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-center gap-2 flex-1">
+                <Scale className="h-4 w-4 text-amber-600 shrink-0" />
+                <p className="text-sm">
+                  Sem peso de anamnese/check-in. <span className="text-muted-foreground">Informe o peso para calcular g/kg.</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={weightInput}
+                  onChange={(e) => setWeightInput(e.target.value)}
+                  placeholder="kg"
+                  className="w-24 h-9"
+                />
+                <Button size="sm" className="gap-1.5" onClick={saveManualWeight} disabled={savingWeight}>
+                  {savingWeight ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
