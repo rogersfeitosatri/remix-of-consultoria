@@ -1,4 +1,5 @@
-import { LogOut, Scale, Ruler, Target, BadgeCheck, Mail, User as UserIcon } from 'lucide-react';
+import { LogOut, Scale, Ruler, Target, BadgeCheck, Mail, User as UserIcon, Bell, BellRing, Loader2 } from 'lucide-react';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const GOLD = 'hsl(43,74%,49%)';
 
@@ -33,6 +34,7 @@ export function ProfileScreen({
   readOnly?: boolean;
   onSignOut: () => void;
 }) {
+  const push = usePushNotifications();
   const initials = (client?.name || '?')
     .split(' ')
     .slice(0, 2)
@@ -85,6 +87,46 @@ export function ProfileScreen({
         <Row icon={<Target className="h-4 w-4" />} label="Objetivo" value={objective || '—'} />
         <Row icon={<BadgeCheck className="h-4 w-4" />} label="Plano contratado" value={plan} />
       </div>
+
+      {/* Push notifications */}
+      {!readOnly && (
+        <div className="rounded-3xl bg-[#131417] border border-gray-800 p-4">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'rgba(191,150,54,0.15)', color: GOLD }}>
+              {push.enabled ? <BellRing className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">Notificações push</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {push.enabled
+                  ? 'Ativas neste dispositivo. Você receberá lembretes de check-in, plano e mensagens do seu nutri.'
+                  : 'Ative para receber lembretes de check-in, plano alimentar e avisos importantes.'}
+              </p>
+              {!push.supported && (
+                <p className="text-[11px] text-yellow-500/80 mt-1">Este navegador/dispositivo não suporta notificações push.</p>
+              )}
+              {push.error && <p className="text-[11px] text-red-400 mt-1">{push.error}</p>}
+            </div>
+          </div>
+          <button
+            onClick={push.enable}
+            disabled={push.status === 'loading' || !push.supported || push.enabled}
+            className="mt-3 w-full h-11 rounded-2xl font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60"
+            style={{
+              background: push.enabled ? 'rgba(34,197,94,0.15)' : `linear-gradient(135deg, ${GOLD}, #8a6d20)`,
+              color: push.enabled ? '#22c55e' : '#000',
+            }}
+          >
+            {push.status === 'loading' ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Ativando...</>
+            ) : push.enabled ? (
+              <><BellRing className="h-4 w-4" /> Notificações ativas</>
+            ) : (
+              <><Bell className="h-4 w-4" /> Ativar notificações</>
+            )}
+          </button>
+        </div>
+      )}
 
       {!readOnly && (
         <button
