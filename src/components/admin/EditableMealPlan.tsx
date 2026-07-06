@@ -367,6 +367,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
   const [isSaving, setIsSaving] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [editedAnalysis, setEditedAnalysis] = useState(() => deepClone(analysis));
+  const [focusedMealIdx, setFocusedMealIdx] = useState<number | null>(null);
+  const mealRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   const meals = isEditing ? editedAnalysis.meal_plan?.meals ?? [] : analysis.meal_plan?.meals ?? [];
   const dailyTotals = isEditing
