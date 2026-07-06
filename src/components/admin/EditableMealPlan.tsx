@@ -1176,7 +1176,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             onClick={() => { toggleSubSearch(mealIdx, food.temp_id, !food._showSubSearch, optIdx); if (food._showReplace) toggleReplace(mealIdx, food.temp_id, false, optIdx); }}
           >
             <Plus className="h-3.5 w-3.5" />
-            Substituição
+            + Equivalente
           </button>
         </div>
       </div>
