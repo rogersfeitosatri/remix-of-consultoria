@@ -1168,7 +1168,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             onClick={() => { toggleReplace(mealIdx, food.temp_id, !food._showReplace, optIdx); if (food._showSubSearch) toggleSubSearch(mealIdx, food.temp_id, false, optIdx); }}
           >
             <Pencil className="h-3.5 w-3.5" />
-            Trocar
+            Trocar alimento
           </button>
           <button
             type="button"
