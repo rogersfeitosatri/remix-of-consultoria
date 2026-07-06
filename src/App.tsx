@@ -139,7 +139,7 @@ function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route path="/" element={<LinkBio />} />
+        <Route path="/" element={<Auth />} />
         <Route path="/bio" element={<LinkBio />} />
         <Route path="/plans" element={<PlansLanding />} />
         <Route path="/assessoria" element={<AssessoriaLanding />} />
