@@ -551,7 +551,52 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     });
   };
 
+  const duplicateMeal = (mealIdx: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      const arr = next.meal_plan.meals;
+      const src = arr[mealIdx];
+      if (!src) return next;
+      const copy = deepClone(src);
+      copy.meal_name = (src.meal_name || '') + ' (cópia)';
+      // Refresh temp_ids so React keys don't collide
+      const refreshIds = (foods: any[]) => (foods || []).forEach((f: any) => {
+        f.temp_id = `f_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        (f.substitutions || []).forEach((s: any) => {
+          s.temp_id = `s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        });
+      });
+      if (copy.options) copy.options.forEach((o: any) => refreshIds(o.foods));
+      else refreshIds(copy.foods);
+      arr.splice(mealIdx + 1, 0, copy);
+      return next;
+    });
+  };
+
+  // Track which meal is in the viewport while editing → power the focused-meal
+  // chip in the sticky totals bar.
+  useEffect(() => {
+    if (!isEditing) { setFocusedMealIdx(null); return; }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the entry with the largest intersection ratio that's currently visible.
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (visible[0]) {
+          const idx = Number((visible[0].target as HTMLElement).dataset.mealIdx);
+          if (!Number.isNaN(idx)) setFocusedMealIdx(idx);
+        }
+      },
+      { rootMargin: '-120px 0px -40% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] },
+    );
+    mealRefs.current.forEach((el) => el && observer.observe(el));
+    return () => observer.disconnect();
+  }, [isEditing, meals.length]);
+
   // -- Structured food operations --
+
+
 
   const getFoodsArray = (meal: any, optIdx?: number) => {
     if (optIdx !== undefined && meal.options) return meal.options[optIdx]?.foods ?? [];
