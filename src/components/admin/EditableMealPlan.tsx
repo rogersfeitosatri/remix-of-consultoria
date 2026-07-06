@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { stripMeasureRef } from '@/lib/athletePlan';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -367,6 +367,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
   const [isSaving, setIsSaving] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [editedAnalysis, setEditedAnalysis] = useState(() => deepClone(analysis));
+  const [focusedMealIdx, setFocusedMealIdx] = useState<number | null>(null);
+  const mealRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   const meals = isEditing ? editedAnalysis.meal_plan?.meals ?? [] : analysis.meal_plan?.meals ?? [];
   const dailyTotals = isEditing
@@ -549,7 +551,52 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     });
   };
 
+  const duplicateMeal = (mealIdx: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      const arr = next.meal_plan.meals;
+      const src = arr[mealIdx];
+      if (!src) return next;
+      const copy = deepClone(src);
+      copy.meal_name = (src.meal_name || '') + ' (cópia)';
+      // Refresh temp_ids so React keys don't collide
+      const refreshIds = (foods: any[]) => (foods || []).forEach((f: any) => {
+        f.temp_id = `f_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        (f.substitutions || []).forEach((s: any) => {
+          s.temp_id = `s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        });
+      });
+      if (copy.options) copy.options.forEach((o: any) => refreshIds(o.foods));
+      else refreshIds(copy.foods);
+      arr.splice(mealIdx + 1, 0, copy);
+      return next;
+    });
+  };
+
+  // Track which meal is in the viewport while editing → power the focused-meal
+  // chip in the sticky totals bar.
+  useEffect(() => {
+    if (!isEditing) { setFocusedMealIdx(null); return; }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the entry with the largest intersection ratio that's currently visible.
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (visible[0]) {
+          const idx = Number((visible[0].target as HTMLElement).dataset.mealIdx);
+          if (!Number.isNaN(idx)) setFocusedMealIdx(idx);
+        }
+      },
+      { rootMargin: '-120px 0px -40% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] },
+    );
+    mealRefs.current.forEach((el) => el && observer.observe(el));
+    return () => observer.disconnect();
+  }, [isEditing, meals.length]);
+
   // -- Structured food operations --
+
+
 
   const getFoodsArray = (meal: any, optIdx?: number) => {
     if (optIdx !== undefined && meal.options) return meal.options[optIdx]?.foods ?? [];
@@ -667,6 +714,27 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       return next;
     });
   };
+
+  // Set exact target weight (grams) — recomputes quantity from the current measure.
+  const updateFoodWeight = (mealIdx: number, foodTempId: string, targetGrams: number, optIdx?: number) => {
+    setEditedAnalysis((prev: any) => {
+      const next = deepClone(prev);
+      const foods = optIdx !== undefined && next.meal_plan.meals[mealIdx].options
+        ? next.meal_plan.meals[mealIdx].options[optIdx].foods || []
+        : next.meal_plan.meals[mealIdx].foods || [];
+      const food = foods.find((f: any) => f.temp_id === foodTempId);
+      if (!food || !(food.measure_weight_g > 0)) return next;
+      const oldCalories = food.calories;
+      const g = Math.max(1, Math.round(targetGrams));
+      food.quantity = Math.max(0.1, Math.round((g / food.measure_weight_g) * 10) / 10);
+      food.weight_g = Math.round(food.measure_weight_g * food.quantity * 10) / 10;
+      recalcFoodFromWeight(food, oldCalories);
+      adjustSubstitutions(food, oldCalories);
+      return next;
+    });
+  };
+
+
 
   // Replace a food's identity (keep its group + substitutions, re-scale substitutions)
   const replaceFood = (mealIdx: number, foodTempId: string, newFood: SelectedFood, optIdx?: number) => {
@@ -1032,27 +1100,36 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             </button>
           </div>
           <InlineMeasurePicker food={food} onSelect={(m) => updateFoodMeasure(mealIdx, food.temp_id, m, optIdx)} />
-          <span className="text-xs text-muted-foreground">{Math.round(food.weight_g)}g</span>
+          <EditableGramsChip
+            weightG={food.weight_g}
+            onCommit={(g) => updateFoodWeight(mealIdx, food.temp_id, g, optIdx)}
+          />
         </div>
 
-        {/* Substitutions */}
-        {(food.substitutions || []).map((sub: any) => (
-          <div key={sub.temp_id} className="flex items-center gap-2 px-3 py-2 border-t bg-muted/20">
-            <Badge className="text-[10px] shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0">ou</Badge>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm truncate">{sub.name}</p>
-              <p className="text-[11px] text-muted-foreground">{sub.quantity} {stripMeasureRef(sub.measure_name)} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-              onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+        {/* Substitutions — equivalências que o atleta pode escolher */}
+        {(food.substitutions || []).length > 0 && (
+          <div className="border-t bg-blue-50/40 dark:bg-blue-950/10">
+            <p className="px-3 pt-2 text-[10px] uppercase tracking-wide font-semibold text-blue-700/80 dark:text-blue-300/80">
+              Equivalentes (o atleta escolhe 1)
+            </p>
+            {(food.substitutions || []).map((sub: any) => (
+              <div key={sub.temp_id} className="flex items-center gap-2 px-3 py-2 border-l-2 border-blue-400/60 ml-3 my-1 rounded-r bg-white/60 dark:bg-black/20">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate">{sub.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{sub.quantity} {stripMeasureRef(sub.measure_name)} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                  onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
 
         {/* Inline replace search */}
         {food._showReplace && (
@@ -1091,7 +1168,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             onClick={() => { toggleReplace(mealIdx, food.temp_id, !food._showReplace, optIdx); if (food._showSubSearch) toggleSubSearch(mealIdx, food.temp_id, false, optIdx); }}
           >
             <Pencil className="h-3.5 w-3.5" />
-            Trocar
+            Trocar alimento
           </button>
           <button
             type="button"
@@ -1099,7 +1176,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             onClick={() => { toggleSubSearch(mealIdx, food.temp_id, !food._showSubSearch, optIdx); if (food._showReplace) toggleReplace(mealIdx, food.temp_id, false, optIdx); }}
           >
             <Plus className="h-3.5 w-3.5" />
-            Substituição
+            + Equivalente
           </button>
         </div>
       </div>
@@ -1239,6 +1316,25 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
               <MacroChip color="purple" label="PTN" g={computedTotals.protein_g} gkg={athleteWeightKg ? computedTotals.protein_g / athleteWeightKg : null} />
               <MacroChip color="orange" label="LIP" g={computedTotals.fat_g} gkg={athleteWeightKg ? computedTotals.fat_g / athleteWeightKg : null} />
             </div>
+            {/* Focused meal chip — updates as you scroll through the meals */}
+            {focusedMealIdx != null && meals[focusedMealIdx] && (() => {
+              const fm = meals[focusedMealIdx];
+              const ft = computedMealTotals(fm);
+              return (
+                <div className="mt-1.5 pt-1.5 border-t border-green-200/70 dark:border-green-800/50 flex items-center gap-2 flex-wrap text-[11px]">
+                  <span className="text-green-700/80 dark:text-green-400/80 uppercase tracking-wide font-semibold">Editando:</span>
+                  <span className="font-semibold text-foreground truncate max-w-[55%]">{fm.meal_name || `Refeição ${focusedMealIdx + 1}`}</span>
+                  {ft && (
+                    <span className="ml-auto flex items-center gap-1.5 text-muted-foreground">
+                      <span className="font-bold text-foreground">{Math.round(ft.calories)} kcal</span>
+                      <span className="text-blue-600 dark:text-blue-400">C {Math.round(ft.carbs_g)}</span>
+                      <span className="text-purple-600 dark:text-purple-400">P {Math.round(ft.protein_g)}</span>
+                      <span className="text-orange-600 dark:text-orange-400">G {Math.round(ft.fat_g)}</span>
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -1263,7 +1359,12 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             const mealTotals = computedMealTotals(meal);
 
             return (
-              <div key={i} className="rounded-lg border bg-card overflow-hidden">
+              <div
+                key={i}
+                ref={(el) => { mealRefs.current[i] = el; }}
+                data-meal-idx={i}
+                className={`rounded-lg border bg-card overflow-hidden transition-shadow ${isEditing && focusedMealIdx === i ? 'ring-2 ring-primary/40 shadow-sm' : ''}`}
+              >
                 {/* Meal header */}
                 <div className="flex items-center gap-2 p-3 bg-muted/30 border-b">
                   {isEditing && (
@@ -1309,10 +1410,19 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                           size="sm"
                           className="h-8 text-xs gap-1 px-2"
                           onClick={() => addOptionToMeal(i)}
-                          title="Adicionar opção de refeição"
+                          title="Adicionar opção alternativa desta refeição"
                         >
                           <Copy className="h-3.5 w-3.5" />
                           <span className="hidden sm:inline">Opção</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground"
+                          onClick={() => duplicateMeal(i)}
+                          title="Duplicar refeição inteira"
+                        >
+                          <Plus className="h-4 w-4" />
                         </Button>
                         {meals.length > 1 && (
                           <Button
@@ -1330,8 +1440,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                 </div>
 
                 <div className="p-3">
-                  {/* Meal-level totals — sempre visível */}
-                  {mealTotals && (
+                  {/* Meal-level totals — hide when the meal has options (each option shows its own totals) */}
+                  {mealTotals && !hasOptions && (
                     <div className="flex items-center gap-1.5 text-[11px] flex-wrap mb-2 pb-2 border-b border-dashed">
                       <span className="font-bold text-foreground">{Math.round(mealTotals.calories)} kcal</span>
                       <span className="text-blue-600 dark:text-blue-400">C {Math.round(mealTotals.carbs_g)}g</span>
@@ -1377,23 +1487,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                         })}
                       </div>
                     ) : (
-                      // Single meal (no options)
-                      <>
-                        {(() => {
-                          const foods = meal.foods || [];
-                          const optTotals = computedMealOptionTotals(foods);
-                          return (
-                            <>
-                              {optTotals && (
-                                <div className="flex justify-end mb-2">
-                                  {mealTotalChips(optTotals)}
-                                </div>
-                              )}
-                              {renderFoodList(foods, meal.food_groups || [], i)}
-                            </>
-                          );
-                        })()}
-                      </>
+                      // Single meal (no options) — totals already shown in meal-level row above
+                      renderFoodList(meal.foods || [], meal.food_groups || [], i)
                     )
                   ) : (
                     // View mode — clean flat list, no category labels
@@ -1425,7 +1520,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                     </div>
                   ) : (
                     <>
-                      {meal.meal_macros && (
+                      {meal.meal_macros && !mealTotals && (
                         <p className="text-xs text-green-600 mt-2 font-medium">
                           {'\u{1F4CA}'} {meal.meal_macros}
                         </p>
@@ -1670,3 +1765,53 @@ function QuantityInput({
   );
 }
 
+
+// Click-to-edit grams chip: tap the total weight (e.g. "94g") to type an
+// exact target — the food's quantity is recomputed from its current measure.
+function EditableGramsChip({ weightG, onCommit }: { weightG: number; onCommit: (g: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(String(Math.round(weightG)));
+
+  useEffect(() => {
+    if (!editing) setText(String(Math.round(weightG)));
+  }, [weightG, editing]);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="text-xs text-muted-foreground hover:text-foreground underline decoration-dotted underline-offset-2 px-1"
+        title="Clique para digitar o peso em gramas"
+      >
+        {Math.round(weightG)}g
+      </button>
+    );
+  }
+
+  const commit = () => {
+    const parsed = parseFloat(text.replace(',', '.'));
+    if (isFinite(parsed) && parsed > 0) onCommit(parsed);
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <Input
+        type="text"
+        inputMode="numeric"
+        autoFocus
+        value={text}
+        onChange={(e) => setText(e.target.value.replace(/[^0-9.,]/g, ''))}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
+        }}
+        className="h-8 w-16 text-xs text-center px-1"
+      />
+      <span className="text-xs text-muted-foreground">g</span>
+    </div>
+  );
+}
