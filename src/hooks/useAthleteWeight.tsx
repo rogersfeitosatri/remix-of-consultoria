@@ -5,14 +5,17 @@ import { supabase } from '@/integrations/supabase/client';
  * Peso de referência do atleta para cálculos de g/kg no plano alimentar:
  * 1) Peso do check-in mais recente que tem o campo "peso" respondido
  * 2) Fallback: peso registrado na última anamnese (current_weight)
- * Retorna null se nenhum dos dois existir.
+ * 3) Fallback: peso informado manualmente pelo nutri (clients.manual_weight_kg)
+ * Retorna null se nenhum existir.
  */
+export type WeightSource = 'checkin' | 'anamnese' | 'manual' | null;
+
 export function useAthleteWeight(clientId?: string | null) {
   return useQuery({
     queryKey: ['athlete-weight', clientId],
     enabled: !!clientId,
     staleTime: 60_000,
-    queryFn: async (): Promise<{ weightKg: number | null; source: 'checkin' | 'anamnese' | null; date?: string }> => {
+    queryFn: async (): Promise<{ weightKg: number | null; source: WeightSource; date?: string }> => {
       if (!clientId) return { weightKg: null, source: null };
 
       // 1) Latest check-in with peso
@@ -46,6 +49,19 @@ export function useAthleteWeight(clientId?: string | null) {
         const w = data?.current_weight ? parseFloat(String(data.current_weight).replace(',', '.')) : null;
         if (w && !isNaN(w) && w > 20 && w < 300) {
           return { weightKg: w, source: 'anamnese', date: data?.submitted_at };
+        }
+      } catch { /* fallthrough */ }
+
+      // 3) Fallback: peso manual informado pelo nutri
+      try {
+        const { data } = await (supabase as any)
+          .from('clients')
+          .select('manual_weight_kg')
+          .eq('id', clientId)
+          .maybeSingle();
+        const w = data?.manual_weight_kg ? parseFloat(String(data.manual_weight_kg).replace(',', '.')) : null;
+        if (w && !isNaN(w) && w > 20 && w < 300) {
+          return { weightKg: w, source: 'manual' };
         }
       } catch { /* fallthrough */ }
 
