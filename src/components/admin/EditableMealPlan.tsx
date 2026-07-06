@@ -1359,7 +1359,12 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             const mealTotals = computedMealTotals(meal);
 
             return (
-              <div key={i} className="rounded-lg border bg-card overflow-hidden">
+              <div
+                key={i}
+                ref={(el) => { mealRefs.current[i] = el; }}
+                data-meal-idx={i}
+                className={`rounded-lg border bg-card overflow-hidden transition-shadow ${isEditing && focusedMealIdx === i ? 'ring-2 ring-primary/40 shadow-sm' : ''}`}
+              >
                 {/* Meal header */}
                 <div className="flex items-center gap-2 p-3 bg-muted/30 border-b">
                   {isEditing && (
