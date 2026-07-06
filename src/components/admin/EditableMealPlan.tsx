@@ -268,7 +268,7 @@ function InlineMeasurePicker({ food, onSelect }: { food: any; onSelect: (m: any)
       }}
       onOpenChange={(o) => { if (o) setTouched(true); }}
     >
-      <SelectTrigger className="h-9 w-auto min-w-0 max-w-[160px] gap-1 text-sm">
+      <SelectTrigger className="h-8 flex-1 w-auto min-w-0 max-w-[150px] gap-1 px-2 text-xs">
         <span className="truncate">{food.measure_name}</span>
       </SelectTrigger>
       <SelectContent>
@@ -1058,48 +1058,65 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
     const setQty = (q: number) => updateFoodQuantity(mealIdx, food.temp_id, Math.max(0.1, Math.round(q * 10) / 10), optIdx);
 
     return (
-      <div key={food.temp_id} className="rounded-xl border bg-card overflow-hidden">
-        {/* Name + delete */}
-        <div className="flex items-start gap-2 px-3 pt-3">
-          <p className="text-sm font-semibold leading-snug break-words flex-1">{food.name}</p>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Badge variant="secondary" className="text-xs font-bold">{Math.round(food.calories)} kcal</Badge>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 -mr-1 text-muted-foreground hover:text-destructive"
-              title="Remover alimento"
-              onClick={() => removeFoodFromMeal(mealIdx, food.temp_id, optIdx)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+      <div key={food.temp_id} className="rounded-lg border bg-card overflow-hidden">
+        {/* Linha 1: nome + kcal + ações (trocar / substituição / remover) */}
+        <div className="flex items-center gap-1.5 pl-2.5 pr-1 pt-1.5">
+          <p className="text-sm font-semibold leading-snug break-words flex-1 min-w-0">{food.name}</p>
+          <span className="text-xs font-bold text-muted-foreground whitespace-nowrap shrink-0">{Math.round(food.calories)} kcal</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-7 w-7 shrink-0 ${food._showReplace ? 'text-primary bg-muted' : 'text-muted-foreground'}`}
+            title="Trocar alimento"
+            onClick={() => { toggleReplace(mealIdx, food.temp_id, !food._showReplace, optIdx); if (food._showSubSearch) toggleSubSearch(mealIdx, food.temp_id, false, optIdx); }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-7 w-7 shrink-0 ${food._showSubSearch ? 'text-blue-700 bg-blue-50 dark:bg-blue-950/30' : 'text-blue-600 dark:text-blue-400'}`}
+            title="Adicionar substituição"
+            onClick={() => { toggleSubSearch(mealIdx, food.temp_id, !food._showSubSearch, optIdx); if (food._showReplace) toggleReplace(mealIdx, food.temp_id, false, optIdx); }}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+            title="Remover alimento"
+            onClick={() => removeFoodFromMeal(mealIdx, food.temp_id, optIdx)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
 
-        {/* Quantity stepper + measure */}
-        <div className="flex items-center gap-2 flex-wrap px-3 pt-2 pb-3">
-          <div className="flex items-center rounded-lg border overflow-hidden h-10">
+        {/* Linha 2: stepper + medida + peso (compactos, na mesma linha) */}
+        <div className="flex items-center gap-1.5 px-2.5 pt-1 pb-2 min-w-0">
+          <div className="flex items-center rounded-md border overflow-hidden h-8 shrink-0">
             <button
               type="button"
-              className="h-full w-10 flex items-center justify-center text-muted-foreground active:bg-muted"
+              className="h-full w-8 flex items-center justify-center text-muted-foreground active:bg-muted"
               onClick={() => setQty(food.quantity - 0.5)}
             >
-              <Minus className="h-4 w-4" />
+              <Minus className="h-3.5 w-3.5" />
             </button>
             <QuantityInput
               value={food.quantity}
               onCommit={(v) => setQty(v)}
-              className="w-14 h-full text-center px-0 border-0 border-x rounded-none font-semibold text-sm focus-visible:ring-0"
+              className="w-11 h-full text-center px-0 border-0 border-x rounded-none font-semibold text-sm focus-visible:ring-0"
             />
             <button
               type="button"
-              className="h-full w-10 flex items-center justify-center text-muted-foreground active:bg-muted"
+              className="h-full w-8 flex items-center justify-center text-muted-foreground active:bg-muted"
               onClick={() => setQty(food.quantity + 0.5)}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
           <InlineMeasurePicker food={food} onSelect={(m) => updateFoodMeasure(mealIdx, food.temp_id, m, optIdx)} />
+<<<<<<< HEAD
           <EditableGramsChip
             weightG={food.weight_g}
             onCommit={(g) => updateFoodWeight(mealIdx, food.temp_id, g, optIdx)}
@@ -1128,13 +1145,34 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                 </Button>
               </div>
             ))}
+=======
+          <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">{Math.round(food.weight_g)}g</span>
+        </div>
+
+        {/* Substituições — uma linha cada */}
+        {(food.substitutions || []).map((sub: any) => (
+          <div key={sub.temp_id} className="flex items-center gap-1.5 pl-2.5 pr-1 py-1 border-t bg-muted/20">
+            <Badge className="text-[10px] px-1.5 shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0">ou</Badge>
+            <p className="text-xs flex-1 min-w-0 truncate">
+              <span className="font-medium text-foreground">{sub.name}</span>
+              <span className="text-muted-foreground"> · {sub.quantity} {sub.measure_name} · {Math.round(sub.weight_g)}g · {Math.round(sub.calories)} kcal</span>
+            </p>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+              onClick={() => removeSubstitution(mealIdx, food.temp_id, sub.temp_id, optIdx)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+>>>>>>> d8b46f3 (Compact meal-plan editor rows + stop iOS auto-zoom on input focus)
           </div>
         )}
 
-        {/* Inline replace search */}
+        {/* Busca inline: trocar alimento */}
         {food._showReplace && (
-          <div className="px-3 pb-3 border-t pt-2.5 bg-muted/20">
-            <p className="text-[11px] text-primary font-semibold mb-1.5">Trocar por outro alimento:</p>
+          <div className="px-2.5 pb-2.5 border-t pt-2 bg-muted/20">
+            <p className="text-[11px] text-primary font-semibold mb-1">Trocar por outro alimento:</p>
             <FoodSearchAutocomplete
               placeholder="Buscar novo alimento..."
               compact
@@ -1143,10 +1181,10 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
           </div>
         )}
 
-        {/* Inline add-substitution search */}
+        {/* Busca inline: adicionar substituição */}
         {food._showSubSearch && (
-          <div className="px-3 pb-3 border-t pt-2.5 bg-blue-50/50 dark:bg-blue-950/20">
-            <p className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mb-1.5">Substituição equivalente:</p>
+          <div className="px-2.5 pb-2.5 border-t pt-2 bg-blue-50/50 dark:bg-blue-950/20">
+            <p className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mb-1">Substituição equivalente:</p>
             <FoodSearchAutocomplete
               placeholder="Buscar substituição..."
               compact
@@ -1159,6 +1197,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             />
           </div>
         )}
+<<<<<<< HEAD
 
         {/* Action footer — big tappable buttons */}
         <div className="flex border-t divide-x text-xs">
@@ -1179,6 +1218,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             + Equivalente
           </button>
         </div>
+=======
+>>>>>>> d8b46f3 (Compact meal-plan editor rows + stop iOS auto-zoom on input focus)
       </div>
     );
   };
@@ -1224,7 +1265,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
 
       {/* Structured foods — clean flat list */}
       {foods.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {foods.map((f) => renderFoodRow(f, mealIdx, optIdx))}
         </div>
       )}
@@ -1487,7 +1528,11 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                         })}
                       </div>
                     ) : (
+<<<<<<< HEAD
                       // Single meal (no options) — totals already shown in meal-level row above
+=======
+                      // Single meal (no options) — totais já aparecem na linha fixa acima
+>>>>>>> d8b46f3 (Compact meal-plan editor rows + stop iOS auto-zoom on input focus)
                       renderFoodList(meal.foods || [], meal.food_groups || [], i)
                     )
                   ) : (
