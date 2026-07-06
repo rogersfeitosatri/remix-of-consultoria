@@ -1,4 +1,5 @@
-import { LogOut, Scale, Ruler, Target, BadgeCheck, Mail, User as UserIcon } from 'lucide-react';
+import { LogOut, Scale, Ruler, Target, BadgeCheck, Mail, User as UserIcon, Bell, BellRing, Loader2 } from 'lucide-react';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const GOLD = 'hsl(43,74%,49%)';
 
