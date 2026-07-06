@@ -1520,7 +1520,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                     </div>
                   ) : (
                     <>
-                      {meal.meal_macros && (
+                      {meal.meal_macros && !mealTotals && (
                         <p className="text-xs text-green-600 mt-2 font-medium">
                           {'\u{1F4CA}'} {meal.meal_macros}
                         </p>
