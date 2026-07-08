@@ -1818,7 +1818,9 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
             <h4 className="font-semibold text-sm mb-3 flex items-center gap-2 text-green-800 dark:text-green-300">
               <TrendingUp className="h-3.5 w-3.5" />
               Total Realizado (calculado dos alimentos)
-              {athleteWeightKg && <span className="text-[10px] font-normal text-muted-foreground ml-auto">Peso: {athleteWeightKg} kg</span>}
+              {athleteWeightKg
+                ? <span className="text-[10px] font-normal text-muted-foreground ml-auto">Peso: {athleteWeightKg} kg</span>
+                : <span className="text-[10px] font-normal text-amber-600 ml-auto">Informe o peso para ver g/kg e kcal/kg</span>}
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="p-2 rounded bg-yellow-100 dark:bg-yellow-900/30 text-center">
@@ -1835,7 +1837,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                 <div className="text-[10px] text-muted-foreground">CHO ({Math.round(computedTotals.carbs_g * 4)} kcal)</div>
                 {athleteWeightKg && (
                   <div className="text-[11px] font-medium text-blue-700 dark:text-blue-400">
-                    {(computedTotals.carbs_g / athleteWeightKg).toFixed(1)} g/kg
+                    {(computedTotals.carbs_g / athleteWeightKg).toFixed(1)} g/kg · {((computedTotals.carbs_g * 4) / athleteWeightKg).toFixed(1)} kcal/kg
                   </div>
                 )}
               </div>
@@ -1844,7 +1846,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                 <div className="text-[10px] text-muted-foreground">PTN ({Math.round(computedTotals.protein_g * 4)} kcal)</div>
                 {athleteWeightKg && (
                   <div className="text-[11px] font-medium text-purple-700 dark:text-purple-400">
-                    {(computedTotals.protein_g / athleteWeightKg).toFixed(1)} g/kg
+                    {(computedTotals.protein_g / athleteWeightKg).toFixed(1)} g/kg · {((computedTotals.protein_g * 4) / athleteWeightKg).toFixed(1)} kcal/kg
                   </div>
                 )}
               </div>
@@ -1853,7 +1855,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                 <div className="text-[10px] text-muted-foreground">LIP ({Math.round(computedTotals.fat_g * 9)} kcal)</div>
                 {athleteWeightKg && (
                   <div className="text-[11px] font-medium text-orange-700 dark:text-orange-400">
-                    {(computedTotals.fat_g / athleteWeightKg).toFixed(1)} g/kg
+                    {(computedTotals.fat_g / athleteWeightKg).toFixed(1)} g/kg · {((computedTotals.fat_g * 9) / athleteWeightKg).toFixed(1)} kcal/kg
                   </div>
                 )}
               </div>
