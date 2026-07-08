@@ -719,7 +719,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       const added = temp.foods as SelectedFood[];
       const failed = (temp.food_groups as any[]).length;
       if (added.length === 0) {
-        toast.warning('Nenhum alimento reconhecido. Verifique os nomes (ex: "2 ovos", "100g arroz").');
+        toast.warning('Nenhum alimento reconhecido. Se NADA é encontrado (nem na busca "+ Adicionar alimento"), o banco de alimentos pode não estar carregado no servidor.');
         return;
       }
       setEditedAnalysis((prev: any) => {
