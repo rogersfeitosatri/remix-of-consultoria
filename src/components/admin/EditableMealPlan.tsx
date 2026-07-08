@@ -1383,13 +1383,18 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         const isQuick = showQuickKey === qKey;
         return (
           <div className="pt-1 space-y-1.5">
-            {/* Adição guiada: digita → aba com opções + valores nutricionais → medida.
+            {/* Adição guiada (é AQUI que as sugestões aparecem enquanto digita):
+                digita → aba com opções + valores nutricionais → medida → e
+                "Buscar via IA" quando o alimento não está no banco.
                 "Selecionar vários" monta alimento + substituições de uma vez. */}
             <FoodSearchAutocomplete
-              placeholder="+ Adicionar alimento..."
+              placeholder="Digite o alimento (as sugestões aparecem aqui)…"
               allowMultiSelect
               onAddFood={(food) => addFoodToMeal(mealIdx, food, optIdx)}
             />
+            <p className="text-[11px] text-muted-foreground px-0.5">
+              Digite acima e escolha nas sugestões (kcal e macros). Não achou? Aparece "Buscar via IA".
+            </p>
             {!isQuick ? (
               <button
                 type="button"
@@ -1397,16 +1402,17 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
                 className="w-full text-xs text-primary hover:underline flex items-center justify-center gap-1 py-1"
               >
                 <Zap className="h-3.5 w-3.5" />
-                Colar lista (vários alimentos de uma vez)
+                Colar lista pronta (texto, vários de uma vez)
               </button>
             ) : (
               <div className="rounded-lg border border-primary/40 bg-primary/[0.04] p-2.5 space-y-2">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
                   <Zap className="h-3.5 w-3.5" />
-                  Digitação rápida
+                  Colar lista pronta
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-snug">
-                  1 alimento por linha. Use <b>ou</b> para os substitutos. A próxima linha é outro alimento.
+                  Para colar uma lista já pronta: 1 alimento por linha, <b>ou</b> para os substitutos.
+                  <br />Este campo <b>não</b> mostra sugestões enquanto digita — use "Digite o alimento" acima para isso.
                 </p>
                 <Textarea
                   value={quickText[qKey] || ''}
