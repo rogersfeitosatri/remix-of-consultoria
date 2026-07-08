@@ -1383,21 +1383,22 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         const isQuick = showQuickKey === qKey;
         return (
           <div className="pt-1 space-y-1.5">
+            {/* Adição guiada: digita → aba com opções + valores nutricionais → medida.
+                "Selecionar vários" monta alimento + substituições de uma vez. */}
+            <FoodSearchAutocomplete
+              placeholder="+ Adicionar alimento..."
+              allowMultiSelect
+              onAddFood={(food) => addFoodToMeal(mealIdx, food, optIdx)}
+            />
             {!isQuick ? (
-              <>
-                <FoodSearchAutocomplete
-                  placeholder="+ Adicionar alimento..."
-                  onAddFood={(food) => addFoodToMeal(mealIdx, food, optIdx)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowQuickKey(qKey)}
-                  className="w-full text-xs text-primary hover:underline flex items-center justify-center gap-1 py-1"
-                >
-                  <Zap className="h-3.5 w-3.5" />
-                  Digitação rápida (vários alimentos de uma vez)
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => setShowQuickKey(qKey)}
+                className="w-full text-xs text-primary hover:underline flex items-center justify-center gap-1 py-1"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                Colar lista (vários alimentos de uma vez)
+              </button>
             ) : (
               <div className="rounded-lg border border-primary/40 bg-primary/[0.04] p-2.5 space-y-2">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
