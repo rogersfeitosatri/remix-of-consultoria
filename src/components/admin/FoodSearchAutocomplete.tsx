@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Sparkles, X, ChevronDown } from 'lucide-react';
+import { Loader2, Plus, Sparkles, X, ChevronDown, Check, ListChecks } from 'lucide-react';
 import {
   useFoodSearch,
   useFoodMeasures,
@@ -13,6 +13,7 @@ import {
   type FoodMeasure,
   type SelectedFood,
 } from '@/hooks/useFoodSearch';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const CATEGORY_TO_GROUP: Record<string, string> = {
@@ -46,6 +47,8 @@ export interface FoodSearchAutoCompleteProps {
   filterCategories?: string[];
   /** Compact mode for inline substitution search */
   compact?: boolean;
+  /** Enable "Selecionar vários": pick several equivalents → primeiro vira o alimento, os demais viram substituições */
+  allowMultiSelect?: boolean;
 }
 
 let _tempIdCounter = 0;
@@ -60,9 +63,13 @@ export default function FoodSearchAutocomplete({
   targetCalories,
   filterCategories,
   compact,
+  allowMultiSelect,
 }: FoodSearchAutoCompleteProps) {
   const [query, setQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [multi, setMulti] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<FoodItem[]>([]);
+  const [committing, setCommitting] = useState(false);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [selectedMeasure, setSelectedMeasure] = useState<FoodMeasure | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -212,6 +219,72 @@ export default function FoodSearchAutocomplete({
     inputRef.current?.focus();
   }, [selectedFood, selectedMeasure, quantity, defaultGroup, onAddFood]);
 
+  const toggleSelectItem = (food: FoodItem) => {
+    setSelectedItems((prev) => prev.some((f) => f.id === food.id) ? prev.filter((f) => f.id !== food.id) : [...prev, food]);
+  };
+
+  const makeFood = (item: FoodItem, measure: FoodMeasure, qty: number, group: string): SelectedFood => {
+    const weightG = measure.measure_weight_g * qty;
+    const n = calcNutrients(item, weightG);
+    return {
+      temp_id: nextTempId(),
+      food_item_id: item.id,
+      name: item.name,
+      group,
+      measure_id: measure.id,
+      measure_name: measure.measure_name,
+      measure_weight_g: measure.measure_weight_g,
+      quantity: qty,
+      weight_g: Math.round(weightG * 10) / 10,
+      calories_per_100g: item.calories_per_100g,
+      ...n,
+    };
+  };
+
+  // "Selecionar vários": 1º item vira o alimento; os demais viram substituições
+  // com porções calculadas para equivaler às calorias do 1º.
+  const handleAddMultiple = useCallback(async () => {
+    if (selectedItems.length === 0) return;
+    setCommitting(true);
+    try {
+      const ids = selectedItems.map((i) => i.id);
+      const { data, error } = await (supabase as any).from('food_measures').select('*').in('food_item_id', ids);
+      if (error) throw error;
+      const byFood: Record<string, FoodMeasure[]> = {};
+      for (const m of (data || []) as any[]) (byFood[m.food_item_id] ||= []).push(m);
+      const pick = (id: string) => { const l = byFood[id] || []; return l.find((m) => m.measure_name !== 'Gramas') || l[0]; };
+
+      const primaryItem = selectedItems[0];
+      const pMeasure = pick(primaryItem.id);
+      if (!pMeasure) { toast.error('Sem medidas para o alimento principal.'); return; }
+      const group = defaultGroup ?? CATEGORY_TO_GROUP[primaryItem.category] ?? 'Outros';
+      const primary = makeFood(primaryItem, pMeasure, 1, group);
+      const targetCal = primary.calories;
+      const subs: SelectedFood[] = [];
+      for (const item of selectedItems.slice(1)) {
+        const m = pick(item.id);
+        if (!m) continue;
+        let qty = 1;
+        if (item.calories_per_100g > 0 && targetCal > 0) {
+          const targetWeight = (targetCal / item.calories_per_100g) * 100;
+          qty = Math.max(0.1, Math.round((targetWeight / m.measure_weight_g) * 10) / 10);
+        }
+        subs.push(makeFood(item, m, qty, group));
+      }
+      if (subs.length) (primary as any).substitutions = subs;
+      onAddFood(primary);
+      toast.success(`${primaryItem.name}${subs.length ? ` + ${subs.length} substituição(ões)` : ''} adicionado.`);
+      setSelectedItems([]);
+      setQuery('');
+      setShowDropdown(false);
+      inputRef.current?.focus();
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message);
+    } finally {
+      setCommitting(false);
+    }
+  }, [selectedItems, defaultGroup, onAddFood]);
+
   const weightG = selectedMeasure ? selectedMeasure.measure_weight_g * quantity : 0;
   const preview = selectedFood && weightG > 0 ? calcNutrients(selectedFood, weightG) : null;
 
@@ -241,14 +314,35 @@ export default function FoodSearchAutocomplete({
         {/* Dropdown results */}
         {showDropdown && query.length >= 2 && !selectedFood && createPortal(
           <div ref={dropdownRef} style={dropdownStyle} className="bg-popover border rounded-lg shadow-lg overflow-y-auto">
+            {allowMultiSelect && (results.length > 0 || multi) && (
+              <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/40 sticky top-0">
+                <span className="text-[11px] text-muted-foreground">{results.length} opções</span>
+                <button
+                  type="button"
+                  onClick={() => { setMulti((v) => !v); setSelectedItems([]); }}
+                  className={`text-[11px] font-medium flex items-center gap-1 rounded-full px-2 py-0.5 ${multi ? 'bg-primary text-primary-foreground' : 'text-primary'}`}
+                >
+                  <ListChecks className="h-3.5 w-3.5" /> Selecionar vários
+                </button>
+              </div>
+            )}
             {results.length > 0 ? (
-              results.map((food) => (
+              results.map((food) => {
+                const isSel = selectedItems.some((f) => f.id === food.id);
+                const selIdx = selectedItems.findIndex((f) => f.id === food.id);
+                return (
                 <button
                   key={food.id}
                   type="button"
-                  className="w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-b-0"
-                  onClick={() => handleSelectFood(food)}
+                  className={`w-full text-left px-3 py-2 hover:bg-accent transition-colors border-b last:border-b-0 flex items-start gap-2 ${isSel ? 'bg-primary/10' : ''}`}
+                  onClick={() => (multi ? toggleSelectItem(food) : handleSelectFood(food))}
                 >
+                  {multi && (
+                    <span className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${isSel ? 'bg-primary border-primary text-primary-foreground' : 'border-muted-foreground/40'}`}>
+                      {isSel ? (selIdx === 0 ? <span className="text-[9px] font-bold">1º</span> : <Check className="h-3 w-3" />) : null}
+                    </span>
+                  )}
+                  <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">{food.name}</span>
                     <Badge variant="outline" className="text-[10px] shrink-0 ml-2">
@@ -262,8 +356,10 @@ export default function FoodSearchAutocomplete({
                     <span>G: {food.fat_per_100g}g</span>
                     <span className="text-muted-foreground/60">por 100g</span>
                   </div>
+                  </div>
                 </button>
-              ))
+                );
+              })
             ) : !searching ? (
               <div className="p-3 text-center text-sm text-muted-foreground">
                 Nenhum alimento encontrado.
@@ -292,6 +388,21 @@ export default function FoodSearchAutocomplete({
                   A IA pesquisa os valores nutricionais e salva para uso futuro
                 </p>
               </button>
+            )}
+
+            {/* Multi-select confirm footer */}
+            {multi && selectedItems.length > 0 && (
+              <div className="sticky bottom-0 border-t bg-popover p-2">
+                <button
+                  type="button"
+                  onClick={handleAddMultiple}
+                  disabled={committing}
+                  className="w-full h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center gap-1.5 disabled:opacity-60"
+                >
+                  {committing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Adicionar {selectedItems.length} (1º = alimento, resto = substituições)
+                </button>
+              </div>
             )}
           </div>,
           document.body,
