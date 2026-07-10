@@ -714,6 +714,8 @@ export default function PublicAnamneseForm() {
                 Suas respostas anteriores foram carregadas. Edite o que precisar e envie no final.
               </AlertDescription>
             </Alert>
+          )}
+
           {znMode && (
             <Card className="mb-6 border-amber-500/40 bg-amber-500/5">
               <CardHeader>
