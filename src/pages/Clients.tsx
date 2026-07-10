@@ -530,8 +530,18 @@ export default function Clients() {
               />
             )}
           </TabsContent>
+
+          <TabsContent value="leads" className="mt-6">
+            <div className="mb-4">
+              <span className="text-sm text-muted-foreground">
+                Atletas que iniciaram o cadastro em <code>/zn/assinar</code> mas ainda não concluíram o pagamento.
+              </span>
+            </div>
+            <ZnLeadsList />
+          </TabsContent>
         </Tabs>
       </div>
+
 
       {/* Form Modal */}
       {showForm && (
