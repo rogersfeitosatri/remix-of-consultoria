@@ -70,22 +70,82 @@ export class SubscriptionIntegrationService {
   }
 
   // --------- POST /subscription/cancel ---------
+  // Regra de estorno: se o cancelamento ocorrer em até 7 dias após o
+  // primeiro pagamento confirmado, todos os pagamentos CONFIRMED/RECEIVED
+  // da assinatura são estornados no Asaas antes do DELETE.
   async cancel(athleteId: string, motivo?: string) {
     const { athlete, subscription } = await this.loadAthleteAndSubscription(athleteId);
     if (!subscription) throw new HttpError(404, "subscription_not_found", "Assinatura não encontrada");
 
+    const refunded: Array<{ id: string; value: number }> = [];
+    let withinGrace = false;
+
     if (subscription.asaas_subscription_id) {
+      // Lista pagamentos da assinatura para avaliar janela de 7 dias
+      try {
+        const payments = await asaasRequest<{
+          data: Array<{
+            id: string;
+            status: string;
+            value: number;
+            paymentDate?: string | null;
+            confirmedDate?: string | null;
+            dueDate?: string | null;
+          }>;
+        }>(`/subscriptions/${subscription.asaas_subscription_id}/payments`);
+
+        const first = [...(payments.data ?? [])]
+          .filter((p) => p.paymentDate || p.confirmedDate)
+          .sort((a, b) => {
+            const da = new Date(a.paymentDate ?? a.confirmedDate ?? 0).getTime();
+            const db = new Date(b.paymentDate ?? b.confirmedDate ?? 0).getTime();
+            return da - db;
+          })[0];
+
+        if (first) {
+          const firstPaid = new Date(first.paymentDate ?? first.confirmedDate ?? Date.now());
+          const diffDays = (Date.now() - firstPaid.getTime()) / (1000 * 60 * 60 * 24);
+          withinGrace = diffDays <= 7;
+        }
+
+        if (withinGrace) {
+          for (const p of payments.data ?? []) {
+            if (p.status === "CONFIRMED" || p.status === "RECEIVED") {
+              try {
+                await asaasRequest(`/payments/${p.id}/refund`, {
+                  method: "POST",
+                  body: JSON.stringify({ description: motivo ?? "Cancelamento em até 7 dias" }),
+                });
+                refunded.push({ id: p.id, value: p.value });
+              } catch (err) {
+                console.error(`[cancel] falha ao estornar ${p.id}:`, (err as Error).message);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[cancel] listagem de pagamentos falhou:", (err as Error).message);
+      }
+
       await asaasRequest(`/subscriptions/${subscription.asaas_subscription_id}`, {
         method: "DELETE",
       });
     }
+
+    const cancelReason = motivo
+      ? withinGrace
+        ? `${motivo} (estorno em 7 dias)`
+        : motivo
+      : withinGrace
+        ? "Cancelamento em até 7 dias — estornado"
+        : null;
 
     const { data: updated, error } = await this.supabase
       .from("zn_subscriptions")
       .update({
         status: "cancelled",
         canceled_at: new Date().toISOString(),
-        cancel_reason: motivo ?? null,
+        cancel_reason: cancelReason,
       })
       .eq("id", subscription.id)
       .select("*")
@@ -93,7 +153,14 @@ export class SubscriptionIntegrationService {
     if (error) throw new HttpError(500, "db_update_failed", error.message);
 
     await this.dispatchSync(athlete, updated, "subscription_cancelled");
-    return { subscriptionId: updated.id, status: updated.status, cancelledAt: updated.canceled_at };
+    return {
+      subscriptionId: updated.id,
+      status: updated.status,
+      cancelledAt: updated.canceled_at,
+      refunded: refunded.length > 0,
+      refundedPayments: refunded,
+      withinGracePeriod: withinGrace,
+    };
   }
 
   // --------- POST /subscription/change-plan ---------
