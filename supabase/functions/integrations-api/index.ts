@@ -87,7 +87,12 @@ Deno.serve(async (req) => {
       if (!v.ok) { status = 400; responseBody = { success: false, error: "validation_error", details: v.errors }; }
       else {
         athleteId = v.data.athleteId;
-        const r = await svc.cancel(v.data.athleteId, v.data.motivoCancelamento);
+        const r = await svc.cancel(
+          v.data.athleteId,
+          v.data.motivoCancelamento,
+          v.data.refundRequested ?? false,
+          v.data.daysSinceStart,
+        );
         subscriptionId = r.subscriptionId;
         responseBody = { success: true, status: "cancelled", ...r };
       }
