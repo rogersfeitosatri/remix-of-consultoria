@@ -130,6 +130,9 @@ export default function PublicAnamneseForm() {
           Sábado: emptyDay(),
           Domingo: emptyDay(),
         };
+      } else if (q.question_type === 'symptom_scale') {
+        const syms: string[] = Array.isArray(q.options) ? (q.options as string[]) : [];
+        initialAnswers[q.id] = syms.reduce((acc, s) => { acc[s] = 0; return acc; }, {} as Record<string, number>);
       } else {
         initialAnswers[q.id] = '';
       }
@@ -661,6 +664,28 @@ export default function PublicAnamneseForm() {
                       />
                     )}
 
+                    {qType === 'boolean' && (
+                      <RadioGroup
+                        value={answers[question.id] || undefined}
+                        onValueChange={(value) => handleAnswerChange(question.id, value)}
+                      >
+                        {['Sim', 'Não'].map((option, i) => (
+                          <div key={i} className="flex items-center space-x-2">
+                            <RadioGroupItem value={option} id={`${question.id}-${i}`} />
+                            <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">{option}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    )}
+
+                    {qType === 'symptom_scale' && (
+                      <SymptomScaleRenderer
+                        symptoms={Array.isArray(question.options) ? (question.options as string[]) : []}
+                        value={answers[question.id] || {}}
+                        onChange={(v) => handleAnswerChange(question.id, v)}
+                      />
+                    )}
+
                     {question.has_comment_field && (
                       <div className="mt-4 pt-4 border-t border-border/50">
                         <Label
@@ -733,6 +758,46 @@ export default function PublicAnamneseForm() {
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// ── Symptom Scale Renderer ─────────────────────────────────────────────────────
+// Cada sintoma é avaliado por frequência de 0 (nunca) a 5 (muito frequente).
+function SymptomScaleRenderer({
+  symptoms,
+  value,
+  onChange,
+}: {
+  symptoms: string[];
+  value: Record<string, number>;
+  onChange: (v: Record<string, number>) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {symptoms.map((symptom) => {
+        const current = typeof value?.[symptom] === 'number' ? value[symptom] : 0;
+        return (
+          <div key={symptom} className="rounded-lg border p-3 bg-muted/30 space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">{symptom}</span>
+              <span className="text-sm font-bold text-primary">{current}</span>
+            </div>
+            <Slider
+              value={[current]}
+              onValueChange={([v]) => onChange({ ...value, [symptom]: v })}
+              min={0}
+              max={5}
+              step={1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>0 · nunca</span>
+              <span>5 · muito frequente</span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
