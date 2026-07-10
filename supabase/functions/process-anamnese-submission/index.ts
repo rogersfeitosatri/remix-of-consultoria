@@ -11,6 +11,7 @@ interface SubmissionRequest {
   respondent_name: string;
   respondent_email: string;
   responses: Record<string, any>;
+  source?: string;
 }
 
 Deno.serve(async (req) => {
