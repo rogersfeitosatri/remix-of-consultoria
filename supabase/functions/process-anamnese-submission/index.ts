@@ -11,6 +11,7 @@ interface SubmissionRequest {
   respondent_name: string;
   respondent_email: string;
   responses: Record<string, any>;
+  source?: string;
 }
 
 Deno.serve(async (req) => {
@@ -26,7 +27,7 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { form_id, respondent_name, respondent_email, responses }: SubmissionRequest = await req.json();
+    const { form_id, respondent_name, respondent_email, responses, source }: SubmissionRequest = await req.json();
 
     if (!form_id || !respondent_name || !respondent_email) {
       return new Response(
@@ -227,9 +228,10 @@ Deno.serve(async (req) => {
 
     // 5.1 If athlete came from public onboarding (has selected_plan + awaiting_anamnese),
     // send the payment link now via WhatsApp.
+    // Bloqueio: fluxo ZN Assessoria gerencia pagamento via Asaas — não disparar link MP.
     let paymentLinkSent = false;
     let paymentLinkError: string | null = null;
-    try {
+    if (source !== "zn") try {
       const { data: clientRow } = await supabaseAdmin
         .from("clients")
         .select("id, name, selected_plan_id, onboarding_status")

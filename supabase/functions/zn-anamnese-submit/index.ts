@@ -102,12 +102,28 @@ Deno.serve(async (req) => {
           respondent_name: data.respondent_name,
           respondent_email: emailNorm,
           responses: data.responses,
+          source: "zn",
         },
       },
     );
     if (procErr) throw new Error(`process-anamnese-submission: ${procErr.message ?? procErr}`);
     if ((procRes as any)?.error) throw new Error(String((procRes as any).error));
     const clientId: string | null = (procRes as any)?.client_id ?? null;
+
+    // Sobrescreve plano legado no client (caso o email já existisse com plano antigo)
+    // e limpa gatilhos do fluxo MP para não disparar link do Mercado Pago em reenvios.
+    if (clientId) {
+      await supabase
+        .from("clients")
+        .update({
+          plan_type: "premium",
+          plan_duration: data.plan_choice,
+          registration_source: "zn_anamnese",
+          selected_plan_id: null,
+          onboarding_status: "awaiting_payment",
+        })
+        .eq("id", clientId);
+    }
 
     // 2) Descobre owner do formulário
     const { data: formRow } = await supabase
@@ -180,7 +196,7 @@ Deno.serve(async (req) => {
     nextDue.setDate(nextDue.getDate() + 1);
     const subPayload: Record<string, unknown> = {
       customer: customerId,
-      billingType: "UNDEFINED",
+      billingType: "CREDIT_CARD",
       cycle: plan.cycle,
       value: plan.value,
       nextDueDate: nextDue.toISOString().slice(0, 10),
