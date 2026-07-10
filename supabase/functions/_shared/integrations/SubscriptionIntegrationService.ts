@@ -91,7 +91,7 @@ export class SubscriptionIntegrationService {
       .single();
     if (error) throw new HttpError(500, "db_update_failed", error.message);
 
-    return { subscriptionId: updated.id, status: updated.status, cancelledAt: updated.cancelled_at };
+    return { subscriptionId: updated.id, status: updated.status, cancelledAt: updated.canceled_at };
   }
 
   // --------- POST /subscription/change-plan ---------
