@@ -444,7 +444,7 @@ export default function Clients() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="active" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <Users className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">Ativos</span> ({activeClients.length})
@@ -456,6 +456,10 @@ export default function Clients() {
             <TabsTrigger value="inactive" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <UserX className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">Inativos</span> ({inactiveClients.length})
+            </TabsTrigger>
+            <TabsTrigger value="leads" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+              <UserPlus className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Leads ZN</span>
             </TabsTrigger>
           </TabsList>
           
