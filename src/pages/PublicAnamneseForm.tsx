@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { isWizardAnamneseForm } from '@/lib/enduranceAnamneseQuestions';
 
 interface Question {
   id: string;
@@ -406,7 +407,7 @@ export default function PublicAnamneseForm() {
   }, {} as Record<string, Question[]>);
 
   // ── Modo wizard (1 pergunta por tela) ──────────────────────────────────────────
-  const isWizard = !!form?.single_question_wizard;
+  const isWizard = isWizardAnamneseForm(form);
   type WizStep =
     | { kind: 'ident' }
     | { kind: 'question'; question: Question; day?: string };

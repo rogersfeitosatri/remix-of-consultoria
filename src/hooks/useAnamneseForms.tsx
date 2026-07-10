@@ -348,12 +348,14 @@ export function useCreateEnduranceAnamneseForm() {
 
       const { data: form, error: formError } = await supabase
         .from('anamnese_forms' as any)
+        // Obs.: o modo wizard é detectado pelo título ("(wizard)") — não
+        // dependemos da coluna single_question_wizard, que pode não existir
+        // ainda no schema. Assim a criação funciona sem migration aplicada.
         .insert({
           user_id: user.id,
           title: ENDURANCE_ANAMNESE_TITLE,
           description: ENDURANCE_ANAMNESE_DESCRIPTION,
           is_active: false,
-          single_question_wizard: true,
         })
         .select()
         .single();
