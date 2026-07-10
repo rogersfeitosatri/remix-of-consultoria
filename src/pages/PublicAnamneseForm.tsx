@@ -439,6 +439,14 @@ export default function PublicAnamneseForm() {
         return (
           <Textarea value={answers[question.id] || ''} onChange={(e) => handleAnswerChange(question.id, e.target.value)} placeholder="Sua resposta..." rows={4} />
         );
+      case 'number':
+        return (
+          <Input type="number" value={answers[question.id] || ''} onChange={(e) => handleAnswerChange(question.id, e.target.value)} placeholder="Digite um número..." />
+        );
+      case 'date':
+        return (
+          <Input type="date" value={answers[question.id] || ''} onChange={(e) => handleAnswerChange(question.id, e.target.value)} />
+        );
       case 'boolean':
         return (
           <RadioGroup value={answers[question.id] || undefined} onValueChange={(v) => handleAnswerChange(question.id, v)}>
