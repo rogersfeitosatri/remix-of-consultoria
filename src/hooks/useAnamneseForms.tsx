@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  ENDURANCE_ANAMNESE_QUESTIONS,
+  ENDURANCE_ANAMNESE_TITLE,
+  ENDURANCE_ANAMNESE_DESCRIPTION,
+} from '@/lib/enduranceAnamneseQuestions';
 
 export interface AnamneseQuestion {
   id: string;
@@ -328,6 +333,60 @@ export function useSubmitAnamneseResponse() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['anamnese-responses', variables.form_id] });
+    },
+  });
+}
+
+// Create the endurance anamnese model (single-question-per-screen wizard)
+export function useCreateEnduranceAnamneseForm() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      const { data: form, error: formError } = await supabase
+        .from('anamnese_forms' as any)
+        .insert({
+          user_id: user.id,
+          title: ENDURANCE_ANAMNESE_TITLE,
+          description: ENDURANCE_ANAMNESE_DESCRIPTION,
+          is_active: false,
+          single_question_wizard: true,
+        })
+        .select()
+        .single();
+
+      if (formError) throw formError;
+
+      const formId = (form as any).id;
+
+      const questions = ENDURANCE_ANAMNESE_QUESTIONS.map((q, index) => ({
+        form_id: formId,
+        section: q.section,
+        question_text: q.question_text,
+        question_type: q.question_type,
+        options: q.options ?? null,
+        scale_min: q.scale_min ?? null,
+        scale_max: q.scale_max ?? null,
+        is_required: q.is_required ?? false,
+        order_index: index,
+        has_comment_field: q.has_comment_field ?? false,
+        comment_field_label: q.comment_field_label ?? null,
+        comment_field_required: q.comment_field_required ?? false,
+      }));
+
+      const { error: questionsError } = await supabase
+        .from('anamnese_questions' as any)
+        .insert(questions);
+
+      if (questionsError) throw questionsError;
+
+      return form as unknown as AnamneseForm;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['anamnese-forms'] });
     },
   });
 }
