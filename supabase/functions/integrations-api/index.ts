@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
   );
 
   // ---- Autenticação (obrigatória em todas as rotas) ----
-  const auth = authenticate(req);
+  const auth = await authenticate(req, supabase);
   if (!auth.ok) {
     const body = { success: false, error: "unauthorized", reason: auth.reason };
     await logApiCall(supabase, {
