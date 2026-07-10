@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { form_id, respondent_name, respondent_email, responses }: SubmissionRequest = await req.json();
+    const { form_id, respondent_name, respondent_email, responses, source }: SubmissionRequest = await req.json();
 
     if (!form_id || !respondent_name || !respondent_email) {
       return new Response(
