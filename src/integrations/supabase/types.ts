@@ -6520,6 +6520,36 @@ export type Database = {
         }
         Relationships: []
       }
+      zn_integration_api_keys: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          key: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key: string
+          last_used_at?: string | null
+          name: string
+          revoked_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+        }
+        Relationships: []
+      }
       zn_integration_api_logs: {
         Row: {
           athlete_id: string | null
