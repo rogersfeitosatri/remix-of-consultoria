@@ -837,27 +837,27 @@ export default function PublicAnamneseForm() {
           {isLastWizStep && (
             <Card className="mb-6 border-primary/30">
               <CardContent className="pt-6 space-y-4">
-                <div>
-                  <Label htmlFor="wiz-cpf" className={cn('text-sm', znMode && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
-                    CPF {znMode ? '(para emissão da cobrança)' : '(opcional)'}
-                  </Label>
-                  <Input
-                    id="wiz-cpf"
-                    inputMode="numeric"
-                    placeholder="000.000.000-00"
-                    value={znCpf}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
-                      const masked = digits
-                        .replace(/(\d{3})(\d)/, '$1.$2')
-                        .replace(/(\d{3})(\d)/, '$1.$2')
-                        .replace(/(\d{3})(\d)/, '$1-$2');
-                      setZnCpf(masked);
-                    }}
-                    className="mt-2"
-                  />
-                </div>
-                <div className="flex items-start gap-3 pt-2 border-t border-border/50">
+                {!znMode && (
+                  <div>
+                    <Label htmlFor="wiz-cpf" className="text-sm">CPF (opcional)</Label>
+                    <Input
+                      id="wiz-cpf"
+                      inputMode="numeric"
+                      placeholder="000.000.000-00"
+                      value={znCpf}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                        const masked = digits
+                          .replace(/(\d{3})(\d)/, '$1.$2')
+                          .replace(/(\d{3})(\d)/, '$1.$2')
+                          .replace(/(\d{3})(\d)/, '$1-$2');
+                        setZnCpf(masked);
+                      }}
+                      className="mt-2"
+                    />
+                  </div>
+                )}
+                <div className={cn('flex items-start gap-3', !znMode && 'pt-2 border-t border-border/50')}>
                   <Checkbox id="wiz-terms" checked={termsAccepted} onCheckedChange={(c) => setTermsAccepted(c as boolean)} className="mt-1" />
                   <Label htmlFor="wiz-terms" className="font-normal cursor-pointer leading-relaxed">
                     Li e aceito os{' '}
