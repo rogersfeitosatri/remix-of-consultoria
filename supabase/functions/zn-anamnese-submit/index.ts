@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
     nextDue.setDate(nextDue.getDate() + 1);
     const subPayload: Record<string, unknown> = {
       customer: customerId,
-      billingType: "UNDEFINED",
+      billingType: "CREDIT_CARD",
       cycle: plan.cycle,
       value: plan.value,
       nextDueDate: nextDue.toISOString().slice(0, 10),
