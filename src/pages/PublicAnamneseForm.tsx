@@ -53,8 +53,30 @@ function isHiddenQuestion(q: Question): boolean {
   );
 }
 
+const PLAN_PARAM_MAP: Record<string, 'monthly' | 'semiannual' | 'annual'> = {
+  mensal: 'monthly',
+  monthly: 'monthly',
+  semestral: 'semiannual',
+  semiannual: 'semiannual',
+  anual: 'annual',
+  annual: 'annual',
+};
+
+const PLAN_INFO: Record<'monthly' | 'semiannual' | 'annual', { label: string; price: string; sub: string }> = {
+  monthly:    { label: 'Mensal',    price: 'R$ 69,90/mês',      sub: 'PIX ou 1x no cartão' },
+  semiannual: { label: 'Semestral', price: 'R$ 299,00/semestre', sub: 'até 6x no cartão' },
+  annual:     { label: 'Anual',     price: 'R$ 419,90/ano',      sub: 'até 12x no cartão' },
+};
+
 export default function PublicAnamneseForm() {
   const { formId } = useParams<{ formId: string }>();
+
+  // ZN Assessoria mode: ?zn=1&plano=mensal|semestral|anual
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const znMode = searchParams.get('zn') === '1';
+  const planFromUrl = PLAN_PARAM_MAP[(searchParams.get('plano') || '').toLowerCase()] || '';
+  const [znPlan, setZnPlan] = useState<'' | 'monthly' | 'semiannual' | 'annual'>(planFromUrl as any);
+  const [znCpf, setZnCpf] = useState('');
 
   const [form, setForm] = useState<Form | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
