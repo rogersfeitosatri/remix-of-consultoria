@@ -2036,6 +2036,9 @@ export type Database = {
           admin_notes_short: string | null
           admin_summary: string | null
           ai_whatsapp_enabled: boolean
+          asaas_customer_id: string | null
+          asaas_subscription_id: string | null
+          asaas_subscription_status: string | null
           athlete_status: string | null
           athlete_user_id: string | null
           checkin_frequency: string | null
@@ -2085,6 +2088,9 @@ export type Database = {
           admin_notes_short?: string | null
           admin_summary?: string | null
           ai_whatsapp_enabled?: boolean
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
+          asaas_subscription_status?: string | null
           athlete_status?: string | null
           athlete_user_id?: string | null
           checkin_frequency?: string | null
@@ -2134,6 +2140,9 @@ export type Database = {
           admin_notes_short?: string | null
           admin_summary?: string | null
           ai_whatsapp_enabled?: boolean
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
+          asaas_subscription_status?: string | null
           athlete_status?: string | null
           athlete_user_id?: string | null
           checkin_frequency?: string | null
@@ -4911,6 +4920,8 @@ export type Database = {
       payments: {
         Row: {
           amount: number
+          asaas_invoice_url: string | null
+          asaas_payment_id: string | null
           client_id: string
           created_at: string
           due_date: string
@@ -4926,6 +4937,8 @@ export type Database = {
         }
         Insert: {
           amount: number
+          asaas_invoice_url?: string | null
+          asaas_payment_id?: string | null
           client_id: string
           created_at?: string
           due_date: string
@@ -4941,6 +4954,8 @@ export type Database = {
         }
         Update: {
           amount?: number
+          asaas_invoice_url?: string | null
+          asaas_payment_id?: string | null
           client_id?: string
           created_at?: string
           due_date?: string
