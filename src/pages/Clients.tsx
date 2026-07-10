@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Loader2, Users, UserX, Filter, Flag, Snowflake } from 'lucide-react';
+import { Plus, Search, Loader2, Users, UserX, Filter, Flag, Snowflake, UserPlus } from 'lucide-react';
+import { ZnLeadsList } from '@/components/clients/ZnLeadsList';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -443,7 +444,7 @@ export default function Clients() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="active" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <Users className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">Ativos</span> ({activeClients.length})
@@ -455,6 +456,10 @@ export default function Clients() {
             <TabsTrigger value="inactive" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <UserX className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">Inativos</span> ({inactiveClients.length})
+            </TabsTrigger>
+            <TabsTrigger value="leads" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+              <UserPlus className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Leads ZN</span>
             </TabsTrigger>
           </TabsList>
           
@@ -525,8 +530,18 @@ export default function Clients() {
               />
             )}
           </TabsContent>
+
+          <TabsContent value="leads" className="mt-6">
+            <div className="mb-4">
+              <span className="text-sm text-muted-foreground">
+                Atletas que iniciaram o cadastro em <code>/zn/assinar</code> mas ainda não concluíram o pagamento.
+              </span>
+            </div>
+            <ZnLeadsList />
+          </TabsContent>
         </Tabs>
       </div>
+
 
       {/* Form Modal */}
       {showForm && (

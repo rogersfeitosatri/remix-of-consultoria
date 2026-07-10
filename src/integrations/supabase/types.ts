@@ -6475,48 +6475,75 @@ export type Database = {
       zn_athletes: {
         Row: {
           asaas_customer_id: string | null
+          body_goal: string | null
           cpf_cnpj: string | null
           created_at: string
           email: string
           first_payment_at: string | null
+          height_cm: number | null
           id: string
+          last_payment_link: string | null
+          lead_marked_at: string | null
           metadata: Json
           name: string
           notes: string | null
           phone: string | null
+          plan_choice: string | null
           status: string
+          subscription_started_at: string | null
+          target_race: string | null
+          target_race_date: string | null
           updated_at: string
           user_id: string
+          weight_kg: number | null
         }
         Insert: {
           asaas_customer_id?: string | null
+          body_goal?: string | null
           cpf_cnpj?: string | null
           created_at?: string
           email: string
           first_payment_at?: string | null
+          height_cm?: number | null
           id?: string
+          last_payment_link?: string | null
+          lead_marked_at?: string | null
           metadata?: Json
           name: string
           notes?: string | null
           phone?: string | null
+          plan_choice?: string | null
           status?: string
+          subscription_started_at?: string | null
+          target_race?: string | null
+          target_race_date?: string | null
           updated_at?: string
           user_id: string
+          weight_kg?: number | null
         }
         Update: {
           asaas_customer_id?: string | null
+          body_goal?: string | null
           cpf_cnpj?: string | null
           created_at?: string
           email?: string
           first_payment_at?: string | null
+          height_cm?: number | null
           id?: string
+          last_payment_link?: string | null
+          lead_marked_at?: string | null
           metadata?: Json
           name?: string
           notes?: string | null
           phone?: string | null
+          plan_choice?: string | null
           status?: string
+          subscription_started_at?: string | null
+          target_race?: string | null
+          target_race_date?: string | null
           updated_at?: string
           user_id?: string
+          weight_kg?: number | null
         }
         Relationships: []
       }
@@ -7239,6 +7266,7 @@ export type Database = {
           valid: boolean
         }[]
       }
+      zn_promote_pending_to_lead: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "admin" | "athlete"

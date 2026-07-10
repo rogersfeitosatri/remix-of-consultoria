@@ -72,6 +72,7 @@ const PublicNpCheckin = lazy(() => import("./pages/PublicNpCheckin"));
 const Terms = lazy(() => import("./pages/Terms"));
 const PublicOnboarding = lazy(() => import("./pages/PublicOnboarding"));
 const ZnAssessoria = lazy(() => import("./pages/ZnAssessoria"));
+const PublicZnSubscribe = lazy(() => import("./pages/PublicZnSubscribe"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -156,6 +157,7 @@ function AppRoutes() {
         <Route path="/np-checkin/:token" element={<PublicNpCheckin />} />
         <Route path="/termos" element={<Terms />} />
         <Route path="/onboarding" element={<PublicOnboarding />} />
+        <Route path="/zn/assinar" element={<PublicZnSubscribe />} />
         <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
         <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
