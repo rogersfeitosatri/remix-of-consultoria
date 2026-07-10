@@ -6603,10 +6603,16 @@ export type Database = {
           athlete_id: string | null
           attempts: number
           created_at: string
+          duration_ms: number | null
+          endpoint: string | null
           event_type: string
+          http_status: number | null
           id: string
+          idempotency_key: string | null
           last_error: string | null
+          next_attempt_at: string | null
           payload: Json
+          response_body: Json | null
           sent_at: string | null
           status: string
           subscription_id: string | null
@@ -6617,10 +6623,16 @@ export type Database = {
           athlete_id?: string | null
           attempts?: number
           created_at?: string
+          duration_ms?: number | null
+          endpoint?: string | null
           event_type: string
+          http_status?: number | null
           id?: string
+          idempotency_key?: string | null
           last_error?: string | null
+          next_attempt_at?: string | null
           payload: Json
+          response_body?: Json | null
           sent_at?: string | null
           status?: string
           subscription_id?: string | null
@@ -6631,10 +6643,16 @@ export type Database = {
           athlete_id?: string | null
           attempts?: number
           created_at?: string
+          duration_ms?: number | null
+          endpoint?: string | null
           event_type?: string
+          http_status?: number | null
           id?: string
+          idempotency_key?: string | null
           last_error?: string | null
+          next_attempt_at?: string | null
           payload?: Json
+          response_body?: Json | null
           sent_at?: string | null
           status?: string
           subscription_id?: string | null

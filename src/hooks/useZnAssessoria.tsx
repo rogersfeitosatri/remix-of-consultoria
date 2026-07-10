@@ -200,6 +200,64 @@ export function useCancelZnSubscription() {
       qc.invalidateQueries({ queryKey: ['zn_subscriptions'] });
       toast.success('Assinatura cancelada');
     },
-    onError: (e: any) => toast.error(e?.message ?? 'Erro'),
+  onError: (e: any) => toast.error(e?.message ?? 'Erro'),
+  });
+}
+
+export interface ZnOutboxRow {
+  id: string;
+  event_type: string;
+  status: 'pending' | 'sent' | 'error' | string;
+  attempts: number | null;
+  last_error: string | null;
+  http_status: number | null;
+  duration_ms: number | null;
+  next_attempt_at: string | null;
+  sent_at: string | null;
+  created_at: string;
+  athlete_id: string | null;
+  subscription_id: string | null;
+  payload: any;
+}
+
+export function useZnOutbox() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['zn_integration_outbox', user?.id],
+    enabled: !!user,
+    refetchInterval: 15000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('zn_integration_outbox')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data ?? []) as ZnOutboxRow[];
+    },
+  });
+}
+
+export function useRetryZnOutbox() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id?: string) => {
+      if (id) {
+        // Reset row to pending + now
+        const { error } = await (supabase as any)
+          .from('zn_integration_outbox')
+          .update({ status: 'pending', next_attempt_at: new Date().toISOString(), last_error: null })
+          .eq('id', id);
+        if (error) throw error;
+      }
+      const { data, error } = await supabase.functions.invoke('zn-sync-retry');
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['zn_integration_outbox'] });
+      toast.success('Fila reprocessada');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Erro ao reprocessar'),
   });
 }

@@ -4,6 +4,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { asaasRequest, PLAN_TO_CYCLE } from "./asaas.ts";
 import type { ZnPlan } from "./dtos.ts";
+import { ZonaNutriSyncService, type ZnSyncEvent } from "../zn/ZonaNutriSyncService.ts";
 
 const PLAN_MONTHS: Record<ZnPlan, number> = {
   monthly: 1,
@@ -70,7 +71,7 @@ export class SubscriptionIntegrationService {
 
   // --------- POST /subscription/cancel ---------
   async cancel(athleteId: string, motivo?: string) {
-    const { subscription } = await this.loadAthleteAndSubscription(athleteId);
+    const { athlete, subscription } = await this.loadAthleteAndSubscription(athleteId);
     if (!subscription) throw new HttpError(404, "subscription_not_found", "Assinatura não encontrada");
 
     if (subscription.asaas_subscription_id) {
@@ -91,12 +92,13 @@ export class SubscriptionIntegrationService {
       .single();
     if (error) throw new HttpError(500, "db_update_failed", error.message);
 
+    await this.dispatchSync(athlete, updated, "subscription_cancelled");
     return { subscriptionId: updated.id, status: updated.status, cancelledAt: updated.canceled_at };
   }
 
   // --------- POST /subscription/change-plan ---------
   async changePlan(athleteId: string, novoPlano: ZnPlan) {
-    const { subscription } = await this.loadAthleteAndSubscription(athleteId);
+    const { athlete, subscription } = await this.loadAthleteAndSubscription(athleteId);
     if (!subscription) throw new HttpError(404, "subscription_not_found", "Assinatura não encontrada");
     if (subscription.plan_code === novoPlano) {
       return { subscriptionId: subscription.id, plano: novoPlano, changed: false };
@@ -110,7 +112,6 @@ export class SubscriptionIntegrationService {
       });
     }
 
-    // Recalcula data de expiração a partir da data de início existente
     const start = subscription.start_date ? new Date(subscription.start_date) : new Date();
     const newExpires = new Date(start);
     newExpires.setMonth(newExpires.getMonth() + PLAN_MONTHS[novoPlano]);
@@ -126,6 +127,7 @@ export class SubscriptionIntegrationService {
       .single();
     if (error) throw new HttpError(500, "db_update_failed", error.message);
 
+    await this.dispatchSync(athlete, updated, "plan_changed");
     return {
       subscriptionId: updated.id,
       plano: updated.plan_code,
@@ -136,13 +138,9 @@ export class SubscriptionIntegrationService {
 
   // --------- POST /subscription/reactivate ---------
   async reactivate(athleteId: string) {
-    const { subscription } = await this.loadAthleteAndSubscription(athleteId);
+    const { athlete, subscription } = await this.loadAthleteAndSubscription(athleteId);
     if (!subscription) throw new HttpError(404, "subscription_not_found", "Assinatura não encontrada");
 
-    // Asaas: assinaturas canceladas (DELETE) não podem ser reativadas — uma
-    // nova precisa ser criada pelo checkout. Aqui apenas retomamos o registro
-    // local para status "active" caso ainda haja assinatura Asaas viva
-    // (ex: overdue/suspended). Se estiver cancelada, sinalizamos ao chamador.
     if (subscription.status === "cancelled" && !subscription.asaas_subscription_id) {
       throw new HttpError(
         409,
@@ -151,9 +149,6 @@ export class SubscriptionIntegrationService {
       );
     }
 
-    // Tenta reabrir no Asaas (idempotente: se já estiver ativa, o próprio
-    // Asaas ignora). PUT com status ACTIVE não é oficial; a estratégia
-    // padrão é apenas garantir cobrança futura via updatePendingPayments.
     if (subscription.asaas_subscription_id) {
       try {
         await asaasRequest(`/subscriptions/${subscription.asaas_subscription_id}`, {
@@ -177,7 +172,35 @@ export class SubscriptionIntegrationService {
       .single();
     if (error) throw new HttpError(500, "db_update_failed", error.message);
 
+    await this.dispatchSync(athlete, updated, "subscription_reactivated");
     return { subscriptionId: updated.id, status: updated.status };
+  }
+
+  // --------- Sync helper (único ponto de saída) ---------
+  private async dispatchSync(athlete: any, subscription: any, event: ZnSyncEvent) {
+    try {
+      const zn = new ZonaNutriSyncService(this.supabase);
+      await zn.enqueueAndSend({
+        owner_user_id: athlete.user_id,
+        event,
+        athlete: {
+          id: athlete.id,
+          email: athlete.email,
+          name: athlete.name ?? null,
+          phone: athlete.phone ?? null,
+        },
+        subscription: {
+          id: subscription.id,
+          plan_code: subscription.plan_code,
+          status: subscription.status,
+          start_date: subscription.start_date,
+          expires_at: subscription.expires_at,
+          cancel_reason: subscription.cancel_reason ?? null,
+        },
+      });
+    } catch (e) {
+      console.error("[dispatchSync] falhou (não bloqueia endpoint):", (e as Error).message);
+    }
   }
 }
 

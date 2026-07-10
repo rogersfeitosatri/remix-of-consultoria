@@ -8,12 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   useZnAthletes, useZnSubscriptions, useZnPayments, useZnPlans, useZnWebhookEvents,
-  useCancelZnSubscription,
+  useCancelZnSubscription, useZnOutbox, useRetryZnOutbox,
 } from '@/hooks/useZnAssessoria';
 import {
   ZnSubscriptionStatusBadge, ZnPaymentStatusBadge, ZnAthleteStatusBadge, ZnPlanBadge,
 } from '@/components/zn/ZnBadges';
-import { Trophy, Users, CreditCard, DollarSign, AlertCircle, ExternalLink, Info, KeyRound } from 'lucide-react';
+import { Trophy, Users, CreditCard, DollarSign, AlertCircle, ExternalLink, Info, KeyRound, RefreshCw, Cloud } from 'lucide-react';
 import { ZnApiKeysTab } from '@/components/zn/ZnApiKeysTab';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -93,12 +93,13 @@ export default function ZnAssessoria() {
         </div>
 
         <Tabs defaultValue="athletes" className="space-y-4">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="athletes">Atletas ({athletes.length})</TabsTrigger>
             <TabsTrigger value="subscriptions">Assinaturas ({subs.length})</TabsTrigger>
             <TabsTrigger value="payments">Pagamentos ({payments.length})</TabsTrigger>
             <TabsTrigger value="plans">Planos</TabsTrigger>
             <TabsTrigger value="events">Eventos webhook</TabsTrigger>
+            <TabsTrigger value="sync"><Cloud className="h-3 w-3 mr-1" />Sincronização</TabsTrigger>
             <TabsTrigger value="api"><KeyRound className="h-3 w-3 mr-1" />API Pública</TabsTrigger>
           </TabsList>
 
@@ -292,6 +293,10 @@ export default function ZnAssessoria() {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="sync">
+            <ZnSyncTab />
           </TabsContent>
 
           <TabsContent value="api">
