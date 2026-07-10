@@ -268,9 +268,6 @@ async function markProcessed(
       status,
       error,
       processed_at: new Date().toISOString(),
-      attempts: (undefined as any),
     })
     .eq("id", id);
-  // incrementa attempts em query separada (Supabase JS não expõe expressão SQL simples aqui)
-  await supabase.rpc("noop_increment_zn_event_attempts", { p_id: id }).catch(() => {});
 }
