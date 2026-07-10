@@ -53,8 +53,30 @@ function isHiddenQuestion(q: Question): boolean {
   );
 }
 
+const PLAN_PARAM_MAP: Record<string, 'monthly' | 'semiannual' | 'annual'> = {
+  mensal: 'monthly',
+  monthly: 'monthly',
+  semestral: 'semiannual',
+  semiannual: 'semiannual',
+  anual: 'annual',
+  annual: 'annual',
+};
+
+const PLAN_INFO: Record<'monthly' | 'semiannual' | 'annual', { label: string; price: string; sub: string }> = {
+  monthly:    { label: 'Mensal',    price: 'R$ 69,90/mês',      sub: 'PIX ou 1x no cartão' },
+  semiannual: { label: 'Semestral', price: 'R$ 299,00/semestre', sub: 'até 6x no cartão' },
+  annual:     { label: 'Anual',     price: 'R$ 419,90/ano',      sub: 'até 12x no cartão' },
+};
+
 export default function PublicAnamneseForm() {
   const { formId } = useParams<{ formId: string }>();
+
+  // ZN Assessoria mode: ?zn=1&plano=mensal|semestral|anual
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const znMode = searchParams.get('zn') === '1';
+  const planFromUrl = PLAN_PARAM_MAP[(searchParams.get('plano') || '').toLowerCase()] || '';
+  const [znPlan, setZnPlan] = useState<'' | 'monthly' | 'semiannual' | 'annual'>(planFromUrl as any);
+  const [znCpf, setZnCpf] = useState('');
 
   const [form, setForm] = useState<Form | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -329,6 +351,48 @@ export default function PublicAnamneseForm() {
         };
       });
 
+      if (znMode) {
+        // Fluxo ZN Assessoria: valida plano + CPF, envia via zn-anamnese-submit
+        // e redireciona para o link de pagamento Asaas.
+        if (!znPlan) {
+          toast.error('Selecione o plano da ZN Assessoria antes de enviar');
+          setSubmitting(false);
+          return;
+        }
+        const cpfDigits = znCpf.replace(/\D/g, '');
+        if (cpfDigits.length !== 11) {
+          toast.error('Informe um CPF válido (11 dígitos)');
+          setSubmitting(false);
+          return;
+        }
+
+        const { data, error: fnError } = await supabase.functions.invoke('zn-anamnese-submit', {
+          body: {
+            form_id: formId,
+            respondent_name: effectiveName,
+            respondent_email: effectiveEmail.toLowerCase(),
+            responses: responsesWithComments,
+            plan_choice: znPlan,
+            cpf: cpfDigits,
+            phone: (findAnswerByText(/telefone|whatsapp/i) || '').replace(/\D/g, '') || null,
+          },
+        });
+
+        if (fnError) throw fnError;
+        if ((data as any)?.error) throw new Error((data as any).error);
+
+        const paymentLink = (data as any)?.payment_link as string | null;
+        if (paymentLink) {
+          toast.success('Anamnese enviada! Redirecionando para o pagamento...');
+          window.location.href = paymentLink;
+          return;
+        }
+        // Sem link: apenas mostra tela de sucesso
+        setSubmitted(true);
+        toast.success('Anamnese enviada! Em breve você receberá o link de pagamento.');
+        return;
+      }
+
       const { data, error: fnError } = await supabase.functions.invoke('process-anamnese-submission', {
         body: {
           form_id: formId,
@@ -343,9 +407,10 @@ export default function PublicAnamneseForm() {
 
       setSubmitted(true);
       toast.success(isEditMode ? 'Respostas atualizadas com sucesso!' : 'Anamnese enviada com sucesso!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting form:', error);
-      toast.error('Erro ao enviar formulário. Tente novamente.');
+      const msg = error?.message || 'Erro ao enviar formulário. Tente novamente.';
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -649,6 +714,68 @@ export default function PublicAnamneseForm() {
                 Suas respostas anteriores foram carregadas. Edite o que precisar e envie no final.
               </AlertDescription>
             </Alert>
+          )}
+
+          {znMode && (
+            <Card className="mb-6 border-amber-500/40 bg-amber-500/5">
+              <CardHeader>
+                <p className="text-xs uppercase tracking-wide text-amber-600 font-semibold mb-1">
+                  ZN Assessoria Nutricional
+                </p>
+                <CardTitle className="text-lg">Seu plano e dados de cobrança</CardTitle>
+                <CardDescription>
+                  Ao final da anamnese você será direcionado para o pagamento seguro via Asaas (PIX, cartão ou boleto).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">Plano escolhido</Label>
+                  <RadioGroup
+                    value={znPlan}
+                    onValueChange={(v) => setZnPlan(v as any)}
+                    className="mt-2 grid gap-2"
+                  >
+                    {(['monthly', 'semiannual', 'annual'] as const).map((code) => (
+                      <label
+                        key={code}
+                        htmlFor={`zn-plan-${code}`}
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition',
+                          znPlan === code ? 'border-amber-500 bg-amber-500/10' : 'border-border hover:border-amber-500/50'
+                        )}
+                      >
+                        <RadioGroupItem id={`zn-plan-${code}`} value={code} />
+                        <div className="flex-1">
+                          <div className="font-semibold text-sm">{PLAN_INFO[code].label}</div>
+                          <div className="text-xs text-muted-foreground">{PLAN_INFO[code].sub}</div>
+                        </div>
+                        <div className="text-sm font-bold text-amber-600">{PLAN_INFO[code].price}</div>
+                      </label>
+                    ))}
+                  </RadioGroup>
+                </div>
+                <div>
+                  <Label htmlFor="zn-cpf" className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">
+                    CPF (para emissão da cobrança)
+                  </Label>
+                  <Input
+                    id="zn-cpf"
+                    inputMode="numeric"
+                    placeholder="000.000.000-00"
+                    value={znCpf}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                      const masked = digits
+                        .replace(/(\d{3})(\d)/, '$1.$2')
+                        .replace(/(\d{3})(\d)/, '$1.$2')
+                        .replace(/(\d{3})(\d)/, '$1-$2');
+                      setZnCpf(masked);
+                    }}
+                    className="mt-2"
+                  />
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           <Card className="mb-6">
