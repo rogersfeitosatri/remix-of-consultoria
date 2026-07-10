@@ -228,9 +228,10 @@ Deno.serve(async (req) => {
 
     // 5.1 If athlete came from public onboarding (has selected_plan + awaiting_anamnese),
     // send the payment link now via WhatsApp.
+    // Bloqueio: fluxo ZN Assessoria gerencia pagamento via Asaas — não disparar link MP.
     let paymentLinkSent = false;
     let paymentLinkError: string | null = null;
-    try {
+    if (source !== "zn") try {
       const { data: clientRow } = await supabaseAdmin
         .from("clients")
         .select("id, name, selected_plan_id, onboarding_status")
