@@ -132,19 +132,26 @@ export class SubscriptionIntegrationService {
       });
     }
 
-    const cancelReason = motivo
-      ? withinGrace
+    // Regra de acesso pós-cancelamento:
+    // - Dentro de 7 dias: estorno + status='cancelled' (acesso encerrado imediato).
+    // - Após 7 dias: Asaas não gera novas cobranças, mas o atleta mantém
+    //   status='active' até expires_at. A expiração converte para 'expired'
+    //   pelo fluxo normal de expiração.
+    const now = new Date().toISOString();
+    const finalStatus: "cancelled" | "active" = withinGrace ? "cancelled" : "active";
+    const cancelReason = withinGrace
+      ? motivo
         ? `${motivo} (estorno em 7 dias)`
-        : motivo
-      : withinGrace
-        ? "Cancelamento em até 7 dias — estornado"
-        : null;
+        : "Cancelamento em até 7 dias — estornado"
+      : motivo
+        ? `${motivo} (acesso mantido até expiração)`
+        : "Cancelamento após 7 dias — acesso mantido até expiração";
 
     const { data: updated, error } = await this.supabase
       .from("zn_subscriptions")
       .update({
-        status: "cancelled",
-        canceled_at: new Date().toISOString(),
+        status: finalStatus,
+        canceled_at: now,
         cancel_reason: cancelReason,
       })
       .eq("id", subscription.id)
@@ -160,6 +167,7 @@ export class SubscriptionIntegrationService {
       refunded: refunded.length > 0,
       refundedPayments: refunded,
       withinGracePeriod: withinGrace,
+      accessUntil: withinGrace ? null : updated.expires_at,
     };
   }
 
