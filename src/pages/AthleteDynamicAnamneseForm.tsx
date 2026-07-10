@@ -420,6 +420,25 @@ export default function AthleteDynamicAnamneseForm() {
             className="bg-gray-800 border-gray-700 text-white"
           />
         );
+      case 'number':
+        return (
+          <Input
+            type="number"
+            value={answers[question.id] || ''}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+            placeholder="Digite um número..."
+            className="bg-gray-800 border-gray-700 text-white"
+          />
+        );
+      case 'date':
+        return (
+          <Input
+            type="date"
+            value={answers[question.id] || ''}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+            className="bg-gray-800 border-gray-700 text-white"
+          />
+        );
       case 'boolean':
         return (
           <RadioGroup

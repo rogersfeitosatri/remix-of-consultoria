@@ -44,6 +44,57 @@ export const ENDURANCE_ANAMNESE_DESCRIPTION =
   'Anamnese para atletas de endurance, exibida como wizard de 1 pergunta por tela. Inclui histórico de saúde (sim/não), sintomas gastrointestinais durante treinos longos, alimentação habitual por refeição e treinos por dia da semana.';
 
 export const ENDURANCE_ANAMNESE_QUESTIONS: EnduranceQuestionDef[] = [
+  // ─────────────── Dados Pessoais (1º bloco) ───────────────
+  {
+    section: 'Dados Pessoais',
+    question_text: 'Nome completo',
+    question_type: 'text',
+    is_required: true,
+  },
+  {
+    section: 'Dados Pessoais',
+    question_text: 'Data de nascimento',
+    question_type: 'date',
+    is_required: true,
+  },
+  {
+    section: 'Dados Pessoais',
+    question_text: 'Sexo',
+    question_type: 'select',
+    options: ['Masculino', 'Feminino', 'Outro'],
+    is_required: true,
+  },
+  {
+    section: 'Dados Pessoais',
+    question_text: 'Telefone / WhatsApp',
+    question_type: 'text',
+    is_required: true,
+  },
+  {
+    section: 'Dados Pessoais',
+    question_text: 'Cidade / Estado',
+    question_type: 'text',
+    is_required: false,
+  },
+  {
+    section: 'Dados Pessoais',
+    question_text: 'Profissão / ocupação',
+    question_type: 'text',
+    is_required: false,
+  },
+  {
+    section: 'Dados Pessoais',
+    question_text: 'Altura (cm)',
+    question_type: 'number',
+    is_required: true,
+  },
+  {
+    section: 'Dados Pessoais',
+    question_text: 'Peso atual (kg)',
+    question_type: 'number',
+    is_required: true,
+  },
+
   // ─────────────── Histórico e Saúde ───────────────
   {
     section: 'Histórico e Saúde',
