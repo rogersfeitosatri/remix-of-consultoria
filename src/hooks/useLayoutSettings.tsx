@@ -33,6 +33,7 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItemConfig[] = [
   { key: '/content', label: 'Conteúdo Atleta', visible: true },
   { key: '/forms', label: 'Formulários', visible: true },
   { key: '/ai-training', label: 'Central de IA', visible: true },
+  { key: '/zn-assessoria', label: 'ZN Assessoria', visible: true },
   { key: '/settings', label: 'Configurações', visible: true },
 ];
 

@@ -6472,6 +6472,335 @@ export type Database = {
         }
         Relationships: []
       }
+      zn_athletes: {
+        Row: {
+          asaas_customer_id: string | null
+          cpf_cnpj: string | null
+          created_at: string
+          email: string
+          first_payment_at: string | null
+          id: string
+          metadata: Json
+          name: string
+          notes: string | null
+          phone: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asaas_customer_id?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email: string
+          first_payment_at?: string | null
+          id?: string
+          metadata?: Json
+          name: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asaas_customer_id?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string
+          first_payment_at?: string | null
+          id?: string
+          metadata?: Json
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      zn_integration_outbox: {
+        Row: {
+          athlete_id: string | null
+          attempts: number
+          created_at: string
+          event_type: string
+          id: string
+          last_error: string | null
+          payload: Json
+          sent_at: string | null
+          status: string
+          subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          athlete_id?: string | null
+          attempts?: number
+          created_at?: string
+          event_type: string
+          id?: string
+          last_error?: string | null
+          payload: Json
+          sent_at?: string | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          athlete_id?: string | null
+          attempts?: number
+          created_at?: string
+          event_type?: string
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          sent_at?: string | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zn_integration_outbox_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "zn_athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zn_integration_outbox_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "zn_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zn_payments: {
+        Row: {
+          amount: number
+          asaas_customer_id: string | null
+          asaas_payment_id: string
+          asaas_subscription_id: string | null
+          athlete_id: string | null
+          billing_type: string | null
+          created_at: string
+          due_date: string | null
+          event_type: string | null
+          id: string
+          invoice_url: string | null
+          net_amount: number | null
+          paid_at: string | null
+          raw_event: Json | null
+          status: string
+          subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          asaas_customer_id?: string | null
+          asaas_payment_id: string
+          asaas_subscription_id?: string | null
+          athlete_id?: string | null
+          billing_type?: string | null
+          created_at?: string
+          due_date?: string | null
+          event_type?: string | null
+          id?: string
+          invoice_url?: string | null
+          net_amount?: number | null
+          paid_at?: string | null
+          raw_event?: Json | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          asaas_customer_id?: string | null
+          asaas_payment_id?: string
+          asaas_subscription_id?: string | null
+          athlete_id?: string | null
+          billing_type?: string | null
+          created_at?: string
+          due_date?: string | null
+          event_type?: string | null
+          id?: string
+          invoice_url?: string | null
+          net_amount?: number | null
+          paid_at?: string | null
+          raw_event?: Json | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zn_payments_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "zn_athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zn_payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "zn_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zn_plans: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          duration_months: number
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          duration_months: number
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          duration_months?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      zn_subscriptions: {
+        Row: {
+          asaas_customer_id: string | null
+          asaas_subscription_id: string | null
+          athlete_id: string
+          cancel_reason: string | null
+          canceled_at: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          last_payment_id: string | null
+          metadata: Json
+          plan_code: string
+          start_date: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
+          athlete_id: string
+          cancel_reason?: string | null
+          canceled_at?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_payment_id?: string | null
+          metadata?: Json
+          plan_code: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
+          athlete_id?: string
+          cancel_reason?: string | null
+          canceled_at?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_payment_id?: string | null
+          metadata?: Json
+          plan_code?: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zn_subscriptions_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "zn_athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zn_webhook_events: {
+        Row: {
+          asaas_event_id: string | null
+          attempts: number
+          created_at: string
+          error: string | null
+          event_type: string
+          id: string
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          asaas_event_id?: string | null
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          event_type: string
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          received_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          asaas_event_id?: string | null
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       checkin_send_audit: {
@@ -6789,6 +7118,7 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      seed_default_zn_plans: { Args: { p_user_id: string }; Returns: undefined }
       validate_booking_email: {
         Args: { p_email: string; p_token: string }
         Returns: {
