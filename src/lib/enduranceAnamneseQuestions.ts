@@ -66,6 +66,12 @@ export const ENDURANCE_ANAMNESE_QUESTIONS: EnduranceQuestionDef[] = [
   },
   {
     section: 'Dados Pessoais',
+    question_text: 'E-mail',
+    question_type: 'text',
+    is_required: true,
+  },
+  {
+    section: 'Dados Pessoais',
     question_text: 'Telefone / WhatsApp',
     question_type: 'text',
     is_required: true,
