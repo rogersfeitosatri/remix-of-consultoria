@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library, Sparkles, ClipboardCheck } from 'lucide-react';
+import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library, Sparkles, ClipboardCheck, Bike } from 'lucide-react';
 import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm, useCreateDefaultCheckinForm } from '@/hooks/useCheckinForms';
 import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm, useCreateDefaultAnamneseForm, useCreateEnduranceAnamneseForm } from '@/hooks/useAnamneseForms';
 import { useToast } from '@/hooks/use-toast';
@@ -261,7 +261,7 @@ export default function Forms() {
             <span className="hidden sm:inline">Criar Padrão</span>
           </Button>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCreateEnduranceAnamneseForm} disabled={createEnduranceAnamneseForm.isPending}>
-            <Sparkles className="h-3.5 w-3.5" />
+            <Bike className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Endurance (wizard)</span>
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => openNewFormDialog('anamnese')}>

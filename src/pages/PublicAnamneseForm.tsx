@@ -254,13 +254,19 @@ export default function PublicAnamneseForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!athleteName.trim() || !athleteEmail.trim()) {
+    // No modo wizard não há tela de identificação: nome e e-mail vêm das
+    // perguntas de Dados Pessoais.
+    const wizard = isWizardAnamneseForm(form);
+    const effectiveName = wizard ? findAnswerByText(/nome/i).trim() : athleteName.trim();
+    const effectiveEmail = wizard ? findAnswerByText(/e-?mail/i).trim() : athleteEmail.trim();
+
+    if (!effectiveName || !effectiveEmail) {
       toast.error('Nome e email são obrigatórios');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(athleteEmail)) {
+    if (!emailRegex.test(effectiveEmail)) {
       toast.error('Email inválido');
       return;
     }
@@ -326,8 +332,8 @@ export default function PublicAnamneseForm() {
       const { data, error: fnError } = await supabase.functions.invoke('process-anamnese-submission', {
         body: {
           form_id: formId,
-          respondent_name: athleteName.trim(),
-          respondent_email: athleteEmail.toLowerCase().trim(),
+          respondent_name: effectiveName,
+          respondent_email: effectiveEmail.toLowerCase(),
           responses: responsesWithComments,
         },
       });
@@ -408,19 +414,22 @@ export default function PublicAnamneseForm() {
 
   // ── Modo wizard (1 pergunta por tela) ──────────────────────────────────────────
   const isWizard = isWizardAnamneseForm(form);
-  type WizStep =
-    | { kind: 'ident' }
-    | { kind: 'question'; question: Question; day?: string };
+  type WizStep = { kind: 'question'; question: Question; day?: string };
   const wizardSteps: WizStep[] = isWizard
-    ? [
-        { kind: 'ident' },
-        ...questions.flatMap<WizStep>((q) =>
-          resolveQuestionType(q) === 'training_week'
-            ? DIAS_SEMANA.map((dia) => ({ kind: 'question', question: q, day: dia as string }))
-            : [{ kind: 'question', question: q }]
-        ),
-      ]
+    ? questions.flatMap<WizStep>((q) =>
+        resolveQuestionType(q) === 'training_week'
+          ? DIAS_SEMANA.map((dia) => ({ kind: 'question', question: q, day: dia as string }))
+          : [{ kind: 'question', question: q }]
+      )
     : [];
+
+  // No modo wizard não há tela de identificação: nome e e-mail vêm das
+  // perguntas de "Dados Pessoais". Localiza essas perguntas para o envio.
+  const findAnswerByText = (regex: RegExp): string => {
+    const q = questions.find((qq) => regex.test(qq.question_text || ''));
+    const val = q ? answers[q.id] : '';
+    return typeof val === 'string' ? val : '';
+  };
   const currentWizStep = wizardSteps[currentStepIndex];
   const wizProgress = wizardSteps.length > 0 ? ((currentStepIndex + 1) / wizardSteps.length) * 100 : 0;
   const isLastWizStep = currentStepIndex === wizardSteps.length - 1;
@@ -536,18 +545,6 @@ export default function PublicAnamneseForm() {
 
   const validateWizStep = (step: WizStep): boolean => {
     if (!step) return true;
-    if (step.kind === 'ident') {
-      if (!athleteName.trim() || !athleteEmail.trim()) {
-        toast.error('Nome e email são obrigatórios');
-        return false;
-      }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(athleteEmail)) {
-        toast.error('Email inválido');
-        return false;
-      }
-      return true;
-    }
     // training_week ocupa vários passos: só valida no último dia.
     const isLastDay = step.day === undefined || step.day === DIAS_SEMANA[DIAS_SEMANA.length - 1];
     if (isLastDay) return validateWizQuestion(step.question);
@@ -654,47 +651,27 @@ export default function PublicAnamneseForm() {
             </Alert>
           )}
 
-          {step.kind === 'ident' ? (
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="text-lg">Identificação</CardTitle>
-                {form.description && <CardDescription>{form.description}</CardDescription>}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="wiz-name">Seu Nome *</Label>
-                  <Input id="wiz-name" value={athleteName} onChange={(e) => setAthleteName(e.target.value)} placeholder="Digite seu nome completo" />
+          <Card className="mb-6">
+            <CardHeader>
+              <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-1">
+                {step.question.section?.replace(/_/g, ' ')}{step.day ? ` — ${step.day}` : ''}
+              </p>
+              <CardTitle className={cn('text-lg', step.question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
+                {step.question.question_text}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {renderWidget(step.question, step.day)}
+              {step.question.has_comment_field && (
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <Label htmlFor={`wiz-comment-${step.question.id}`} className={cn('text-sm text-muted-foreground', step.question.comment_field_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
+                    {step.question.comment_field_label || 'Comentário'}
+                  </Label>
+                  <Textarea id={`wiz-comment-${step.question.id}`} value={comments[step.question.id] || ''} onChange={(e) => handleCommentChange(step.question.id, e.target.value)} placeholder="Seu comentário..." rows={2} className="mt-2" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="wiz-email">Seu Email *</Label>
-                  <Input id="wiz-email" type="email" value={athleteEmail} onChange={(e) => setAthleteEmail(e.target.value)} onBlur={handleEmailBlur} placeholder="Use o email cadastrado pelo seu assessor" />
-                  {loadingPrevious && <p className="text-xs text-primary animate-pulse">Verificando respostas anteriores...</p>}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="mb-6">
-              <CardHeader>
-                <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-1">
-                  {step.question.section?.replace(/_/g, ' ')}{step.day ? ` — ${step.day}` : ''}
-                </p>
-                <CardTitle className={cn('text-lg', step.question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
-                  {step.question.question_text}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {renderWidget(step.question, step.day)}
-                {step.question.has_comment_field && (
-                  <div className="mt-4 pt-4 border-t border-border/50">
-                    <Label htmlFor={`wiz-comment-${step.question.id}`} className={cn('text-sm text-muted-foreground', step.question.comment_field_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
-                      {step.question.comment_field_label || 'Comentário'}
-                    </Label>
-                    <Textarea id={`wiz-comment-${step.question.id}`} value={comments[step.question.id] || ''} onChange={(e) => handleCommentChange(step.question.id, e.target.value)} placeholder="Seu comentário..." rows={2} className="mt-2" />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+              )}
+            </CardContent>
+          </Card>
 
           {isLastWizStep && (
             <Card className="mb-6 border-primary/30">
