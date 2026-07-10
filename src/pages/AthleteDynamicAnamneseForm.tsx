@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PersonStanding, ArrowLeft, ArrowRight, Check, Loader2, Send, LogOut, Plus, X } from 'lucide-react';
 import rogersProfile from '@/assets/rogers-profile.jpg';
+import { isWizardAnamneseForm } from '@/lib/enduranceAnamneseQuestions';
 
 // ── Constantes de treino (espelham PublicAnamneseForm) ──────────────────────────
 const DIAS_SEMANA = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] as const;
@@ -383,7 +384,7 @@ export default function AthleteDynamicAnamneseForm() {
   const progress = sections.length > 0 ? ((currentSectionIndex + 1) / sections.length) * 100 : 0;
 
   // ── Modo wizard (1 pergunta por tela) ──────────────────────────────────────────
-  const isWizard = !!form?.single_question_wizard;
+  const isWizard = isWizardAnamneseForm(form);
   // Expande training_week em uma tela por dia da semana.
   const steps = isWizard
     ? questions.flatMap((q) =>

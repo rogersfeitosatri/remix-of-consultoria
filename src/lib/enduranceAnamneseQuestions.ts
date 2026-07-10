@@ -31,6 +31,15 @@ export const ENDURANCE_SYMPTOMS = [
 ] as const;
 
 export const ENDURANCE_ANAMNESE_TITLE = 'Anamnese Endurance (wizard)';
+
+// Detecta se um formulário deve ser exibido como wizard (1 pergunta por tela).
+// Prioriza a coluna single_question_wizard quando existir; senão, usa o título
+// (que contém "(wizard)") — assim funciona mesmo sem a migration aplicada.
+export function isWizardAnamneseForm(form: { title?: string | null; single_question_wizard?: boolean | null } | null | undefined): boolean {
+  if (!form) return false;
+  if (form.single_question_wizard) return true;
+  return /\(wizard\)/i.test(form.title || '');
+}
 export const ENDURANCE_ANAMNESE_DESCRIPTION =
   'Anamnese para atletas de endurance, exibida como wizard de 1 pergunta por tela. Inclui histórico de saúde (sim/não), sintomas gastrointestinais durante treinos longos, alimentação habitual por refeição e treinos por dia da semana.';
 
