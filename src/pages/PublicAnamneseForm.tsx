@@ -36,6 +36,7 @@ interface Form {
   title: string;
   description: string | null;
   is_active: boolean;
+  single_question_wizard?: boolean;
 }
 
 // A prova alvo já é perguntada na seção de Objetivos, então a pergunta de
@@ -69,6 +70,7 @@ export default function PublicAnamneseForm() {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
   useEffect(() => {
     const fetchForm = async () => {
@@ -403,6 +405,160 @@ export default function PublicAnamneseForm() {
     return acc;
   }, {} as Record<string, Question[]>);
 
+  // ── Modo wizard (1 pergunta por tela) ──────────────────────────────────────────
+  const isWizard = !!form?.single_question_wizard;
+  type WizStep =
+    | { kind: 'ident' }
+    | { kind: 'question'; question: Question; day?: string };
+  const wizardSteps: WizStep[] = isWizard
+    ? [
+        { kind: 'ident' },
+        ...questions.flatMap<WizStep>((q) =>
+          resolveQuestionType(q) === 'training_week'
+            ? DIAS_SEMANA.map((dia) => ({ kind: 'question', question: q, day: dia as string }))
+            : [{ kind: 'question', question: q }]
+        ),
+      ]
+    : [];
+  const currentWizStep = wizardSteps[currentStepIndex];
+  const wizProgress = wizardSteps.length > 0 ? ((currentStepIndex + 1) / wizardSteps.length) * 100 : 0;
+  const isLastWizStep = currentStepIndex === wizardSteps.length - 1;
+
+  // Renderiza o widget de entrada de uma pergunta (usado no modo wizard).
+  const renderWidget = (question: Question, dayOverride?: string) => {
+    const qType = resolveQuestionType(question);
+    switch (qType) {
+      case 'short_text':
+      case 'text':
+        return (
+          <Input value={answers[question.id] || ''} onChange={(e) => handleAnswerChange(question.id, e.target.value)} placeholder="Sua resposta..." />
+        );
+      case 'long_text':
+      case 'textarea':
+        return (
+          <Textarea value={answers[question.id] || ''} onChange={(e) => handleAnswerChange(question.id, e.target.value)} placeholder="Sua resposta..." rows={4} />
+        );
+      case 'boolean':
+        return (
+          <RadioGroup value={answers[question.id] || undefined} onValueChange={(v) => handleAnswerChange(question.id, v)}>
+            {['Sim', 'Não'].map((option, i) => (
+              <div key={i} className="flex items-center space-x-2">
+                <RadioGroupItem value={option} id={`${question.id}-${i}`} />
+                <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">{option}</Label>
+              </div>
+            ))}
+          </RadioGroup>
+        );
+      case 'select':
+      case 'multiple_choice':
+        return question.options ? (
+          <RadioGroup value={answers[question.id] || undefined} onValueChange={(v) => handleAnswerChange(question.id, v)}>
+            {(question.options as string[]).map((o) => (o ?? '').trim()).filter(Boolean).map((option, i) => (
+              <div key={i} className="flex items-center space-x-2">
+                <RadioGroupItem value={option} id={`${question.id}-${i}`} />
+                <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">{option}</Label>
+              </div>
+            ))}
+          </RadioGroup>
+        ) : null;
+      case 'multiselect':
+      case 'checkbox':
+        return question.options ? (
+          <div className="space-y-2">
+            {(question.options as string[]).map((o) => (o ?? '').trim()).filter(Boolean).map((option, i) => (
+              <div key={i} className="flex items-center space-x-2">
+                <Checkbox id={`${question.id}-${i}`} checked={(answers[question.id] || []).includes(option)} onCheckedChange={(c) => handleCheckboxChange(question.id, option, c as boolean)} />
+                <Label htmlFor={`${question.id}-${i}`} className="font-normal cursor-pointer">{option}</Label>
+              </div>
+            ))}
+          </div>
+        ) : null;
+      case 'scale':
+        return (
+          <div className="space-y-4">
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>{question.scale_min}</span>
+              <span className="font-medium text-foreground">{answers[question.id]}</span>
+              <span>{question.scale_max}</span>
+            </div>
+            <Slider value={[answers[question.id] ?? question.scale_min]} onValueChange={([v]) => handleAnswerChange(question.id, v)} min={question.scale_min} max={question.scale_max} step={1} className="w-full" />
+          </div>
+        );
+      case 'meal_items':
+        return (
+          <MealItemsRenderer value={answers[question.id] || { horario: '', itens: [['']], bebidas: '' }} onChange={(v) => handleAnswerChange(question.id, v)} />
+        );
+      case 'training_week':
+        return (
+          <TrainingDayRenderer dia={dayOverride || DIAS_SEMANA[0]} value={answers[question.id] || {}} onChange={(v) => handleAnswerChange(question.id, v)} />
+        );
+      case 'symptom_scale':
+        return (
+          <SymptomScaleRenderer symptoms={Array.isArray(question.options) ? (question.options as string[]) : []} value={answers[question.id] || {}} onChange={(v) => handleAnswerChange(question.id, v)} />
+        );
+      default:
+        return (
+          <Input value={answers[question.id] || ''} onChange={(e) => handleAnswerChange(question.id, e.target.value)} placeholder="Sua resposta..." />
+        );
+    }
+  };
+
+  const validateWizQuestion = (question: Question): boolean => {
+    if (question.is_required) {
+      const answer = answers[question.id];
+      const empty =
+        answer === undefined || answer === null ||
+        (Array.isArray(answer) && answer.length === 0) ||
+        (typeof answer === 'string' && answer.trim() === '');
+      if (empty) {
+        toast.error(`Responda: ${question.question_text.replace(/[:?.\s]+$/, '')}`);
+        return false;
+      }
+    }
+    if (question.has_comment_field && question.comment_field_required) {
+      const comment = comments[question.id];
+      if (!comment || !comment.trim()) {
+        toast.error(`Preencha: ${question.comment_field_label}`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const validateWizStep = (step: WizStep): boolean => {
+    if (!step) return true;
+    if (step.kind === 'ident') {
+      if (!athleteName.trim() || !athleteEmail.trim()) {
+        toast.error('Nome e email são obrigatórios');
+        return false;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(athleteEmail)) {
+        toast.error('Email inválido');
+        return false;
+      }
+      return true;
+    }
+    // training_week ocupa vários passos: só valida no último dia.
+    const isLastDay = step.day === undefined || step.day === DIAS_SEMANA[DIAS_SEMANA.length - 1];
+    if (isLastDay) return validateWizQuestion(step.question);
+    return true;
+  };
+
+  const handleWizNext = () => {
+    if (!validateWizStep(currentWizStep)) return;
+    if (currentStepIndex < wizardSteps.length - 1) {
+      setCurrentStepIndex((p) => p + 1);
+      window.scrollTo(0, 0);
+    }
+  };
+  const handleWizPrevious = () => {
+    if (currentStepIndex > 0) {
+      setCurrentStepIndex((p) => p - 1);
+      window.scrollTo(0, 0);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -446,6 +602,123 @@ export default function PublicAnamneseForm() {
             <Button variant="ghost" size="sm" onClick={() => window.close()}>
               Fechar
             </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Renderização em modo wizard (1 pergunta por tela) ──────────────────────────
+  if (isWizard && wizardSteps.length > 0) {
+    const step = currentWizStep;
+    return (
+      <div className="min-h-screen bg-background py-8 px-4 pb-28">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <img src={logoRF} alt="Rogers Feitosa" className="h-12 w-12 rounded-xl object-cover" />
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Rogers Feitosa</h1>
+              <p className="text-sm text-muted-foreground">Nutrição & Treinamento</p>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-foreground">{form.title}</h2>
+          </div>
+
+          <div className="mb-6">
+            <div className="flex justify-between text-sm text-muted-foreground mb-2">
+              <span>Etapa {currentStepIndex + 1} de {wizardSteps.length}</span>
+              <span>{Math.round(wizProgress)}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+              <div className="h-full bg-primary transition-all" style={{ width: `${wizProgress}%` }} />
+            </div>
+          </div>
+
+          {isEditMode && (
+            <Alert className="mb-6 border-primary/30 bg-primary/5">
+              <Info className="h-4 w-4 text-primary" />
+              <AlertDescription className="text-sm">
+                Suas respostas anteriores foram carregadas. Edite o que precisar e envie no final.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {step.kind === 'ident' ? (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="text-lg">Identificação</CardTitle>
+                {form.description && <CardDescription>{form.description}</CardDescription>}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="wiz-name">Seu Nome *</Label>
+                  <Input id="wiz-name" value={athleteName} onChange={(e) => setAthleteName(e.target.value)} placeholder="Digite seu nome completo" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="wiz-email">Seu Email *</Label>
+                  <Input id="wiz-email" type="email" value={athleteEmail} onChange={(e) => setAthleteEmail(e.target.value)} onBlur={handleEmailBlur} placeholder="Use o email cadastrado pelo seu assessor" />
+                  {loadingPrevious && <p className="text-xs text-primary animate-pulse">Verificando respostas anteriores...</p>}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="mb-6">
+              <CardHeader>
+                <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-1">
+                  {step.question.section?.replace(/_/g, ' ')}{step.day ? ` — ${step.day}` : ''}
+                </p>
+                <CardTitle className={cn('text-lg', step.question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
+                  {step.question.question_text}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {renderWidget(step.question, step.day)}
+                {step.question.has_comment_field && (
+                  <div className="mt-4 pt-4 border-t border-border/50">
+                    <Label htmlFor={`wiz-comment-${step.question.id}`} className={cn('text-sm text-muted-foreground', step.question.comment_field_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
+                      {step.question.comment_field_label || 'Comentário'}
+                    </Label>
+                    <Textarea id={`wiz-comment-${step.question.id}`} value={comments[step.question.id] || ''} onChange={(e) => handleCommentChange(step.question.id, e.target.value)} placeholder="Seu comentário..." rows={2} className="mt-2" />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {isLastWizStep && (
+            <Card className="mb-6 border-primary/30">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <Checkbox id="wiz-terms" checked={termsAccepted} onCheckedChange={(c) => setTermsAccepted(c as boolean)} className="mt-1" />
+                  <Label htmlFor="wiz-terms" className="font-normal cursor-pointer leading-relaxed">
+                    Li e aceito os{' '}
+                    <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-primary underline font-medium">Termos e Condições de Serviço</a>{' '}
+                    do acompanhamento nutricional. <span className="text-red-500">*</span>
+                  </Label>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4">
+          <div className="max-w-2xl mx-auto flex gap-3">
+            {currentStepIndex > 0 && (
+              <Button type="button" variant="outline" onClick={handleWizPrevious} className="flex-1">Anterior</Button>
+            )}
+            {!isLastWizStep ? (
+              <Button type="button" onClick={handleWizNext} className="flex-1">Próximo</Button>
+            ) : (
+              <Button type="button" onClick={(e) => handleSubmit(e as any)} disabled={submitting || !termsAccepted} className="flex-1 gap-2">
+                {submitting ? (
+                  <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground" />{isEditMode ? 'Atualizando...' : 'Enviando...'}</>
+                ) : (
+                  <><Send className="h-4 w-4" />{isEditMode ? 'Atualizar Anamnese' : 'Enviar Anamnese'}</>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -920,6 +1193,78 @@ const INTENSIDADES_OPT = [
 const ENDURANCE_MODALIDADES = ['corrida', 'ciclismo', 'natacao', 'triathlon'];
 
 const emptyTrainingSession = () => ({ modalidade: '', turno: '', intensidade: '', longao: false });
+
+// Renderiza o treino de UM único dia (usado no modo wizard, 1 dia por tela).
+function TrainingDayRenderer({ dia, value, onChange }: { dia: string; value: any; onChange: (v: any) => void }) {
+  const getSessions = (): any[] => {
+    const v = value?.[dia];
+    if (Array.isArray(v)) return v.length ? v : [emptyTrainingSession()];
+    if (v && typeof v === 'object' && 'modalidade' in v) return [v];
+    return [emptyTrainingSession()];
+  };
+  const setSessions = (sessions: any[]) => onChange({ ...value, [dia]: sessions });
+  const setField = (idx: number, field: string, v: string) => {
+    const sessions = getSessions().map((s, i) => (i === idx ? { ...s, [field]: v } : s));
+    if (field === 'modalidade') {
+      if (v === 'repouso') sessions[idx] = { modalidade: 'repouso', turno: '', intensidade: '', longao: false };
+      else if (!ENDURANCE_MODALIDADES.includes(v)) sessions[idx] = { ...sessions[idx], longao: false };
+    }
+    setSessions(sessions);
+  };
+  const toggleLongao = (idx: number, checked: boolean) =>
+    setSessions(getSessions().map((s, i) => (i === idx ? { ...s, longao: checked } : s)));
+  const addSession = () => setSessions([...getSessions(), emptyTrainingSession()]);
+  const removeSession = (idx: number) => {
+    const sessions = getSessions();
+    if (sessions.length <= 1) return;
+    setSessions(sessions.filter((_, i) => i !== idx));
+  };
+
+  const sessions = getSessions();
+  return (
+    <div className="rounded-lg border p-3 space-y-3 bg-muted/30">
+      <p className="text-xs font-semibold uppercase tracking-wide text-primary">{dia}</p>
+      {sessions.map((session, idx) => {
+        const isRepouso = session.modalidade === 'repouso';
+        const showLongao = ENDURANCE_MODALIDADES.includes(session.modalidade);
+        return (
+          <div key={idx} className={cn('space-y-2', isRepouso && 'opacity-60', idx > 0 && 'pt-3 border-t border-dashed')}>
+            <div className="flex items-start gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1">
+                <Select value={session.modalidade} onValueChange={(v) => setField(idx, 'modalidade', v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Modalidade…" /></SelectTrigger>
+                  <SelectContent>{MODALIDADES_OPT.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <Select value={session.turno} onValueChange={(v) => setField(idx, 'turno', v)} disabled={isRepouso || !session.modalidade}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Turno…" /></SelectTrigger>
+                  <SelectContent>{TURNOS_OPT.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <Select value={session.intensidade} onValueChange={(v) => setField(idx, 'intensidade', v)} disabled={isRepouso || !session.modalidade}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Intensidade…" /></SelectTrigger>
+                  <SelectContent>{INTENSIDADES_OPT.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {sessions.length > 1 && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeSession(idx)} className="h-9 w-9 p-0 shrink-0">
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            {showLongao && (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={!!session.longao} onChange={(e) => toggleLongao(idx, e.target.checked)} className="h-4 w-4 rounded border-input accent-primary" />
+                <span className="text-sm text-muted-foreground">🐢 É o <strong>longão</strong> da semana<span className="text-xs ml-1">(volume longo / resistência)</span></span>
+              </label>
+            )}
+          </div>
+        );
+      })}
+      <Button type="button" variant="ghost" size="sm" onClick={addSession} className="gap-1 px-2 h-8 text-xs">
+        <Plus className="h-3.5 w-3.5" /> Adicionar modalidade neste dia
+      </Button>
+    </div>
+  );
+}
 
 function TrainingWeekRenderer({ value, onChange }: { value: any; onChange: (v: any) => void }) {
   // Normalize a day to an array of sessions (supports legacy single-object shape)
