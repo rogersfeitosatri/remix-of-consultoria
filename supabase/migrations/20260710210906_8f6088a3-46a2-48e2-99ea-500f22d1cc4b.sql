@@ -1,0 +1,2 @@
+DELETE FROM public.zn_athletes WHERE email = 'nutri.rogersfeitosa@gmail.com' AND status = 'pending' AND asaas_customer_id IS NULL;
+UPDATE public.clients SET selected_plan_id = NULL, onboarding_status = NULL WHERE id = '24fb6e32-b1e1-4101-9943-d3fcff32e5c9';
