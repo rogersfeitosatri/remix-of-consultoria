@@ -484,13 +484,18 @@ export default function PublicAnamneseForm() {
 
   // ── Modo wizard (1 pergunta por tela) ──────────────────────────────────────────
   const isWizard = isWizardAnamneseForm(form);
-  type WizStep = { kind: 'question'; question: Question; day?: string };
-  const wizardSteps: WizStep[] = isWizard
+  type WizStep = { kind: 'plan' } | { kind: 'question'; question: Question; day?: string };
+  const questionSteps: WizStep[] = isWizard
     ? questions.flatMap<WizStep>((q) =>
         resolveQuestionType(q) === 'training_week'
           ? DIAS_SEMANA.map((dia) => ({ kind: 'question', question: q, day: dia as string }))
           : [{ kind: 'question', question: q }]
       )
+    : [];
+  // No modo ZN o plano/CPF ganha uma tela dedicada como 1º passo, para que as
+  // perguntas seguintes apareçam sozinhas (com o plano minimizado no topo).
+  const wizardSteps: WizStep[] = isWizard
+    ? (znMode ? [{ kind: 'plan' } as WizStep, ...questionSteps] : questionSteps)
     : [];
 
   // No modo wizard não há tela de identificação: nome e e-mail vêm das
@@ -614,7 +619,7 @@ export default function PublicAnamneseForm() {
   };
 
   const validateWizStep = (step: WizStep): boolean => {
-    if (!step) return true;
+    if (!step || step.kind !== 'question') return true;
     // training_week ocupa vários passos: só valida no último dia.
     const isLastDay = step.day === undefined || step.day === DIAS_SEMANA[DIAS_SEMANA.length - 1];
     if (isLastDay) return validateWizQuestion(step.question);
@@ -622,7 +627,7 @@ export default function PublicAnamneseForm() {
   };
 
   const handleWizNext = () => {
-    if (znMode && currentStepIndex === 0) {
+    if (currentWizStep?.kind === 'plan') {
       if (!znPlan) {
         toast.error('Selecione o plano da ZN Assessoria para continuar');
         return;
@@ -631,6 +636,11 @@ export default function PublicAnamneseForm() {
         toast.error('Informe um CPF válido (11 dígitos)');
         return;
       }
+      if (currentStepIndex < wizardSteps.length - 1) {
+        setCurrentStepIndex((p) => p + 1);
+        window.scrollTo(0, 0);
+      }
+      return;
     }
     if (!validateWizStep(currentWizStep)) return;
     if (currentStepIndex < wizardSteps.length - 1) {
@@ -731,118 +741,117 @@ export default function PublicAnamneseForm() {
             </Alert>
           )}
 
-          {znMode && (() => {
-            const planLocked = !!znPlan && currentStepIndex > 0;
-            return (
+          {/* Tela dedicada de plano + CPF (1º passo no modo ZN) */}
+          {znMode && step.kind === 'plan' && (
             <Card className="mb-6 border-amber-500/40 bg-amber-500/5">
-              <CardHeader className={planLocked ? 'pb-3' : undefined}>
+              <CardHeader>
                 <p className="text-xs uppercase tracking-wide text-amber-600 font-semibold mb-1">
                   ZN Assessoria Nutricional
                 </p>
-                {planLocked ? (
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold truncate">
-                        Plano {PLAN_INFO[znPlan as 'monthly'].label} · {PLAN_INFO[znPlan as 'monthly'].price}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        CPF {znCpf || '—'}
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setCurrentStepIndex(0)}
-                      className="text-amber-700 hover:text-amber-800 gap-1"
-                    >
-                      <Pencil className="h-3.5 w-3.5" /> Alterar
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <CardTitle className="text-lg">Seu plano e CPF</CardTitle>
-                    <CardDescription>
-                      Ao final da anamnese você será direcionado para o pagamento seguro via Asaas (PIX, cartão ou boleto).
-                    </CardDescription>
-                  </>
-                )}
+                <CardTitle className="text-lg">Seu plano e CPF</CardTitle>
+                <CardDescription>
+                  Ao final da anamnese você será direcionado para o pagamento seguro via Asaas (PIX, cartão ou boleto).
+                </CardDescription>
               </CardHeader>
-              {!planLocked && (
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">Plano escolhido</Label>
-                    <RadioGroup
-                      value={znPlan}
-                      onValueChange={(v) => setZnPlan(v as any)}
-                      className="mt-2 grid gap-2"
-                    >
-                      {(['monthly', 'semiannual', 'annual'] as const).map((code) => (
-                        <label
-                          key={code}
-                          htmlFor={`zn-plan-${code}`}
-                          className={cn(
-                            'flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition',
-                            znPlan === code ? 'border-amber-500 bg-amber-500/10' : 'border-border hover:border-amber-500/50'
-                          )}
-                        >
-                          <RadioGroupItem id={`zn-plan-${code}`} value={code} />
-                          <div className="flex-1">
-                            <div className="font-semibold text-sm">{PLAN_INFO[code].label}</div>
-                            <div className="text-xs text-muted-foreground">{PLAN_INFO[code].sub}</div>
-                          </div>
-                          <div className="text-sm font-bold text-amber-600">{PLAN_INFO[code].price}</div>
-                        </label>
-                      ))}
-                    </RadioGroup>
-                  </div>
-                  <div>
-                    <Label htmlFor="zn-cpf-top" className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">
-                      CPF (para emissão da cobrança)
-                    </Label>
-                    <Input
-                      id="zn-cpf-top"
-                      inputMode="numeric"
-                      placeholder="000.000.000-00"
-                      value={znCpf}
-                      onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
-                        const masked = digits
-                          .replace(/(\d{3})(\d)/, '$1.$2')
-                          .replace(/(\d{3})(\d)/, '$1.$2')
-                          .replace(/(\d{3})(\d)/, '$1-$2');
-                        setZnCpf(masked);
-                      }}
-                      className="mt-2"
-                    />
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-            );
-          })()}
-
-          <Card className="mb-6">
-            <CardHeader>
-              <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-1">
-                {step.question.section?.replace(/_/g, ' ')}{step.day ? ` — ${step.day}` : ''}
-              </p>
-              <CardTitle className={cn('text-lg', step.question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
-                {step.question.question_text}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {renderWidget(step.question, step.day)}
-              {step.question.has_comment_field && (
-                <div className="mt-4 pt-4 border-t border-border/50">
-                  <Label htmlFor={`wiz-comment-${step.question.id}`} className={cn('text-sm text-muted-foreground', step.question.comment_field_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
-                    {step.question.comment_field_label || 'Comentário'}
-                  </Label>
-                  <Textarea id={`wiz-comment-${step.question.id}`} value={comments[step.question.id] || ''} onChange={(e) => handleCommentChange(step.question.id, e.target.value)} placeholder="Seu comentário..." rows={2} className="mt-2" />
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">Plano escolhido</Label>
+                  <RadioGroup
+                    value={znPlan}
+                    onValueChange={(v) => setZnPlan(v as any)}
+                    className="mt-2 grid gap-2"
+                  >
+                    {(['monthly', 'semiannual', 'annual'] as const).map((code) => (
+                      <label
+                        key={code}
+                        htmlFor={`zn-plan-${code}`}
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition',
+                          znPlan === code ? 'border-amber-500 bg-amber-500/10' : 'border-border hover:border-amber-500/50'
+                        )}
+                      >
+                        <RadioGroupItem id={`zn-plan-${code}`} value={code} />
+                        <div className="flex-1">
+                          <div className="font-semibold text-sm">{PLAN_INFO[code].label}</div>
+                          <div className="text-xs text-muted-foreground">{PLAN_INFO[code].sub}</div>
+                        </div>
+                        <div className="text-sm font-bold text-amber-600">{PLAN_INFO[code].price}</div>
+                      </label>
+                    ))}
+                  </RadioGroup>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <div>
+                  <Label htmlFor="zn-cpf-top" className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">
+                    CPF (para emissão da cobrança)
+                  </Label>
+                  <Input
+                    id="zn-cpf-top"
+                    inputMode="numeric"
+                    placeholder="000.000.000-00"
+                    value={znCpf}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                      const masked = digits
+                        .replace(/(\d{3})(\d)/, '$1.$2')
+                        .replace(/(\d{3})(\d)/, '$1.$2')
+                        .replace(/(\d{3})(\d)/, '$1-$2');
+                      setZnCpf(masked);
+                    }}
+                    className="mt-2"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Faixa minimizada do plano nas telas de pergunta */}
+          {znMode && step.kind === 'question' && znPlan && (
+            <Card className="mb-6 border-amber-500/40 bg-amber-500/5">
+              <CardHeader className="py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate">
+                      Plano {PLAN_INFO[znPlan as 'monthly'].label} · {PLAN_INFO[znPlan as 'monthly'].price}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">CPF {znCpf || '—'}</div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentStepIndex(0)}
+                    className="text-amber-700 hover:text-amber-800 gap-1"
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Alterar
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
+          )}
+
+          {step.kind === 'question' && (
+            <Card className="mb-6">
+              <CardHeader>
+                <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-1">
+                  {step.question.section?.replace(/_/g, ' ')}{step.day ? ` — ${step.day}` : ''}
+                </p>
+                <CardTitle className={cn('text-lg', step.question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
+                  {step.question.question_text}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {renderWidget(step.question, step.day)}
+                {step.question.has_comment_field && (
+                  <div className="mt-4 pt-4 border-t border-border/50">
+                    <Label htmlFor={`wiz-comment-${step.question.id}`} className={cn('text-sm text-muted-foreground', step.question.comment_field_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
+                      {step.question.comment_field_label || 'Comentário'}
+                    </Label>
+                    <Textarea id={`wiz-comment-${step.question.id}`} value={comments[step.question.id] || ''} onChange={(e) => handleCommentChange(step.question.id, e.target.value)} placeholder="Seu comentário..." rows={2} className="mt-2" />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {isLastWizStep && (
             <Card className="mb-6 border-primary/30">
