@@ -533,7 +533,7 @@ export default function PublicAnamneseForm() {
         );
       case 'boolean':
         return (
-          <RadioGroup value={answers[question.id] || undefined} onValueChange={(v) => handleAnswerChange(question.id, v)}>
+          <RadioGroup value={answers[question.id] || ''} onValueChange={(v) => handleAnswerChange(question.id, v)}>
             {['Sim', 'Não'].map((option, i) => (
               <div key={i} className="flex items-center space-x-2">
                 <RadioGroupItem value={option} id={`${question.id}-${i}`} />
@@ -545,7 +545,7 @@ export default function PublicAnamneseForm() {
       case 'select':
       case 'multiple_choice':
         return question.options ? (
-          <RadioGroup value={answers[question.id] || undefined} onValueChange={(v) => handleAnswerChange(question.id, v)}>
+          <RadioGroup value={answers[question.id] || ''} onValueChange={(v) => handleAnswerChange(question.id, v)}>
             {(question.options as string[]).map((o) => (o ?? '').trim()).filter(Boolean).map((option, i) => (
               <div key={i} className="flex items-center space-x-2">
                 <RadioGroupItem value={option} id={`${question.id}-${i}`} />
@@ -830,7 +830,7 @@ export default function PublicAnamneseForm() {
           )}
 
           {step.kind === 'question' && (
-            <Card className="mb-6">
+            <Card className="mb-6" key={`${step.question.id}-${step.day || ''}`}>
               <CardHeader>
                 <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-1">
                   {step.question.section?.replace(/_/g, ' ')}{step.day ? ` — ${step.day}` : ''}
