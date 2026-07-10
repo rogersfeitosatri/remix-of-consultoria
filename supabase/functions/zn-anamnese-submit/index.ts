@@ -149,9 +149,9 @@ Deno.serve(async (req) => {
       .from("zn_athletes")
       .update({
         plan_choice: data.plan_choice,
-        client_id: clientId,
         status: existing?.status === "lead" ? "pending" : (znAthlete.status ?? "pending"),
         lead_marked_at: null,
+        metadata: { ...(znAthlete.metadata ?? {}), consultoria_client_id: clientId },
       })
       .eq("id", znAthlete.id);
 
