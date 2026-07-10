@@ -780,7 +780,7 @@ export default function AthleteDynamicAnamneseForm() {
             <Progress value={stepProgress} className="h-2 bg-gray-800" />
           </div>
 
-          <Card className="bg-gray-900 border-gray-800 mb-6">
+          <Card className="bg-gray-900 border-gray-800 mb-6" key={`${q.id}-${currentStep.day || ''}`}>
             <CardHeader>
               <p className="text-xs uppercase tracking-wide text-[hsl(43,74%,49%)] font-semibold mb-1">{q.section?.replace(/_/g, ' ')}{dayLabel}</p>
               <CardTitle className={cn('text-white text-lg', q.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
