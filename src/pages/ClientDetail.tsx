@@ -49,6 +49,7 @@ import { ChangeAthletePasswordDialog } from '@/components/clients/ChangeAthleteP
 import { RenewPlanDialog } from '@/components/clients/RenewPlanDialog';
 import { FreezePlanDialog } from '@/components/clients/FreezePlanDialog';
 import { PlanHistorySection } from '@/components/clients/PlanHistorySection';
+import { AsaasSubscriptionCard } from '@/components/clients/AsaasSubscriptionCard';
 import { AthleteCheckinSchedules } from '@/components/admin/AthleteCheckinSchedules';
 import { PipelineTimelineTab } from '@/components/admin/PipelineTimelineTab';
 import { PipelineAuditPanel } from '@/components/admin/PipelineAuditPanel';
@@ -493,6 +494,9 @@ export default function ClientDetail() {
         {/* Automação de Check-ins */}
         <AthleteCheckinSchedules clientId={client.id} />
         
+        {/* Cobrança recorrente Asaas */}
+        <AsaasSubscriptionCard client={client as any} />
+
         {/* Histórico de Planos */}
         <PlanHistorySection clientId={client.id} />
         
