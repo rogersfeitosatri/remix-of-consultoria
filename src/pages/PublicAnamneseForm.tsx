@@ -351,6 +351,48 @@ export default function PublicAnamneseForm() {
         };
       });
 
+      if (znMode) {
+        // Fluxo ZN Assessoria: valida plano + CPF, envia via zn-anamnese-submit
+        // e redireciona para o link de pagamento Asaas.
+        if (!znPlan) {
+          toast.error('Selecione o plano da ZN Assessoria antes de enviar');
+          setSubmitting(false);
+          return;
+        }
+        const cpfDigits = znCpf.replace(/\D/g, '');
+        if (cpfDigits.length !== 11) {
+          toast.error('Informe um CPF válido (11 dígitos)');
+          setSubmitting(false);
+          return;
+        }
+
+        const { data, error: fnError } = await supabase.functions.invoke('zn-anamnese-submit', {
+          body: {
+            form_id: formId,
+            respondent_name: effectiveName,
+            respondent_email: effectiveEmail.toLowerCase(),
+            responses: responsesWithComments,
+            plan_choice: znPlan,
+            cpf: cpfDigits,
+            phone: (findAnswerByText(/telefone|whatsapp/i) || '').replace(/\D/g, '') || null,
+          },
+        });
+
+        if (fnError) throw fnError;
+        if ((data as any)?.error) throw new Error((data as any).error);
+
+        const paymentLink = (data as any)?.payment_link as string | null;
+        if (paymentLink) {
+          toast.success('Anamnese enviada! Redirecionando para o pagamento...');
+          window.location.href = paymentLink;
+          return;
+        }
+        // Sem link: apenas mostra tela de sucesso
+        setSubmitted(true);
+        toast.success('Anamnese enviada! Em breve você receberá o link de pagamento.');
+        return;
+      }
+
       const { data, error: fnError } = await supabase.functions.invoke('process-anamnese-submission', {
         body: {
           form_id: formId,
@@ -365,9 +407,10 @@ export default function PublicAnamneseForm() {
 
       setSubmitted(true);
       toast.success(isEditMode ? 'Respostas atualizadas com sucesso!' : 'Anamnese enviada com sucesso!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting form:', error);
-      toast.error('Erro ao enviar formulário. Tente novamente.');
+      const msg = error?.message || 'Erro ao enviar formulário. Tente novamente.';
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
