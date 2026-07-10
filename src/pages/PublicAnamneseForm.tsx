@@ -279,18 +279,23 @@ export default function PublicAnamneseForm() {
     // No modo wizard não há tela de identificação: nome e e-mail vêm das
     // perguntas de Dados Pessoais.
     const wizard = isWizardAnamneseForm(form);
-    const effectiveName = wizard ? findAnswerByText(/nome/i).trim() : athleteName.trim();
-    const effectiveEmail = wizard ? findAnswerByText(/e-?mail/i).trim() : athleteEmail.trim();
-
-    if (!effectiveName || !effectiveEmail) {
-      toast.error('Nome e email são obrigatórios');
-      return;
-    }
+    // No wizard: nome/e-mail vêm das perguntas de Dados Pessoais. Se a pergunta
+    // não existir no formulário, usamos fallbacks para não bloquear o envio.
+    let effectiveName = wizard
+      ? (findAnswerByText(/nome\s*completo/i) || findAnswerByText(/^nome/i) || findAnswerByText(/nome/i)).trim()
+      : athleteName.trim();
+    let effectiveEmail = wizard
+      ? (findAnswerByText(/e-?mail/i) || findAnswerByText(/@/)).trim()
+      : athleteEmail.trim();
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(effectiveEmail)) {
-      toast.error('Email inválido');
+    if (!effectiveEmail || !emailRegex.test(effectiveEmail)) {
+      toast.error('Informe um e-mail válido no formulário');
       return;
+    }
+    if (!effectiveName) {
+      // Sem pergunta de nome: usa o prefixo do e-mail como identificação inicial.
+      effectiveName = effectiveEmail.split('@')[0].replace(/[._-]+/g, ' ').trim() || 'Atleta';
     }
 
     if (!termsAccepted) {
