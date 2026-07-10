@@ -17,6 +17,8 @@ const isUuid = (v: unknown): v is string =>
 export interface CancelDTO {
   athleteId: string;
   motivoCancelamento?: string;
+  refundRequested?: boolean;
+  daysSinceStart?: number;
 }
 export function validateCancel(body: unknown): Validated<CancelDTO> {
   const errors: ValidationError[] = [];
@@ -28,12 +30,20 @@ export function validateCancel(body: unknown): Validated<CancelDTO> {
   if (typeof b.motivoCancelamento === "string" && b.motivoCancelamento.length > 500) {
     errors.push({ field: "motivoCancelamento", message: "máx. 500 caracteres" });
   }
+  if (b.refundRequested != null && typeof b.refundRequested !== "boolean") {
+    errors.push({ field: "refundRequested", message: "deve ser boolean" });
+  }
+  if (b.daysSinceStart != null && (typeof b.daysSinceStart !== "number" || !Number.isFinite(b.daysSinceStart) || b.daysSinceStart < 0)) {
+    errors.push({ field: "daysSinceStart", message: "deve ser number >= 0" });
+  }
   if (errors.length) return { ok: false, errors };
   return {
     ok: true,
     data: {
       athleteId: b.athleteId as string,
       motivoCancelamento: (b.motivoCancelamento as string | undefined)?.trim() || undefined,
+      refundRequested: (b.refundRequested as boolean | undefined) ?? false,
+      daysSinceStart: b.daysSinceStart as number | undefined,
     },
   };
 }

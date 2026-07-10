@@ -70,51 +70,36 @@ export class SubscriptionIntegrationService {
   }
 
   // --------- POST /subscription/cancel ---------
-  // Regra de estorno: se o cancelamento ocorrer em até 7 dias após o
-  // primeiro pagamento confirmado, todos os pagamentos CONFIRMED/RECEIVED
-  // da assinatura são estornados no Asaas antes do DELETE.
-  async cancel(athleteId: string, motivo?: string) {
+  // O consumidor (Zona Nutri) envia `refundRequested` e `daysSinceStart`
+  // já avaliados no lado dele. A Consultoria:
+  //   - Se refundRequested=true → estorna pagamentos CONFIRMED/RECEIVED no
+  //     Asaas, dá DELETE na assinatura e grava status='cancelled'.
+  //   - Se refundRequested=false → dá DELETE na assinatura (nenhuma nova
+  //     cobrança), mas mantém status='active' até expires_at.
+  async cancel(
+    athleteId: string,
+    motivo?: string,
+    refundRequested: boolean = false,
+    daysSinceStart?: number,
+  ) {
     const { athlete, subscription } = await this.loadAthleteAndSubscription(athleteId);
     if (!subscription) throw new HttpError(404, "subscription_not_found", "Assinatura não encontrada");
 
     const refunded: Array<{ id: string; value: number }> = [];
-    let withinGrace = false;
 
     if (subscription.asaas_subscription_id) {
-      // Lista pagamentos da assinatura para avaliar janela de 7 dias
-      try {
-        const payments = await asaasRequest<{
-          data: Array<{
-            id: string;
-            status: string;
-            value: number;
-            paymentDate?: string | null;
-            confirmedDate?: string | null;
-            dueDate?: string | null;
-          }>;
-        }>(`/subscriptions/${subscription.asaas_subscription_id}/payments`);
+      if (refundRequested) {
+        try {
+          const payments = await asaasRequest<{
+            data: Array<{ id: string; status: string; value: number }>;
+          }>(`/subscriptions/${subscription.asaas_subscription_id}/payments`);
 
-        const first = [...(payments.data ?? [])]
-          .filter((p) => p.paymentDate || p.confirmedDate)
-          .sort((a, b) => {
-            const da = new Date(a.paymentDate ?? a.confirmedDate ?? 0).getTime();
-            const db = new Date(b.paymentDate ?? b.confirmedDate ?? 0).getTime();
-            return da - db;
-          })[0];
-
-        if (first) {
-          const firstPaid = new Date(first.paymentDate ?? first.confirmedDate ?? Date.now());
-          const diffDays = (Date.now() - firstPaid.getTime()) / (1000 * 60 * 60 * 24);
-          withinGrace = diffDays <= 7;
-        }
-
-        if (withinGrace) {
           for (const p of payments.data ?? []) {
             if (p.status === "CONFIRMED" || p.status === "RECEIVED") {
               try {
                 await asaasRequest(`/payments/${p.id}/refund`, {
                   method: "POST",
-                  body: JSON.stringify({ description: motivo ?? "Cancelamento em até 7 dias" }),
+                  body: JSON.stringify({ description: motivo ?? "Cancelamento com estorno solicitado" }),
                 });
                 refunded.push({ id: p.id, value: p.value });
               } catch (err) {
@@ -122,9 +107,9 @@ export class SubscriptionIntegrationService {
               }
             }
           }
+        } catch (err) {
+          console.warn("[cancel] listagem de pagamentos falhou:", (err as Error).message);
         }
-      } catch (err) {
-        console.warn("[cancel] listagem de pagamentos falhou:", (err as Error).message);
       }
 
       await asaasRequest(`/subscriptions/${subscription.asaas_subscription_id}`, {
@@ -132,20 +117,15 @@ export class SubscriptionIntegrationService {
       });
     }
 
-    // Regra de acesso pós-cancelamento:
-    // - Dentro de 7 dias: estorno + status='cancelled' (acesso encerrado imediato).
-    // - Após 7 dias: Asaas não gera novas cobranças, mas o atleta mantém
-    //   status='active' até expires_at. A expiração converte para 'expired'
-    //   pelo fluxo normal de expiração.
+    // Acesso: com estorno encerra na hora; sem estorno segue até expires_at.
     const now = new Date().toISOString();
-    const finalStatus: "cancelled" | "active" = withinGrace ? "cancelled" : "active";
-    const cancelReason = withinGrace
-      ? motivo
-        ? `${motivo} (estorno em 7 dias)`
-        : "Cancelamento em até 7 dias — estornado"
-      : motivo
-        ? `${motivo} (acesso mantido até expiração)`
-        : "Cancelamento após 7 dias — acesso mantido até expiração";
+    const finalStatus: "cancelled" | "active" = refundRequested ? "cancelled" : "active";
+    const daysTag = typeof daysSinceStart === "number"
+      ? ` [${Math.round(daysSinceStart)}d desde o início]`
+      : "";
+    const cancelReason = refundRequested
+      ? `${motivo ?? "Cancelamento com estorno"}${daysTag}`
+      : `${motivo ?? "Cancelamento — acesso mantido até expiração"}${daysTag}`;
 
     const { data: updated, error } = await this.supabase
       .from("zn_subscriptions")
@@ -166,8 +146,9 @@ export class SubscriptionIntegrationService {
       cancelledAt: updated.canceled_at,
       refunded: refunded.length > 0,
       refundedPayments: refunded,
-      withinGracePeriod: withinGrace,
-      accessUntil: withinGrace ? null : updated.expires_at,
+      refundRequested,
+      daysSinceStart: daysSinceStart ?? null,
+      accessUntil: refundRequested ? null : updated.expires_at,
     };
   }
 
