@@ -115,12 +115,14 @@ export class PaymentOrchestrator {
     const reference_date = p.paymentDate ? new Date(p.paymentDate) : new Date();
 
     let subscription: any = null;
+    let isFirstPurchase = false;
     if (plan && isPaid) {
       const existingSub = await this.subs.findByAsaasIds({
         asaas_subscription_id: p.subscription,
         asaas_customer_id: customerInfo.asaas_customer_id,
         athlete_id: athlete.id,
       });
+      isFirstPurchase = !existingSub;
 
       subscription = await this.subs.upsertFromPayment({
         owner_user_id: ownerUserId,
@@ -137,7 +139,7 @@ export class PaymentOrchestrator {
           status: subscription.status,
         });
       } else {
-        this.log("[5/9] Assinatura criada", {
+        this.log("[5/9] Assinatura criada (primeira compra)", {
           subscription_id: subscription.id,
           status: subscription.status,
         });
@@ -161,15 +163,23 @@ export class PaymentOrchestrator {
     }
 
     // Transições de status derivadas do evento (não bloqueia acesso, só registra)
+    let statusEvent: string | null = null;
     if (subscription) {
       if (eventType === "PAYMENT_OVERDUE") {
         await this.subs.setStatus(subscription.id, "overdue");
+        subscription.status = "overdue";
+        statusEvent = "subscription.suspended";
         this.log("[status] Assinatura marcada como overdue");
       } else if (eventType === "SUBSCRIPTION_DELETED") {
         await this.subs.setStatus(subscription.id, "cancelled", "asaas_subscription_deleted");
+        subscription.status = "cancelled";
+        subscription.cancel_reason = "asaas_subscription_deleted";
+        statusEvent = "subscription.cancelled";
         this.log("[status] Assinatura cancelada (acesso permanece — regra atual)");
       } else if (eventType === "PAYMENT_REFUNDED") {
         await this.subs.setStatus(subscription.id, "suspended", "payment_refunded");
+        subscription.status = "suspended";
+        statusEvent = "subscription.suspended";
         this.log("[status] Assinatura marcada como suspended (refund)");
       }
     }
@@ -196,11 +206,16 @@ export class PaymentOrchestrator {
         .eq("id", subscription.id);
     }
 
-    // 8) Sincronização externa (ponto ÚNICO — só loga por enquanto)
-    if (isPaid && subscription) {
+    // 8) Sincronização Zona Nutri — ÚNICO ponto de saída externa
+    if (subscription && (isPaid || statusEvent)) {
+      const syncEvent = statusEvent
+        ? statusEvent
+        : isFirstPurchase
+          ? "subscription.activated"
+          : "subscription.renewed";
       await this.sync.syncAthlete({
         owner_user_id: ownerUserId,
-        event: eventType === "PAYMENT_RECEIVED" ? "subscription.renewed" : "subscription.activated",
+        event: syncEvent,
         athlete: {
           id: athlete.id,
           email: athlete.email,
@@ -216,14 +231,31 @@ export class PaymentOrchestrator {
           expires_at: subscription.expires_at,
           asaas_customer_id: subscription.asaas_customer_id,
           asaas_subscription_id: subscription.asaas_subscription_id,
+          cancel_reason: subscription.cancel_reason ?? null,
         },
-        payment: payment
-          ? { id: payment.id, amount: Number(payment.amount), status: payment.status, paid_at: payment.paid_at }
-          : null,
       });
-      this.log("[8/9] Sincronização Zona Nutri preparada (outbox pendente)");
+      this.log("[8/9] Sync Zona Nutri disparada", { event: syncEvent });
+
+      // WhatsApp de boas-vindas apenas na primeira compra bem-sucedida
+      if (isFirstPurchase && isPaid && athlete.phone) {
+        try {
+          await this.supabase.functions.invoke("send-whatsapp", {
+            body: {
+              phone: athlete.phone,
+              message:
+                `Olá ${athlete.name ?? ""}! Seu acesso à ZN Assessoria foi ativado ✅\n` +
+                `Plano: ${subscription.plan_code} • válido até ${subscription.expires_at}.\n` +
+                `Em breve você receberá as instruções de acesso.`,
+              context: "zn_welcome",
+            },
+          });
+          this.log("[whatsapp] Mensagem de boas-vindas enviada");
+        } catch (e) {
+          this.log("[whatsapp] Falha ao enviar boas-vindas (não bloqueia)", { error: (e as Error).message });
+        }
+      }
     } else {
-      this.log("[8/9] Sincronização não disparada (evento não-pago ou sem plano)");
+      this.log("[8/9] Sync Zona Nutri não disparada (evento não-pago e sem transição relevante)");
     }
 
     this.log("[9/9] Fluxo finalizado com sucesso");
