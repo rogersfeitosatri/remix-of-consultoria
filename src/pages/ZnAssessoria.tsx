@@ -320,3 +320,89 @@ function KpiCard({ icon, label, value }: { icon: React.ReactNode; label: string;
     </Card>
   );
 }
+
+function ZnSyncTab() {
+  const { data: rows = [], isLoading } = useZnOutbox();
+  const retry = useRetryZnOutbox();
+
+  const counts = useMemo(() => {
+    return rows.reduce((acc, r) => {
+      acc[r.status] = (acc[r.status] ?? 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [rows]);
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle className="text-sm">Sincronização Zona Nutri</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Fila de eventos enviados ao Zona Nutri (idempotentes, com retry automático em até 5 tentativas).
+          </p>
+          <div className="flex gap-2 mt-2 text-xs">
+            <Badge variant="outline">Pendentes: {counts.pending ?? 0}</Badge>
+            <Badge className="bg-green-600">Enviados: {counts.sent ?? 0}</Badge>
+            <Badge variant="destructive">Erros: {counts.error ?? 0}</Badge>
+          </div>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => retry.mutate(undefined)} disabled={retry.isPending}>
+          <RefreshCw className={`h-3 w-3 mr-1 ${retry.isPending ? 'animate-spin' : ''}`} />
+          Reprocessar fila
+        </Button>
+      </CardHeader>
+      <CardContent className="p-0 overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Criado em</TableHead>
+              <TableHead>Evento</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Tentativas</TableHead>
+              <TableHead>HTTP</TableHead>
+              <TableHead>Último erro</TableHead>
+              <TableHead>Próxima tentativa</TableHead>
+              <TableHead className="text-right">Ação</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && (
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Carregando…</TableCell></TableRow>
+            )}
+            {!isLoading && rows.length === 0 && (
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Nenhum evento na fila.</TableCell></TableRow>
+            )}
+            {rows.map(r => (
+              <TableRow key={r.id}>
+                <TableCell className="text-xs text-muted-foreground">
+                  {fmtDate(r.created_at)} {format(parseISO(r.created_at), 'HH:mm')}
+                </TableCell>
+                <TableCell className="font-mono text-xs">{r.event_type}</TableCell>
+                <TableCell>
+                  <Badge variant={
+                    r.status === 'sent' ? 'default' :
+                    r.status === 'error' ? 'destructive' :
+                    'outline'
+                  }>{r.status}</Badge>
+                </TableCell>
+                <TableCell className="text-xs">{r.attempts ?? 0}</TableCell>
+                <TableCell className="text-xs">{r.http_status ?? '—'}</TableCell>
+                <TableCell className="text-xs text-destructive max-w-[280px] truncate">{r.last_error ?? '—'}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {r.next_attempt_at ? `${fmtDate(r.next_attempt_at)} ${format(parseISO(r.next_attempt_at), 'HH:mm')}` : '—'}
+                </TableCell>
+                <TableCell className="text-right">
+                  {r.status !== 'sent' && (
+                    <Button size="sm" variant="ghost" onClick={() => retry.mutate(r.id)} disabled={retry.isPending}>
+                      Tentar agora
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
