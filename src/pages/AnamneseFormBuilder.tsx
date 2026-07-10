@@ -78,6 +78,7 @@ const questionTypes = [
   { value: 'date', label: 'Data' },
   { value: 'meal_items', label: '🍽️ Refeição (horário + alimentos)' },
   { value: 'training_week', label: '🏋️ Rotina de Treino Semanal' },
+  { value: 'symptom_scale', label: '📊 Sintomas (frequência 0–5)' },
 ];
 
 export default function AnamneseFormBuilder() {

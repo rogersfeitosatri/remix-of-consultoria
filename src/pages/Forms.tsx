@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library, Sparkles, ClipboardCheck } from 'lucide-react';
 import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm, useCreateDefaultCheckinForm } from '@/hooks/useCheckinForms';
-import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm, useCreateDefaultAnamneseForm } from '@/hooks/useAnamneseForms';
+import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm, useCreateDefaultAnamneseForm, useCreateEnduranceAnamneseForm } from '@/hooks/useAnamneseForms';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -92,6 +92,7 @@ export default function Forms() {
   const deleteAnamneseForm = useDeleteAnamneseForm();
   const createAnamneseForm = useCreateAnamneseForm();
   const createDefaultAnamneseForm = useCreateDefaultAnamneseForm();
+  const createEnduranceAnamneseForm = useCreateEnduranceAnamneseForm();
 
   // Badge counts
   const { data: pendingCheckinCount = 0 } = useQuery({
@@ -220,6 +221,16 @@ export default function Forms() {
     }
   };
 
+  const handleCreateEnduranceAnamneseForm = async () => {
+    try {
+      const form = await createEnduranceAnamneseForm.mutateAsync();
+      toast({ title: 'Anamnese Endurance criada!', description: 'Wizard de 1 pergunta por tela.' });
+      navigate(`/anamnese/${form.id}`);
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message || 'Não foi possível criar.', variant: 'destructive' });
+    }
+  };
+
   const openNewFormDialog = (type: 'checkin' | 'anamnese') => {
     setNewFormType(type);
     setNewFormData({ title: '', description: '' });
@@ -248,6 +259,10 @@ export default function Forms() {
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCreateDefaultAnamneseForm} disabled={createDefaultAnamneseForm.isPending}>
             <Sparkles className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Criar Padrão</span>
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCreateEnduranceAnamneseForm} disabled={createEnduranceAnamneseForm.isPending}>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Endurance (wizard)</span>
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => openNewFormDialog('anamnese')}>
             <Plus className="h-3.5 w-3.5" />
