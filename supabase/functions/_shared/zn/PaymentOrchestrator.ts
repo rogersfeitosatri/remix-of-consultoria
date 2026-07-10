@@ -73,6 +73,22 @@ export class PaymentOrchestrator {
       subscriptionData = await this.fetchAsaasSubscription(p.subscription);
     }
 
+    // Guard multi-tenant: só aceita eventos originados no funil ZN.
+    // externalReference "zn:{athlete_id}" é setado por zn-create-subscription.
+    const ZN_VALUES = new Set([69.9, 299, 419.9]);
+    const extRef = (subscriptionData?.externalReference ?? (p as any).externalReference ?? "").toString();
+    const isZnRef = extRef.startsWith("zn:");
+    const value = Number(p.value ?? subscriptionData?.value ?? 0);
+    const isZnValue = ZN_VALUES.has(Math.round(value * 100) / 100);
+    if (!isZnRef && !isZnValue) {
+      this.log("[skip] Evento fora do escopo ZN (externalReference/valor não batem)", {
+        externalReference: extRef || null,
+        value,
+      });
+      return { status: "skipped", reason: "not_zn_subscription" };
+    }
+
+
     const email = customerData?.email ?? null;
     if (!email) {
       this.log("[skip] Customer sem e-mail — não é possível cadastrar atleta");
