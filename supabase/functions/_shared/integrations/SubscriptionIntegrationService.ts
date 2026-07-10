@@ -83,8 +83,8 @@ export class SubscriptionIntegrationService {
       .from("zn_subscriptions")
       .update({
         status: "cancelled",
-        cancelled_at: new Date().toISOString(),
-        cancellation_reason: motivo ?? null,
+        canceled_at: new Date().toISOString(),
+        cancel_reason: motivo ?? null,
       })
       .eq("id", subscription.id)
       .select("*")
@@ -169,8 +169,8 @@ export class SubscriptionIntegrationService {
       .from("zn_subscriptions")
       .update({
         status: "active",
-        cancelled_at: null,
-        cancellation_reason: null,
+        canceled_at: null,
+        cancel_reason: null,
       })
       .eq("id", subscription.id)
       .select("*")
