@@ -721,47 +721,96 @@ export default function PublicAnamneseForm() {
             </Alert>
           )}
 
-          {znMode && (
+          {znMode && (() => {
+            const planLocked = !!znPlan && currentStepIndex > 0;
+            return (
             <Card className="mb-6 border-amber-500/40 bg-amber-500/5">
-              <CardHeader>
+              <CardHeader className={planLocked ? 'pb-3' : undefined}>
                 <p className="text-xs uppercase tracking-wide text-amber-600 font-semibold mb-1">
                   ZN Assessoria Nutricional
                 </p>
-                <CardTitle className="text-lg">Seu plano</CardTitle>
-                <CardDescription>
-                  Ao final da anamnese você será direcionado para o pagamento seguro via Asaas (PIX, cartão ou boleto).
-                </CardDescription>
+                {planLocked ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold truncate">
+                        Plano {PLAN_INFO[znPlan as 'monthly'].label} · {PLAN_INFO[znPlan as 'monthly'].price}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        CPF {znCpf || '—'}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCurrentStepIndex(0)}
+                      className="text-amber-700 hover:text-amber-800 gap-1"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Alterar
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <CardTitle className="text-lg">Seu plano e CPF</CardTitle>
+                    <CardDescription>
+                      Ao final da anamnese você será direcionado para o pagamento seguro via Asaas (PIX, cartão ou boleto).
+                    </CardDescription>
+                  </>
+                )}
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">Plano escolhido</Label>
-                  <RadioGroup
-                    value={znPlan}
-                    onValueChange={(v) => setZnPlan(v as any)}
-                    className="mt-2 grid gap-2"
-                  >
-                    {(['monthly', 'semiannual', 'annual'] as const).map((code) => (
-                      <label
-                        key={code}
-                        htmlFor={`zn-plan-${code}`}
-                        className={cn(
-                          'flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition',
-                          znPlan === code ? 'border-amber-500 bg-amber-500/10' : 'border-border hover:border-amber-500/50'
-                        )}
-                      >
-                        <RadioGroupItem id={`zn-plan-${code}`} value={code} />
-                        <div className="flex-1">
-                          <div className="font-semibold text-sm">{PLAN_INFO[code].label}</div>
-                          <div className="text-xs text-muted-foreground">{PLAN_INFO[code].sub}</div>
-                        </div>
-                        <div className="text-sm font-bold text-amber-600">{PLAN_INFO[code].price}</div>
-                      </label>
-                    ))}
-                  </RadioGroup>
-                </div>
-              </CardContent>
+              {!planLocked && (
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">Plano escolhido</Label>
+                    <RadioGroup
+                      value={znPlan}
+                      onValueChange={(v) => setZnPlan(v as any)}
+                      className="mt-2 grid gap-2"
+                    >
+                      {(['monthly', 'semiannual', 'annual'] as const).map((code) => (
+                        <label
+                          key={code}
+                          htmlFor={`zn-plan-${code}`}
+                          className={cn(
+                            'flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition',
+                            znPlan === code ? 'border-amber-500 bg-amber-500/10' : 'border-border hover:border-amber-500/50'
+                          )}
+                        >
+                          <RadioGroupItem id={`zn-plan-${code}`} value={code} />
+                          <div className="flex-1">
+                            <div className="font-semibold text-sm">{PLAN_INFO[code].label}</div>
+                            <div className="text-xs text-muted-foreground">{PLAN_INFO[code].sub}</div>
+                          </div>
+                          <div className="text-sm font-bold text-amber-600">{PLAN_INFO[code].price}</div>
+                        </label>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                  <div>
+                    <Label htmlFor="zn-cpf-top" className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">
+                      CPF (para emissão da cobrança)
+                    </Label>
+                    <Input
+                      id="zn-cpf-top"
+                      inputMode="numeric"
+                      placeholder="000.000.000-00"
+                      value={znCpf}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                        const masked = digits
+                          .replace(/(\d{3})(\d)/, '$1.$2')
+                          .replace(/(\d{3})(\d)/, '$1.$2')
+                          .replace(/(\d{3})(\d)/, '$1-$2');
+                        setZnCpf(masked);
+                      }}
+                      className="mt-2"
+                    />
+                  </div>
+                </CardContent>
+              )}
             </Card>
-          )}
+            );
+          })()}
 
           <Card className="mb-6">
             <CardHeader>
