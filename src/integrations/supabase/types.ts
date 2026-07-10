@@ -6520,6 +6520,54 @@ export type Database = {
         }
         Relationships: []
       }
+      zn_integration_api_logs: {
+        Row: {
+          athlete_id: string | null
+          created_at: string
+          duration_ms: number | null
+          endpoint: string
+          error_message: string | null
+          id: string
+          method: string
+          request_payload: Json | null
+          response_payload: Json | null
+          source_system: string | null
+          status_code: number
+          subscription_id: string | null
+          success: boolean
+        }
+        Insert: {
+          athlete_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint: string
+          error_message?: string | null
+          id?: string
+          method: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          source_system?: string | null
+          status_code: number
+          subscription_id?: string | null
+          success: boolean
+        }
+        Update: {
+          athlete_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint?: string
+          error_message?: string | null
+          id?: string
+          method?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          source_system?: string | null
+          status_code?: number
+          subscription_id?: string | null
+          success?: boolean
+        }
+        Relationships: []
+      }
       zn_integration_outbox: {
         Row: {
           athlete_id: string | null
