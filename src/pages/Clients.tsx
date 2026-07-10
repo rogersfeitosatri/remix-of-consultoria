@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Loader2, Users, UserX, Filter, Flag, Snowflake } from 'lucide-react';
+import { Plus, Search, Loader2, Users, UserX, Filter, Flag, Snowflake, UserPlus } from 'lucide-react';
+import { ZnLeadsList } from '@/components/clients/ZnLeadsList';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
