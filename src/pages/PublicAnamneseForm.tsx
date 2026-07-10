@@ -279,18 +279,23 @@ export default function PublicAnamneseForm() {
     // No modo wizard não há tela de identificação: nome e e-mail vêm das
     // perguntas de Dados Pessoais.
     const wizard = isWizardAnamneseForm(form);
-    const effectiveName = wizard ? findAnswerByText(/nome/i).trim() : athleteName.trim();
-    const effectiveEmail = wizard ? findAnswerByText(/e-?mail/i).trim() : athleteEmail.trim();
-
-    if (!effectiveName || !effectiveEmail) {
-      toast.error('Nome e email são obrigatórios');
-      return;
-    }
+    // No wizard: nome/e-mail vêm das perguntas de Dados Pessoais. Se a pergunta
+    // não existir no formulário, usamos fallbacks para não bloquear o envio.
+    let effectiveName = wizard
+      ? (findAnswerByText(/nome\s*completo/i) || findAnswerByText(/^nome/i) || findAnswerByText(/nome/i)).trim()
+      : athleteName.trim();
+    let effectiveEmail = wizard
+      ? (findAnswerByText(/e-?mail/i) || findAnswerByText(/@/)).trim()
+      : athleteEmail.trim();
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(effectiveEmail)) {
-      toast.error('Email inválido');
+    if (!effectiveEmail || !emailRegex.test(effectiveEmail)) {
+      toast.error('Informe um e-mail válido no formulário');
       return;
+    }
+    if (!effectiveName) {
+      // Sem pergunta de nome: usa o prefixo do e-mail como identificação inicial.
+      effectiveName = effectiveEmail.split('@')[0].replace(/[._-]+/g, ' ').trim() || 'Atleta';
     }
 
     if (!termsAccepted) {
@@ -617,6 +622,16 @@ export default function PublicAnamneseForm() {
   };
 
   const handleWizNext = () => {
+    if (znMode && currentStepIndex === 0) {
+      if (!znPlan) {
+        toast.error('Selecione o plano da ZN Assessoria para continuar');
+        return;
+      }
+      if (znCpf.replace(/\D/g, '').length !== 11) {
+        toast.error('Informe um CPF válido (11 dígitos)');
+        return;
+      }
+    }
     if (!validateWizStep(currentWizStep)) return;
     if (currentStepIndex < wizardSteps.length - 1) {
       setCurrentStepIndex((p) => p + 1);
@@ -716,47 +731,96 @@ export default function PublicAnamneseForm() {
             </Alert>
           )}
 
-          {znMode && (
+          {znMode && (() => {
+            const planLocked = !!znPlan && currentStepIndex > 0;
+            return (
             <Card className="mb-6 border-amber-500/40 bg-amber-500/5">
-              <CardHeader>
+              <CardHeader className={planLocked ? 'pb-3' : undefined}>
                 <p className="text-xs uppercase tracking-wide text-amber-600 font-semibold mb-1">
                   ZN Assessoria Nutricional
                 </p>
-                <CardTitle className="text-lg">Seu plano</CardTitle>
-                <CardDescription>
-                  Ao final da anamnese você será direcionado para o pagamento seguro via Asaas (PIX, cartão ou boleto).
-                </CardDescription>
+                {planLocked ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold truncate">
+                        Plano {PLAN_INFO[znPlan as 'monthly'].label} · {PLAN_INFO[znPlan as 'monthly'].price}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        CPF {znCpf || '—'}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCurrentStepIndex(0)}
+                      className="text-amber-700 hover:text-amber-800 gap-1"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> Alterar
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <CardTitle className="text-lg">Seu plano e CPF</CardTitle>
+                    <CardDescription>
+                      Ao final da anamnese você será direcionado para o pagamento seguro via Asaas (PIX, cartão ou boleto).
+                    </CardDescription>
+                  </>
+                )}
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">Plano escolhido</Label>
-                  <RadioGroup
-                    value={znPlan}
-                    onValueChange={(v) => setZnPlan(v as any)}
-                    className="mt-2 grid gap-2"
-                  >
-                    {(['monthly', 'semiannual', 'annual'] as const).map((code) => (
-                      <label
-                        key={code}
-                        htmlFor={`zn-plan-${code}`}
-                        className={cn(
-                          'flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition',
-                          znPlan === code ? 'border-amber-500 bg-amber-500/10' : 'border-border hover:border-amber-500/50'
-                        )}
-                      >
-                        <RadioGroupItem id={`zn-plan-${code}`} value={code} />
-                        <div className="flex-1">
-                          <div className="font-semibold text-sm">{PLAN_INFO[code].label}</div>
-                          <div className="text-xs text-muted-foreground">{PLAN_INFO[code].sub}</div>
-                        </div>
-                        <div className="text-sm font-bold text-amber-600">{PLAN_INFO[code].price}</div>
-                      </label>
-                    ))}
-                  </RadioGroup>
-                </div>
-              </CardContent>
+              {!planLocked && (
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">Plano escolhido</Label>
+                    <RadioGroup
+                      value={znPlan}
+                      onValueChange={(v) => setZnPlan(v as any)}
+                      className="mt-2 grid gap-2"
+                    >
+                      {(['monthly', 'semiannual', 'annual'] as const).map((code) => (
+                        <label
+                          key={code}
+                          htmlFor={`zn-plan-${code}`}
+                          className={cn(
+                            'flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition',
+                            znPlan === code ? 'border-amber-500 bg-amber-500/10' : 'border-border hover:border-amber-500/50'
+                          )}
+                        >
+                          <RadioGroupItem id={`zn-plan-${code}`} value={code} />
+                          <div className="flex-1">
+                            <div className="font-semibold text-sm">{PLAN_INFO[code].label}</div>
+                            <div className="text-xs text-muted-foreground">{PLAN_INFO[code].sub}</div>
+                          </div>
+                          <div className="text-sm font-bold text-amber-600">{PLAN_INFO[code].price}</div>
+                        </label>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                  <div>
+                    <Label htmlFor="zn-cpf-top" className="text-sm after:content-['*'] after:ml-0.5 after:text-red-500">
+                      CPF (para emissão da cobrança)
+                    </Label>
+                    <Input
+                      id="zn-cpf-top"
+                      inputMode="numeric"
+                      placeholder="000.000.000-00"
+                      value={znCpf}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                        const masked = digits
+                          .replace(/(\d{3})(\d)/, '$1.$2')
+                          .replace(/(\d{3})(\d)/, '$1.$2')
+                          .replace(/(\d{3})(\d)/, '$1-$2');
+                        setZnCpf(masked);
+                      }}
+                      className="mt-2"
+                    />
+                  </div>
+                </CardContent>
+              )}
             </Card>
-          )}
+            );
+          })()}
 
           <Card className="mb-6">
             <CardHeader>
@@ -783,27 +847,27 @@ export default function PublicAnamneseForm() {
           {isLastWizStep && (
             <Card className="mb-6 border-primary/30">
               <CardContent className="pt-6 space-y-4">
-                <div>
-                  <Label htmlFor="wiz-cpf" className={cn('text-sm', znMode && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
-                    CPF {znMode ? '(para emissão da cobrança)' : '(opcional)'}
-                  </Label>
-                  <Input
-                    id="wiz-cpf"
-                    inputMode="numeric"
-                    placeholder="000.000.000-00"
-                    value={znCpf}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
-                      const masked = digits
-                        .replace(/(\d{3})(\d)/, '$1.$2')
-                        .replace(/(\d{3})(\d)/, '$1.$2')
-                        .replace(/(\d{3})(\d)/, '$1-$2');
-                      setZnCpf(masked);
-                    }}
-                    className="mt-2"
-                  />
-                </div>
-                <div className="flex items-start gap-3 pt-2 border-t border-border/50">
+                {!znMode && (
+                  <div>
+                    <Label htmlFor="wiz-cpf" className="text-sm">CPF (opcional)</Label>
+                    <Input
+                      id="wiz-cpf"
+                      inputMode="numeric"
+                      placeholder="000.000.000-00"
+                      value={znCpf}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                        const masked = digits
+                          .replace(/(\d{3})(\d)/, '$1.$2')
+                          .replace(/(\d{3})(\d)/, '$1.$2')
+                          .replace(/(\d{3})(\d)/, '$1-$2');
+                        setZnCpf(masked);
+                      }}
+                      className="mt-2"
+                    />
+                  </div>
+                )}
+                <div className={cn('flex items-start gap-3', !znMode && 'pt-2 border-t border-border/50')}>
                   <Checkbox id="wiz-terms" checked={termsAccepted} onCheckedChange={(c) => setTermsAccepted(c as boolean)} className="mt-1" />
                   <Label htmlFor="wiz-terms" className="font-normal cursor-pointer leading-relaxed">
                     Li e aceito os{' '}
