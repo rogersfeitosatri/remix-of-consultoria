@@ -622,6 +622,16 @@ export default function PublicAnamneseForm() {
   };
 
   const handleWizNext = () => {
+    if (znMode && currentStepIndex === 0) {
+      if (!znPlan) {
+        toast.error('Selecione o plano da ZN Assessoria para continuar');
+        return;
+      }
+      if (znCpf.replace(/\D/g, '').length !== 11) {
+        toast.error('Informe um CPF válido (11 dígitos)');
+        return;
+      }
+    }
     if (!validateWizStep(currentWizStep)) return;
     if (currentStepIndex < wizardSteps.length - 1) {
       setCurrentStepIndex((p) => p + 1);
