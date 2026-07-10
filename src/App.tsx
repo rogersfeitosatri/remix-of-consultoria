@@ -72,6 +72,7 @@ const PublicNpCheckin = lazy(() => import("./pages/PublicNpCheckin"));
 const Terms = lazy(() => import("./pages/Terms"));
 const PublicOnboarding = lazy(() => import("./pages/PublicOnboarding"));
 const ZnAssessoria = lazy(() => import("./pages/ZnAssessoria"));
+const PublicZnSubscribe = lazy(() => import("./pages/PublicZnSubscribe"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
