@@ -71,6 +71,7 @@ const NutriPeriodizaProtocols = lazy(() => import("./pages/NutriPeriodizaProtoco
 const PublicNpCheckin = lazy(() => import("./pages/PublicNpCheckin"));
 const Terms = lazy(() => import("./pages/Terms"));
 const PublicOnboarding = lazy(() => import("./pages/PublicOnboarding"));
+const ZnAssessoria = lazy(() => import("./pages/ZnAssessoria"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -191,6 +192,7 @@ function AppRoutes() {
         <Route path="/scheduling-links" element={<ProtectedRoute adminOnly><CallScheduling /></ProtectedRoute>} />
         <Route path="/scheduling-links/:linkId" element={<ProtectedRoute adminOnly><CallSchedulingConfig /></ProtectedRoute>} />
         <Route path="/ai-training" element={<ProtectedRoute adminOnly><AiTrainingCenter /></ProtectedRoute>} />
+        <Route path="/zn-assessoria" element={<ProtectedRoute adminOnly><ZnAssessoria /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
         <Route path="/nutriperiodiza/protocols" element={<ProtectedRoute adminOnly><NutriPeriodizaProtocols /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
