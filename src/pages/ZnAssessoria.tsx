@@ -1,0 +1,311 @@
+import { useMemo } from 'react';
+import { Layout } from '@/components/layout/Layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  useZnAthletes, useZnSubscriptions, useZnPayments, useZnPlans, useZnWebhookEvents,
+  useCancelZnSubscription,
+} from '@/hooks/useZnAssessoria';
+import {
+  ZnSubscriptionStatusBadge, ZnPaymentStatusBadge, ZnAthleteStatusBadge, ZnPlanBadge,
+} from '@/components/zn/ZnBadges';
+import { Trophy, Users, CreditCard, DollarSign, AlertCircle, ExternalLink, Info } from 'lucide-react';
+import { format, parseISO, differenceInDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+const fmtBRL = (v: number) => `R$ ${Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+const fmtDate = (s: string | null) => (s ? format(parseISO(s), "dd/MM/yyyy", { locale: ptBR }) : '—');
+
+export default function ZnAssessoria() {
+  const { data: athletes = [] } = useZnAthletes();
+  const { data: subs = [] } = useZnSubscriptions();
+  const { data: payments = [] } = useZnPayments();
+  const { data: plans = [] } = useZnPlans();
+  const { data: events = [] } = useZnWebhookEvents();
+  const cancelSub = useCancelZnSubscription();
+
+  const kpis = useMemo(() => {
+    const active = subs.filter(s => s.status === 'active').length;
+    const overdue = subs.filter(s => s.status === 'overdue').length;
+    const pendingAthletes = athletes.filter(a => a.status === 'pending').length;
+
+    const now = new Date();
+    const last30 = payments.filter(p => {
+      if (!p.paid_at) return false;
+      const d = parseISO(p.paid_at);
+      return differenceInDays(now, d) <= 30 && (p.status === 'confirmed' || p.status === 'received');
+    });
+    const revenue30 = last30.reduce((s, p) => s + Number(p.amount || 0), 0);
+
+    // MRR estimado: para cada assinatura ativa, valor do plano / meses do ciclo
+    const planByCode = new Map(plans.map(p => [p.code, p]));
+    const mrr = subs
+      .filter(s => s.status === 'active')
+      .reduce((sum, s) => {
+        const pl = planByCode.get(s.plan_code);
+        if (!pl || !pl.duration_months) return sum;
+        return sum + Number(pl.price || 0) / pl.duration_months;
+      }, 0);
+
+    return { active, overdue, pendingAthletes, revenue30, mrr };
+  }, [subs, athletes, payments, plans]);
+
+  const athletesById = useMemo(
+    () => new Map(athletes.map(a => [a.id, a])),
+    [athletes],
+  );
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Trophy className="h-6 w-6 text-primary" />
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">ZN Assessoria</h1>
+            <p className="text-sm text-muted-foreground">
+              Módulo isolado. Cadastro, assinaturas e pagamentos separados da consultoria.
+            </p>
+          </div>
+        </div>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Como funciona</AlertTitle>
+          <AlertDescription className="text-xs">
+            Pagamentos aprovados no Asaas caem no webhook <code>/functions/v1/zn-asaas-webhook</code>,
+            criam automaticamente o atleta, a assinatura e o registro do pagamento — tudo em tabelas
+            <code> zn_*</code> separadas. Integração com Zona Nutri fica preparada em fila (nenhum envio agora).
+          </AlertDescription>
+        </Alert>
+
+        {/* KPIs */}
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
+          <KpiCard icon={<CreditCard className="h-4 w-4" />} label="Assinaturas ativas" value={kpis.active.toString()} />
+          <KpiCard icon={<AlertCircle className="h-4 w-4 text-destructive" />} label="Atrasadas" value={kpis.overdue.toString()} />
+          <KpiCard icon={<Users className="h-4 w-4" />} label="Atletas pendentes" value={kpis.pendingAthletes.toString()} />
+          <KpiCard icon={<DollarSign className="h-4 w-4 text-green-500" />} label="Receita 30d" value={fmtBRL(kpis.revenue30)} />
+          <KpiCard icon={<DollarSign className="h-4 w-4 text-primary" />} label="MRR estimado" value={fmtBRL(kpis.mrr)} />
+        </div>
+
+        <Tabs defaultValue="athletes" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="athletes">Atletas ({athletes.length})</TabsTrigger>
+            <TabsTrigger value="subscriptions">Assinaturas ({subs.length})</TabsTrigger>
+            <TabsTrigger value="payments">Pagamentos ({payments.length})</TabsTrigger>
+            <TabsTrigger value="plans">Planos</TabsTrigger>
+            <TabsTrigger value="events">Eventos webhook</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="athletes">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Atletas ZN</CardTitle></CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>E-mail</TableHead>
+                      <TableHead>Telefone</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>1º pagamento</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {athletes.length === 0 && (
+                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Nenhum atleta ZN ainda.</TableCell></TableRow>
+                    )}
+                    {athletes.map(a => (
+                      <TableRow key={a.id}>
+                        <TableCell className="font-medium">{a.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{a.email}</TableCell>
+                        <TableCell className="text-muted-foreground">{a.phone ?? '—'}</TableCell>
+                        <TableCell><ZnAthleteStatusBadge status={a.status} /></TableCell>
+                        <TableCell className="text-muted-foreground">{fmtDate(a.first_payment_at)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="subscriptions">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Assinaturas</CardTitle></CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Atleta</TableHead>
+                      <TableHead>Plano</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Início</TableHead>
+                      <TableHead>Expira em</TableHead>
+                      <TableHead className="text-right">Ação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {subs.length === 0 && (
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhuma assinatura.</TableCell></TableRow>
+                    )}
+                    {subs.map(s => {
+                      const a = athletesById.get(s.athlete_id);
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell className="font-medium">{a?.name ?? '—'}</TableCell>
+                          <TableCell><ZnPlanBadge plan={s.plan_code} /></TableCell>
+                          <TableCell><ZnSubscriptionStatusBadge status={s.status} /></TableCell>
+                          <TableCell className="text-muted-foreground">{fmtDate(s.start_date)}</TableCell>
+                          <TableCell className="text-muted-foreground">{fmtDate(s.expires_at)}</TableCell>
+                          <TableCell className="text-right">
+                            {s.status !== 'cancelled' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm('Cancelar esta assinatura no sistema? (não cancela no Asaas)')) {
+                                    cancelSub.mutate(s.id);
+                                  }
+                                }}
+                              >
+                                Cancelar
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="payments">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Pagamentos recentes</CardTitle></CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Atleta</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Método</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Pago em</TableHead>
+                      <TableHead>Fatura</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.length === 0 && (
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Nenhum pagamento registrado.</TableCell></TableRow>
+                    )}
+                    {payments.map(p => {
+                      const a = p.athlete_id ? athletesById.get(p.athlete_id) : null;
+                      return (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium">{a?.name ?? '—'}</TableCell>
+                          <TableCell>{fmtBRL(p.amount)}</TableCell>
+                          <TableCell className="uppercase text-xs">{p.billing_type ?? '—'}</TableCell>
+                          <TableCell><ZnPaymentStatusBadge status={p.status} /></TableCell>
+                          <TableCell className="text-muted-foreground">{fmtDate(p.paid_at)}</TableCell>
+                          <TableCell>
+                            {p.invoice_url ? (
+                              <a href={p.invoice_url} target="_blank" rel="noreferrer" className="text-primary hover:underline text-xs inline-flex items-center gap-1">
+                                <ExternalLink className="h-3 w-3" /> Abrir
+                              </a>
+                            ) : '—'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="plans">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Catálogo de planos</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {plans.map(pl => (
+                    <Card key={pl.id} className="border-primary/20">
+                      <CardContent className="p-4 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold text-foreground">{pl.name}</p>
+                          <ZnPlanBadge plan={pl.code} />
+                        </div>
+                        <p className="text-xs text-muted-foreground">{pl.duration_months} {pl.duration_months === 1 ? 'mês' : 'meses'}</p>
+                        <p className="text-lg font-bold text-primary">{fmtBRL(pl.price)}</p>
+                        {!pl.is_active && <Badge variant="outline">Inativo</Badge>}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Edição de preços será liberada em Configurações → ZN Assessoria (próxima etapa).
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="events">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Últimos eventos recebidos do Asaas</CardTitle></CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Recebido em</TableHead>
+                      <TableHead>Evento</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Erro</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {events.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Nenhum evento ainda.</TableCell></TableRow>
+                    )}
+                    {events.map(e => (
+                      <TableRow key={e.id}>
+                        <TableCell className="text-xs text-muted-foreground">{fmtDate(e.received_at)} {e.received_at ? format(parseISO(e.received_at), 'HH:mm') : ''}</TableCell>
+                        <TableCell className="font-mono text-xs">{e.event_type}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            e.status === 'processed' ? 'default' :
+                            e.status === 'failed' ? 'destructive' :
+                            'outline'
+                          }>{e.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-xs text-destructive max-w-[300px] truncate">{e.error ?? '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </Layout>
+  );
+}
+
+function KpiCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+          {icon} {label}
+        </div>
+        <p className="text-lg font-bold text-foreground">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
