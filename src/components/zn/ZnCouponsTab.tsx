@@ -64,7 +64,7 @@ export function ZnCouponsSection() {
                 <TableCell className="font-mono font-semibold">{c.code}</TableCell>
                 <TableCell className="text-sm">
                   {c.discount_type === 'percent'
-                    ? `${c.percent_off}%${c.applies_to === 'first' ? ' (1ª cobrança)' : ''}`
+                    ? `${c.percent_off}% (contrato)`
                     : `${c.free_months} ${c.free_months === 1 ? 'mês grátis' : 'meses grátis'}`}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{promoterName(c.promoter_id)}</TableCell>
@@ -165,18 +165,11 @@ function CouponDialog({ coupon, promoters, onClose, onSave, saving }: {
             )}
           </div>
 
-          {f.discount_type === 'percent' && (
-            <div>
-              <Label>Aplicar em</Label>
-              <Select value={f.applies_to ?? 'all'} onValueChange={v => set({ applies_to: v as any })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as cobranças (recorrente)</SelectItem>
-                  <SelectItem value="first">Somente a 1ª cobrança</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <p className="text-xs text-muted-foreground">
+            {f.discount_type === 'percent'
+              ? 'O desconto % vale apenas para o período do contrato (1ª cobrança). As renovações voltam ao valor cheio. Desativar o cupom impede novos usos.'
+              : 'Acesso liberado no cadastro durante o período grátis. Ao final, o link do Asaas é enviado por WhatsApp para o atleta continuar — sem refazer a anamnese.'}
+          </p>
 
           <div className="grid grid-cols-3 gap-3">
             <div>

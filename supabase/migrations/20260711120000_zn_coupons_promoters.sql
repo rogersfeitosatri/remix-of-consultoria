@@ -114,3 +114,7 @@ BEGIN
       FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
   END IF;
 END $$;
+
+-- Força o PostgREST a recarregar o cache de schema (evita
+-- "Could not find the table ... in the schema cache" logo após aplicar).
+NOTIFY pgrst, 'reload schema';

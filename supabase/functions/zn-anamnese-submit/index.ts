@@ -165,10 +165,11 @@ Deno.serve(async (req) => {
         if (c.discount_type === "free_months") {
           freeMonths = Math.max(0, Number(c.free_months ?? 0));
         } else {
+          // Desconto percentual vale APENAS para o período do contrato (1ª
+          // cobrança). As renovações voltam ao valor cheio — assim, se o cupom
+          // for desativado depois, nenhuma cobrança futura continua com desconto.
           const pct = Math.min(100, Math.max(0, Number(c.percent_off ?? 0)));
-          const discounted = Math.round(plan.value * (1 - pct / 100) * 100) / 100;
-          if (c.applies_to === "first") firstPaymentValue = discounted;
-          else effectiveValue = discounted;
+          firstPaymentValue = Math.round(plan.value * (1 - pct / 100) * 100) / 100;
         }
       }
     }
@@ -307,6 +308,54 @@ Deno.serve(async (req) => {
         .from("zn_coupons")
         .update({ uses_count: Number(coupon.uses_count ?? 0) + 1 })
         .eq("id", coupon.id);
+    }
+
+    // 8) Cupom de meses grátis: libera o acesso já no cadastro (período grátis)
+    //    e envia o link do Asaas por WhatsApp para o atleta finalizar o
+    //    pagamento ao fim do período e continuar com acesso — sem refazer a anamnese.
+    if (freeMonths > 0) {
+      const freeUntil = addMonthsISO(new Date(), freeMonths);
+      // Ativa a assinatura no nosso sistema durante o período grátis.
+      const { data: existingSub } = await supabase
+        .from("zn_subscriptions")
+        .select("id")
+        .eq("asaas_subscription_id", subscription.id)
+        .maybeSingle();
+      if (!existingSub) {
+        await supabase.from("zn_subscriptions").insert({
+          user_id: ownerUserId,
+          athlete_id: znAthlete.id,
+          plan_code: data.plan_choice,
+          status: "active",
+          start_date: new Date().toISOString().slice(0, 10),
+          expires_at: freeUntil,
+          asaas_customer_id: customerId,
+          asaas_subscription_id: subscription.id,
+          coupon_id: coupon?.id ?? null,
+          promoter_id: coupon?.promoter_id ?? null,
+        });
+      }
+      await supabase.from("zn_athletes").update({ status: "active" }).eq("id", znAthlete.id);
+
+      // Envia o link de pagamento por WhatsApp (não bloqueia o retorno).
+      if (phoneDigits && paymentLink) {
+        try {
+          const [y, m, d] = freeUntil.split("-");
+          const venc = `${d}/${m}/${y}`;
+          await supabase.functions.invoke("send-whatsapp", {
+            body: {
+              phone: phoneDigits,
+              message:
+                `Olá ${data.respondent_name.split(" ")[0]}! 🎉 Seu acesso à ZN Assessoria já está liberado ` +
+                `com ${freeMonths === 1 ? "o 1º mês grátis" : `${freeMonths} meses grátis`}.\n\n` +
+                `Para continuar após ${venc}, finalize o pagamento por aqui (não precisa refazer a anamnese): ${paymentLink}`,
+              context: "zn_free_trial",
+            },
+          });
+        } catch (e) {
+          console.warn("zn-anamnese-submit: WhatsApp do período grátis falhou:", (e as Error).message);
+        }
+      }
     }
 
     return new Response(
