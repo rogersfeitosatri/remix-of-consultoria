@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,8 +13,9 @@ import {
 import {
   ZnSubscriptionStatusBadge, ZnPaymentStatusBadge, ZnAthleteStatusBadge, ZnPlanBadge,
 } from '@/components/zn/ZnBadges';
-import { Trophy, Users, CreditCard, DollarSign, AlertCircle, ExternalLink, Info, KeyRound, RefreshCw, Cloud } from 'lucide-react';
+import { Trophy, Users, CreditCard, DollarSign, AlertCircle, ExternalLink, Info, KeyRound, RefreshCw, Cloud, Ticket, Megaphone, Award, Package } from 'lucide-react';
 import { ZnApiKeysTab } from '@/components/zn/ZnApiKeysTab';
+import { ZnCouponsSection, ZnPromotersSection, ZnPromoterRanking } from '@/components/zn/ZnCouponsTab';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -60,6 +61,20 @@ export default function ZnAssessoria() {
     [athletes],
   );
 
+  const [tab, setTab] = useState('athletes');
+
+  const navCards: { value: string; label: string; icon: React.ReactNode; hint: string }[] = [
+    { value: 'athletes', label: 'Atletas', icon: <Users className="h-5 w-5" />, hint: `${athletes.length} cadastrados` },
+    { value: 'subscriptions', label: 'Assinaturas', icon: <CreditCard className="h-5 w-5" />, hint: `${subs.length} no total` },
+    { value: 'payments', label: 'Pagamentos', icon: <DollarSign className="h-5 w-5" />, hint: `${payments.length} registros` },
+    { value: 'coupons', label: 'Cupons', icon: <Ticket className="h-5 w-5" />, hint: 'Descontos e grátis' },
+    { value: 'promoters', label: 'Criadores', icon: <Megaphone className="h-5 w-5" />, hint: 'Afiliados / divulgação' },
+    { value: 'ranking', label: 'Ranking', icon: <Award className="h-5 w-5" />, hint: 'Quem mais converte' },
+    { value: 'plans', label: 'Planos', icon: <Package className="h-5 w-5" />, hint: 'Catálogo' },
+    { value: 'sync', label: 'Sincronização', icon: <Cloud className="h-5 w-5" />, hint: 'Zona Nutri' },
+    { value: 'api', label: 'API Pública', icon: <KeyRound className="h-5 w-5" />, hint: 'Chaves de acesso' },
+  ];
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -92,11 +107,29 @@ export default function ZnAssessoria() {
           <KpiCard icon={<DollarSign className="h-4 w-4 text-primary" />} label="MRR estimado" value={fmtBRL(kpis.mrr)} />
         </div>
 
-        <Tabs defaultValue="athletes" className="space-y-4">
+        {/* Dashboard — botões de acesso rápido */}
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {navCards.map(c => (
+            <button
+              key={c.value}
+              onClick={() => setTab(c.value)}
+              className={`text-left rounded-xl border p-4 transition hover:border-primary hover:bg-primary/5 ${tab === c.value ? 'border-primary bg-primary/5' : 'border-border'}`}
+            >
+              <div className="flex items-center gap-2 text-primary mb-2">{c.icon}</div>
+              <div className="font-semibold text-foreground text-sm">{c.label}</div>
+              <div className="text-xs text-muted-foreground">{c.hint}</div>
+            </button>
+          ))}
+        </div>
+
+        <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="athletes">Atletas ({athletes.length})</TabsTrigger>
             <TabsTrigger value="subscriptions">Assinaturas ({subs.length})</TabsTrigger>
             <TabsTrigger value="payments">Pagamentos ({payments.length})</TabsTrigger>
+            <TabsTrigger value="coupons"><Ticket className="h-3 w-3 mr-1" />Cupons</TabsTrigger>
+            <TabsTrigger value="promoters"><Megaphone className="h-3 w-3 mr-1" />Criadores</TabsTrigger>
+            <TabsTrigger value="ranking"><Award className="h-3 w-3 mr-1" />Ranking</TabsTrigger>
             <TabsTrigger value="plans">Planos</TabsTrigger>
             <TabsTrigger value="events">Eventos webhook</TabsTrigger>
             <TabsTrigger value="sync"><Cloud className="h-3 w-3 mr-1" />Sincronização</TabsTrigger>
@@ -230,6 +263,18 @@ export default function ZnAssessoria() {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="coupons">
+            <ZnCouponsSection />
+          </TabsContent>
+
+          <TabsContent value="promoters">
+            <ZnPromotersSection />
+          </TabsContent>
+
+          <TabsContent value="ranking">
+            <ZnPromoterRanking />
           </TabsContent>
 
           <TabsContent value="plans">
