@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // percent
+    // percent — vale apenas para o período do contrato (1ª cobrança)
     const pct = Number(coupon.percent_off ?? 0);
     const discountValue = Math.round(baseValue * (pct / 100) * 100) / 100;
     const finalValue = Math.round((baseValue - discountValue) * 100) / 100;
@@ -84,13 +84,11 @@ Deno.serve(async (req) => {
       code: coupon.code,
       discount_type: "percent",
       percent_off: pct,
-      applies_to: coupon.applies_to ?? "all",
       base_value: baseValue,
       discount_value: discountValue,
       final_value: finalValue,
-      label: `${pct}% de desconto no plano ${PLAN_LABEL[plan]}` +
-        (coupon.applies_to === "first" ? " (1ª cobrança)" : ""),
-      message: `Cupom aplicado: ${pct}% de desconto.`,
+      label: `${pct}% de desconto no plano ${PLAN_LABEL[plan]} (período do contrato)`,
+      message: `Cupom aplicado: ${pct}% de desconto no período do contrato.`,
     });
   } catch (err: any) {
     console.error("zn-validate-coupon:", err?.message ?? err);
