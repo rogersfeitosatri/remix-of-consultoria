@@ -77,6 +77,9 @@ export default function PublicAnamneseForm() {
   const planFromUrl = PLAN_PARAM_MAP[(searchParams.get('plano') || '').toLowerCase()] || '';
   const [znPlan, setZnPlan] = useState<'' | 'monthly' | 'semiannual' | 'annual'>(planFromUrl as any);
   const [znCpf, setZnCpf] = useState('');
+  const [znCoupon, setZnCoupon] = useState((searchParams.get('cupom') || searchParams.get('ref') || '').trim());
+  const [couponInfo, setCouponInfo] = useState<any>(null); // resultado da validação
+  const [couponChecking, setCouponChecking] = useState(false);
 
   const [form, setForm] = useState<Form | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -380,6 +383,7 @@ export default function PublicAnamneseForm() {
             plan_choice: znPlan,
             cpf: cpfDigits,
             phone: (findAnswerByText(/telefone|whatsapp/i) || '').replace(/\D/g, '') || null,
+            coupon_code: couponInfo?.valid ? (couponInfo.code || znCoupon.trim()) : (znCoupon.trim() || null),
           },
         });
 
@@ -626,6 +630,27 @@ export default function PublicAnamneseForm() {
     return true;
   };
 
+  const validateCoupon = async () => {
+    const code = znCoupon.trim();
+    if (!code) { setCouponInfo(null); return; }
+    if (!znPlan) { toast.error('Selecione o plano antes de aplicar o cupom'); return; }
+    setCouponChecking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('zn-validate-coupon', {
+        body: { code, plan_choice: znPlan },
+      });
+      if (error) throw error;
+      setCouponInfo(data);
+      if ((data as any)?.valid) toast.success((data as any).message || 'Cupom aplicado!');
+      else toast.error((data as any)?.message || 'Cupom inválido');
+    } catch (e: any) {
+      setCouponInfo({ valid: false, message: 'Erro ao validar cupom' });
+      toast.error('Erro ao validar cupom');
+    } finally {
+      setCouponChecking(false);
+    }
+  };
+
   const handleWizNext = () => {
     if (currentWizStep?.kind === 'plan') {
       if (!znPlan) {
@@ -799,6 +824,26 @@ export default function PublicAnamneseForm() {
                     }}
                     className="mt-2"
                   />
+                </div>
+                <div>
+                  <Label htmlFor="zn-coupon" className="text-sm">Cupom de desconto (opcional)</Label>
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      id="zn-coupon"
+                      placeholder="Ex.: ANA20"
+                      value={znCoupon}
+                      onChange={(e) => { setZnCoupon(e.target.value.toUpperCase()); setCouponInfo(null); }}
+                      className="uppercase"
+                    />
+                    <Button type="button" variant="outline" onClick={validateCoupon} disabled={couponChecking || !znCoupon.trim()}>
+                      {couponChecking ? '...' : 'Aplicar'}
+                    </Button>
+                  </div>
+                  {couponInfo && (
+                    <p className={cn('text-xs mt-1', couponInfo.valid ? 'text-green-600' : 'text-destructive')}>
+                      {couponInfo.valid ? `✓ ${couponInfo.label}` : couponInfo.message}
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

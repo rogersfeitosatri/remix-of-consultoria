@@ -261,3 +261,169 @@ export function useRetryZnOutbox() {
     onError: (e: any) => toast.error(e?.message ?? 'Erro ao reprocessar'),
   });
 }
+
+// ---------- Cupons & Criadores (afiliados) ----------
+export interface ZnPromoter {
+  id: string;
+  user_id: string;
+  name: string;
+  handle: string | null;
+  contact: string | null;
+  ref_code: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ZnCoupon {
+  id: string;
+  user_id: string;
+  code: string;
+  description: string | null;
+  promoter_id: string | null;
+  discount_type: 'percent' | 'free_months';
+  percent_off: number | null;
+  free_months: number | null;
+  applies_to: 'first' | 'all';
+  max_uses: number | null;
+  uses_count: number;
+  valid_from: string | null;
+  valid_until: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ZnRedemption {
+  id: string;
+  coupon_id: string | null;
+  promoter_id: string | null;
+  athlete_id: string | null;
+  code: string | null;
+  discount_type: string | null;
+  amount_off: number | null;
+  created_at: string;
+}
+
+export function useZnPromoters() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['zn_promoters', user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('zn_promoters')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ZnPromoter[];
+    },
+  });
+}
+
+export function useZnCoupons() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['zn_coupons', user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('zn_coupons')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ZnCoupon[];
+    },
+  });
+}
+
+export function useZnRedemptions() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['zn_coupon_redemptions', user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('zn_coupon_redemptions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      return (data ?? []) as ZnRedemption[];
+    },
+  });
+}
+
+export function useSaveZnPromoter() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (input: Partial<ZnPromoter> & { id?: string }) => {
+      const { id, created_at, user_id, ...patch } = input as any;
+      if (id) {
+        const { error } = await (supabase as any).from('zn_promoters').update(patch).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase as any).from('zn_promoters').insert({ ...patch, user_id: user?.id });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['zn_promoters'] });
+      toast.success('Criador salvo');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Erro ao salvar criador'),
+  });
+}
+
+export function useDeleteZnPromoter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from('zn_promoters').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['zn_promoters'] });
+      qc.invalidateQueries({ queryKey: ['zn_coupons'] });
+      toast.success('Criador removido');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Erro ao remover'),
+  });
+}
+
+export function useSaveZnCoupon() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (input: Partial<ZnCoupon> & { id?: string }) => {
+      const { id, created_at, user_id, uses_count, ...patch } = input as any;
+      if (id) {
+        const { error } = await (supabase as any).from('zn_coupons').update(patch).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase as any).from('zn_coupons').insert({ ...patch, user_id: user?.id });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['zn_coupons'] });
+      toast.success('Cupom salvo');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Erro ao salvar cupom'),
+  });
+}
+
+export function useDeleteZnCoupon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from('zn_coupons').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['zn_coupons'] });
+      toast.success('Cupom removido');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Erro ao remover'),
+  });
+}

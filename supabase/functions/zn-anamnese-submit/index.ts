@@ -33,10 +33,17 @@ const Schema = z.object({
   plan_choice: z.enum(["monthly", "semiannual", "annual"]),
   cpf: z.string().trim().min(11).max(20),
   phone: z.string().trim().min(8).max(20).optional().nullable(),
+  coupon_code: z.string().trim().max(40).optional().nullable(),
 });
 
 function onlyDigits(s: string) {
   return (s ?? "").replace(/\D+/g, "");
+}
+
+function addMonthsISO(base: Date, months: number): string {
+  const d = new Date(base);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
 }
 
 async function asaas(path: string, init: RequestInit = {}) {
@@ -133,6 +140,39 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const ownerUserId = await resolveOwnerUserId(supabase, formRow?.user_id ?? null);
 
+    // 2.1) Cupom (opcional) — valida e calcula o efeito sobre o plano
+    let coupon: any = null;
+    let effectiveValue = plan.value;      // valor recorrente da assinatura
+    let firstPaymentValue: number | null = null; // desconto só na 1ª cobrança (percent 'first')
+    let freeMonths = 0;                   // meses grátis antes da 1ª cobrança
+    if (data.coupon_code) {
+      const { data: c } = await supabase
+        .from("zn_coupons")
+        .select("*")
+        .eq("user_id", ownerUserId)
+        .ilike("code", data.coupon_code.trim())
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      const today = new Date().toISOString().slice(0, 10);
+      const valid =
+        c &&
+        (!c.valid_from || today >= c.valid_from) &&
+        (!c.valid_until || today <= c.valid_until) &&
+        (c.max_uses == null || Number(c.uses_count) < Number(c.max_uses));
+      if (valid) {
+        coupon = c;
+        if (c.discount_type === "free_months") {
+          freeMonths = Math.max(0, Number(c.free_months ?? 0));
+        } else {
+          const pct = Math.min(100, Math.max(0, Number(c.percent_off ?? 0)));
+          const discounted = Math.round(plan.value * (1 - pct / 100) * 100) / 100;
+          if (c.applies_to === "first") firstPaymentValue = discounted;
+          else effectiveValue = discounted;
+        }
+      }
+    }
+
     // Bloqueio: assinatura ativa no mesmo e-mail
     const { data: existing } = await supabase
       .from("zn_athletes")
@@ -192,15 +232,17 @@ Deno.serve(async (req) => {
     }
 
     // 5) Assinatura Asaas
-    const nextDue = new Date();
-    nextDue.setDate(nextDue.getDate() + 1);
+    // Com cupom de meses grátis, a 1ª cobrança é adiada para depois do período.
+    const nextDueStr = freeMonths > 0
+      ? addMonthsISO(new Date(), freeMonths)
+      : (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })();
     const subPayload: Record<string, unknown> = {
       customer: customerId,
       billingType: "CREDIT_CARD",
       cycle: plan.cycle,
-      value: plan.value,
-      nextDueDate: nextDue.toISOString().slice(0, 10),
-      description: `ZN Assessoria - Plano ${plan.label}`,
+      value: effectiveValue,
+      nextDueDate: nextDueStr,
+      description: `ZN Assessoria - Plano ${plan.label}` + (coupon ? ` (cupom ${coupon.code})` : ""),
       externalReference: `zn:${znAthlete.id}`,
     };
     if (plan.installments && plan.installments > 1) {
@@ -211,17 +253,61 @@ Deno.serve(async (req) => {
       body: JSON.stringify(subPayload),
     });
 
-    // 6) 1ª cobrança → invoiceUrl
+    // 6) 1ª cobrança → invoiceUrl (e, se cupom 'first', ajusta o valor só dela)
     let paymentLink: string | null = null;
     try {
       const payments = await asaas(`/subscriptions/${subscription.id}/payments`);
-      paymentLink = payments?.data?.[0]?.invoiceUrl ?? null;
+      const first = payments?.data?.[0] ?? null;
+      if (first && firstPaymentValue != null && firstPaymentValue !== plan.value) {
+        try {
+          const updated = await asaas(`/payments/${first.id}`, {
+            method: "POST",
+            body: JSON.stringify({ value: firstPaymentValue }),
+          });
+          paymentLink = updated?.invoiceUrl ?? first.invoiceUrl ?? null;
+        } catch (_) {
+          paymentLink = first.invoiceUrl ?? null;
+        }
+      } else {
+        paymentLink = first?.invoiceUrl ?? null;
+      }
     } catch (_) { /* ignore */ }
 
     await supabase
       .from("zn_athletes")
       .update({ last_payment_link: paymentLink })
       .eq("id", znAthlete.id);
+
+    // 7) Atribuição do cupom/criador + registro de uso (para ranking)
+    if (coupon) {
+      const amountOff =
+        coupon.discount_type === "percent"
+          ? Math.round((plan.value - (firstPaymentValue ?? effectiveValue)) * 100) / 100
+          : null;
+      await supabase
+        .from("zn_athletes")
+        .update({
+          coupon_id: coupon.id,
+          promoter_id: coupon.promoter_id ?? null,
+          coupon_code: coupon.code,
+        })
+        .eq("id", znAthlete.id);
+
+      await supabase.from("zn_coupon_redemptions").insert({
+        user_id: ownerUserId,
+        coupon_id: coupon.id,
+        promoter_id: coupon.promoter_id ?? null,
+        athlete_id: znAthlete.id,
+        code: coupon.code,
+        discount_type: coupon.discount_type,
+        amount_off: amountOff,
+      });
+
+      await supabase
+        .from("zn_coupons")
+        .update({ uses_count: Number(coupon.uses_count ?? 0) + 1 })
+        .eq("id", coupon.id);
+    }
 
     return new Response(
       JSON.stringify({
@@ -233,6 +319,9 @@ Deno.serve(async (req) => {
         payment_link: paymentLink,
         plan: data.plan_choice,
         value: plan.value,
+        coupon_applied: coupon ? coupon.code : null,
+        charged_value: firstPaymentValue ?? effectiveValue,
+        free_months: freeMonths,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
