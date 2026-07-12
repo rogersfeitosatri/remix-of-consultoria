@@ -6476,6 +6476,8 @@ export type Database = {
         Row: {
           asaas_customer_id: string | null
           body_goal: string | null
+          coupon_code: string | null
+          coupon_id: string | null
           cpf_cnpj: string | null
           created_at: string
           email: string
@@ -6489,6 +6491,7 @@ export type Database = {
           notes: string | null
           phone: string | null
           plan_choice: string | null
+          promoter_id: string | null
           status: string
           subscription_started_at: string | null
           target_race: string | null
@@ -6500,6 +6503,8 @@ export type Database = {
         Insert: {
           asaas_customer_id?: string | null
           body_goal?: string | null
+          coupon_code?: string | null
+          coupon_id?: string | null
           cpf_cnpj?: string | null
           created_at?: string
           email: string
@@ -6513,6 +6518,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           plan_choice?: string | null
+          promoter_id?: string | null
           status?: string
           subscription_started_at?: string | null
           target_race?: string | null
@@ -6524,6 +6530,8 @@ export type Database = {
         Update: {
           asaas_customer_id?: string | null
           body_goal?: string | null
+          coupon_code?: string | null
+          coupon_id?: string | null
           cpf_cnpj?: string | null
           created_at?: string
           email?: string
@@ -6537,6 +6545,7 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           plan_choice?: string | null
+          promoter_id?: string | null
           status?: string
           subscription_started_at?: string | null
           target_race?: string | null
@@ -6545,7 +6554,145 @@ export type Database = {
           user_id?: string
           weight_kg?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "zn_athletes_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "zn_coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zn_athletes_promoter_id_fkey"
+            columns: ["promoter_id"]
+            isOneToOne: false
+            referencedRelation: "zn_promoters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zn_coupon_redemptions: {
+        Row: {
+          amount_off: number | null
+          athlete_id: string | null
+          code: string | null
+          coupon_id: string | null
+          created_at: string
+          discount_type: string | null
+          id: string
+          promoter_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount_off?: number | null
+          athlete_id?: string | null
+          code?: string | null
+          coupon_id?: string | null
+          created_at?: string
+          discount_type?: string | null
+          id?: string
+          promoter_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount_off?: number | null
+          athlete_id?: string | null
+          code?: string | null
+          coupon_id?: string | null
+          created_at?: string
+          discount_type?: string | null
+          id?: string
+          promoter_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zn_coupon_redemptions_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "zn_athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zn_coupon_redemptions_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "zn_coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zn_coupon_redemptions_promoter_id_fkey"
+            columns: ["promoter_id"]
+            isOneToOne: false
+            referencedRelation: "zn_promoters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zn_coupons: {
+        Row: {
+          applies_to: string
+          code: string
+          created_at: string
+          description: string | null
+          discount_type: string
+          free_months: number | null
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          percent_off: number | null
+          promoter_id: string | null
+          updated_at: string
+          user_id: string
+          uses_count: number
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          applies_to?: string
+          code: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          free_months?: number | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          percent_off?: number | null
+          promoter_id?: string | null
+          updated_at?: string
+          user_id: string
+          uses_count?: number
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          applies_to?: string
+          code?: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          free_months?: number | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          percent_off?: number | null
+          promoter_id?: string | null
+          updated_at?: string
+          user_id?: string
+          uses_count?: number
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zn_coupons_promoter_id_fkey"
+            columns: ["promoter_id"]
+            isOneToOne: false
+            referencedRelation: "zn_promoters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       zn_integration_api_keys: {
         Row: {
@@ -6820,6 +6967,45 @@ export type Database = {
         }
         Relationships: []
       }
+      zn_promoters: {
+        Row: {
+          contact: string | null
+          created_at: string
+          handle: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          ref_code: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contact?: string | null
+          created_at?: string
+          handle?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          ref_code?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contact?: string | null
+          created_at?: string
+          handle?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          ref_code?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       zn_subscriptions: {
         Row: {
           asaas_customer_id: string | null
@@ -6827,12 +7013,14 @@ export type Database = {
           athlete_id: string
           cancel_reason: string | null
           canceled_at: string | null
+          coupon_id: string | null
           created_at: string
           expires_at: string | null
           id: string
           last_payment_id: string | null
           metadata: Json
           plan_code: string
+          promoter_id: string | null
           start_date: string | null
           status: string
           updated_at: string
@@ -6844,12 +7032,14 @@ export type Database = {
           athlete_id: string
           cancel_reason?: string | null
           canceled_at?: string | null
+          coupon_id?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
           last_payment_id?: string | null
           metadata?: Json
           plan_code: string
+          promoter_id?: string | null
           start_date?: string | null
           status?: string
           updated_at?: string
@@ -6861,12 +7051,14 @@ export type Database = {
           athlete_id?: string
           cancel_reason?: string | null
           canceled_at?: string | null
+          coupon_id?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
           last_payment_id?: string | null
           metadata?: Json
           plan_code?: string
+          promoter_id?: string | null
           start_date?: string | null
           status?: string
           updated_at?: string
@@ -6878,6 +7070,20 @@ export type Database = {
             columns: ["athlete_id"]
             isOneToOne: false
             referencedRelation: "zn_athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zn_subscriptions_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "zn_coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zn_subscriptions_promoter_id_fkey"
+            columns: ["promoter_id"]
+            isOneToOne: false
+            referencedRelation: "zn_promoters"
             referencedColumns: ["id"]
           },
         ]
