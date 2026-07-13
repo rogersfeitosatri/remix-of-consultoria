@@ -47,6 +47,9 @@ interface EditableMealPlanProps {
   athleteWeightKg?: number | null;
   mealSchedule?: MealScheduleData;
   onUpdated: () => void;
+  // Quando fornecido, o salvamento do plano é roteado para o pai (ex.: gravar
+  // como variação de um dia da semana) em vez de escrever direto em ai_analyses.
+  onSavePlan?: (mealPlan: any) => Promise<void>;
 }
 
 function deepClone<T>(obj: T): T {
@@ -442,7 +445,7 @@ function targetIsPureLegacy(target: any): boolean {
   return (!target?.foods || target.foods.length === 0) && (target?.food_groups?.length > 0);
 }
 
-export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSchedule, onUpdated }: EditableMealPlanProps) {
+export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSchedule, onUpdated, onSavePlan }: EditableMealPlanProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -998,6 +1001,12 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
 
   const saveDirectly = async (source?: any) => {
     const data = buildSaveData(source);
+    // Roteia o salvamento para o pai quando ele controla a persistência
+    // (ex.: gravar como variação de um dia da semana).
+    if (onSavePlan) {
+      await onSavePlan(data.meal_plan);
+      return;
+    }
     const updatedRaw = JSON.stringify({ ...data, _isNewFormat: true });
     const { error } = await supabase
       .from('ai_analyses')

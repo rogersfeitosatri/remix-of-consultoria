@@ -18,6 +18,12 @@ import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Sca
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
 
+const WEEKDAYS = [
+  { key: 'seg', label: 'Seg' }, { key: 'ter', label: 'Ter' }, { key: 'qua', label: 'Qua' },
+  { key: 'qui', label: 'Qui' }, { key: 'sex', label: 'Sex' }, { key: 'sab', label: 'Sáb' },
+  { key: 'dom', label: 'Dom' },
+];
+
 interface Guidance {
   meals_count: string;
   target_kcal: string;
@@ -96,6 +102,72 @@ export default function MealPlanDetail() {
 
   // Auto-dispara a análise ao chegar do check-in (?fromCheckin=1), uma única vez.
   const [autoRan, setAutoRan] = useState(false);
+
+  // --- Dias da semana: plano base + variações por dia ---
+  const [selectedDay, setSelectedDay] = useState<string>('base'); // 'base' | 'seg'..'dom'
+  const dayVariations: Record<string, any> = structured?.meal_plan?.day_variations || {};
+  const activeVariation = selectedDay !== 'base' ? dayVariations[selectedDay] : null;
+
+  // Analysis efetivo para o editor: base, ou a variação do dia selecionado.
+  const effectiveAnalysis = (() => {
+    if (!structured) return structured;
+    if (!activeVariation) return structured;
+    const clone = JSON.parse(JSON.stringify(structured));
+    clone.meal_plan.meals = activeVariation.meals ?? [];
+    clone.meal_plan.daily_totals = activeVariation.daily_totals ?? clone.meal_plan.daily_totals;
+    return clone;
+  })();
+
+  // Persiste o analysis completo em ai_analyses (sem refresh — usado nos saves).
+  const persistStructured = async (next: any) => {
+    const raw = JSON.stringify({ ...next, _isNewFormat: true });
+    const { error } = await supabase.from('ai_analyses').update({
+      raw_response: raw,
+      caloric_deficit: { meal_plan: next.meal_plan } as any,
+      updated_at: new Date().toISOString(),
+    }).eq('client_id', clientId!);
+    if (error) throw error;
+  };
+
+  // Salvamento vindo do editor quando estamos numa variação de dia.
+  const onSaveDayVariation = async (mealPlan: any) => {
+    const next = JSON.parse(JSON.stringify(structured));
+    next.meal_plan.day_variations = {
+      ...(next.meal_plan.day_variations || {}),
+      [selectedDay]: { meals: mealPlan.meals, daily_totals: mealPlan.daily_totals },
+    };
+    await persistStructured(next);
+  };
+
+  const createDayVariation = async (dayKey: string) => {
+    if (!structured) return;
+    const next = JSON.parse(JSON.stringify(structured));
+    next.meal_plan.day_variations = {
+      ...(next.meal_plan.day_variations || {}),
+      [dayKey]: {
+        meals: JSON.parse(JSON.stringify(structured.meal_plan.meals || [])),
+        daily_totals: structured.meal_plan.daily_totals,
+      },
+    };
+    try {
+      await persistStructured(next);
+      setSelectedDay(dayKey);
+      toast.success(`Variação criada para ${WEEKDAYS.find(d => d.key === dayKey)?.label}.`);
+      refresh();
+    } catch (e: any) { toast.error(e.message || 'Erro ao criar variação'); }
+  };
+
+  const removeDayVariation = async (dayKey: string) => {
+    if (!structured) return;
+    const next = JSON.parse(JSON.stringify(structured));
+    if (next.meal_plan.day_variations) delete next.meal_plan.day_variations[dayKey];
+    try {
+      await persistStructured(next);
+      setSelectedDay('base');
+      toast.success('Variação removida — o dia volta a seguir o plano base.');
+      refresh();
+    } catch (e: any) { toast.error(e.message || 'Erro ao remover variação'); }
+  };
 
   // --- Guidance (persisted per client) ---
   const [guidance, setGuidance] = useState<Guidance>(EMPTY_GUIDANCE);
@@ -518,15 +590,62 @@ export default function MealPlanDetail() {
               </Card>
             </Collapsible>
 
+            {/* Seletor de dias da semana: plano base + variações */}
+            {structured?.meal_plan?.meals && (
+              <Card>
+                <CardContent className="py-3 space-y-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => setSelectedDay('base')}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${selectedDay === 'base' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'}`}
+                    >
+                      Base (todos)
+                    </button>
+                    {WEEKDAYS.map(d => {
+                      const hasVar = !!dayVariations[d.key];
+                      return (
+                        <button
+                          key={d.key}
+                          onClick={() => setSelectedDay(d.key)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${selectedDay === d.key ? 'bg-primary text-primary-foreground' : hasVar ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground hover:bg-muted/70'}`}
+                          title={hasVar ? 'Tem variação própria' : 'Segue o plano base'}
+                        >
+                          {d.label}{hasVar ? ' •' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedDay === 'base' ? (
+                    <p className="text-xs text-muted-foreground">Editando o <strong>plano base</strong> — vale para todos os dias sem variação própria.</p>
+                  ) : activeVariation ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-primary">Editando a variação de <strong>{WEEKDAYS.find(d => d.key === selectedDay)?.label}</strong>.</p>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => removeDayVariation(selectedDay)}>
+                        Remover variação
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">Este dia segue o plano base.</p>
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => createDayVariation(selectedDay)}>
+                        Criar variação para {WEEKDAYS.find(d => d.key === selectedDay)?.label}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Meal plan editor (calories, g/kg, recalc, structured foods) */}
             {structured?.meal_plan?.meals && (
               <EditableMealPlan
-                key={`mp-${structured.updated_at}`}
-                analysis={structured}
+                key={`mp-${structured.updated_at}-${selectedDay}-${activeVariation ? 'var' : 'base'}`}
+                analysis={effectiveAnalysis}
                 clientId={clientId!}
                 athleteWeightKg={athleteWeightKg}
                 mealSchedule={mealSchedule}
                 onUpdated={refresh}
+                onSavePlan={activeVariation ? onSaveDayVariation : undefined}
               />
             )}
 
