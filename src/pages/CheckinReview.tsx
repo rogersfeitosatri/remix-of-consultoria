@@ -25,7 +25,8 @@ import {
   History,
   Target,
   Calendar,
-  Phone
+  Phone,
+  Brain
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -681,6 +682,16 @@ export default function CheckinReview() {
           </div>
 
           <div className="flex items-center gap-2">
+            {checkinResponse?.client_id && (
+              <Button
+                size="sm"
+                onClick={() => navigate(`/meal-plans/${checkinResponse.client_id}?fromCheckin=1`)}
+                className="gap-2"
+              >
+                <Brain className="h-4 w-4" />
+                <span className="hidden sm:inline">Ajustar plano com IA</span>
+              </Button>
+            )}
             <CheckinReviewPdfButton
               checkinResponse={checkinResponse as any}
               questions={questions as any}
