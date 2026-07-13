@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,7 @@ export default function MealPlanDetail() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: client } = useQuery({
     queryKey: ['meal-plan-client', clientId],
@@ -91,6 +92,9 @@ export default function MealPlanDetail() {
 
   const structured = parseStructured(analysisRow);
   const hasPlan = !!structured?.meal_plan?.meals;
+
+  // Auto-dispara a análise ao chegar do check-in (?fromCheckin=1), uma única vez.
+  const [autoRan, setAutoRan] = useState(false);
 
   // --- Guidance (persisted per client) ---
   const [guidance, setGuidance] = useState<Guidance>(EMPTY_GUIDANCE);
@@ -151,6 +155,18 @@ export default function MealPlanDetail() {
     onSuccess: () => { toast.success('Plano atualizado com base no último check-in!'); refresh(); },
     onError: (e: any) => toast.error(e.message || 'Erro ao atualizar plano'),
   });
+
+  // Ao chegar do check-in, importa o plano atual e roda a análise automaticamente.
+  useEffect(() => {
+    if (searchParams.get('fromCheckin') === '1' && hasPlan && !autoRan && !updateFromCheckin.isPending) {
+      setAutoRan(true);
+      updateFromCheckin.mutate();
+      const next = new URLSearchParams(searchParams);
+      next.delete('fromCheckin');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, hasPlan, autoRan]);
 
   const createFromScratch = useMutation({
     mutationFn: async () => {
@@ -377,8 +393,59 @@ export default function MealPlanDetail() {
                   Atualizar plano com o último check-in
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  A IA ajusta o plano e as orientações com base no último check-in, objetivos, evolução e feedback do atleta — mantendo o plano atual como base.
+                  Importa o plano atual como base e a IA o revisa de forma conservadora com base no último check-in, histórico, objetivos, prova-alvo e dinâmica de treinos — ajustando só o necessário.
                 </p>
+
+                {/* Leitura do check-in */}
+                {structured?.checkin_reading && (
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <span className="text-xs font-semibold text-foreground">📋 Leitura do check-in</span>
+                    <p className="text-sm text-foreground whitespace-pre-wrap mt-1">{structured.checkin_reading}</p>
+                  </div>
+                )}
+
+                {structured?.no_change_needed && (
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700">
+                    ✅ A IA avaliou que o plano deve ser <strong>mantido</strong> (sem ajustes necessários neste check-in).
+                  </div>
+                )}
+
+                {/* Tabela de ajustes */}
+                {Array.isArray(structured?.adjustments) && structured.adjustments.length > 0 && (
+                  <div className="rounded-lg border overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left p-2 font-semibold">Local</th>
+                          <th className="text-left p-2 font-semibold">Antes</th>
+                          <th className="text-left p-2 font-semibold">Depois</th>
+                          <th className="text-left p-2 font-semibold">Motivo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {structured.adjustments.map((a: any, i: number) => (
+                          <tr key={i} className="border-t align-top">
+                            <td className="p-2 font-medium">{a.location}</td>
+                            <td className="p-2 text-muted-foreground">{a.before || '—'}</td>
+                            <td className="p-2">{a.after}</td>
+                            <td className="p-2 text-muted-foreground">{a.reason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Pontos de atenção para avaliação direta */}
+                {Array.isArray(structured?.attention_points) && structured.attention_points.length > 0 && (
+                  <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+                    <span className="text-xs font-semibold text-amber-700">⚠️ Pontos para sua avaliação direta</span>
+                    <ul className="list-disc pl-4 mt-1 space-y-0.5 text-sm text-foreground">
+                      {structured.attention_points.map((p: string, i: number) => <li key={i}>{p}</li>)}
+                    </ul>
+                  </div>
+                )}
+
                 {structured?.adjustment_message && (
                   <div className="rounded-lg border bg-muted/40 p-3">
                     <div className="flex items-center justify-between mb-1">

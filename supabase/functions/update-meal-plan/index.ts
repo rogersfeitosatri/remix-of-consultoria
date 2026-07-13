@@ -87,9 +87,30 @@ Deno.serve(async (req) => {
       (client as any)?.goal, (client as any)?.objective,
     ].filter(Boolean).join(" | ") || "não informado";
 
-    const prompt = `Você vai ATUALIZAR o plano alimentar de um atleta de endurance com base na evolução dele.
+    // Prova-alvo e prazo (contextualiza estratégias de CHO/periodização)
+    const targetRace = (profile as any)?.target_race || (client as any)?.target_race || null;
+    const targetDeadline = (profile as any)?.target_deadline || (client as any)?.target_deadline || null;
+    let raceBlock = "PROVA-ALVO: não informada.";
+    if (targetRace) {
+      let prazo = "";
+      if (targetDeadline) {
+        const days = Math.round((new Date(targetDeadline).getTime() - Date.now()) / 864e5);
+        prazo = days >= 0 ? ` (faltam ~${days} dias, em ${new Date(targetDeadline).toLocaleDateString("pt-BR")})` : ` (data já passou: ${new Date(targetDeadline).toLocaleDateString("pt-BR")})`;
+      }
+      raceBlock = `PROVA-ALVO: ${targetRace}${prazo}. Contextualize as estratégias (construção x refinamento, carb loading só se justificado).`;
+    }
+
+    // Respostas da anamnese (dinâmica de treinos/hábitos), se houver
+    const anamneseBlock = anamnese?.responses
+      ? `RESPOSTAS DA ANAMNESE (hábitos, rotina e dinâmica de treinos — use se houver; se faltar, siga normal):\n${JSON.stringify(anamnese.responses).slice(0, 4000)}`
+      : "ANAMNESE: não disponível — siga normalmente com o plano e os check-ins.";
+
+    const prompt = `Você vai REVISAR e, se necessário, AJUSTAR (de forma conservadora) o plano alimentar de um atleta de endurance, a partir do check-in mais recente e do histórico.
 
 OBJETIVO DO ATLETA: ${objectives}
+${raceBlock}
+
+${anamneseBlock}
 
 PLANO ALIMENTAR ATUAL (JSON — mantenha a mesma estrutura ao devolver):
 ${JSON.stringify(currentPlan.meal_plan)}
@@ -101,11 +122,14 @@ HISTÓRICO DE CHECK-INS (use principalmente o MAIS RECENTE, mas considere a evol
 ${checkinHistory}
 
 ${adminNote ? `OBSERVAÇÃO DO NUTRICIONISTA: ${adminNote}\n` : ""}
-TAREFA:
-1. Ajuste o plano alimentar e as orientações considerando o relato, feedback, adesão e evolução do atleta nos check-ins (peso, energia, treinos, dificuldades relatadas).
-2. Mantenha o formato e os alimentos que o atleta já usa; ajuste porções/quantidades/estratégias conforme necessário.
-3. Recalcule os totais diários (kcal e g/kg) coerentes com os ajustes.
-4. Escreva "adjustment_message": uma mensagem curta (2 a 5 frases), calorosa e clara, para o NUTRICIONISTA ENVIAR AO ATLETA, explicando de forma simples o que mudou no plano e por quê (com base na evolução/feedback dele). Não use jargão técnico em excesso.`;
+TAREFA (siga as regras do sistema — ajustes conservadores, só o necessário):
+1. "checkin_reading": síntese curta do check-in mais recente (sinais favoráveis e pontos de atenção).
+2. Decida se o plano deve ser MANTIDO ou AJUSTADO. Se não houver necessidade real de mudança, defina "no_change_needed": true, explique em "checkin_reading" e NÃO gere adjustment_message.
+3. Se ajustar: altere apenas o necessário, preservando horários/preferências/opções que seguem adequados. Nada de reduzir energia ou compensar automaticamente. Periodize CHO conforme a demanda real do treino. Relacione cada mudança a um achado do check-in ou a uma mudança objetiva de treino/prova.
+4. "adjustments": lista de mudanças, cada uma com { location (refeição/estratégia), before, after, reason }.
+5. "attention_points": pontos que exigem avaliação DIRETA do nutricionista (sinais de alerta, dados insuficientes) — pode ser vazio.
+6. Recalcule os totais diários (kcal e g/kg) coerentes com os ajustes.
+7. "adjustment_message": SOMENTE quando houver mudança — mensagem curta (2 a 5 frases), humana e acolhedora, para o NUTRICIONISTA enviar ao atleta, citando naturalmente o que orientou a mudança. Sem culpa, sem jargão, sem prometer cura.`;
 
     let systemPrompt = SYSTEM_PROMPT;
     try {
@@ -133,6 +157,10 @@ TAREFA:
       strategic_orientations: analysisData.strategic_orientations ?? currentPlan.strategic_orientations,
       alerts: analysisData.alerts ?? currentPlan.alerts,
       adjustment_message: analysisData.adjustment_message ?? "",
+      checkin_reading: analysisData.checkin_reading ?? "",
+      adjustments: analysisData.adjustments ?? [],
+      attention_points: analysisData.attention_points ?? [],
+      no_change_needed: analysisData.no_change_needed ?? false,
       _isNewFormat: true,
       last_update_reason: "checkin_update",
       updated_at: new Date().toISOString(),
@@ -157,7 +185,15 @@ TAREFA:
     if (saveErr) throw new Error(`Falha ao salvar plano atualizado: ${saveErr.message}`);
 
     return new Response(
-      JSON.stringify({ success: true, analysis: saved, adjustment_message: merged.adjustment_message }),
+      JSON.stringify({
+        success: true,
+        analysis: saved,
+        adjustment_message: merged.adjustment_message,
+        checkin_reading: merged.checkin_reading,
+        adjustments: merged.adjustments,
+        attention_points: merged.attention_points,
+        no_change_needed: merged.no_change_needed,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
@@ -180,17 +216,31 @@ function safeParse(s: string): any {
   try { return JSON.parse(s); } catch { return null; }
 }
 
-const SYSTEM_PROMPT = `Você é um nutricionista esportivo funcional especializado em atletas de endurance (corrida, triathlon, ciclismo), baseando suas análises no Tratado de Nutrição Esportiva Funcional (Paschoal & Naves) e evidências científicas atuais.
+const SYSTEM_PROMPT = `Você é um assistente técnico de um nutricionista esportivo especializado em corredores, triatletas e atletas amadores. Sua função é REVISAR o plano alimentar atual a partir do check-in semanal, propor e aplicar AJUSTES CONSERVADORES, e preparar a devolutiva ao atleta. Você é apoio à decisão profissional: não diagnostica, não substitui avaliação clínica e não apresenta inferências como certezas.
 
-Sua tarefa é ATUALIZAR um plano alimentar já existente com base na evolução do atleta (check-ins), mantendo aplicação prática.
+ORDEM DO RACIOCÍNIO:
+1) Mudanças de modalidade, volume, intensidade, lesão, prova-alvo e rotina.
+2) Adesão e contexto das refeições fora do plano.
+3) Fome, saciedade, energia, sono, intestino, treino, recuperação e sintomas.
+4) Peso e composição corporal dentro do objetivo e do histórico disponível.
+5) Estratégias que podem ter perdido a indicação (carb loading, pré/intra-treino de atividade suspensa).
+6) Distribuição de proteínas, CHO, gorduras, fibras, frutas, vegetais e líquidos.
+7) MENOR conjunto de mudanças capaz de responder aos achados.
 
-REGRAS:
-- Linguagem simples, clara e direta; foco em aplicação prática
-- Usar os alimentos que o atleta JÁ consome; manter substituições na MESMA LINHA (ex: "pão francês ou tapioca ou cuscuz")
-- Porções e quantidades REAIS (gramas, ml, unidades), coerentes com os alvos de macros e calorias
-- A soma das refeições deve fechar com o alvo calórico e de macros
-- Ajustar com base no relato e evolução do atleta (peso, energia, adesão, dificuldades)
-- Sempre incluir a mensagem de ajuste (adjustment_message) para o atleta`;
+REGRAS PARA AJUSTAR:
+- Altere SOMENTE o necessário; preserve horários, preferências, opções e estrutura que seguem adequados.
+- NÃO reduza energia automaticamente por aumento de peso/composição, lesão ou queda de volume de corrida.
+- NÃO faça compensação alimentar por refeições fora do plano. NÃO transforme relato isolado em diagnóstico/tendência.
+- Periodize CHO conforme a demanda real do treino; retire carb loading/pré/intra-treino quando a atividade for suspensa; mantenha CHO suficiente para musculação, bike, recuperação e rotina.
+- Proteína ~1,4–2,0 g/kg/dia e ~0,25 g/kg (20–40 g) por refeição, individualizando; em lesão evite déficit agressivo e proteína insuficiente.
+- Alimentos novos: simples, acessíveis e comuns no Brasil (arroz, feijão, aveia, pão, tapioca, cuscuz, batata, ovos, frango, leite/iogurte, frutas/legumes, castanhas). Sem produtos raros/caros. Não prometa cura; não sugira suplemento/dose sem dados e aprovação do nutri.
+- Substituições na MESMA LINHA (ex: "pão francês ou tapioca ou cuscuz"), com porções reais (g, ml, unidades).
+
+SINAIS DE ATENÇÃO (faça só ajuste conservador e destaque para avaliação DIRETA do nutri): compulsão/perda de controle/restrição compensatória; ansiedade/estresse ligados à comida; sinais de baixa disponibilidade energética/RED-S; perda/ganho rápido não explicado; fadiga importante/tontura/desmaio; alteração menstrual; lesões recorrentes/dor persistente; sintomas GI intensos; gestação/alergia/condição clínica/medicamento. Não diagnostique; não use linguagem de culpa.
+
+MENSAGEM AO ATLETA: só quando houver mudança. PT-BR, humana e acolhedora; mostra que o check-in foi lido; explica os ajustes principais e a utilidade prática; orienta contato se houver ponto de atenção; pede para observar a resposta do corpo. Não diga que "falhou/saiu da dieta/precisa compensar". Não liste cada grama.
+
+Se NÃO houver necessidade de ajuste: no_change_needed=true, explique por que manter é a melhor decisão e não gere adjustment_message.`;
 
 // Esquema = análise completa + adjustment_message
 const UPDATE_SCHEMA = {
@@ -276,11 +326,38 @@ const UPDATE_SCHEMA = {
       required: ["meal_routine", "training_strategy", "supplementation"],
     },
     alerts: { type: "array", items: { type: "string" } },
+    checkin_reading: {
+      type: "string",
+      description: "Síntese curta do check-in mais recente: sinais favoráveis e pontos de atenção.",
+    },
+    no_change_needed: {
+      type: "boolean",
+      description: "true quando o plano deve ser MANTIDO sem ajustes. Nesse caso não gerar adjustment_message.",
+    },
+    adjustments: {
+      type: "array",
+      description: "Cada ajuste feito no plano.",
+      items: {
+        type: "object",
+        properties: {
+          location: { type: "string", description: "Onde no plano (refeição/estratégia)" },
+          before: { type: "string", description: "Como estava" },
+          after: { type: "string", description: "Como ficou" },
+          reason: { type: "string", description: "Justificativa ligada a um achado do check-in/treino" },
+        },
+        required: ["location", "after", "reason"],
+      },
+    },
+    attention_points: {
+      type: "array",
+      items: { type: "string" },
+      description: "Pontos que exigem avaliação DIRETA do nutricionista (sinais de alerta, dados insuficientes). Pode ser vazio.",
+    },
     adjustment_message: {
       type: "string",
-      description: "Mensagem curta (2-5 frases) para o nutricionista enviar ao atleta explicando os ajustes feitos e o porquê, com base na evolução/feedback do atleta.",
+      description: "SOMENTE quando houver mudança: mensagem curta (2-5 frases) para o nutricionista enviar ao atleta explicando os ajustes e o porquê.",
     },
   },
-  required: ["meal_plan", "strategic_orientations", "adjustment_message"],
+  required: ["meal_plan", "strategic_orientations", "checkin_reading"],
   additionalProperties: false,
 };
