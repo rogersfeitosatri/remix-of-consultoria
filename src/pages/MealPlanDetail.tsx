@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
-import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check } from 'lucide-react';
+import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare } from 'lucide-react';
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
 
@@ -137,6 +137,19 @@ export default function MealPlanDetail() {
     },
     onSuccess: () => { toast.success('Plano gerado pela IA!'); refresh(); },
     onError: (e: any) => toast.error(e.message || 'Erro ao gerar plano'),
+  });
+
+  const updateFromCheckin = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('update-meal-plan', {
+        body: { clientId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => { toast.success('Plano atualizado com base no último check-in!'); refresh(); },
+    onError: (e: any) => toast.error(e.message || 'Erro ao atualizar plano'),
   });
 
   const createFromScratch = useMutation({
@@ -352,6 +365,39 @@ export default function MealPlanDetail() {
         ) : (
           <>
             {/* Regenerate with AI (collapsible) */}
+            {/* Atualizar plano com base no último check-in */}
+            <Card className="border-primary/30">
+              <CardContent className="pt-4 space-y-3">
+                <Button
+                  className="w-full gap-2"
+                  onClick={() => updateFromCheckin.mutate()}
+                  disabled={busy || updateFromCheckin.isPending}
+                >
+                  {updateFromCheckin.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Atualizar plano com o último check-in
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  A IA ajusta o plano e as orientações com base no último check-in, objetivos, evolução e feedback do atleta — mantendo o plano atual como base.
+                </p>
+                {structured?.adjustment_message && (
+                  <div className="rounded-lg border bg-muted/40 p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <MessageSquare className="h-3.5 w-3.5 text-primary" /> Mensagem para enviar ao atleta
+                      </span>
+                      <Button
+                        variant="ghost" size="sm" className="h-7 gap-1 text-xs"
+                        onClick={() => { navigator.clipboard.writeText(structured.adjustment_message); toast.success('Mensagem copiada!'); }}
+                      >
+                        <Copy className="h-3 w-3" /> Copiar
+                      </Button>
+                    </div>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{structured.adjustment_message}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Collapsible open={guidanceOpen} onOpenChange={setGuidanceOpen}>
               <Card>
                 <CollapsibleTrigger className="w-full">
