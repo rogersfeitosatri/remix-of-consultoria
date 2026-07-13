@@ -128,7 +128,16 @@ Deno.serve(async (req) => {
     });
     const text = await res.text();
     if (!res.ok) {
-      return json({ error: `Zona Nutri respondeu ${res.status}: ${text.slice(0, 500)}` }, 502);
+      let znError: string | null = null;
+      try { znError = JSON.parse(text)?.error ?? null; } catch { /* */ }
+      if (znError === "athlete_not_found") {
+        return json({
+          error: "ATHLETE_NOT_FOUND",
+          message: `Este atleta (${(client.email || "").toLowerCase()}) ainda não existe no Zona Nutri. Peça para ele criar a conta no app Zona Nutri com o mesmo e-mail antes de reenviar o plano.`,
+          fallback: true,
+        }, 200);
+      }
+      return json({ error: `Zona Nutri respondeu ${res.status}: ${text.slice(0, 500)}`, fallback: res.status >= 500 }, res.status >= 500 ? 200 : 502);
     }
 
     // Marca envio no plano (para o admin ver que foi enviado)
