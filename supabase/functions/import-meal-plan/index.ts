@@ -19,10 +19,10 @@ Deno.serve(async (req) => {
     if (!supabaseUrl || !supabaseServiceKey) throw new Error("Supabase configuration is missing");
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { clientId, planText } = await req.json();
+    const { clientId, planText, pdfBase64 } = await req.json();
     if (!clientId) throw new Error("clientId is required");
-    if (!planText || String(planText).trim().length < 20) {
-      throw new Error("Cole o texto da dieta atual do atleta para importar.");
+    if ((!planText || String(planText).trim().length < 20) && !pdfBase64) {
+      throw new Error("Envie o PDF da dieta ou cole o texto para importar.");
     }
 
     const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
@@ -30,27 +30,40 @@ Deno.serve(async (req) => {
     const { data: profile } = await supabase
       .from("athlete_profiles").select("id").eq("client_id", clientId).maybeSingle();
 
-    const prompt = `Abaixo está a DIETA ATUAL do atleta (copiada do plano/PDF existente). Estruture-a EXATAMENTE como está, sem inventar alimentos, quantidades ou refeições que não estejam no texto.
+    const RULES = `REGRAS:
+- Extraia HORÁRIO de cada refeição (campo "horario", ex: "07:00"), nome e ordem das refeições.
+- Preserve alimentos, porções, medidas caseiras, substituições e OPÇÕES exatamente como no documento. Substituições (separadas por "ou") viram várias entradas em "options" do mesmo grupo.
+- NÃO crie alimentos novos nem altere quantidades. Se um macro/total não existir, estime aproximadamente e diga no reasoning que é estimativa.
+- Se o plano tiver DIAS DA SEMANA diferentes (refeições/quantidades que mudam por dia), preencha "day_variations" com a chave do dia (seg,ter,qua,qui,sex,sab,dom) contendo as refeições daquele dia; o restante fica no plano base (meals).
+- Orientações/estratégias (pré/pós-treino, suplementos) vão em strategic_orientations.`;
 
-DIETA ATUAL (texto):
-"""
-${String(planText).slice(0, 12000)}
-"""
+    let structured: any;
+    let provider = "gemini";
+    let model = "gemini-2.5-flash";
 
-REGRAS:
-- Preserve os nomes e a ordem das refeições e os horários, se houver.
-- Preserve alimentos, porções, medidas caseiras e substituições. Substituições (separadas por "ou") viram várias "options" do mesmo grupo.
-- Não crie alimentos novos nem altere quantidades. Se algum macro/total não estiver no texto, estime aproximadamente e deixe claro que é estimativa no campo reasoning.
-- Se houver orientações/estratégias no texto (pré/pós-treino, suplementos), coloque em strategic_orientations.`;
+    if (pdfBase64) {
+      // Lê o PDF diretamente (inclui PDFs em imagem / OCR) via Gemini nativo.
+      structured = await extractFromPdf(String(pdfBase64), RULES);
+    } else {
+      const prompt = `Abaixo está a DIETA ATUAL do atleta (texto do plano/PDF existente). Estruture-a EXATAMENTE como está, sem inventar.\n\nDIETA ATUAL (texto):\n"""\n${String(planText).slice(0, 14000)}\n"""\n\n${RULES}`;
+      const r = await callAiStructured({
+        systemPrompt: SYSTEM_PROMPT,
+        userPrompt: prompt,
+        toolName: "submit_imported_plan",
+        toolDescription: "Structure the athlete's existing diet into the meal plan format",
+        schema: IMPORT_SCHEMA,
+        fallback: "lovable-gemini-pro",
+      });
+      structured = r.data; provider = r.provider; model = r.model;
+    }
 
-    const { data: structured, provider, model } = await callAiStructured({
-      systemPrompt: SYSTEM_PROMPT,
-      userPrompt: prompt,
-      toolName: "submit_imported_plan",
-      toolDescription: "Structure the athlete's existing diet into the meal plan format",
-      schema: IMPORT_SCHEMA,
-      fallback: "lovable-gemini-pro",
-    });
+    if (!structured?.meal_plan?.meals) {
+      throw new Error("Não foi possível extrair as refeições do documento. Tente colar o texto do plano.");
+    }
+    // Mantém as variações por dia dentro do meal_plan (padrão da consultoria).
+    if (structured.day_variations && !structured.meal_plan.day_variations) {
+      structured.meal_plan.day_variations = structured.day_variations;
+    }
 
     const full = {
       athlete_summary: structured.athlete_summary ?? "",
@@ -60,7 +73,7 @@ REGRAS:
       strategic_orientations: structured.strategic_orientations ?? { meal_routine: [], training_strategy: [], supplementation: [], race_context: "" },
       alerts: structured.alerts ?? [],
       _isNewFormat: true,
-      source: "imported_diet",
+      source: pdfBase64 ? "imported_pdf" : "imported_diet",
       updated_at: new Date().toISOString(),
     };
 
@@ -107,6 +120,57 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
+// Lê um PDF (base64, inclusive PDFs em imagem) via Gemini nativo e devolve o
+// plano estruturado em JSON. Usa response_mime_type JSON e descreve o formato.
+async function extractFromPdf(pdfBase64: string, rules: string): Promise<any> {
+  const key = Deno.env.get("GEMINI_API_KEY");
+  if (!key) throw new Error("GEMINI_API_KEY não configurada.");
+  const clean = pdfBase64.includes(",") ? pdfBase64.split(",").pop()! : pdfBase64;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+  const instruction = `${SYSTEM_PROMPT}
+
+Leia o PDF do plano alimentar (mesmo que seja composto por imagens — faça OCR) e retorne SOMENTE um JSON com este formato:
+{
+  "athlete_summary": string,
+  "meal_plan": {
+    "meals": [ { "meal_name": string, "horario": string, "timing_note": string,
+      "food_groups": [ { "group": string, "options": "alimento com porção ou substituição ou ..." } ],
+      "meal_macros": string } ],
+    "daily_totals": { "kcal": number, "cho_g": number, "protein_g": number, "fat_g": number },
+    "day_variations": { "seg": { "meals": [...], "daily_totals": {...} } }  // só se o plano variar por dia
+  },
+  "strategic_orientations": { "meal_routine": [string], "training_strategy": [string],
+    "supplementation": [ { "supplement": string, "recommendation": string } ], "race_context": string },
+  "alerts": [string]
+}
+
+${rules}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: instruction },
+          { inline_data: { mime_type: "application/pdf", data: clean } },
+        ],
+      }],
+      generationConfig: { response_mime_type: "application/json", temperature: 0.2 },
+    }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(`Gemini PDF [${res.status}]: ${JSON.stringify(body).slice(0, 400)}`);
+  const text = body?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") ?? "";
+  const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error("Não consegui interpretar o PDF como plano estruturado.");
+  }
+}
+
 const SYSTEM_PROMPT = `Você organiza dietas já prontas no formato estruturado de um sistema de nutrição esportiva. Sua tarefa é APENAS estruturar fielmente a dieta recebida — não é criar, nem otimizar, nem alterar quantidades. Mantenha alimentos, porções, medidas caseiras, substituições ("ou"), refeições e horários exatamente como no texto. Só estime macros/totais quando não estiverem no texto, deixando claro que é estimativa.`;
 
 const IMPORT_SCHEMA = {
@@ -131,6 +195,7 @@ const IMPORT_SCHEMA = {
             type: "object",
             properties: {
               meal_name: { type: "string" },
+              horario: { type: "string", description: "Horário da refeição (ex: 07:00)" },
               timing_note: { type: "string" },
               food_groups: {
                 type: "array",

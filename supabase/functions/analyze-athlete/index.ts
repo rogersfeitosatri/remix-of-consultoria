@@ -185,7 +185,8 @@ REGRAS:
 - O PLANO ALIMENTAR DEVE TER PORÇÕES E QUANTIDADES REAIS (gramas, ml, unidades) condizentes com os alvos de macros e calorias
 - Cada opção de alimento deve incluir a quantidade (ex: "2 fatias de pão francês (100g) ou 1 tapioca grande (80g) ou 1 cuscuz médio (120g)")
 - A soma das refeições deve fechar com o alvo calórico e de macronutrientes definido na progressão
-- Incluir ao final do plano um resumo dos totais aproximados de macros e calorias do dia`;
+- Incluir ao final do plano um resumo dos totais aproximados de macros e calorias do dia
+- VARIAÇÕES POR DIA: quando a rotina de treinos indicar demandas diferentes por dia (ex.: dia de treino longo/intenso pede mais carboidrato; dia de descanso pede menos), preencha "day_variations" (chaves seg,ter,qua,qui,sex,sab,dom) com as refeições daquele dia; o plano base (meals) vale para os demais. Só crie variações quando a dinâmica de treinos justificar; caso contrário deixe vazio.`;
 
 const ANALYSIS_SCHEMA = {
   type: "object",
@@ -260,6 +261,10 @@ const ANALYSIS_SCHEMA = {
             kcal_kg: { type: "number", description: "Calorias por kg de peso corporal" },
           },
           required: ["kcal", "cho_g", "cho_gkg", "protein_g", "fat_g"],
+        },
+        day_variations: {
+          type: "object",
+          description: "Opcional. Variações por dia da semana (chaves seg,ter,qua,qui,sex,sab,dom), cada uma com { meals, daily_totals }, quando a dinâmica de treinos justificar (ex.: dia de treino longo com mais CHO). Vazio se todos os dias forem iguais.",
         },
       },
       required: ["meals", "daily_totals"],

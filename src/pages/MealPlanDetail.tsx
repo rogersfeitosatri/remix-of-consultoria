@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
-import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp } from 'lucide-react';
+import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send } from 'lucide-react';
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
 
@@ -231,18 +231,45 @@ export default function MealPlanDetail() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
+  const [importPdf, setImportPdf] = useState<{ name: string; base64: string } | null>(null);
   const importDiet = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('import-meal-plan', {
-        body: { clientId, planText: importText },
+      const body: any = { clientId };
+      if (importPdf) body.pdfBase64 = importPdf.base64;
+      else body.planText = importText;
+      const { data, error } = await supabase.functions.invoke('import-meal-plan', { body });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => { toast.success('Dieta importada! Já aparece em Plano Alimentar.'); setImportOpen(false); setImportText(''); setImportPdf(null); refresh(); },
+    onError: (e: any) => toast.error(e.message || 'Erro ao importar dieta'),
+  });
+
+  const sendToZonaNutri = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('send-meal-plan-to-zona-nutri', {
+        body: { clientId },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => { toast.success('Dieta importada! Já aparece em Plano Alimentar.'); setImportOpen(false); setImportText(''); refresh(); },
-    onError: (e: any) => toast.error(e.message || 'Erro ao importar dieta'),
+    onSuccess: () => toast.success('Plano enviado ao Zona Nutri!'),
+    onError: (e: any) => toast.error(e.message || 'Erro ao enviar ao Zona Nutri'),
   });
+
+  const handlePdfPick = (file: File | null) => {
+    if (!file) { setImportPdf(null); return; }
+    if (file.type !== 'application/pdf') { toast.error('Selecione um arquivo PDF.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      setImportPdf({ name: file.name, base64 });
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Ao chegar do check-in, importa o plano atual e roda a análise automaticamente.
   useEffect(() => {
@@ -393,17 +420,30 @@ export default function MealPlanDetail() {
             </div>
           </div>
           {hasPlan && (
-            <Button
-              variant="default"
-              size="sm"
-              className="gap-1.5 shrink-0"
-              onClick={() => notifyAthlete.mutate(false)}
-              disabled={notifyAthlete.isPending}
-              title="Enviar notificação ao atleta avisando que o plano foi atualizado"
-            >
-              {notifyAthlete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
-              <span className="hidden sm:inline">Avisar atleta</span>
-            </Button>
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-1.5 shrink-0"
+                onClick={() => notifyAthlete.mutate(false)}
+                disabled={notifyAthlete.isPending}
+                title="Enviar notificação ao atleta avisando que o plano foi atualizado"
+              >
+                {notifyAthlete.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
+                <span className="hidden sm:inline">Avisar atleta</span>
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="gap-1.5 shrink-0"
+                onClick={() => sendToZonaNutri.mutate()}
+                disabled={sendToZonaNutri.isPending}
+                title="Enviar o plano (com os dias da semana) para o app Zona Nutri"
+              >
+                {sendToZonaNutri.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                <span className="hidden sm:inline">Enviar ao Zona Nutri</span>
+              </Button>
+            </>
           )}
         </div>
 
@@ -658,21 +698,40 @@ export default function MealPlanDetail() {
         <Dialog open={importOpen} onOpenChange={setImportOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Importar dieta atual do atleta</DialogTitle></DialogHeader>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Cole aqui o texto da dieta que o atleta já usa (do PDF ou plano atual). O sistema estrutura em refeições, alimentos, porções e substituições — <strong>sem inventar nada</strong>. Essa dieta passa a ser o Plano Alimentar.
+                Envie o <strong>PDF</strong> do plano atual (o sistema lê horários, alimentos, porções, substituições, opções e dias da semana) — ou cole o texto. O plano é estruturado <strong>sem inventar nada</strong> e passa a ser o Plano Alimentar.
               </p>
-              <Textarea
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                rows={12}
-                placeholder={"Ex.:\nCafé da manhã (07h)\n- 2 fatias de pão francês (100g) ou 1 tapioca (80g)\n- 2 ovos\n- 1 fruta\n\nAlmoço (12h)\n- Arroz 4 col. sopa ou batata 2 unid.\n..."}
-                className="font-mono text-xs"
-              />
+
+              <div className="rounded-lg border border-dashed p-3">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
+                  <FileUp className="h-3.5 w-3.5 text-primary" /> Importar do PDF (recomendado)
+                </label>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => handlePdfPick(e.target.files?.[0] ?? null)}
+                  className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-primary file:text-primary-foreground file:px-3 file:py-1.5 file:text-xs file:font-medium"
+                />
+                {importPdf && <p className="text-xs text-primary mt-1">📄 {importPdf.name} — pronto para importar.</p>}
+              </div>
+
+              {!importPdf && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Ou cole o texto da dieta:</p>
+                  <Textarea
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                    rows={8}
+                    placeholder={"Ex.:\nCafé da manhã (07h)\n- 2 fatias de pão francês (100g) ou 1 tapioca (80g)\n- 2 ovos\n\nAlmoço (12h)\n- Arroz 4 col. sopa ou batata 2 unid.\n..."}
+                    className="font-mono text-xs"
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setImportOpen(false)}>Cancelar</Button>
-              <Button onClick={() => importDiet.mutate()} disabled={importDiet.isPending || importText.trim().length < 20}>
+              <Button onClick={() => importDiet.mutate()} disabled={importDiet.isPending || (!importPdf && importText.trim().length < 20)}>
                 {importDiet.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importando...</> : <><FileUp className="h-4 w-4 mr-2" />Importar</>}
               </Button>
             </DialogFooter>

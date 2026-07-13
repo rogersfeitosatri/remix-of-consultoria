@@ -129,7 +129,8 @@ TAREFA (siga as regras do sistema — ajustes conservadores, só o necessário):
 4. "adjustments": lista de mudanças, cada uma com { location (refeição/estratégia), before, after, reason }.
 5. "attention_points": pontos que exigem avaliação DIRETA do nutricionista (sinais de alerta, dados insuficientes) — pode ser vazio.
 6. Recalcule os totais diários (kcal e g/kg) coerentes com os ajustes.
-7. "adjustment_message": SOMENTE quando houver mudança — mensagem curta (2 a 5 frases), humana e acolhedora, para o NUTRICIONISTA enviar ao atleta, citando naturalmente o que orientou a mudança. Sem culpa, sem jargão, sem prometer cura.`;
+7. VARIAÇÕES POR DIA: se a dinâmica de treinos indicar que dias diferentes pedem alimentação diferente (ex.: dia de treino longo/intenso com mais carboidrato, dia de descanso com menos), preencha "day_variations" com a chave do dia (seg,ter,qua,qui,sex,sab,dom) contendo as refeições daquele dia. O plano base (meals) vale para os demais dias. Só crie variações quando fizer sentido pela rotina real de treinos; caso contrário, deixe day_variations vazio.
+8. "adjustment_message": SOMENTE quando houver mudança — mensagem curta (2 a 5 frases), humana e acolhedora, para o NUTRICIONISTA enviar ao atleta, citando naturalmente o que orientou a mudança. Sem culpa, sem jargão, sem prometer cura.`;
 
     let systemPrompt = SYSTEM_PROMPT;
     try {
@@ -304,6 +305,10 @@ const UPDATE_SCHEMA = {
             fat_g: { type: "number" }, fat_gkg: { type: "number" }, kcal_kg: { type: "number" },
           },
           required: ["kcal", "cho_g", "cho_gkg", "protein_g", "fat_g"],
+        },
+        day_variations: {
+          type: "object",
+          description: "Variações por dia da semana (chaves seg,ter,qua,qui,sex,sab,dom). Cada valor tem { meals: [...igual ao base...], daily_totals: {...} }. Vazio se todos os dias forem iguais.",
         },
       },
       required: ["meals", "daily_totals"],
