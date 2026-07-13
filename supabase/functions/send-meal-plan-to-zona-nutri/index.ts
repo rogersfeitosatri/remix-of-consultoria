@@ -99,10 +99,11 @@ Deno.serve(async (req) => {
       sent_at: new Date().toISOString(),
       source: "consultoria",
       athlete: {
-        external_id: znAthlete ? `zn:${znAthlete.id}` : null,
+        // Não enviamos external_id: o id local do zn_athletes não corresponde
+        // ao id do atleta dentro do Zona Nutri. O ZN deve resolver por email/cpf.
         email: (client.email || "").toLowerCase(),
         name: client.name ?? znAthlete?.name ?? null,
-        cpf: znAthlete?.cpf_cnpj ?? null,
+        cpf: (znAthlete?.cpf_cnpj ?? (client as any).cpf ?? null),
       },
       nutritionist: { name: "Rogers Feitosa", crn: "CRN 14885" },
       plan: {
