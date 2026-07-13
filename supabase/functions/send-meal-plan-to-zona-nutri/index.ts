@@ -55,9 +55,9 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const MEAL_PLAN_URL = Deno.env.get("ZONA_NUTRI_MEAL_PLAN_URL");
-    const API_KEY = Deno.env.get("ZONA_NUTRI_API_KEY");
+    const API_KEY = Deno.env.get("CONSULTORIA_API_KEY");
     if (!MEAL_PLAN_URL) throw new Error("ZONA_NUTRI_MEAL_PLAN_URL não configurada.");
-    if (!API_KEY) throw new Error("ZONA_NUTRI_API_KEY não configurada.");
+    if (!API_KEY) throw new Error("CONSULTORIA_API_KEY não configurada.");
 
     const { clientId } = await req.json();
     if (!clientId) throw new Error("clientId is required");
