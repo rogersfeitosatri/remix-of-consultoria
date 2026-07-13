@@ -126,7 +126,6 @@ async function extractFromPdf(pdfBase64: string, rules: string): Promise<any> {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY não configurada.");
   const clean = pdfBase64.includes(",") ? pdfBase64.split(",").pop()! : pdfBase64;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
   const instruction = `${SYSTEM_PROMPT}
 
 Leia o PDF do plano alimentar (mesmo que seja composto por imagens — faça OCR) e retorne SOMENTE um JSON com este formato:
@@ -145,30 +144,44 @@ Leia o PDF do plano alimentar (mesmo que seja composto por imagens — faça OCR
 }
 
 ${rules}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { text: instruction },
-          { inline_data: { mime_type: "application/pdf", data: clean } },
-        ],
-      }],
-      generationConfig: { response_mime_type: "application/json", temperature: 0.2 },
-    }),
-  });
-  const body = await res.json();
-  if (!res.ok) throw new Error(`Gemini PDF [${res.status}]: ${JSON.stringify(body).slice(0, 400)}`);
-  const text = body?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") ?? "";
-  const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const m = cleaned.match(/\{[\s\S]*\}/);
-    if (m) return JSON.parse(m[0]);
-    throw new Error("Não consegui interpretar o PDF como plano estruturado.");
+  const body = {
+    contents: [{
+      parts: [
+        { text: instruction },
+        { inline_data: { mime_type: "application/pdf", data: clean } },
+      ],
+    }],
+    generationConfig: { response_mime_type: "application/json", temperature: 0.2 },
+  };
+
+  // Tenta gemini-2.5-flash com retry; se 503/429/500 persistir, cai para gemini-2.5-pro.
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro"];
+  let lastErr = "";
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const text = json?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join("") ?? "";
+        const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+        try { return JSON.parse(cleaned); }
+        catch {
+          const m = cleaned.match(/\{[\s\S]*\}/);
+          if (m) return JSON.parse(m[0]);
+          throw new Error("Não consegui interpretar o PDF como plano estruturado.");
+        }
+      }
+      lastErr = `Gemini PDF [${res.status}] (${model}): ${JSON.stringify(json).slice(0, 300)}`;
+      if (![429, 500, 503, 504].includes(res.status)) throw new Error(lastErr);
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    }
   }
+  throw new Error(`${lastErr} — modelo Gemini sobrecarregado. Tente novamente em instantes ou cole o texto do plano.`);
 }
 
 const SYSTEM_PROMPT = `Você organiza dietas já prontas no formato estruturado de um sistema de nutrição esportiva. Sua tarefa é APENAS estruturar fielmente a dieta recebida — não é criar, nem otimizar, nem alterar quantidades. Mantenha alimentos, porções, medidas caseiras, substituições ("ou"), refeições e horários exatamente como no texto. Só estime macros/totais quando não estiverem no texto, deixando claro que é estimativa.`;
