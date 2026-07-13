@@ -8,12 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
-import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp } from 'lucide-react';
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
 
@@ -154,6 +155,21 @@ export default function MealPlanDetail() {
     },
     onSuccess: () => { toast.success('Plano atualizado com base no último check-in!'); refresh(); },
     onError: (e: any) => toast.error(e.message || 'Erro ao atualizar plano'),
+  });
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const importDiet = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('import-meal-plan', {
+        body: { clientId, planText: importText },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => { toast.success('Dieta importada! Já aparece em Plano Alimentar.'); setImportOpen(false); setImportText(''); refresh(); },
+    onError: (e: any) => toast.error(e.message || 'Erro ao importar dieta'),
   });
 
   // Ao chegar do check-in, importa o plano atual e roda a análise automaticamente.
@@ -349,34 +365,46 @@ export default function MealPlanDetail() {
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
         ) : !hasPlan ? (
-          /* No plan yet → two paths */
-          <div className="grid md:grid-cols-2 gap-4">
-            <Card className="border-primary/30">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Gerar com IA (anamnese)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">A IA analisa a anamnese e monta o plano. Ajuste as metas abaixo (opcional).</p>
-                {GuidanceInputs}
-                <Button className="w-full gap-2" onClick={() => analyzeMutation.mutate()} disabled={busy}>
-                  {analyzeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-                  Gerar plano com IA
-                </Button>
-              </CardContent>
-            </Card>
+          /* Ainda não há plano → duas formas de criar */
+          <div className="space-y-4">
+            <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+              Este atleta ainda não tem plano. Há <strong>duas formas</strong> de criar:
+              <span className="text-foreground"> (1) Importar a dieta atual</span> (se ele já tem uma) ou
+              <span className="text-foreground"> (2) Gerar pela anamnese</span> (a IA monta a partir da anamnese).
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* 1) Importar dieta atual */}
+              <Card className="border-primary/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2"><FileUp className="h-4 w-4 text-primary" /> 1. Importar dieta atual</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">O atleta já tem uma dieta? Cole o texto dela (do PDF/plano atual) e o sistema estrutura em refeições, alimentos, porções e substituições. Essa dieta vira o Plano Alimentar.</p>
+                  <Button className="w-full gap-2" onClick={() => setImportOpen(true)} disabled={busy}>
+                    <FileUp className="h-4 w-4" /> Importar dieta
+                  </Button>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2"><FilePlus2 className="h-4 w-4 text-primary" /> Criar do zero</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">Comece um plano em branco e monte refeição por refeição manualmente.</p>
-                <Button variant="outline" className="w-full gap-2" onClick={() => createFromScratch.mutate()} disabled={busy}>
-                  {createFromScratch.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
-                  Criar plano em branco
-                </Button>
-              </CardContent>
-            </Card>
+              {/* 2) Gerar pela anamnese */}
+              <Card className="border-primary/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> 2. Gerar pela anamnese (IA)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Não tem dieta ainda? A IA analisa a anamnese e monta o plano original. Ajuste as metas abaixo (opcional).</p>
+                  {GuidanceInputs}
+                  <Button className="w-full gap-2" onClick={() => analyzeMutation.mutate()} disabled={busy}>
+                    {analyzeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+                    Gerar plano pela anamnese
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            <button className="text-xs text-muted-foreground underline" onClick={() => createFromScratch.mutate()} disabled={busy}>
+              ou criar um plano em branco para montar manualmente
+            </button>
           </div>
         ) : (
           <>
@@ -395,6 +423,9 @@ export default function MealPlanDetail() {
                 <p className="text-xs text-muted-foreground">
                   Importa o plano atual como base e a IA o revisa de forma conservadora com base no último check-in, histórico, objetivos, prova-alvo e dinâmica de treinos — ajustando só o necessário.
                 </p>
+                <button className="text-xs text-muted-foreground underline" onClick={() => setImportOpen(true)}>
+                  Substituir por outra dieta (importar do PDF/plano atual)
+                </button>
 
                 {/* Leitura do check-in */}
                 {structured?.checkin_reading && (
@@ -503,6 +534,31 @@ export default function MealPlanDetail() {
             <EditableStrategicOrientations key={`so-${structured.updated_at}`} analysis={structured} clientId={clientId!} onUpdated={refresh} />
           </>
         )}
+
+        {/* Diálogo: importar dieta atual */}
+        <Dialog open={importOpen} onOpenChange={setImportOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>Importar dieta atual do atleta</DialogTitle></DialogHeader>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Cole aqui o texto da dieta que o atleta já usa (do PDF ou plano atual). O sistema estrutura em refeições, alimentos, porções e substituições — <strong>sem inventar nada</strong>. Essa dieta passa a ser o Plano Alimentar.
+              </p>
+              <Textarea
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                rows={12}
+                placeholder={"Ex.:\nCafé da manhã (07h)\n- 2 fatias de pão francês (100g) ou 1 tapioca (80g)\n- 2 ovos\n- 1 fruta\n\nAlmoço (12h)\n- Arroz 4 col. sopa ou batata 2 unid.\n..."}
+                className="font-mono text-xs"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setImportOpen(false)}>Cancelar</Button>
+              <Button onClick={() => importDiet.mutate()} disabled={importDiet.isPending || importText.trim().length < 20}>
+                {importDiet.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importando...</> : <><FileUp className="h-4 w-4 mr-2" />Importar</>}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
