@@ -2,7 +2,8 @@
 // Mapeia o plano base + variações por dia (meal_plan.day_variations) para os
 // dias da semana no formato do endpoint do Zona Nutri.
 //
-// Secrets: ZONA_NUTRI_MEAL_PLAN_URL (endpoint do plano) e ZONA_NUTRI_API_KEY.
+// Secrets: ZONA_NUTRI_MEAL_PLAN_URL (endpoint do plano) e CONSULTORIA_API_KEY.
+// Opcional: ZONA_NUTRI_SYNC_URL. Se ausente, é derivada do endpoint do plano.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -23,6 +24,28 @@ const WEEKDAYS: { key: string; weekday: string; label: string }[] = [
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+function normalizeEmail(email: unknown) {
+  return String(email ?? "").trim().toLowerCase();
+}
+
+function onlyDigits(value: unknown) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits || null;
+}
+
+function deriveSyncUrl(mealPlanUrl: string) {
+  const explicit = Deno.env.get("ZONA_NUTRI_SYNC_URL")?.trim();
+  if (explicit) return explicit;
+  return mealPlanUrl.replace(/\/consultoria-meal-plan\/?$/, "/consultoria-sync");
+}
+
+async function readResponse(res: Response) {
+  const text = await res.text();
+  let body: any = text;
+  try { body = text ? JSON.parse(text) : null; } catch { /* keep text */ }
+  return { text, body };
 }
 
 // Converte uma refeição do formato da consultoria para o formato do Zona Nutri.
@@ -51,13 +74,90 @@ function mapMeals(meals: any[]) {
   return (meals || []).map((m, i) => mapMeal(m, i + 1));
 }
 
+async function findOrCreateLocalZnAthlete(supabase: any, client: any, email: string) {
+  const ownerUserId = client.user_id;
+  const selectCols = "id, user_id, email, name, phone, cpf_cnpj, status, plan_choice, metadata";
+
+  let query = supabase.from("zn_athletes").select(selectCols).eq("email", email);
+  if (ownerUserId) query = query.eq("user_id", ownerUserId);
+  const { data: existing } = await query.maybeSingle();
+  if (existing) return existing;
+
+  const insertPayload = {
+    user_id: ownerUserId,
+    email,
+    name: client.name ?? email.split("@")[0],
+    phone: onlyDigits(client.phone),
+    cpf_cnpj: onlyDigits(client.cpf ?? client.cpf_cnpj),
+    status: client.is_active ? "active" : "pending",
+    plan_choice: client.plan_type ?? client.plan_duration ?? null,
+    metadata: { consultoria_client_id: client.id },
+  };
+  const { data: created, error } = await supabase
+    .from("zn_athletes")
+    .insert(insertPayload)
+    .select(selectCols)
+    .single();
+
+  if (!error && created) return created;
+
+  // Corrida de inserção/unique: tenta carregar novamente e deixa o envio seguir.
+  let retry = supabase.from("zn_athletes").select(selectCols).eq("email", email);
+  if (ownerUserId) retry = retry.eq("user_id", ownerUserId);
+  const { data: afterRace } = await retry.maybeSingle();
+  return afterRace ?? null;
+}
+
+async function ensureZonaNutriProfile(params: {
+  syncUrl: string;
+  apiKey: string;
+  client: any;
+  znAthlete: any;
+  email: string;
+}) {
+  const { syncUrl, apiKey, client, znAthlete, email } = params;
+  if (!syncUrl || !syncUrl.includes("/consultoria-sync")) {
+    return { ok: false, skipped: true, error: "ZONA_NUTRI_SYNC_URL inválida ou não configurada" };
+  }
+
+  const payload = {
+    evento: "subscription_created",
+    athleteId: znAthlete.id,
+    nome: client.name ?? znAthlete.name ?? email.split("@")[0],
+    email,
+    telefone: onlyDigits(client.phone ?? znAthlete.phone),
+    plano: client.plan_type ?? znAthlete.plan_choice ?? client.plan_duration ?? "consultoria",
+    status: client.is_active === false ? "inactive" : "active",
+    dataInicio: client.start_date ?? new Date().toISOString().slice(0, 10),
+    dataExpiracao: client.end_date ?? null,
+    eventId: `meal-plan-profile-link:${znAthlete.id}:${client.updated_at ?? client.id}`,
+  };
+
+  try {
+    const res = await fetch(syncUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "Idempotency-Key": payload.eventId,
+      },
+      body: JSON.stringify(payload),
+    });
+    const parsed = await readResponse(res);
+    return { ok: res.ok && parsed.body?.success !== false, status: res.status, response: parsed.body };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const MEAL_PLAN_URL = Deno.env.get("ZONA_NUTRI_MEAL_PLAN_URL");
+    const MEAL_PLAN_URL = Deno.env.get("ZONA_NUTRI_MEAL_PLAN_URL")?.trim();
     const API_KEY = Deno.env.get("CONSULTORIA_API_KEY");
     if (!MEAL_PLAN_URL) throw new Error("ZONA_NUTRI_MEAL_PLAN_URL não configurada.");
     if (!API_KEY) throw new Error("CONSULTORIA_API_KEY não configurada.");
+    const SYNC_URL = deriveSyncUrl(MEAL_PLAN_URL);
 
     const { clientId } = await req.json();
     if (!clientId) throw new Error("clientId is required");
@@ -66,6 +166,8 @@ Deno.serve(async (req) => {
 
     const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
     if (!client) throw new Error("Cliente não encontrado");
+    const email = normalizeEmail(client.email);
+    if (!email) throw new Error("Cliente sem e-mail; não é possível vincular ao Zona Nutri.");
 
     const { data: analysis } = await supabase
       .from("ai_analyses").select("*").eq("client_id", clientId).maybeSingle();
@@ -73,10 +175,18 @@ Deno.serve(async (req) => {
     try { plan = analysis?.raw_response ? JSON.parse(analysis.raw_response) : null; } catch { /* */ }
     if (!plan?.meal_plan?.meals) throw new Error("Não há plano alimentar para enviar.");
 
-    // Localiza o atleta ZN correspondente (mesmo e-mail) para o external_id.
-    const { data: znAthlete } = await supabase
-      .from("zn_athletes").select("id, email, name, phone, cpf_cnpj")
-      .eq("email", (client.email || "").toLowerCase()).maybeSingle();
+    // O endpoint do Zona Nutri resolve primeiro por external_id
+    // (profiles.consultoria_athlete_id). Portanto, antes de enviar o plano,
+    // garantimos o vínculo remoto por e-mail e reenviamos o ID local correto.
+    const znAthlete = await findOrCreateLocalZnAthlete(supabase, client, email);
+    if (!znAthlete?.id) throw new Error("Não foi possível preparar o vínculo local do atleta Zona Nutri.");
+    const preSync = await ensureZonaNutriProfile({
+      syncUrl: SYNC_URL,
+      apiKey: API_KEY,
+      client,
+      znAthlete,
+      email,
+    });
 
     const base = plan.meal_plan;
     const variations = base.day_variations || {};
@@ -99,11 +209,13 @@ Deno.serve(async (req) => {
       sent_at: new Date().toISOString(),
       source: "consultoria",
       athlete: {
-        // Não enviamos external_id: o id local do zn_athletes não corresponde
-        // ao id do atleta dentro do Zona Nutri. O ZN deve resolver por email/cpf.
-        email: (client.email || "").toLowerCase(),
+        // O Zona Nutri lê "zn:<id>" como consultoria_athlete_id e usa e-mail
+        // apenas como fallback. Sem esse external_id, usuários já existentes por
+        // e-mail podem cair em athlete_not_found dependendo da versão da API ZN.
+        external_id: `zn:${znAthlete.id}`,
+        email,
         name: client.name ?? znAthlete?.name ?? null,
-        cpf: (znAthlete?.cpf_cnpj ?? (client as any).cpf ?? null),
+        cpf: (znAthlete?.cpf_cnpj ?? onlyDigits((client as any).cpf ?? (client as any).cpf_cnpj)),
       },
       nutritionist: { name: "Rogers Feitosa", crn: "CRN 14885" },
       plan: {
@@ -118,7 +230,7 @@ Deno.serve(async (req) => {
       },
     };
 
-    const res = await fetch(MEAL_PLAN_URL, {
+    const sendPlan = () => fetch(MEAL_PLAN_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -127,15 +239,39 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify(payload),
     });
-    const text = await res.text();
+
+    let res = await sendPlan();
+    let { text, body: responseBody } = await readResponse(res);
     if (!res.ok) {
       let znError: string | null = null;
-      try { znError = JSON.parse(text)?.error ?? null; } catch { /* */ }
+      try { znError = typeof responseBody === "object" ? responseBody?.error ?? null : null; } catch { /* */ }
       if (znError === "athlete_not_found") {
+        // Self-healing final: força novamente o vínculo e tenta o plano uma vez
+        // mais. Isso cobre casos em que a conta já existia no ZN, mas ainda não
+        // estava com consultoria_athlete_id preenchido.
+        const syncAgain = preSync.ok ? preSync : await ensureZonaNutriProfile({
+          syncUrl: SYNC_URL,
+          apiKey: API_KEY,
+          client,
+          znAthlete,
+          email,
+        });
+        if (syncAgain.ok) {
+          res = await sendPlan();
+          ({ text, body: responseBody } = await readResponse(res));
+          if (res.ok) {
+            try {
+              const updated = { ...plan, zona_nutri_sent_at: new Date().toISOString() };
+              await supabase.from("ai_analyses").update({ raw_response: JSON.stringify(updated) }).eq("id", analysis.id);
+            } catch { /* não bloqueia */ }
+            return json({ success: true, sent: true, linked: true, response: responseBody });
+          }
+        }
         return json({
           error: "ATHLETE_NOT_FOUND",
-          message: `Este atleta (${(client.email || "").toLowerCase()}) ainda não existe no Zona Nutri. Peça para ele criar a conta no app Zona Nutri com o mesmo e-mail antes de reenviar o plano.`,
+          message: `Não foi possível localizar/vincular ${email} no Zona Nutri automaticamente. Verifique se a conta do atleta no Zona Nutri usa exatamente este e-mail e tente novamente.`,
           fallback: true,
+          sync: syncAgain,
         }, 200);
       }
       return json({ error: `Zona Nutri respondeu ${res.status}: ${text.slice(0, 500)}`, fallback: res.status >= 500 }, res.status >= 500 ? 200 : 502);
@@ -147,7 +283,7 @@ Deno.serve(async (req) => {
       await supabase.from("ai_analyses").update({ raw_response: JSON.stringify(updated) }).eq("id", analysis.id);
     } catch { /* não bloqueia */ }
 
-    return json({ success: true, sent: true, response: safeJson(text) });
+    return json({ success: true, sent: true, linked: preSync.ok, response: responseBody });
   } catch (error) {
     console.error("send-meal-plan-to-zona-nutri error:", error);
     const msg = error instanceof Error ? error.message : "Unknown error";
