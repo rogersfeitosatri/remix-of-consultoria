@@ -82,9 +82,11 @@ Deno.serve(async (req) => {
 
     console.log('Sending request to Gemini (with fallback)...');
 
+    const reinforcedUserPrompt = `${prompt}\n\n---\n${FORMAT_RULES}\n\nATENÇÃO: preencha "day_variations" com os 7 dias da semana refletindo a dinâmica de treinos acima. Não devolva day_variations vazio.`;
+
     const { data: analysisData, provider, model } = await callAiStructured({
       systemPrompt,
-      userPrompt: prompt,
+      userPrompt: reinforcedUserPrompt,
       toolName: 'submit_athlete_analysis',
       toolDescription: 'Submit the complete structured nutritional analysis for the athlete',
       schema: ANALYSIS_SCHEMA,
