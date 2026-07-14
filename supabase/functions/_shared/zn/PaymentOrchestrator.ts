@@ -361,14 +361,19 @@ export class PaymentOrchestrator {
       ? `Olá ${firstName}! 🎉 Seu acesso à *ZN Assessoria* foi ativado.\n\n` +
         `Plano: *${input.planCode}*${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}\n\n` +
         `👇 *Acesse o app Zona Nutri com estes dados:*\n` +
-        `🔗 https://zonanutri.com\n` +
+        `🔗 https://zonanutri.com/login\n` +
         `📧 Login: ${input.login}\n` +
         `🔑 Senha temporária: ${input.senhaTemporaria}\n\n` +
         `⚠️ Por segurança, você precisará trocar a senha no primeiro acesso.\n\n` +
         `Bons treinos! 🏃‍♂️💪`
-      : `Olá ${firstName}! Seu acesso à ZN Assessoria foi ativado ✅\n` +
-        `Plano: ${input.planCode}${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}.\n` +
-        `Em instantes você receberá seu login e senha do app Zona Nutri.`;
+      : `Olá ${firstName}! 🎉 Seu acesso à *ZN Assessoria* foi ativado.\n\n` +
+        `Plano: *${input.planCode}*${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}\n\n` +
+        `👇 *Acesse o app Zona Nutri:*\n` +
+        `🔗 https://zonanutri.com/login\n` +
+        `📧 Login (e-mail): ${input.athlete.email}\n\n` +
+        `🔑 *Como definir sua senha:*\n` +
+        `Clique em *"Esqueci minha senha"* na tela de login e siga as instruções enviadas para o seu e-mail.\n\n` +
+        `Bons treinos! 🏃‍♂️💪`;
 
     const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}/send-text`;
     const res = await fetch(zapiUrl, {
