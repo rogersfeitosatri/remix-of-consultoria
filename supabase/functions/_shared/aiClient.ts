@@ -47,7 +47,7 @@ function fallbackProvider(kind: FallbackKind): Provider | null {
       name: 'lovable',
       endpoint: LOVABLE_ENDPOINT,
       apiKey: Deno.env.get('LOVABLE_API_KEY'),
-      model: 'google/gemini-2.5-pro',
+      model: 'google/gemini-2.5-flash',
       sanitizeSchema: false,
     };
   }
