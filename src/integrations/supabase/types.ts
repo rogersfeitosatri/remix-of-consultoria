@@ -2065,6 +2065,7 @@ export type Database = {
           is_frozen: boolean
           last_consultation_at: string | null
           last_consultation_index: number | null
+          manual_weight_kg: number | null
           monthly_value: number
           name: string
           notes: string | null
@@ -2117,6 +2118,7 @@ export type Database = {
           is_frozen?: boolean
           last_consultation_at?: string | null
           last_consultation_index?: number | null
+          manual_weight_kg?: number | null
           monthly_value: number
           name: string
           notes?: string | null
@@ -2169,6 +2171,7 @@ export type Database = {
           is_frozen?: boolean
           last_consultation_at?: string | null
           last_consultation_index?: number | null
+          manual_weight_kg?: number | null
           monthly_value?: number
           name?: string
           notes?: string | null
