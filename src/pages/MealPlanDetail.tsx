@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { PlanPipelinePanel } from '@/components/admin/PlanPipelinePanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -514,13 +515,17 @@ export default function MealPlanDetail() {
               </Card>
             </div>
 
+            <PlanPipelinePanel clientId={clientId!} onDone={refresh} />
+
             <button className="text-xs text-muted-foreground underline" onClick={() => createFromScratch.mutate()} disabled={busy}>
               ou criar um plano em branco para montar manualmente
             </button>
           </div>
         ) : (
           <>
-            {/* Regenerate with AI (collapsible) */}
+            {/* Pipeline em etapas (regerar) */}
+            <PlanPipelinePanel clientId={clientId!} onDone={refresh} />
+
             {/* Atualizar plano com base no último check-in */}
             <Card className="border-primary/30">
               <CardContent className="pt-4 space-y-3">
