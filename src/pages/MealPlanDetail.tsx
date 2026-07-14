@@ -243,6 +243,18 @@ export default function MealPlanDetail() {
     onError: (e: any) => toast.error(e.message || 'Erro ao gerar plano-base'),
   });
 
+  // Desfaz o v2: volta ao formato padrão (v1) mantendo a dieta já espelhada.
+  // Assim os botões de sempre (anamnese, orientações, check-in) voltam a valer.
+  const undoV2 = useMutation({
+    mutationFn: async () => {
+      if (!structured) return;
+      const next = { ...structured, planModelVersion: 1 };
+      await persistStructured(next);
+    },
+    onSuccess: () => { toast.success('Plano v2 desfeito — voltou ao formato padrão (a dieta foi mantida).'); refresh(); },
+    onError: (e: any) => toast.error(e.message || 'Erro ao desfazer'),
+  });
+
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
   const [importPdf, setImportPdf] = useState<{ name: string; base64: string } | null>(null);
@@ -572,25 +584,24 @@ export default function MealPlanDetail() {
               ou criar um plano em branco para montar manualmente
             </button>
           </div>
-        ) : isV2 ? (
-          <>
-            {/* Estratégia da semana + longão (carbload por regra) */}
-            <PlanV2Panel clientId={clientId!} stored={structured} onUpdated={refresh} />
-            {/* A DIETA no formato de sempre (editável, kcal/macros, envio ao Zona Nutri) */}
-            {structured?.meal_plan?.meals && (
-              <EditableMealPlan
-                key={`mpv2-${structured.updated_at}`}
-                analysis={structured}
-                clientId={clientId!}
-                athleteWeightKg={athleteWeightKg}
-                mealSchedule={mealSchedule}
-                onUpdated={refresh}
-              />
-            )}
-            <EditableStrategicOrientations key={`sov2-${structured.updated_at}`} analysis={structured} clientId={clientId!} onUpdated={refresh} />
-          </>
         ) : (
           <>
+            {/* Plano v2: estratégia da semana + longão. A dieta segue no editor de
+                sempre abaixo; os botões (anamnese, check-in, orientações) continuam
+                disponíveis. Pode-se desfazer o v2 sem perder a dieta. */}
+            {isV2 && (
+              <>
+                <PlanV2Panel clientId={clientId!} stored={structured} onUpdated={refresh} />
+                <button
+                  className="self-start text-xs text-muted-foreground underline"
+                  onClick={() => undoV2.mutate()}
+                  disabled={busy || undoV2.isPending}
+                >
+                  Desfazer plano v2 e voltar ao formato padrão (mantém a dieta)
+                </button>
+              </>
+            )}
+
             {/* Pipeline em etapas (regerar) */}
             <PlanPipelinePanel clientId={clientId!} onDone={refresh} />
 
@@ -697,6 +708,10 @@ export default function MealPlanDetail() {
                     <Button variant="outline" className="w-full gap-2" onClick={() => analyzeMutation.mutate()} disabled={busy}>
                       {analyzeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
                       Reanalisar (substitui o plano atual)
+                    </Button>
+                    <Button variant="outline" className="w-full gap-2" onClick={() => generateV2.mutate()} disabled={busy || generateV2.isPending}>
+                      {generateV2.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                      Gerar/atualizar via v2 (base + camadas, encaixa por dia)
                     </Button>
                   </CardContent>
                 </CollapsibleContent>
