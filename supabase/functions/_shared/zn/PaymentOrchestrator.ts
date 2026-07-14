@@ -361,7 +361,7 @@ export class PaymentOrchestrator {
       ? `Olá ${firstName}! 🎉 Seu acesso à *ZN Assessoria* foi ativado.\n\n` +
         `Plano: *${input.planCode}*${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}\n\n` +
         `👇 *Acesse o app Zona Nutri com estes dados:*\n` +
-        `🔗 https://app.zonanutri.com\n` +
+        `🔗 https://zonanutri.com\n` +
         `📧 Login: ${input.login}\n` +
         `🔑 Senha temporária: ${input.senhaTemporaria}\n\n` +
         `⚠️ Por segurança, você precisará trocar a senha no primeiro acesso.\n\n` +
