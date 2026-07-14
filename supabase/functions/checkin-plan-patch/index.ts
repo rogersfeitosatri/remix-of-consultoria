@@ -110,6 +110,11 @@ Escreva SOMENTE {"summaryForAthlete": string} — 2 a 4 frases explicando o ajus
     };
     await supabase.from("ai_analyses").update({ raw_response: JSON.stringify(next), updated_at: new Date().toISOString() }).eq("id", row.id);
 
+    console.log("checkin-plan-patch obs:", JSON.stringify({
+      clientId, signals, carbloadChange: carbloadChange ? `${carbloadChange.fromDays}->${carbloadChange.toDays}` : "keep",
+      professionalReviewRequired, version: next.planVersionNumber,
+    }));
+
     return json({ success: true, planAction: "patch", signals, carbloadChange, professionalReviewRequired, summaryForAthlete });
   } catch (error) {
     console.error("checkin-plan-patch:", error);

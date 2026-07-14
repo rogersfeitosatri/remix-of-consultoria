@@ -35,6 +35,38 @@ function extractTraining(anamnese: any, questions: any[]): { trainingWeek: any; 
   return { trainingWeek: tw, longRunWeekday: longRun };
 }
 
+function foodText(f: any): string {
+  return `${f.name}${f.grams ? ` ${Math.round(Number(f.grams))}g` : ""}${f.measure ? ` (${f.measure})` : ""}`;
+}
+// Converte o plano-base v2 para o formato v1 (meal_plan.meals) para renderização.
+function mirrorToMealPlan(meals: any[]): any[] {
+  return (meals || []).map((m: any) => {
+    const mainTxt = (m.mainOption?.foods || []).map(foodText).join(" + ");
+    const subTxts = (m.substitutions || []).map((o: any) => (o.foods || []).map(foodText).join(" + ")).filter(Boolean);
+    const options = [mainTxt, ...subTxts].filter(Boolean).join(" ou ");
+    const mm = m.macros || {};
+    return {
+      meal_name: m.name, horario: m.defaultTime || "",
+      timing_note: (m.generalInstructions || [])[0] || "",
+      food_groups: [{ group: m.name, options }],
+      meal_macros: mm.kcal != null ? `~${Math.round(mm.kcal)} kcal, CHO ${Math.round(mm.cho_g || 0)}g, PTN ${Math.round(mm.protein_g || 0)}g` : "",
+    };
+  });
+}
+// Fallback determinístico: estrutura mínima segura, marcada para revisão.
+function fallbackBasePlan(): any {
+  const meal = (id: string, name: string, time: string) => ({
+    id, name, defaultTime: time,
+    mainOption: { foods: [] }, substitutions: [], generalInstructions: ["Preencher com o nutricionista."], macros: {},
+  });
+  return {
+    athlete_summary: "Plano-base em modo de segurança (IA indisponível). Preencha as refeições e regenere quando possível.",
+    alerts: [], dailyTargets: {},
+    meals: [meal("breakfast", "Café da manhã", "07:00"), meal("lunch", "Almoço", "12:00"), meal("afternoon_snack", "Lanche da tarde", "16:00"), meal("dinner", "Jantar", "20:00")],
+    carbBlocks: [], generalInstructions: [],
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -118,14 +150,26 @@ Regras: cada refeição aparece UMA vez, com id único. Use alimentos que o atle
     const genStub = { planModelVersion: 2, status: "generating", updatedAt: new Date().toISOString() };
     if (existingRow) await supabase.from("ai_analyses").update({ raw_response: JSON.stringify({ ...(existing || {}), ...genStub }) }).eq("id", existingRow.id);
 
-    let result: any;
+    // Observabilidade
+    const t0 = Date.now();
+    let usedFallback = false;
+    let result: any = null;
+    let provider = "-", model = "-";
     try {
       const r = await callAiJson({ systemPrompt, userPrompt, perAttemptMs: 60_000 });
-      result = r.data;
+      result = r.data; provider = r.provider; model = r.model;
     } catch (e) {
-      return json({ error: (e as Error).message }, 502);
+      console.warn("generate-base-plan: IA falhou, usando fallback determinístico:", (e as Error).message);
     }
-    if (!Array.isArray(result?.meals) || !result.meals.length) throw new Error("A IA não retornou o plano-base.");
+    if (!Array.isArray(result?.meals) || !result.meals.length) {
+      // Fallback determinístico: estrutura-base segura, marcada para revisão.
+      usedFallback = true;
+      result = fallbackBasePlan();
+    }
+    console.log("generate-base-plan obs:", JSON.stringify({
+      clientId, provider, model, usedFallback, durationMs: Date.now() - t0,
+      inputChars: userPrompt.length, mealsOut: result?.meals?.length ?? 0,
+    }));
 
     // Garante ids únicos
     const seen = new Set<string>();
@@ -139,28 +183,32 @@ Regras: cada refeição aparece UMA vez, com id único. Use alimentos que o atle
       meals: result.meals, carbBlocks: result.carbBlocks || [], generalInstructions: result.generalInstructions || [],
       dailyTargets: result.dailyTargets || null,
     };
+    // Espelha o plano-base no formato v1 (meal_plan.meals) para o app do atleta,
+    // o envio ao Zona Nutri e telas legadas renderizarem sem mudança.
+    const mealPlanMeals = mirrorToMealPlan(basePlan.meals);
+
     const stored = {
-      planModelVersion: 2, status: "active",
+      planModelVersion: 2, status: usedFallback ? "requires_review" : "active",
       basePlan,
       inputs: { longRunWeekday, trainingWeek, raceDate: profile?.target_deadline || client.target_deadline || null },
       athlete_summary: result.athlete_summary || "",
-      alerts: result.alerts || [],
+      alerts: [...(result.alerts || []), ...(usedFallback ? ["Plano-base gerado em modo de segurança (IA indisponível) — revise antes de enviar."] : [])],
+      planVersionNumber: (existing?.planVersionNumber || 0) + 1,
       generatedAt: new Date().toISOString(),
-      // compat com telas antigas que leem meal_plan.meals: espelha o base como meal_plan
-      meal_plan: { meals: [], daily_totals: basePlan.dailyTargets || {} },
+      meal_plan: { meals: mealPlanMeals, daily_totals: basePlan.dailyTargets || {} },
       _isNewFormat: true,
     };
 
     const record = {
       client_id: clientId, athlete_profile_id: profile?.id ?? null,
       diagnosis: stored.athlete_summary, alerts: stored.alerts,
-      raw_response: JSON.stringify(stored), model_used: "v2-base", updated_at: new Date().toISOString(),
+      raw_response: JSON.stringify(stored), model_used: `v2-base/${model}`, updated_at: new Date().toISOString(),
       energy_expenditure: {} as any, macronutrients: {} as any, caloric_deficit: { meal_plan: stored.meal_plan } as any,
     };
     if (existingRow) await supabase.from("ai_analyses").update(record).eq("id", existingRow.id);
     else await supabase.from("ai_analyses").insert(record);
 
-    return json({ success: true, planModelVersion: 2, longRunWeekday });
+    return json({ success: true, planModelVersion: 2, longRunWeekday, status: stored.status, usedFallback });
   } catch (error) {
     console.error("generate-base-plan:", error);
     return json({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
