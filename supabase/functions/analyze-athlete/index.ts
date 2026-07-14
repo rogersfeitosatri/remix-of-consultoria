@@ -188,7 +188,7 @@ REGRAS:
 - Cada opção de alimento deve incluir a quantidade (ex: "2 fatias de pão francês (100g) ou 1 tapioca grande (80g) ou 1 cuscuz médio (120g)")
 - A soma das refeições deve fechar com o alvo calórico e de macronutrientes definido na progressão
 - Incluir ao final do plano um resumo dos totais aproximados de macros e calorias do dia
-- VARIAÇÕES POR DIA: quando a rotina de treinos indicar demandas diferentes por dia (ex.: dia de treino longo/intenso pede mais carboidrato; dia de descanso pede menos), preencha "day_variations" (chaves seg,ter,qua,qui,sex,sab,dom) com as refeições daquele dia; o plano base (meals) vale para os demais. Só crie variações quando a dinâmica de treinos justificar; caso contrário deixe vazio.`;
+- DINÂMICA POR DIA (obrigatório quando houver frequência de treinos na anamnese): LEIA a frequência/dinâmica de treinos semanais informada na anamnese e ajuste a alimentação à demanda energética de cada dia (dia de treino longo/intenso = mais carboidrato e energia; dia leve/descanso = menos). Preencha "day_variations" (chaves seg,ter,qua,qui,sex,sab,dom) com o plano JÁ AJUSTADO daquele dia. NÃO escreva observações genéricas como "ajustar conforme rotina" — traga o plano concreto por dia. Só deixe day_variations vazio se todos os dias tiverem a mesma demanda.`;
 
 // Regras de FORMATO sempre aplicadas (mesmo com prompt customizado da central),
 // para o plano sair compatível com o envio ao Zona Nutri.
@@ -196,7 +196,7 @@ const FORMAT_RULES = `REGRAS DE FORMATO (obrigatórias):
 - Use os alimentos que o atleta já consome; porções e quantidades REAIS (gramas, ml, unidades).
 - Substituições na MESMA LINHA separadas por "ou" (ex: "2 fatias de pão francês (100g) ou 1 tapioca (80g)").
 - Cada refeição com nome e, quando houver, horário; feche os totais diários (kcal e g/kg) coerentes.
-- VARIAÇÕES POR DIA: quando a rotina de treinos justificar, preencha "day_variations" (seg,ter,qua,qui,sex,sab,dom) com as refeições do dia; o plano base vale para os demais dias (vazio se todos iguais).`;
+- DINÂMICA POR DIA: LEIA a frequência semanal de treinos da anamnese e gere "day_variations" (seg..dom) com o plano JÁ AJUSTADO à demanda de cada dia (treino longo/intenso = mais CHO/energia; descanso = menos). NÃO use observações genéricas tipo "ajustar conforme rotina" — entregue o plano concreto por dia. Vazio só se todos os dias tiverem a mesma demanda.`;
 
 const ANALYSIS_SCHEMA = {
   type: "object",
@@ -319,6 +319,51 @@ const ANALYSIS_SCHEMA = {
   additionalProperties: false,
 };
 
+// Formata respostas estruturadas (treino semanal, refeições, sintomas) de forma
+// LEGÍVEL para a IA — caso contrário viram "[object Object]" e a dinâmica de
+// treinos/alimentação se perde.
+function formatAnswer(answer: any): string {
+  if (answer == null || answer === '') return 'Não respondido';
+  if (Array.isArray(answer)) return answer.map((a) => formatAnswer(a)).join(', ');
+  if (typeof answer !== 'object') return String(answer);
+
+  const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+  // training_week: { Segunda: [ {modalidade, turno, intensidade, longao} ], ... }
+  if (DIAS.some((d) => d in answer)) {
+    const parts: string[] = [];
+    for (const dia of DIAS) {
+      const sessions = answer[dia];
+      if (!Array.isArray(sessions) || sessions.length === 0) continue;
+      const desc = sessions
+        .filter((s: any) => s && s.modalidade)
+        .map((s: any) => {
+          if (s.modalidade === 'repouso') return 'repouso';
+          const bits = [s.modalidade, s.turno, s.intensidade].filter(Boolean).join(' ');
+          return bits + (s.longao ? ' (LONGÃO)' : '');
+        })
+        .join(' + ');
+      if (desc) parts.push(`${dia}: ${desc}`);
+    }
+    return parts.length ? parts.join(' | ') : 'sem treinos informados';
+  }
+  // meal_items: { horario, itens: string[][], bebidas }
+  if ('itens' in answer || 'bebidas' in answer) {
+    const itens = Array.isArray(answer.itens)
+      ? answer.itens.map((slot: any) => (Array.isArray(slot) ? slot.filter(Boolean).join(' ou ') : slot)).filter(Boolean).join('; ')
+      : '';
+    const h = answer.horario ? `${answer.horario} — ` : '';
+    const b = answer.bebidas ? ` | Bebidas: ${answer.bebidas}` : '';
+    return `${h}${itens}${b}`.trim() || 'não informado';
+  }
+  // symptom_scale: { [sintoma]: 0..5 }
+  const vals = Object.values(answer);
+  if (vals.length && vals.every((v) => typeof v === 'number')) {
+    return Object.entries(answer).map(([k, v]) => `${k}: ${v}/5`).join(', ');
+  }
+  // objeto genérico
+  try { return JSON.stringify(answer); } catch { return String(answer); }
+}
+
 function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, anamneseQuestions: any[], adminGuidance?: any): string {
   let guidanceBlock = '';
   if (adminGuidance && typeof adminGuidance === 'object') {
@@ -355,14 +400,13 @@ function buildAnalysisPrompt(profile: any, client: any, anamneseResponses: any, 
         if (!groupedBySection[section]) groupedBySection[section] = [];
         
         let answerText = '';
-        if (typeof response === 'object' && response.answer !== undefined) {
-          const answer = response.answer;
-          answerText = Array.isArray(answer) ? answer.join(', ') : String(answer);
+        if (response && typeof response === 'object' && 'answer' in response) {
+          answerText = formatAnswer(response.answer);
           if (response.comment) answerText += ` (Comentário: ${response.comment})`;
         } else {
-          answerText = Array.isArray(response) ? response.join(', ') : String(response);
+          answerText = formatAnswer(response);
         }
-        
+
         groupedBySection[section].push(`- ${question.question_text}: ${answerText || 'Não respondido'}`);
       }
     }
