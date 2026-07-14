@@ -104,13 +104,26 @@ export async function notifyUser(
     }
     const sa = JSON.parse(saRaw);
 
-    // 3) Tokens do usuário
-    const { data: tokens } = await supabase.from('push_tokens').select('token').eq('user_id', userId);
-    if (!tokens || tokens.length === 0) {
+    // 3) Tokens do usuário.
+    // Um mesmo aparelho pode acumular VÁRIOS tokens (rotação do FCM, navegador +
+    // PWA), o que gera notificações duplicadas. Para evitar isso, enviamos
+    // apenas ao token MAIS RECENTE de cada plataforma (o do dispositivo em uso).
+    const { data: allTokens } = await supabase
+      .from('push_tokens')
+      .select('token, platform, updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+    if (!allTokens || allTokens.length === 0) {
       console.warn(`[fcm] nenhum dispositivo registrado (push_tokens) para user ${userId} — push não enviado.`);
       return { sent: 0, failed: 0, skipped: true };
     }
-    console.log(`[fcm] enviando push para ${tokens.length} dispositivo(s) do user ${userId}.`);
+    const latestByPlatform = new Map<string, { token: string }>();
+    for (const t of allTokens) {
+      const key = t.platform || 'web';
+      if (!latestByPlatform.has(key)) latestByPlatform.set(key, { token: t.token });
+    }
+    const tokens = Array.from(latestByPlatform.values());
+    console.log(`[fcm] ${allTokens.length} token(s); enviando para ${tokens.length} (mais recente por plataforma) do user ${userId}.`);
 
     const accessToken = await getFcmAccessToken(sa);
     const url = opts.url || '/';
