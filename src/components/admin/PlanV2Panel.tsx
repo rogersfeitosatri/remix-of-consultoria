@@ -72,7 +72,7 @@ export function PlanV2Panel({ clientId, stored, onUpdated }: { clientId: string;
           </div>
         </CardHeader>
         <CardContent>
-          {stored.athlete_summary && <p className="text-sm text-muted-foreground mb-2">{stored.athlete_summary}</p>}
+          {(stored as any).athlete_summary && <p className="text-sm text-muted-foreground mb-2">{(stored as any).athlete_summary}</p>}
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList>
               <TabsTrigger value="base"><Utensils className="h-3.5 w-3.5 mr-1" />Plano-base</TabsTrigger>

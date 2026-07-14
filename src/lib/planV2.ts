@@ -134,7 +134,8 @@ export function buildWeekMap(opts: {
     const ptKey = Object.keys(trainingWeek || {}).find((k) => PT_TO_WEEKDAY[k.toLowerCase()] === wd);
     const sessions = (ptKey ? (trainingWeek as any)[ptKey] : []) as RawSession[];
     const main = (Array.isArray(sessions) ? sessions : []).filter((s) => s?.modalidade && s.modalidade !== 'repouso');
-    const type: TrainingType = main.length ? main.map(sessionType).sort(rank).at(-1)! : 'rest';
+    const sorted = main.length ? main.map(sessionType).sort(rank) : [];
+    const type: TrainingType = sorted.length ? sorted[sorted.length - 1] : 'rest';
     const isLongRun = wd === longRunWeekday || type === 'long_run';
     const isCarbload = carbSet.has(wd);
     const first = main[0];
