@@ -328,7 +328,43 @@ const UPDATE_SCHEMA = {
         },
         day_variations: {
           type: "object",
-          description: "Variações por dia da semana (chaves seg,ter,qua,qui,sex,sab,dom). Cada valor tem { meals: [...igual ao base...], daily_totals: {...} }. Vazio se todos os dias forem iguais.",
+          description: "Variações por dia (seg,ter,qua,qui,sex,sab,dom) já refletindo a periodização de CHO (Fuel for the Work Required). Cada dia com level (0-4), note, meals COMPLETOS (mesma estrutura de meal_plan.meals) e daily_totals ajustados.",
+          properties: Object.fromEntries((['seg','ter','qua','qui','sex','sab','dom'] as const).map((d) => [d, {
+            type: "object",
+            properties: {
+              level: { type: "integer", minimum: 0, maximum: 4 },
+              note: { type: "string" },
+              meals: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    meal_name: { type: "string" },
+                    food_groups: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: { group: { type: "string" }, options: { type: "string" } },
+                        required: ["group", "options"],
+                      },
+                    },
+                    meal_macros: { type: "string" },
+                    timing_note: { type: "string" },
+                  },
+                  required: ["meal_name", "food_groups"],
+                },
+              },
+              daily_totals: {
+                type: "object",
+                properties: {
+                  kcal: { type: "number" }, cho_g: { type: "number" }, cho_gkg: { type: "number" },
+                  protein_g: { type: "number" }, fat_g: { type: "number" },
+                },
+                required: ["kcal", "cho_g", "cho_gkg", "protein_g", "fat_g"],
+              },
+            },
+            required: ["level", "meals", "daily_totals"],
+          }])),
         },
       },
       required: ["meals", "daily_totals"],
