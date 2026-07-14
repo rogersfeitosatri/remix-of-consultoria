@@ -70,13 +70,14 @@ export function useAthleteWeight(clientId?: string | null) {
       try {
         const { data } = await (supabase as any)
           .from('anamnese_responses')
-          .select('current_weight, responses, form_id, submitted_at')
+          .select('responses, form_id, submitted_at')
           .eq('client_id', clientId)
           .order('submitted_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        // 2a) Coluna current_weight (formulários antigos)
+        // 2a) Formulários dinâmicos: peso está na RESPOSTA de uma pergunta
+
         const wCol = data?.current_weight ? parseFloat(String(data.current_weight).replace(',', '.')) : null;
         if (wCol && !isNaN(wCol) && wCol > 20 && wCol < 300) {
           return { weightKg: wCol, source: 'anamnese', date: data?.submitted_at };
