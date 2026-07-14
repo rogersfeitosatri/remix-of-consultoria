@@ -47,7 +47,7 @@ function fallbackProvider(kind: FallbackKind): Provider | null {
       name: 'lovable',
       endpoint: LOVABLE_ENDPOINT,
       apiKey: Deno.env.get('LOVABLE_API_KEY'),
-      model: 'google/gemini-2.5-pro',
+      model: 'google/gemini-2.5-flash',
       sanitizeSchema: false,
     };
   }
@@ -75,7 +75,7 @@ function stripUnsupported(schema: any): any {
   return schema;
 }
 
-async function postChat(p: Provider, body: any, timeoutMs = 60000): Promise<any> {
+async function postChat(p: Provider, body: any, timeoutMs = 120000): Promise<any> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
