@@ -192,11 +192,12 @@ REGRAS:
 
 // Regras de FORMATO sempre aplicadas (mesmo com prompt customizado da central),
 // para o plano sair compatível com o envio ao Zona Nutri.
-const FORMAT_RULES = `REGRAS DE FORMATO (obrigatórias):
+const FORMAT_RULES = `REGRAS DE FORMATO (OBRIGATÓRIAS — sobrepõem qualquer instrução conflitante do prompt customizado):
 - Use os alimentos que o atleta já consome; porções e quantidades REAIS (gramas, ml, unidades).
 - Substituições na MESMA LINHA separadas por "ou" (ex: "2 fatias de pão francês (100g) ou 1 tapioca (80g)").
 - Cada refeição com nome e, quando houver, horário; feche os totais diários (kcal e g/kg) coerentes.
-- DINÂMICA POR DIA: LEIA a frequência semanal de treinos da anamnese e gere "day_variations" (seg..dom) com o plano JÁ AJUSTADO à demanda de cada dia (treino longo/intenso = mais CHO/energia; descanso = menos). NÃO use observações genéricas tipo "ajustar conforme rotina" — entregue o plano concreto por dia. Vazio só se todos os dias tiverem a mesma demanda.`;
+- DINÂMICA POR DIA (CRÍTICO): você DEVE ler a frequência/dinâmica semanal de treinos da anamnese e preencher "day_variations" com TODOS os 7 dias (seg,ter,qua,qui,sex,sab,dom). Para cada dia entregue o plano CONCRETO daquele dia (meals + daily_totals ajustados): dias de treino longo/intenso = mais CHO/energia; dias leves/descanso = menos. NÃO deixe day_variations vazio. NÃO escreva observações genéricas como "ajustar conforme rotina". Só use a chave "note" com uma frase curta quando aquele dia específico for idêntico ao plano base — nunca para todos ao mesmo tempo.
+- Respeite os critérios, filosofia e nuances do prompt customizado da Central de IA (progressão, timing, comportamento, priorização de alimentos), aplicando-os DENTRO da estrutura acima.`;
 
 const ANALYSIS_SCHEMA = {
   type: "object",
