@@ -5262,6 +5262,109 @@ export type Database = {
           },
         ]
       }
+      plan_generation_days: {
+        Row: {
+          attempts: number
+          created_at: string
+          error: string | null
+          id: string
+          job_id: string
+          menu_output: Json | null
+          status: string
+          strategy_input: Json | null
+          updated_at: string
+          validation_result: Json | null
+          weekday: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id: string
+          menu_output?: Json | null
+          status?: string
+          strategy_input?: Json | null
+          updated_at?: string
+          validation_result?: Json | null
+          weekday: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id?: string
+          menu_output?: Json | null
+          status?: string
+          strategy_input?: Json | null
+          updated_at?: string
+          validation_result?: Json | null
+          weekday?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_generation_days_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "plan_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_generation_jobs: {
+        Row: {
+          admin_guidance: Json | null
+          client_id: string
+          completed_days: number
+          created_at: string
+          current_stage: string | null
+          error: string | null
+          id: string
+          status: string
+          total_days: number
+          updated_at: string
+          user_id: string
+          weekly_blueprint: Json | null
+        }
+        Insert: {
+          admin_guidance?: Json | null
+          client_id: string
+          completed_days?: number
+          created_at?: string
+          current_stage?: string | null
+          error?: string | null
+          id?: string
+          status?: string
+          total_days?: number
+          updated_at?: string
+          user_id: string
+          weekly_blueprint?: Json | null
+        }
+        Update: {
+          admin_guidance?: Json | null
+          client_id?: string
+          completed_days?: number
+          created_at?: string
+          current_stage?: string | null
+          error?: string | null
+          id?: string
+          status?: string
+          total_days?: number
+          updated_at?: string
+          user_id?: string
+          weekly_blueprint?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_generation_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_templates: {
         Row: {
           checkin_frequency: string | null
@@ -5766,6 +5869,44 @@ export type Database = {
           whatsapp_message?: string | null
         }
         Relationships: []
+      }
+      substitution_groups: {
+        Row: {
+          created_at: string
+          group_key: string
+          id: string
+          job_id: string
+          main_macro: string | null
+          options: Json | null
+          target_g: number | null
+        }
+        Insert: {
+          created_at?: string
+          group_key: string
+          id?: string
+          job_id: string
+          main_macro?: string | null
+          options?: Json | null
+          target_g?: number | null
+        }
+        Update: {
+          created_at?: string
+          group_key?: string
+          id?: string
+          job_id?: string
+          main_macro?: string | null
+          options?: Json | null
+          target_g?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "substitution_groups_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "plan_generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       support_materials: {
         Row: {
