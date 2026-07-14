@@ -254,18 +254,17 @@ export class PaymentOrchestrator {
       });
       this.log("[8/9] Sync Zona Nutri disparada", { event: syncEvent });
 
-      // WhatsApp de boas-vindas apenas na primeira compra bem-sucedida
+      // WhatsApp de boas-vindas apenas na primeira compra bem-sucedida.
+      // ZN athletes NÃO existem em public.clients, então não podemos usar
+      // send-whatsapp (que exige clientId). Enviamos direto para o ZAPI e
+      // logamos em whatsapp_message_logs com client_id=null.
       if (isFirstPurchase && isPaid && athlete.phone) {
         try {
-          await this.supabase.functions.invoke("send-whatsapp", {
-            body: {
-              phone: athlete.phone,
-              message:
-                `Olá ${athlete.name ?? ""}! Seu acesso à ZN Assessoria foi ativado ✅\n` +
-                `Plano: ${subscription.plan_code} • válido até ${subscription.expires_at}.\n` +
-                `Em breve você receberá as instruções de acesso.`,
-              context: "zn_welcome",
-            },
+          await this.sendZnWelcomeWhatsapp({
+            ownerUserId,
+            athlete,
+            planCode: subscription.plan_code,
+            expiresAt: subscription.expires_at,
           });
           this.log("[whatsapp] Mensagem de boas-vindas enviada");
         } catch (e) {
