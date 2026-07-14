@@ -253,6 +253,7 @@ export interface PlanV2Stored {
   planVersionNumber?: number;
   status?: string;
   generatedAt?: string;
+  athlete_summary?: string | null;
 }
 
 export interface CarbloadProtocol {
