@@ -132,12 +132,17 @@ TAREFA (siga as regras do sistema — ajustes conservadores, só o necessário):
 7. VARIAÇÕES POR DIA: se a dinâmica de treinos indicar que dias diferentes pedem alimentação diferente (ex.: dia de treino longo/intenso com mais carboidrato, dia de descanso com menos), preencha "day_variations" com a chave do dia (seg,ter,qua,qui,sex,sab,dom) contendo as refeições daquele dia. O plano base (meals) vale para os demais dias. Só crie variações quando fizer sentido pela rotina real de treinos; caso contrário, deixe day_variations vazio.
 8. "adjustment_message": SOMENTE quando houver mudança — mensagem curta (2 a 5 frases), humana e acolhedora, para o NUTRICIONISTA enviar ao atleta, citando naturalmente o que orientou a mudança. Sem culpa, sem jargão, sem prometer cura.`;
 
+    // Prompt da central de IA (Plano Alimentar) conduz o estilo; as regras
+    // conservadoras + de formato são sempre garantidas (fluxo de ajuste por
+    // check-in) para o plano sair compatível com o envio ao Zona Nutri.
     let systemPrompt = SYSTEM_PROMPT;
     try {
       const { data: customPrompt } = await supabase
         .from("ai_prompts").select("prompt_text")
         .eq("user_id", client.user_id).eq("context_key", "meal_plan_generation").maybeSingle();
-      if (customPrompt?.prompt_text?.trim()) systemPrompt = customPrompt.prompt_text;
+      if (customPrompt?.prompt_text?.trim()) {
+        systemPrompt = `${customPrompt.prompt_text.trim()}\n\n${ADJUST_FORMAT_RULES}`;
+      }
     } catch { /* usa default */ }
 
     const { data: analysisData, provider, model } = await callAiStructured({
@@ -242,6 +247,16 @@ SINAIS DE ATENÇÃO (faça só ajuste conservador e destaque para avaliação DI
 MENSAGEM AO ATLETA: só quando houver mudança. PT-BR, humana e acolhedora; mostra que o check-in foi lido; explica os ajustes principais e a utilidade prática; orienta contato se houver ponto de atenção; pede para observar a resposta do corpo. Não diga que "falhou/saiu da dieta/precisa compensar". Não liste cada grama.
 
 Se NÃO houver necessidade de ajuste: no_change_needed=true, explique por que manter é a melhor decisão e não gere adjustment_message.`;
+
+// Regras sempre garantidas quando o prompt da central é usado neste fluxo de
+// AJUSTE por check-in: mantém a disciplina conservadora + o formato do plano.
+const ADJUST_FORMAT_RULES = `REGRAS OBRIGATÓRIAS DESTE AJUSTE (mesmo com prompt customizado):
+- AJUSTE CONSERVADOR: altere só o necessário; NÃO reduza energia automaticamente por aumento de peso/composição, lesão ou queda de volume; NÃO faça compensação por refeições fora do plano; não transforme relato isolado em tendência/diagnóstico.
+- Periodize carboidrato conforme a demanda real do treino; preserve horários/preferências/opções adequados.
+- Sinais de atenção (compulsão, RED-S, sintomas GI intensos, etc.) vão para "attention_points" (avaliação direta do nutri), não viram ajuste automático.
+- FORMATO: alimentos que o atleta já usa; porções reais (g, ml, unidades); substituições na MESMA LINHA com "ou"; feche os totais diários (kcal e g/kg).
+- VARIAÇÕES POR DIA (day_variations: seg..dom) quando a dinâmica de treinos justificar; base vale para os demais dias.
+- "adjustment_message" só quando houver mudança; "checkin_reading" sempre.`;
 
 // Esquema = análise completa + adjustment_message
 const UPDATE_SCHEMA = {
