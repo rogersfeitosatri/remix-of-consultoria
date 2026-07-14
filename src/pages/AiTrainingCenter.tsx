@@ -26,6 +26,7 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
+  FileUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -93,6 +94,45 @@ export default function AiTrainingCenter() {
   const [testLoading, setTestLoading] = useState(false);
   const [variablesOpen, setVariablesOpen] = useState(true);
   const [playgroundOpen, setPlaygroundOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  // Importa o conteúdo de um arquivo (.md/.txt lido direto; .pdf transcrito via IA)
+  // para o editor do prompt.
+  const handleImportFile = async (file: File | null) => {
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    try {
+      setImporting(true);
+      if (name.endsWith('.pdf') || file.type === 'application/pdf') {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const r = String(reader.result || '');
+            resolve(r.includes(',') ? r.split(',')[1] : r);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const { data, error } = await supabase.functions.invoke('extract-pdf-text', { body: { pdfBase64: base64 } });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        const text = data?.text || '';
+        if (!text.trim()) throw new Error('Não consegui extrair texto do PDF.');
+        setPromptText(text);
+        toast.success('PDF importado para o prompt.');
+      } else {
+        // .md / .markdown / .txt / outros textos
+        const text = await file.text();
+        if (!text.trim()) throw new Error('Arquivo vazio.');
+        setPromptText(text);
+        toast.success('Arquivo importado para o prompt.');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao importar o arquivo.');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const currentContext = CONTEXTS.find((c) => c.key === selectedContext)!;
 
@@ -226,7 +266,30 @@ export default function AiTrainingCenter() {
                   <CardContent className="space-y-4">
                     {/* System Prompt Editor */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">System Prompt</label>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-sm font-medium">System Prompt</label>
+                        <div>
+                          <input
+                            id="prompt-file-import"
+                            type="file"
+                            accept=".md,.markdown,.txt,.pdf,text/markdown,text/plain,application/pdf"
+                            className="hidden"
+                            onChange={(e) => { handleImportFile(e.target.files?.[0] ?? null); e.currentTarget.value = ''; }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            disabled={importing}
+                            onClick={() => document.getElementById('prompt-file-import')?.click()}
+                          >
+                            {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
+                            Importar PDF/MD
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Anexe um arquivo <strong>.md</strong>, <strong>.txt</strong> ou <strong>.pdf</strong> — o conteúdo substitui o texto abaixo (revise e clique em Salvar).</p>
                       {isLoading ? (
                         <Skeleton className="h-64 w-full" />
                       ) : (
