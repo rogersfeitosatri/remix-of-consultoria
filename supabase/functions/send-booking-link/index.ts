@@ -236,8 +236,13 @@ Deno.serve(async (req) => {
     }
 
     // ===== EMAIL CHANNEL: foreign athletes (non-+55) =====
-    const phoneDigits = (client.phone || '').replace(/\D/g, '');
-    const isForeign = client.phone && !phoneDigits.startsWith('55');
+    // Only treat as foreign when phone is explicitly international (starts with '+'
+    // and country code is not 55). BR numbers stored without the "55" prefix
+    // (e.g. "21997245686") are still Brazilian and must go through WhatsApp.
+    const rawPhone = (client.phone || '').trim();
+    const phoneDigits = rawPhone.replace(/\D/g, '');
+    const hasPlusPrefix = rawPhone.startsWith('+');
+    const isForeign = !!client.phone && hasPlusPrefix && !phoneDigits.startsWith('55');
 
     if (isForeign) {
       // Load full client (need email + onboarding fields)
