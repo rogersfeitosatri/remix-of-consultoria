@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     const event = payload?.event as string | undefined;
     const p = payload?.payment;
-    if (!event || !p) {
+    if (!event) {
       return new Response(JSON.stringify({ ignored: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -38,6 +38,43 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // Roteamento ZN Assessoria: se o evento pertencer ao fluxo ZN
+    // (externalReference "zn:..." OU customer/subscription já registrados em
+    // zn_athletes), delega ao webhook ZN. Assim o Asaas pode apontar para uma
+    // única URL e ambos os fluxos funcionam.
+    const extRef = String(
+      p?.externalReference ?? payload?.subscription?.externalReference ?? payload?.externalReference ?? "",
+    );
+    let isZn = extRef.startsWith("zn:") || event.startsWith("SUBSCRIPTION_");
+    if (!isZn && (p?.subscription || p?.customer)) {
+      const { data: znMatch } = await supabase
+        .from("zn_athletes")
+        .select("id")
+        .or(
+          [
+            p?.subscription ? `asaas_subscription_id.eq.${p.subscription}` : null,
+            p?.customer ? `asaas_customer_id.eq.${p.customer}` : null,
+          ].filter(Boolean).join(","),
+        )
+        .limit(1)
+        .maybeSingle();
+      if (znMatch?.id) isZn = true;
+    }
+    if (isZn) {
+      console.log("asaas-webhook: encaminhando evento ZN para zn-asaas-webhook", { event, extRef });
+      const { error: fwdErr } = await supabase.functions.invoke("zn-asaas-webhook", { body: payload });
+      if (fwdErr) console.error("asaas-webhook: falha ao encaminhar ZN:", fwdErr);
+      return new Response(JSON.stringify({ ok: true, forwarded: "zn" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!p) {
+      return new Response(JSON.stringify({ ignored: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Localiza o atleta via subscription ou customer
     let clientRow: any = null;
