@@ -190,7 +190,36 @@ REGRAS:
 - Cada opção de alimento deve incluir a quantidade (ex: "2 fatias de pão francês (100g) ou 1 tapioca grande (80g) ou 1 cuscuz médio (120g)")
 - A soma das refeições deve fechar com o alvo calórico e de macronutrientes definido na progressão
 - Incluir ao final do plano um resumo dos totais aproximados de macros e calorias do dia
-- DINÂMICA POR DIA (obrigatório quando houver frequência de treinos na anamnese): LEIA a frequência/dinâmica de treinos semanais informada na anamnese e ajuste a alimentação à demanda energética de cada dia (dia de treino longo/intenso = mais carboidrato e energia; dia leve/descanso = menos). Preencha "day_variations" (chaves seg,ter,qua,qui,sex,sab,dom) com o plano JÁ AJUSTADO daquele dia. NÃO escreva observações genéricas como "ajustar conforme rotina" — traga o plano concreto por dia. Só deixe day_variations vazio se todos os dias tiverem a mesma demanda.`;
+- DINÂMICA POR DIA (obrigatório quando houver frequência de treinos na anamnese): LEIA a frequência/dinâmica de treinos semanais informada na anamnese e ajuste a alimentação à demanda energética de cada dia. Preencha "day_variations" (chaves seg,ter,qua,qui,sex,sab,dom) com o plano JÁ AJUSTADO daquele dia (meals concretos + daily_totals). Só deixe day_variations vazio se todos os dias tiverem a mesma demanda.
+
+## PERIODIZAÇÃO INTELIGENTE DE CARBOIDRATOS — "Fuel for the Work Required" (SEMPRE aplicar automaticamente)
+
+Após calcular a necessidade SEMANAL de CHO (média g/kg × 7), REDISTRIBUA esse total ao longo dos dias conforme a demanda de cada treino — nunca deixe CHO igual em todos os dias quando existir variação de treino.
+
+1) Classifique cada dia (leia rotina/frequência/intensidade/duração/longão/duplo turno da anamnese):
+   - Nível 0 — Descanso total.
+   - Nível 1 — Recuperação leve: regenerativo, musculação leve, mobilidade, técnico curto.
+   - Nível 2 — Corrida moderada, musculação moderada, sessão única de duração moderada.
+   - Nível 3 — Intervalado, tempo run, limiar, VO₂, musculação intensa, DOIS treinos no mesmo dia.
+   - Nível 4 — Longão, treino-chave, longão com intensidade, simulado, competição.
+
+2) Ajuste do CHO diário (g/kg) vs. média semanal:
+   Nível 0 ↓↓ • Nível 1 ↓ • Nível 2 = • Nível 3 ↑ • Nível 4 ↑↑
+   A média semanal final deve permanecer próxima do alvo — o objetivo é REDISTRIBUIR, não aumentar o total.
+
+3) Regras invioláveis:
+   - NUNCA reduzir CHO em dia de intervalado, tempo run, limiar, VO₂, longão, competição ou duplo turno.
+   - Nunca comprometer recuperação nem qualidade do treino. Nunca virar low-carb extremo em dia leve.
+
+4) Distribuição DENTRO do dia por turno do treino:
+   - Manhã: reforçar jantar da véspera, café da manhã e pós-treino.
+   - Tarde: reforçar café, almoço, pré-treino e pós-treino.
+   - Noite: reforçar almoço, lanche, pré-treino e pós-treino.
+   - Descanso: reduzir pré-treino (inexistente) e lanches ricos em CHO; manter proteína, vegetais, frutas e gorduras boas.
+   - Duplo turno: aumentar CHO e reforçar refeição entre as sessões.
+   - Longão (Nível 4): véspera com CHO discretamente maior no almoço/jantar; no dia, café reforçado + estratégia intra + pós reforçado (não chamar de carb loading).
+
+5) Preencha "day_variations" com o plano CONCRETO refletindo o nível e a distribuição por refeição acima. Em "note" sinalize o nível (ex: "Nível 3 — intervalado à tarde").`;
 
 // Regras de FORMATO sempre aplicadas (mesmo com prompt customizado da central),
 // para o plano sair compatível com o envio ao Zona Nutri.
@@ -198,7 +227,8 @@ const FORMAT_RULES = `REGRAS DE FORMATO (OBRIGATÓRIAS — sobrepõem qualquer i
 - Use os alimentos que o atleta já consome; porções e quantidades REAIS (gramas, ml, unidades).
 - Substituições na MESMA LINHA separadas por "ou" (ex: "2 fatias de pão francês (100g) ou 1 tapioca (80g)").
 - Cada refeição com nome e, quando houver, horário; feche os totais diários (kcal e g/kg) coerentes.
-- DINÂMICA POR DIA (CRÍTICO): você DEVE ler a frequência/dinâmica semanal de treinos da anamnese e preencher "day_variations" com TODOS os 7 dias (seg,ter,qua,qui,sex,sab,dom). Para cada dia entregue o plano CONCRETO daquele dia (meals + daily_totals ajustados): dias de treino longo/intenso = mais CHO/energia; dias leves/descanso = menos. NÃO deixe day_variations vazio. NÃO escreva observações genéricas como "ajustar conforme rotina". Só use a chave "note" com uma frase curta quando aquele dia específico for idêntico ao plano base — nunca para todos ao mesmo tempo.
+- DINÂMICA POR DIA (CRÍTICO): preencha "day_variations" com TODOS os 7 dias (seg,ter,qua,qui,sex,sab,dom). Cada dia deve conter o array "meals" COMPLETO no mesmo formato de meal_plan.meals (meal_name + food_groups[{group,options com porções reais}] + meal_macros + timing_note quando fizer sentido) e "daily_totals" com kcal, cho_g, cho_gkg, protein_g, fat_g já ajustados pela periodização de CHO. NUNCA devolva meals vazio ou apenas "note".
+- PERIODIZAÇÃO DE CHO (CRÍTICO — automática): classifique cada dia (Nível 0–4) e redistribua CHO conforme a demanda (↓↓/↓/=/↑/↑↑), sem inflar o total semanal e sem virar low-carb. Ajuste também refeições dentro do dia conforme turno do treino. NUNCA reduzir CHO em intervalado, tempo run, limiar, VO₂, longão, duplo turno ou competição.
 - Respeite os critérios, filosofia e nuances do prompt customizado da Central de IA (progressão, timing, comportamento, priorização de alimentos), aplicando-os DENTRO da estrutura acima.`;
 
 const ANALYSIS_SCHEMA = {
