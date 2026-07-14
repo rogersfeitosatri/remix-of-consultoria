@@ -70,14 +70,36 @@ export function useAthleteWeight(clientId?: string | null) {
       try {
         const { data } = await (supabase as any)
           .from('anamnese_responses')
-          .select('current_weight, submitted_at')
+          .select('current_weight, responses, form_id, submitted_at')
           .eq('client_id', clientId)
           .order('submitted_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        const w = data?.current_weight ? parseFloat(String(data.current_weight).replace(',', '.')) : null;
-        if (w && !isNaN(w) && w > 20 && w < 300) {
-          return { weightKg: w, source: 'anamnese', date: data?.submitted_at };
+
+        // 2a) Coluna current_weight (formulários antigos)
+        const wCol = data?.current_weight ? parseFloat(String(data.current_weight).replace(',', '.')) : null;
+        if (wCol && !isNaN(wCol) && wCol > 20 && wCol < 300) {
+          return { weightKg: wCol, source: 'anamnese', date: data?.submitted_at };
+        }
+
+        // 2b) Formulários dinâmicos: peso está na RESPOSTA de uma pergunta
+        // (indexada por ID). Localiza a pergunta de peso pelo texto.
+        const resp = data?.responses || {};
+        if (data?.form_id && resp && typeof resp === 'object') {
+          const { data: qs } = await (supabase as any)
+            .from('anamnese_questions')
+            .select('id, question_text')
+            .eq('form_id', data.form_id);
+          // Prioriza "peso atual"; senão qualquer pergunta com "peso" (evita histórico/objetivo de peso).
+          const weightQs = (qs || []).filter((q: any) => /peso/i.test(q.question_text || ''));
+          const preferred = weightQs.filter((q: any) => /atual|jejum/i.test(q.question_text || ''));
+          for (const q of (preferred.length ? preferred : weightQs)) {
+            const w = parseWeight(resp[q.id]);
+            if (w != null) return { weightKg: w, source: 'anamnese', date: data?.submitted_at };
+          }
+          // compat: chave literal
+          const legacy = parseWeight(resp.peso ?? resp.current_weight);
+          if (legacy != null) return { weightKg: legacy, source: 'anamnese', date: data?.submitted_at };
         }
       } catch { /* fallthrough */ }
 
