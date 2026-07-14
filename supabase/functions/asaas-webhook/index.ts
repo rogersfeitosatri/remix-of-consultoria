@@ -63,9 +63,15 @@ Deno.serve(async (req) => {
     }
     if (isZn) {
       console.log("asaas-webhook: encaminhando evento ZN para zn-asaas-webhook", { event, extRef });
-      const { error: fwdErr } = await supabase.functions.invoke("zn-asaas-webhook", { body: payload });
+      // Repassa o header asaas-access-token para o zn-asaas-webhook autenticar
+      const { error: fwdErr } = await supabase.functions.invoke("zn-asaas-webhook", {
+        body: payload,
+        headers: ASAAS_WEBHOOK_TOKEN
+          ? { "asaas-access-token": ASAAS_WEBHOOK_TOKEN }
+          : {},
+      });
       if (fwdErr) console.error("asaas-webhook: falha ao encaminhar ZN:", fwdErr);
-      return new Response(JSON.stringify({ ok: true, forwarded: "zn" }), {
+      return new Response(JSON.stringify({ ok: true, forwarded: "zn", error: fwdErr?.message ?? null }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
