@@ -260,13 +260,31 @@ export class PaymentOrchestrator {
       // logamos em whatsapp_message_logs com client_id=null.
       if (isFirstPurchase && isPaid && athlete.phone) {
         try {
+          // Buscar credenciais retornadas pelo Zona Nutri no sync anterior
+          const { data: outboxRow } = await this.supabase
+            .from("zn_integration_outbox")
+            .select("response_body, status")
+            .eq("athlete_id", athlete.id)
+            .eq("subscription_id", subscription.id)
+            .eq("event_type", "subscription_created")
+            .eq("status", "sent")
+            .order("sent_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const resp = (outboxRow?.response_body ?? {}) as Record<string, any>;
+          const login = typeof resp.login === "string" ? resp.login : null;
+          const senha = typeof resp.senha_temporaria === "string" ? resp.senha_temporaria : null;
+
           await this.sendZnWelcomeWhatsapp({
             ownerUserId,
             athlete,
             planCode: subscription.plan_code,
             expiresAt: subscription.expires_at,
+            login,
+            senhaTemporaria: senha,
           });
-          this.log("[whatsapp] Mensagem de boas-vindas enviada");
+          this.log("[whatsapp] Mensagem de boas-vindas enviada", { hasCredentials: !!(login && senha) });
         } catch (e) {
           this.log("[whatsapp] Falha ao enviar boas-vindas (não bloqueia)", { error: (e as Error).message });
         }
@@ -320,6 +338,8 @@ export class PaymentOrchestrator {
     athlete: { id: string; name: string | null; phone: string | null; email: string };
     planCode: string;
     expiresAt: string | null;
+    login: string | null;
+    senhaTemporaria: string | null;
   }): Promise<void> {
     const zapiInstanceId = Deno.env.get("ZAPI_INSTANCE_ID");
     const zapiToken = Deno.env.get("ZAPI_TOKEN");
@@ -335,10 +355,20 @@ export class PaymentOrchestrator {
       throw new Error(`Telefone inválido: "${input.athlete.phone}" → ${digits.length} dígitos`);
     }
 
-    const message =
-      `Olá ${input.athlete.name ?? ""}! Seu acesso à ZN Assessoria foi ativado ✅\n` +
-      `Plano: ${input.planCode}${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}.\n` +
-      `Em instantes você receberá seu login e senha do app Zona Nutri.`;
+    const firstName = (input.athlete.name ?? "").split(" ")[0] || "";
+    const hasCreds = !!(input.login && input.senhaTemporaria);
+    const message = hasCreds
+      ? `Olá ${firstName}! 🎉 Seu acesso à *ZN Assessoria* foi ativado.\n\n` +
+        `Plano: *${input.planCode}*${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}\n\n` +
+        `👇 *Acesse o app Zona Nutri com estes dados:*\n` +
+        `🔗 https://app.zonanutri.com\n` +
+        `📧 Login: ${input.login}\n` +
+        `🔑 Senha temporária: ${input.senhaTemporaria}\n\n` +
+        `⚠️ Por segurança, você precisará trocar a senha no primeiro acesso.\n\n` +
+        `Bons treinos! 🏃‍♂️💪`
+      : `Olá ${firstName}! Seu acesso à ZN Assessoria foi ativado ✅\n` +
+        `Plano: ${input.planCode}${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}.\n` +
+        `Em instantes você receberá seu login e senha do app Zona Nutri.`;
 
     const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}/send-text`;
     const res = await fetch(zapiUrl, {
