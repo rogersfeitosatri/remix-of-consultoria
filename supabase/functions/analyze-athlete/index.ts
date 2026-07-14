@@ -307,16 +307,52 @@ const ANALYSIS_SCHEMA = {
         },
         day_variations: {
           type: "object",
-          description: "OBRIGATÓRIO quando a anamnese trouxer frequência/dinâmica semanal de treinos. Preencha TODOS os dias da semana em que houver variação de demanda. Cada dia deve conter o plano JÁ AJUSTADO (meals + daily_totals) — não use texto genérico. Se todos os dias forem realmente iguais, deixe cada dia com uma nota curta explicando.",
-          properties: {
-            seg: { type: "object", description: "Segunda — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
-            ter: { type: "object", description: "Terça — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
-            qua: { type: "object", description: "Quarta — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
-            qui: { type: "object", description: "Quinta — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
-            sex: { type: "object", description: "Sexta — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
-            sab: { type: "object", description: "Sábado — plano ajustado ao treino/demanda do dia (geralmente longão)", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
-            dom: { type: "object", description: "Domingo — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
-          },
+          description: "OBRIGATÓRIO quando a anamnese trouxer frequência/dinâmica semanal de treinos. Preencha TODOS os 7 dias com o plano JÁ AJUSTADO pela periodização de CHO (Fuel for the Work Required). Cada dia deve ter meals COMPLETOS (mesma estrutura de meal_plan.meals) e daily_totals coerentes com o nível de demanda daquele dia. Não devolva meals vazio.",
+          properties: Object.fromEntries((['seg','ter','qua','qui','sex','sab','dom'] as const).map((d) => [d, {
+            type: "object",
+            description: `${d.toUpperCase()} — plano concreto ajustado ao treino/demanda do dia (aplicar periodização de CHO)`,
+            properties: {
+              level: { type: "integer", description: "Nível de demanda de 0 a 4 conforme classificação (0 descanso, 4 longão/chave)", minimum: 0, maximum: 4 },
+              note: { type: "string", description: "Frase curta indicando o nível e o treino do dia (ex: 'Nível 3 — intervalado à tarde')" },
+              meals: {
+                type: "array",
+                description: "Refeições do dia — MESMA estrutura de meal_plan.meals com food_groups completos e porções reais.",
+                items: {
+                  type: "object",
+                  properties: {
+                    meal_name: { type: "string" },
+                    food_groups: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          group: { type: "string" },
+                          options: { type: "string", description: "Opções com porções reais separadas por 'ou'" },
+                        },
+                        required: ["group", "options"],
+                      },
+                    },
+                    meal_macros: { type: "string" },
+                    timing_note: { type: "string" },
+                  },
+                  required: ["meal_name", "food_groups"],
+                },
+              },
+              daily_totals: {
+                type: "object",
+                properties: {
+                  kcal: { type: "number" },
+                  cho_g: { type: "number" },
+                  cho_gkg: { type: "number" },
+                  protein_g: { type: "number" },
+                  fat_g: { type: "number" },
+                },
+                required: ["kcal", "cho_g", "cho_gkg", "protein_g", "fat_g"],
+              },
+            },
+            required: ["level", "meals", "daily_totals"],
+          }])),
+          required: ["seg","ter","qua","qui","sex","sab","dom"],
         },
       },
       required: ["meals", "daily_totals"],
