@@ -338,6 +338,8 @@ export class PaymentOrchestrator {
     athlete: { id: string; name: string | null; phone: string | null; email: string };
     planCode: string;
     expiresAt: string | null;
+    login: string | null;
+    senhaTemporaria: string | null;
   }): Promise<void> {
     const zapiInstanceId = Deno.env.get("ZAPI_INSTANCE_ID");
     const zapiToken = Deno.env.get("ZAPI_TOKEN");
@@ -353,10 +355,20 @@ export class PaymentOrchestrator {
       throw new Error(`Telefone inválido: "${input.athlete.phone}" → ${digits.length} dígitos`);
     }
 
-    const message =
-      `Olá ${input.athlete.name ?? ""}! Seu acesso à ZN Assessoria foi ativado ✅\n` +
-      `Plano: ${input.planCode}${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}.\n` +
-      `Em instantes você receberá seu login e senha do app Zona Nutri.`;
+    const firstName = (input.athlete.name ?? "").split(" ")[0] || "";
+    const hasCreds = !!(input.login && input.senhaTemporaria);
+    const message = hasCreds
+      ? `Olá ${firstName}! 🎉 Seu acesso à *ZN Assessoria* foi ativado.\n\n` +
+        `Plano: *${input.planCode}*${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}\n\n` +
+        `👇 *Acesse o app Zona Nutri com estes dados:*\n` +
+        `🔗 https://app.zonanutri.com\n` +
+        `📧 Login: ${input.login}\n` +
+        `🔑 Senha temporária: ${input.senhaTemporaria}\n\n` +
+        `⚠️ Por segurança, você precisará trocar a senha no primeiro acesso.\n\n` +
+        `Bons treinos! 🏃‍♂️💪`
+      : `Olá ${firstName}! Seu acesso à ZN Assessoria foi ativado ✅\n` +
+        `Plano: ${input.planCode}${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}.\n` +
+        `Em instantes você receberá seu login e senha do app Zona Nutri.`;
 
     const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}/send-text`;
     const res = await fetch(zapiUrl, {
