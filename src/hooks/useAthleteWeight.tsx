@@ -78,12 +78,6 @@ export function useAthleteWeight(clientId?: string | null) {
 
         // 2a) Formulários dinâmicos: peso está na RESPOSTA de uma pergunta
 
-        const wCol = data?.current_weight ? parseFloat(String(data.current_weight).replace(',', '.')) : null;
-        if (wCol && !isNaN(wCol) && wCol > 20 && wCol < 300) {
-          return { weightKg: wCol, source: 'anamnese', date: data?.submitted_at };
-        }
-
-        // 2b) Formulários dinâmicos: peso está na RESPOSTA de uma pergunta
         // (indexada por ID). Localiza a pergunta de peso pelo texto.
         const resp = data?.responses || {};
         if (data?.form_id && resp && typeof resp === 'object') {
