@@ -61,7 +61,9 @@ Deno.serve(async (req) => {
 
     const prompt = buildAnalysisPrompt(profile, client, anamneseResponses, anamneseQuestions, adminGuidance);
 
-    // Try to load custom prompt from ai_prompts table
+    // Prompt da "central de IA → Plano Alimentar" (context_key meal_plan_generation).
+    // O prompt do usuário conduz o raciocínio; as REGRAS DE FORMATO abaixo são
+    // sempre anexadas para garantir a estrutura enviada ao Zona Nutri.
     let systemPrompt = SYSTEM_PROMPT;
     try {
       const { data: customPrompt } = await supabase
@@ -71,8 +73,8 @@ Deno.serve(async (req) => {
         .eq('context_key', 'meal_plan_generation')
         .maybeSingle();
       if (customPrompt?.prompt_text?.trim()) {
-        systemPrompt = customPrompt.prompt_text;
-        console.log('Using custom AI prompt from ai_prompts table');
+        systemPrompt = `${customPrompt.prompt_text.trim()}\n\n${FORMAT_RULES}`;
+        console.log('Using custom AI prompt (central de IA) + regras de formato');
       }
     } catch (e) {
       console.warn('Could not fetch custom AI prompt, using default:', e);
@@ -187,6 +189,14 @@ REGRAS:
 - A soma das refeições deve fechar com o alvo calórico e de macronutrientes definido na progressão
 - Incluir ao final do plano um resumo dos totais aproximados de macros e calorias do dia
 - VARIAÇÕES POR DIA: quando a rotina de treinos indicar demandas diferentes por dia (ex.: dia de treino longo/intenso pede mais carboidrato; dia de descanso pede menos), preencha "day_variations" (chaves seg,ter,qua,qui,sex,sab,dom) com as refeições daquele dia; o plano base (meals) vale para os demais. Só crie variações quando a dinâmica de treinos justificar; caso contrário deixe vazio.`;
+
+// Regras de FORMATO sempre aplicadas (mesmo com prompt customizado da central),
+// para o plano sair compatível com o envio ao Zona Nutri.
+const FORMAT_RULES = `REGRAS DE FORMATO (obrigatórias):
+- Use os alimentos que o atleta já consome; porções e quantidades REAIS (gramas, ml, unidades).
+- Substituições na MESMA LINHA separadas por "ou" (ex: "2 fatias de pão francês (100g) ou 1 tapioca (80g)").
+- Cada refeição com nome e, quando houver, horário; feche os totais diários (kcal e g/kg) coerentes.
+- VARIAÇÕES POR DIA: quando a rotina de treinos justificar, preencha "day_variations" (seg,ter,qua,qui,sex,sab,dom) com as refeições do dia; o plano base vale para os demais dias (vazio se todos iguais).`;
 
 const ANALYSIS_SCHEMA = {
   type: "object",
