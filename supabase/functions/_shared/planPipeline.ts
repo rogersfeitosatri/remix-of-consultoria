@@ -125,3 +125,54 @@ export function addMacros(a: Macros, b: Macros): Macros {
 export const roundMacros = (m: Macros): Macros => ({
   kcal: Math.round(m.kcal), cho_g: Math.round(m.cho_g), protein_g: Math.round(m.protein_g), fat_g: Math.round(m.fat_g), fiber_g: Math.round(m.fiber_g),
 });
+
+const numOr0 = (v: any) => { const n = Number(v); return isFinite(n) && n >= 0 ? n : 0; };
+
+// Para os alimentos SEM correspondência no banco: busca os macros por 100g via
+// IA (TACO/IBGE) e SALVA em food_items (para os próximos planos). Enriquece a
+// tabela em memória. Uma única chamada de IA para todos os faltantes.
+export async function resolveMissingFoods(
+  supabase: SupabaseClient, names: string[], table: FoodRow[], ownerUserId: string | null,
+): Promise<{ added: number }> {
+  const seen = new Set<string>();
+  const missing: string[] = [];
+  for (const nm of names) {
+    const key = norm(nm);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    if (!matchFood(nm, table)) missing.push(nm.trim());
+  }
+  if (!missing.length) return { added: 0 };
+
+  let rows: any[] = [];
+  try {
+    const { data } = await callAiJson({
+      systemPrompt: "Você é um banco de dados nutricional brasileiro (TACO/IBGE). Estime valores confiáveis por 100g.",
+      userPrompt: `Para CADA alimento da lista, retorne os macros por 100g. Responda SOMENTE JSON: {"foods":[{"name":string,"category":string,"kcal":number,"protein":number,"carbs":number,"fat":number,"fiber":number}]}. Use o nome exatamente como recebido. Lista: ${JSON.stringify(missing)}`,
+      perAttemptMs: 40_000,
+    });
+    rows = Array.isArray(data?.foods) ? data.foods : [];
+  } catch (_) { rows = []; }
+
+  let added = 0;
+  for (const r of rows) {
+    if (!r?.name) continue;
+    const ins = {
+      name: String(r.name), category: r.category || "Outros",
+      calories_per_100g: numOr0(r.kcal), protein_per_100g: numOr0(r.protein),
+      carbs_per_100g: numOr0(r.carbs), fat_per_100g: numOr0(r.fat), fiber_per_100g: numOr0(r.fiber),
+      source: "ai", created_by: ownerUserId,
+    };
+    try {
+      const { data: inserted } = await supabase.from("food_items").insert(ins).select("id").single();
+      if (inserted?.id) {
+        table.push({
+          id: inserted.id, name: ins.name, norm: norm(ins.name),
+          kcal: ins.calories_per_100g, protein: ins.protein_per_100g, carbs: ins.carbs_per_100g, fat: ins.fat_per_100g, fiber: ins.fiber_per_100g,
+        });
+        added++;
+      }
+    } catch (_) { /* ignora falha de insert individual */ }
+  }
+  return { added };
+}

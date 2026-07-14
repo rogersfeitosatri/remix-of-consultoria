@@ -2,7 +2,7 @@
 // código, a partir do banco de alimentos). Failover com timeout curto por
 // tentativa. Persiste imediatamente em plan_generation_days.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { callAiJson, loadFoodTable, matchFood, foodMacros, addMacros, zeroMacros, roundMacros, WEEKDAY_LABEL, type FoodRow, type Macros } from "../_shared/planPipeline.ts";
+import { callAiJson, loadFoodTable, matchFood, foodMacros, addMacros, zeroMacros, roundMacros, resolveMissingFoods, WEEKDAY_LABEL, type FoodRow, type Macros } from "../_shared/planPipeline.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -115,22 +115,25 @@ Retorne SOMENTE um JSON deste dia:
 }
 Use as quantidades em GRAMAS coerentes com as metas do blueprint. Substituições dentro do mesmo grupo funcional. Não repita listas enormes: 1–3 substitutos por alimento.`;
 
-    // 1ª geração
-    let genRes = await callAiJson({ systemPrompt, userPrompt: buildPrompt(), perAttemptMs: 50_000 });
-    let validation = validateDay(genRes.data, dayBp, table);
+    // 1ª (e única) geração do dia
+    const genRes = await callAiJson({ systemPrompt, userPrompt: buildPrompt(), perAttemptMs: 50_000 });
 
-    // 1 correção se necessário
-    if (!validation.ok && (dayRow.attempts || 0) < 3) {
-      await supabase.from("plan_generation_days").update({ status: "validating" }).eq("id", dayRow.id);
-      try {
-        const corr = await callAiJson({ systemPrompt, userPrompt: buildPrompt(validation.issues), perAttemptMs: 50_000 });
-        const v2 = validateDay(corr.data, dayBp, table);
-        // fica com a versão com menos problemas
-        if (v2.issues.length <= validation.issues.length) { genRes = corr; validation = v2; }
-      } catch { /* mantém a 1ª */ }
+    // Alimentos fora do banco: busca macros via IA e SALVA em food_items (para
+    // os próximos planos). Assim os macros ficam determinísticos e o banco cresce.
+    await supabase.from("plan_generation_days").update({ status: "validating" }).eq("id", dayRow.id);
+    const names: string[] = [];
+    for (const meal of (genRes.data?.meals || [])) {
+      for (const f of (meal.foods || [])) {
+        if (f?.name) names.push(f.name);
+        for (const s of (f.substitutes || [])) if (s?.name) names.push(s.name);
+      }
     }
+    try { await resolveMissingFoods(supabase, names, table, job.user_id); } catch { /* segue com o que tem */ }
 
-    const finalStatus = validation.ok ? "completed" : "correction_required";
+    // Validação DETERMINÍSTICA (advisory): calcula macros e lista pendências,
+    // mas NÃO reprova o dia — o nutricionista revisa/edita depois.
+    const validation = validateDay(genRes.data, dayBp, table);
+    const finalStatus = validation.issues.length ? "correction_required" : "completed";
     await supabase.from("plan_generation_days").update({
       status: finalStatus, menu_output: validation.menu, validation_result: { totals: validation.totals, issues: validation.issues, ok: validation.ok },
       error: null,
