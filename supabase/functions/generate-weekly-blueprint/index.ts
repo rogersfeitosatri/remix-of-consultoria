@@ -124,7 +124,7 @@ Inclua os 7 dias (seg..dom). Preserve a lógica entre dias consecutivos (a noite
 
     let blueprint: any;
     try {
-      const r = await callAiJson({ systemPrompt, userPrompt, perAttemptMs: 50_000 });
+      const r = await callAiJson({ systemPrompt, userPrompt, perAttemptMs: 110_000 });
       blueprint = r.data;
     } catch (e) {
       await supabase.from("plan_generation_jobs").update({ status: "failed", error: (e as Error).message }).eq("id", job.id);
