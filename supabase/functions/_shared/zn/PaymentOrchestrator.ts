@@ -260,13 +260,31 @@ export class PaymentOrchestrator {
       // logamos em whatsapp_message_logs com client_id=null.
       if (isFirstPurchase && isPaid && athlete.phone) {
         try {
+          // Buscar credenciais retornadas pelo Zona Nutri no sync anterior
+          const { data: outboxRow } = await this.supabase
+            .from("zn_integration_outbox")
+            .select("response_body, status")
+            .eq("athlete_id", athlete.id)
+            .eq("subscription_id", subscription.id)
+            .eq("event_type", "subscription_created")
+            .eq("status", "sent")
+            .order("sent_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const resp = (outboxRow?.response_body ?? {}) as Record<string, any>;
+          const login = typeof resp.login === "string" ? resp.login : null;
+          const senha = typeof resp.senha_temporaria === "string" ? resp.senha_temporaria : null;
+
           await this.sendZnWelcomeWhatsapp({
             ownerUserId,
             athlete,
             planCode: subscription.plan_code,
             expiresAt: subscription.expires_at,
+            login,
+            senhaTemporaria: senha,
           });
-          this.log("[whatsapp] Mensagem de boas-vindas enviada");
+          this.log("[whatsapp] Mensagem de boas-vindas enviada", { hasCredentials: !!(login && senha) });
         } catch (e) {
           this.log("[whatsapp] Falha ao enviar boas-vindas (não bloqueia)", { error: (e as Error).message });
         }
