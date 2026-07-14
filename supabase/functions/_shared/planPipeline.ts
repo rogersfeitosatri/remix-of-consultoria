@@ -15,7 +15,7 @@ interface AiProvider { name: string; endpoint: string; apiKey?: string; model: s
 function providers(): AiProvider[] {
   const list: AiProvider[] = [
     { name: "gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", apiKey: Deno.env.get("GEMINI_API_KEY"), model: "gemini-2.5-flash" },
-    { name: "lovable", endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions", apiKey: Deno.env.get("LOVABLE_API_KEY"), model: "google/gemini-2.5-pro" },
+    { name: "lovable", endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions", apiKey: Deno.env.get("LOVABLE_API_KEY"), model: "google/gemini-2.5-flash" },
   ];
   return list.filter((p) => !!p.apiKey);
 }
@@ -27,7 +27,7 @@ export async function callAiJson(opts: {
   userPrompt: string;
   perAttemptMs?: number;
 }): Promise<{ data: any; provider: string; model: string }> {
-  const perAttempt = opts.perAttemptMs ?? 50_000;
+  const perAttempt = opts.perAttemptMs ?? 110_000;
   const errs: string[] = [];
   for (const p of providers()) {
     const controller = new AbortController();
