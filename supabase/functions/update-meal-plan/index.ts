@@ -252,10 +252,15 @@ Se NÃO houver necessidade de ajuste: no_change_needed=true, explique por que ma
 // AJUSTE por check-in: mantém a disciplina conservadora + o formato do plano.
 const ADJUST_FORMAT_RULES = `REGRAS OBRIGATÓRIAS DESTE AJUSTE (mesmo com prompt customizado):
 - AJUSTE CONSERVADOR: altere só o necessário; NÃO reduza energia automaticamente por aumento de peso/composição, lesão ou queda de volume; NÃO faça compensação por refeições fora do plano; não transforme relato isolado em tendência/diagnóstico.
-- Periodize carboidrato conforme a demanda real do treino; preserve horários/preferências/opções adequados.
-- Sinais de atenção (compulsão, RED-S, sintomas GI intensos, etc.) vão para "attention_points" (avaliação direta do nutri), não viram ajuste automático.
+- PERIODIZAÇÃO INTELIGENTE DE CHO — "Fuel for the Work Required" (SEMPRE reavaliar no check-in):
+  • Classifique cada dia da semana em nível 0 (descanso), 1 (recuperação/leve), 2 (moderado), 3 (intervalado/tempo/limiar/VO₂/musc. intensa/duplo turno) ou 4 (longão/chave/competição).
+  • Redistribua o CHO conforme a demanda (Nível 0 ↓↓ • 1 ↓ • 2 = • 3 ↑ • 4 ↑↑) mantendo a média semanal próxima do alvo — não infle o total.
+  • NUNCA reduza CHO em intervalado, tempo run, limiar, VO₂, longão, duplo turno ou competição.
+  • Ajuste também as refeições dentro do dia conforme turno do treino (manhã → reforçar jantar véspera/café/pós; tarde → café/almoço/pré/pós; noite → almoço/lanche/pré/pós; descanso → cortar pré-treino e lanches ricos em CHO mantendo proteína, vegetais, frutas e gorduras boas; duplo turno → refeição entre sessões; longão → véspera com CHO discretamente maior + café reforçado + intra + pós).
+  • Use os sinais do check-in (fadiga, fome, sono, energia, peso, qualidade dos treinos, aderência, feedback) para redistribuir dias-chave × dias leves e refinar pré/pós/estratégia de longão.
 - FORMATO: alimentos que o atleta já usa; porções reais (g, ml, unidades); substituições na MESMA LINHA com "ou"; feche os totais diários (kcal e g/kg).
-- VARIAÇÕES POR DIA (day_variations: seg..dom) quando a dinâmica de treinos justificar; base vale para os demais dias.
+- VARIAÇÕES POR DIA (day_variations: seg,ter,qua,qui,sex,sab,dom) OBRIGATÓRIAS quando houver dinâmica de treino semanal. Cada dia com meals COMPLETOS (mesma estrutura do meal_plan.meals) + daily_totals ajustados pela periodização de CHO + note curta com o nível. Nunca devolva meals vazio.
+- Sinais de atenção (compulsão, RED-S, sintomas GI intensos, etc.) vão para "attention_points" (avaliação direta do nutri), não viram ajuste automático.
 - "adjustment_message" só quando houver mudança; "checkin_reading" sempre.`;
 
 // Esquema = análise completa + adjustment_message
