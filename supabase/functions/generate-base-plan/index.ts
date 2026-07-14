@@ -53,6 +53,75 @@ function mirrorToMealPlan(meals: any[]): any[] {
     };
   });
 }
+// ---------- Encaixe determinístico por dia da semana (para o Zona Nutri) ----------
+// Espelha a lógica de src/lib/planV2.ts (mapa semanal + carbload) para materializar
+// meal_plan.day_variations (seg…dom). O ZN lê essas variações e envia o plano
+// "encaixado" em cada dia. Só criamos variação para os dias que diferem da base;
+// os demais caem na base automaticamente no envio.
+const WEEKDAYS_EN = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
+const EN_TO_PT_KEY: Record<string, string> = {
+  monday: "seg", tuesday: "ter", wednesday: "qua", thursday: "qui", friday: "sex", saturday: "sab", sunday: "dom",
+};
+const PT_LABEL: Record<string, string> = {
+  seg: "Segunda", ter: "Terça", qua: "Quarta", qui: "Quinta", sex: "Sexta", sab: "Sábado", dom: "Domingo",
+};
+function prevWeekday(w: string, back: number): string {
+  const i = WEEKDAYS_EN.indexOf(w as any);
+  if (i < 0) return w;
+  return WEEKDAYS_EN[(i - back + 7) % 7];
+}
+function carbloadDaysFor(longRunWeekday: string | null, numberOfDays: number): string[] {
+  if (!longRunWeekday) return [];
+  const n = numberOfDays >= 2 ? 2 : 1;
+  const days: string[] = [];
+  for (let k = 1; k <= n; k++) days.push(prevWeekday(longRunWeekday, k));
+  return days.reverse();
+}
+function sessionsForWeekday(trainingWeek: any, wdEn: string): any[] {
+  if (!trainingWeek || typeof trainingWeek !== "object") return [];
+  const key = Object.keys(trainingWeek).find((k) => PT_TO_WEEKDAY[k.toLowerCase()] === wdEn);
+  if (!key) return [];
+  const s = trainingWeek[key];
+  return Array.isArray(s) ? s : s ? [s] : [];
+}
+// Texto do carbBlock (reforço de carboidrato) para os dias de carbload.
+function carbBlockText(carbBlocks: any[]): string {
+  const b = (carbBlocks || [])[0];
+  if (!b) return "";
+  const opt = (b.options || [])[0];
+  return (opt?.foods || []).map(foodText).join(" + ");
+}
+// Constrói meal_plan.day_variations só para os dias que diferem da base.
+function buildDayVariations(basePlan: any, trainingWeek: any, longRunWeekday: string | null, dailyTotals: any): Record<string, any> {
+  const baseMeals = mirrorToMealPlan(basePlan.meals);
+  const carbSet = new Set(carbloadDaysFor(longRunWeekday, 1));
+  const carbTxt = carbBlockText(basePlan.carbBlocks);
+  const variations: Record<string, any> = {};
+  for (const wdEn of WEEKDAYS_EN) {
+    const sessions = sessionsForWeekday(trainingWeek, wdEn).filter((s: any) => s?.modalidade && s.modalidade !== "repouso");
+    const isLongRun = wdEn === longRunWeekday || sessions.some((s: any) => s?.longao);
+    const isCarbload = carbSet.has(wdEn);
+    const isQuality = sessions.some((s: any) => /intenso/i.test(s?.intensidade || ""));
+    if (!isLongRun && !isCarbload && !isQuality) continue; // dia-base → cai na base no envio
+
+    let dayNote = "";
+    if (isCarbload) dayNote = "Preparação para o longão: use a opção completa de carboidrato e evite alimentos novos.";
+    else if (isLongRun) dayNote = "Dia de longão: capriche no carboidrato de fácil digestão antes do treino e recupere com CHO + proteína.";
+    else if (isQuality) dayNote = "Treino de qualidade: priorize a opção completa de carboidrato para render bem.";
+
+    const meals = baseMeals.map((m: any, i: number) => (i === 0 ? { ...m, timing_note: dayNote || m.timing_note } : { ...m }));
+    if (isCarbload && carbTxt) {
+      meals.push({
+        meal_name: "Reforço de carboidrato (carbload)", horario: "", timing_note: "Bloco adicional nos dias de preparação para o longão.",
+        food_groups: [{ group: "Carbload", options: carbTxt }], meal_macros: "",
+      });
+    }
+    const key = EN_TO_PT_KEY[wdEn];
+    variations[key] = { label: PT_LABEL[key], meals, daily_totals: dailyTotals || {} };
+  }
+  return variations;
+}
+
 // Fallback determinístico: estrutura mínima segura, marcada para revisão.
 function fallbackBasePlan(): any {
   const meal = (id: string, name: string, time: string) => ({
@@ -186,6 +255,9 @@ Regras: cada refeição aparece UMA vez, com id único. Use alimentos que o atle
     // Espelha o plano-base no formato v1 (meal_plan.meals) para o app do atleta,
     // o envio ao Zona Nutri e telas legadas renderizarem sem mudança.
     const mealPlanMeals = mirrorToMealPlan(basePlan.meals);
+    // Encaixa o plano em cada dia da semana (carbload/longão/qualidade) para que o
+    // envio ao Zona Nutri vá per_day. Dias sem diferença caem na base no envio.
+    const dayVariations = buildDayVariations(basePlan, trainingWeek, longRunWeekday, basePlan.dailyTargets);
 
     const stored = {
       planModelVersion: 2, status: usedFallback ? "requires_review" : "active",
@@ -195,7 +267,7 @@ Regras: cada refeição aparece UMA vez, com id único. Use alimentos que o atle
       alerts: [...(result.alerts || []), ...(usedFallback ? ["Plano-base gerado em modo de segurança (IA indisponível) — revise antes de enviar."] : [])],
       planVersionNumber: (existing?.planVersionNumber || 0) + 1,
       generatedAt: new Date().toISOString(),
-      meal_plan: { meals: mealPlanMeals, daily_totals: basePlan.dailyTargets || {} },
+      meal_plan: { meals: mealPlanMeals, daily_totals: basePlan.dailyTargets || {}, day_variations: dayVariations },
       _isNewFormat: true,
     };
 
