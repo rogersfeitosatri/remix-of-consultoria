@@ -21,6 +21,7 @@ import { LayoutCustomizationSection } from '@/components/settings/LayoutCustomiz
 import { ScanAnamneseTargetRaces } from '@/components/admin/ScanAnamneseTargetRaces';
 import { PlanTemplatesSection } from '@/components/settings/PlanTemplatesSection';
 import { OnboardingSettingsSection } from '@/components/settings/OnboardingSettingsSection';
+import { ZnPlansSettingsSection } from '@/components/settings/ZnPlansSettingsSection';
 import { AiWhatsAppAssistantSection } from '@/components/settings/AiWhatsAppAssistantSection';
 import { NotificationsSettingsSection } from '@/components/settings/NotificationsSettingsSection';
 import { Bell } from 'lucide-react';
@@ -721,6 +722,23 @@ export default function Settings() {
               </AccordionTrigger>
               <AccordionContent className="pb-4">
                 <OnboardingSettingsSection />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="zn-plans" className="border border-border rounded-lg bg-card px-4">
+              <AccordionTrigger className="hover:no-underline py-4">
+                <div className="flex items-center gap-2 text-left">
+                  <CreditCard className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <div className="font-semibold">Planos da Assessoria (ZN) · valores</div>
+                    <div className="text-sm text-muted-foreground font-normal">
+                      Nome, valor e ativação dos planos — fonte única usada na anamnese e no Asaas
+                    </div>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <ZnPlansSettingsSection />
               </AccordionContent>
             </AccordionItem>
           </Accordion>

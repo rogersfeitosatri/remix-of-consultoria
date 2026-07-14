@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { isWizardAnamneseForm } from '@/lib/enduranceAnamneseQuestions';
+import { usePublicZnPlans } from '@/hooks/usePublicZnPlans';
 
 interface Question {
   id: string;
@@ -62,7 +63,7 @@ const PLAN_PARAM_MAP: Record<string, 'monthly' | 'semiannual' | 'annual'> = {
   annual: 'annual',
 };
 
-const PLAN_INFO: Record<'monthly' | 'semiannual' | 'annual', { label: string; price: string; sub: string }> = {
+const PLAN_INFO_FALLBACK: Record<'monthly' | 'semiannual' | 'annual', { label: string; price: string; sub: string }> = {
   monthly:    { label: 'Mensal',    price: 'R$ 69,90/mês',      sub: 'PIX ou 1x no cartão' },
   semiannual: { label: 'Semestral', price: 'R$ 299,00/semestre', sub: 'até 6x no cartão' },
   annual:     { label: 'Anual',     price: 'R$ 419,90/ano',      sub: 'até 12x no cartão' },
@@ -74,6 +75,13 @@ export default function PublicAnamneseForm() {
   // ZN Assessoria mode: ?zn=1&plano=mensal|semestral|anual
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const znMode = searchParams.get('zn') === '1';
+  // Preços vêm da configuração (zn_plans); fallback local enquanto carrega.
+  const { info: znPlanInfo } = usePublicZnPlans();
+  const PLAN_INFO = {
+    monthly: znPlanInfo('monthly', PLAN_INFO_FALLBACK.monthly),
+    semiannual: znPlanInfo('semiannual', PLAN_INFO_FALLBACK.semiannual),
+    annual: znPlanInfo('annual', PLAN_INFO_FALLBACK.annual),
+  } as Record<'monthly' | 'semiannual' | 'annual', { label: string; price: string; sub: string }>;
   const planFromUrl = PLAN_PARAM_MAP[(searchParams.get('plano') || '').toLowerCase()] || '';
   const [znPlan, setZnPlan] = useState<'' | 'monthly' | 'semiannual' | 'annual'>(planFromUrl as any);
   const [znCpf, setZnCpf] = useState('');

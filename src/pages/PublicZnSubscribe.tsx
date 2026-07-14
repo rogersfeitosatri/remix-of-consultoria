@@ -8,10 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { usePublicZnPlans, fmtBRL as fmtBRLShort } from '@/hooks/usePublicZnPlans';
 
 type PlanCode = 'monthly' | 'semiannual' | 'annual';
 
-const PLANS: Record<PlanCode, { label: string; price: string; installments: string }> = {
+const PLANS_FALLBACK: Record<PlanCode, { label: string; price: string; installments: string }> = {
   monthly: { label: 'Mensal', price: 'R$ 69,90', installments: 'PIX ou 1x no cartão' },
   semiannual: { label: 'Semestral', price: 'R$ 299,00', installments: 'PIX ou até 6x no cartão' },
   annual: { label: 'Anual', price: 'R$ 419,90', installments: 'PIX ou até 12x no cartão' },
@@ -57,6 +58,14 @@ export default function PublicZnSubscribe() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<{ paymentLink: string | null } | null>(null);
   const { toast } = useToast();
+
+  // Preços vêm da configuração (zn_plans); fallback local enquanto carrega.
+  const { plans: znPlans } = usePublicZnPlans();
+  const PLANS: Record<PlanCode, { label: string; price: string; installments: string }> = {
+    monthly: znPlans.monthly ? { label: znPlans.monthly.label, price: fmtBRLShort(znPlans.monthly.price), installments: PLANS_FALLBACK.monthly.installments } : PLANS_FALLBACK.monthly,
+    semiannual: znPlans.semiannual ? { label: znPlans.semiannual.label, price: fmtBRLShort(znPlans.semiannual.price), installments: PLANS_FALLBACK.semiannual.installments } : PLANS_FALLBACK.semiannual,
+    annual: znPlans.annual ? { label: znPlans.annual.label, price: fmtBRLShort(znPlans.annual.price), installments: PLANS_FALLBACK.annual.installments } : PLANS_FALLBACK.annual,
+  };
 
   const [form, setForm] = useState({
     name: '',

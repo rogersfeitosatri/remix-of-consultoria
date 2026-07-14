@@ -9,6 +9,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "https://esm.sh/zod@3.23.8";
 import { AthleteService } from "../_shared/zn/AthleteService.ts";
+import { loadZnPlans } from "../_shared/zn/planCatalog.ts";
 
 const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY")!;
 const ASAAS_ENV = (Deno.env.get("ASAAS_ENV") ?? "sandbox").toLowerCase();
@@ -18,12 +19,6 @@ const ASAAS_BASE =
     : "https://api-sandbox.asaas.com/v3";
 
 type PlanCode = "monthly" | "semiannual" | "annual";
-
-const PLANS: Record<PlanCode, { cycle: string; value: number; installments?: number; label: string }> = {
-  monthly:    { cycle: "MONTHLY",       value: 69.9,  installments: 1,  label: "Mensal" },
-  semiannual: { cycle: "SEMIANNUALLY",  value: 299.0, installments: 6,  label: "Semestral" },
-  annual:     { cycle: "YEARLY",        value: 419.9, installments: 12, label: "Anual" },
-};
 
 const Schema = z.object({
   form_id: z.string().uuid(),
@@ -90,7 +85,6 @@ Deno.serve(async (req) => {
       );
     }
     const data = parsed.data;
-    const plan = PLANS[data.plan_choice];
     const emailNorm = data.respondent_email.trim().toLowerCase();
     const cpfDigits = onlyDigits(data.cpf);
     const phoneDigits = data.phone ? onlyDigits(data.phone) : null;
@@ -139,6 +133,11 @@ Deno.serve(async (req) => {
       .eq("id", data.form_id)
       .maybeSingle();
     const ownerUserId = await resolveOwnerUserId(supabase, formRow?.user_id ?? null);
+
+    // Planos vêm da configuração (zn_plans) — fonte única de preço/ciclo.
+    const catalog = await loadZnPlans(supabase, ownerUserId);
+    const p = catalog[data.plan_choice];
+    const plan = { value: p.price, cycle: p.cycle, label: p.label, installments: p.installments };
 
     // 2.1) Cupom (opcional) — valida e calcula o efeito sobre o plano
     let coupon: any = null;
