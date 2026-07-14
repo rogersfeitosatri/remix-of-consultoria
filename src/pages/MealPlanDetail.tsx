@@ -411,13 +411,25 @@ export default function MealPlanDetail() {
               {hasPlan ? <Badge className="text-[10px] bg-emerald-500/15 text-emerald-600 border-emerald-500/30">Plano criado</Badge>
                        : <Badge className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/30">Sem plano</Badge>}
               {athleteWeightKg && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
                   Peso: {athleteWeightKg} kg
                   {weightInfo?.source === 'checkin' && ' (último check-in)'}
                   {weightInfo?.source === 'anamnese' && ' (anamnese)'}
                   {weightInfo?.source === 'manual' && ' (manual)'}
+                  <button
+                    type="button"
+                    title="Atualizar do último check-in"
+                    onClick={async () => {
+                      await queryClient.invalidateQueries({ queryKey: ['athlete-weight', clientId] });
+                      toast.success('Peso atualizado do último check-in.');
+                    }}
+                    className="ml-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-muted text-[10px] text-primary"
+                  >
+                    <RefreshCw className="h-3 w-3" /> Atualizar do check-in
+                  </button>
                 </span>
               )}
+
             </div>
           </div>
           {hasPlan && (
