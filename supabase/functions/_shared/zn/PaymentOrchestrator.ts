@@ -15,6 +15,7 @@ import { SubscriptionService } from "./SubscriptionService.ts";
 import { PaymentService } from "./PaymentService.ts";
 import { ExternalSyncService } from "./ExternalSyncService.ts";
 import { mapAsaasCycleToPlan, type AsaasEventPayload, type ZnPlanCode } from "./types.ts";
+import { znActivePrices } from "./planCatalog.ts";
 
 const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY") ?? "";
 const ASAAS_BASE =
@@ -75,7 +76,8 @@ export class PaymentOrchestrator {
 
     // Guard multi-tenant: só aceita eventos originados no funil ZN.
     // externalReference "zn:{athlete_id}" é setado por zn-create-subscription.
-    const ZN_VALUES = new Set([69.9, 299, 419.9]);
+    // Os valores válidos vêm da configuração (zn_plans) + defaults.
+    const ZN_VALUES = await znActivePrices(this.supabase, ownerUserId);
     const extRef = (subscriptionData?.externalReference ?? (p as any).externalReference ?? "").toString();
     const isZnRef = extRef.startsWith("zn:");
     const value = Number(p.value ?? subscriptionData?.value ?? 0);
