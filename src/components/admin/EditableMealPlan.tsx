@@ -74,13 +74,21 @@ function sumFoods(foods: SelectedFood[]) {
 // Usado para somar refeições legadas (texto) no total diário até que sejam convertidas.
 function parseMealMacrosString(s: string | undefined | null): { calories: number; carbs_g: number; protein_g: number; fat_g: number } | null {
   if (!s) return null;
+  // Aceita as duas ordens: "41g CHO" (número→rótulo) e "CHO 41g" (rótulo→número),
+  // pois o mirror do v2 escreve "CHO 41g, PTN 18g, LIP 12g".
+  const num = (label: string): number => {
+    const before = s.match(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*g?\\s*(?:${label})`, 'i'));
+    const after = s.match(new RegExp(`(?:${label})\\s*[:=-]?\\s*(\\d+(?:[.,]\\d+)?)`, 'i'));
+    const m = before || after;
+    return m ? parseFloat(m[1].replace(',', '.')) : 0;
+  };
   const kcal = s.match(/(\d+(?:[.,]\d+)?)\s*kcal/i);
-  const cho = s.match(/(\d+(?:[.,]\d+)?)\s*g?\s*CHO/i);
-  const ptn = s.match(/(\d+(?:[.,]\d+)?)\s*g?\s*(?:PTN|PROT)/i);
-  const lip = s.match(/(\d+(?:[.,]\d+)?)\s*g?\s*(?:LIP|GORD|FAT)/i);
-  if (!kcal && !cho && !ptn && !lip) return null;
-  const n = (m: RegExpMatchArray | null) => (m ? parseFloat(m[1].replace(',', '.')) : 0);
-  return { calories: n(kcal), carbs_g: n(cho), protein_g: n(ptn), fat_g: n(lip) };
+  const calories = kcal ? parseFloat(kcal[1].replace(',', '.')) : 0;
+  const carbs_g = num('CHO');
+  const protein_g = num('PTN|PROT');
+  const fat_g = num('LIP|GORD|FAT');
+  if (!calories && !carbs_g && !protein_g && !fat_g) return null;
+  return { calories, carbs_g, protein_g, fat_g };
 }
 
 function extractMealTimes(schedule?: MealScheduleData): string[] {

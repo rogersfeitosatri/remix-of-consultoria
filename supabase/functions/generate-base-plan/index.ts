@@ -49,7 +49,7 @@ function mirrorToMealPlan(meals: any[]): any[] {
       meal_name: m.name, horario: m.defaultTime || "",
       timing_note: (m.generalInstructions || [])[0] || "",
       food_groups: [{ group: m.name, options }],
-      meal_macros: mm.kcal != null ? `~${Math.round(mm.kcal)} kcal, CHO ${Math.round(mm.cho_g || 0)}g, PTN ${Math.round(mm.protein_g || 0)}g` : "",
+      meal_macros: mm.kcal != null ? `~${Math.round(mm.kcal)} kcal, CHO ${Math.round(mm.cho_g || 0)}g, PTN ${Math.round(mm.protein_g || 0)}g, LIP ${Math.round(mm.fat_g || 0)}g` : "",
     };
   });
 }
