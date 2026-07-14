@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PlanPipelinePanel } from '@/components/admin/PlanPipelinePanel';
+import { PlanV2Panel } from '@/components/admin/PlanV2Panel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -99,7 +100,8 @@ export default function MealPlanDetail() {
   });
 
   const structured = parseStructured(analysisRow);
-  const hasPlan = !!structured?.meal_plan?.meals;
+  const isV2 = structured?.planModelVersion === 2 && Array.isArray(structured?.basePlan?.meals);
+  const hasPlan = isV2 || !!structured?.meal_plan?.meals;
 
   // Auto-dispara a análise ao chegar do check-in (?fromCheckin=1), uma única vez.
   const [autoRan, setAutoRan] = useState(false);
@@ -228,6 +230,17 @@ export default function MealPlanDetail() {
     },
     onSuccess: () => { toast.success('Plano atualizado com base no último check-in!'); refresh(); },
     onError: (e: any) => toast.error(e.message || 'Erro ao atualizar plano'),
+  });
+
+  const generateV2 = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('generate-base-plan', { body: { clientId } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => { toast.success('Plano-base (v2) gerado!'); refresh(); },
+    onError: (e: any) => toast.error(e.message || 'Erro ao gerar plano-base'),
   });
 
   const [importOpen, setImportOpen] = useState(false);
@@ -505,10 +518,23 @@ export default function MealPlanDetail() {
         ) : !hasPlan ? (
           /* Ainda não há plano → duas formas de criar */
           <div className="space-y-4">
+            <Card className="border-primary/40 bg-primary/5">
+              <CardContent className="pt-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">Gerar plano-base (novo modelo v2)</p>
+                  <p className="text-xs text-muted-foreground">Uma única chamada de IA gera o plano-base; a dinâmica por dia de treino e o carbload são aplicados automaticamente pelo sistema (sem gerar 7 dietas).</p>
+                </div>
+                <Button className="gap-2 shrink-0" onClick={() => generateV2.mutate()} disabled={busy || generateV2.isPending}>
+                  {generateV2.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  Gerar plano-base
+                </Button>
+              </CardContent>
+            </Card>
+
             <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-              Este atleta ainda não tem plano. Há <strong>duas formas</strong> de criar:
-              <span className="text-foreground"> (1) Importar a dieta atual</span> (se ele já tem uma) ou
-              <span className="text-foreground"> (2) Gerar pela anamnese</span> (a IA monta a partir da anamnese).
+              Ou pelos modos anteriores:
+              <span className="text-foreground"> (1) Importar a dieta atual</span> ou
+              <span className="text-foreground"> (2) Gerar pela anamnese</span>.
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               {/* 1) Importar dieta atual */}
@@ -546,6 +572,8 @@ export default function MealPlanDetail() {
               ou criar um plano em branco para montar manualmente
             </button>
           </div>
+        ) : isV2 ? (
+          <PlanV2Panel clientId={clientId!} stored={structured} onUpdated={refresh} />
         ) : (
           <>
             {/* Pipeline em etapas (regerar) */}
