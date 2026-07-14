@@ -274,7 +274,16 @@ const ANALYSIS_SCHEMA = {
         },
         day_variations: {
           type: "object",
-          description: "Opcional. Variações por dia da semana (chaves seg,ter,qua,qui,sex,sab,dom), cada uma com { meals, daily_totals }, quando a dinâmica de treinos justificar (ex.: dia de treino longo com mais CHO). Vazio se todos os dias forem iguais.",
+          description: "OBRIGATÓRIO quando a anamnese trouxer frequência/dinâmica semanal de treinos. Preencha TODOS os dias da semana em que houver variação de demanda. Cada dia deve conter o plano JÁ AJUSTADO (meals + daily_totals) — não use texto genérico. Se todos os dias forem realmente iguais, deixe cada dia com uma nota curta explicando.",
+          properties: {
+            seg: { type: "object", description: "Segunda — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
+            ter: { type: "object", description: "Terça — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
+            qua: { type: "object", description: "Quarta — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
+            qui: { type: "object", description: "Quinta — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
+            sex: { type: "object", description: "Sexta — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
+            sab: { type: "object", description: "Sábado — plano ajustado ao treino/demanda do dia (geralmente longão)", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
+            dom: { type: "object", description: "Domingo — plano ajustado ao treino/demanda do dia", properties: { meals: { type: "array", items: { type: "object" } }, daily_totals: { type: "object" }, note: { type: "string" } } },
+          },
         },
       },
       required: ["meals", "daily_totals"],
