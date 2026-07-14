@@ -75,22 +75,36 @@ function stripUnsupported(schema: any): any {
   return schema;
 }
 
-async function postChat(p: Provider, body: any): Promise<any> {
-  const res = await fetch(p.endpoint, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${p.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    const err: any = new Error(`${p.name} HTTP ${res.status}: ${text.slice(0, 500)}`);
-    err.status = res.status;
-    throw err;
+async function postChat(p: Provider, body: any, timeoutMs = 60000): Promise<any> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(p.endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${p.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      const err: any = new Error(`${p.name} HTTP ${res.status}: ${text.slice(0, 500)}`);
+      err.status = res.status;
+      throw err;
+    }
+    return await res.json();
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      const err: any = new Error(`${p.name}: timeout após ${timeoutMs}ms`);
+      err.status = 504;
+      throw err;
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 function parseJsonLoose(text: string): any {
