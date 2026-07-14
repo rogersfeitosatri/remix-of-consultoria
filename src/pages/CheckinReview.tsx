@@ -357,6 +357,23 @@ export default function CheckinReview() {
     },
   });
 
+  // Ajuste incremental (patch) do plano v2 a partir do check-in — sem regenerar.
+  const patchV2 = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('checkin-plan-patch', {
+        body: { clientId: checkinResponse?.client_id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data: any) => {
+      toast.success(data?.summaryForAthlete || 'Ajuste aplicado ao plano v2.', { duration: 8000 });
+      if (data?.professionalReviewRequired) toast.warning('Sinais que pedem sua avaliação direta — confira o histórico do plano.');
+    },
+    onError: (e: any) => toast.error(e.message || 'Erro ao aplicar ajuste'),
+  });
+
   // Auto-complete the checkin_response task for this athlete
   const autoCompleteCheckinTask = async (clientId: string) => {
     try {
@@ -682,6 +699,19 @@ export default function CheckinReview() {
           </div>
 
           <div className="flex items-center gap-2">
+            {checkinResponse?.client_id && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => patchV2.mutate()}
+                disabled={patchV2.isPending}
+                className="gap-2"
+                title="Aplica um ajuste incremental (patch) ao plano v2 — carbload e orientações — sem regenerar o plano"
+              >
+                {patchV2.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                <span className="hidden sm:inline">Ajuste rápido (v2)</span>
+              </Button>
+            )}
             {checkinResponse?.client_id && (
               <Button
                 size="sm"
