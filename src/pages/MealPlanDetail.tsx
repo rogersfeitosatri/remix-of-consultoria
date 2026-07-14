@@ -573,7 +573,22 @@ export default function MealPlanDetail() {
             </button>
           </div>
         ) : isV2 ? (
-          <PlanV2Panel clientId={clientId!} stored={structured} onUpdated={refresh} />
+          <>
+            {/* Estratégia da semana + longão (carbload por regra) */}
+            <PlanV2Panel clientId={clientId!} stored={structured} onUpdated={refresh} />
+            {/* A DIETA no formato de sempre (editável, kcal/macros, envio ao Zona Nutri) */}
+            {structured?.meal_plan?.meals && (
+              <EditableMealPlan
+                key={`mpv2-${structured.updated_at}`}
+                analysis={structured}
+                clientId={clientId!}
+                athleteWeightKg={athleteWeightKg}
+                mealSchedule={mealSchedule}
+                onUpdated={refresh}
+              />
+            )}
+            <EditableStrategicOrientations key={`sov2-${structured.updated_at}`} analysis={structured} clientId={clientId!} onUpdated={refresh} />
+          </>
         ) : (
           <>
             {/* Pipeline em etapas (regerar) */}

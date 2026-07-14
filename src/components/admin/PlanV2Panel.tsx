@@ -39,7 +39,7 @@ function MealBlock({ meal }: { meal: BaseMeal }) {
 }
 
 export function PlanV2Panel({ clientId, stored, onUpdated }: { clientId: string; stored: PlanV2Stored; onUpdated: () => void }) {
-  const [tab, setTab] = useState('base');
+  const [tab, setTab] = useState('week');
   const view = useMemo(() => {
     try { return buildPlanV2View(stored); } catch { return null; }
   }, [stored]);
@@ -72,23 +72,13 @@ export function PlanV2Panel({ clientId, stored, onUpdated }: { clientId: string;
           </div>
         </CardHeader>
         <CardContent>
-          {(stored as any).athlete_summary && <p className="text-sm text-muted-foreground mb-2">{(stored as any).athlete_summary}</p>}
+          {stored.athlete_summary && <p className="text-sm text-muted-foreground mb-2">{stored.athlete_summary}</p>}
+          <p className="text-xs text-muted-foreground mb-2">A dieta (refeições, quantidades, macros e edição) está no editor abaixo — no mesmo formato do plano normal. Aqui ficam só a periodização da semana e a estratégia do longão.</p>
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList>
-              <TabsTrigger value="base"><Utensils className="h-3.5 w-3.5 mr-1" />Plano-base</TabsTrigger>
               <TabsTrigger value="week"><CalendarDays className="h-3.5 w-3.5 mr-1" />Minha semana</TabsTrigger>
               <TabsTrigger value="long"><Flame className="h-3.5 w-3.5 mr-1" />Estratégia do longão</TabsTrigger>
             </TabsList>
-
-            <TabsContent value="base" className="space-y-2 pt-3">
-              {meals.map((m) => <MealBlock key={m.id} meal={m} />)}
-              {(view.basePlan.generalInstructions || []).length > 0 && (
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <span className="text-xs font-semibold">Orientações gerais</span>
-                  {view.basePlan.generalInstructions!.map((g, i) => <p key={i} className="text-xs text-muted-foreground">• {g}</p>)}
-                </div>
-              )}
-            </TabsContent>
 
             <TabsContent value="week" className="pt-3">
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
