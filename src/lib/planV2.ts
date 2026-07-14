@@ -229,6 +229,15 @@ export function buildDayView(base: BasePlan, day: WeekDay) {
 }
 
 // ---------- Composer: transforma o plano v2 armazenado na visão completa ----------
+export interface PlanPatch {
+  createdAt: string;
+  signals: string[];
+  carbloadChange?: { fromDays: number; toDays: number; reasonCodes: string[] } | null;
+  summaryForAthlete: string;
+  professionalReviewRequired: boolean;
+  newMealNotes?: MealNote[];
+}
+
 export interface PlanV2Stored {
   planModelVersion: 2;
   basePlan: BasePlan;
@@ -238,6 +247,9 @@ export interface PlanV2Stored {
     raceDate?: string | null;
   };
   carbloadRules?: Partial<CarbloadRules>;
+  carbloadOverride?: { numberOfDays?: number; reasonCodes?: string[] } | null; // vindo do check-in
+  patches?: PlanPatch[];
+  planVersionNumber?: number;
   status?: string;
   generatedAt?: string;
 }
@@ -269,7 +281,11 @@ export function buildPlanV2View(stored: PlanV2Stored, opts?: { escalate?: boolea
   const dtr = daysToRace(stored.inputs?.raceDate, now);
   const phase = computePhase(dtr);
   const decision = decideCarbloadDays(rules, { phase, escalate: opts?.escalate, block: opts?.block });
-  const appliesOn = computeCarbloadDays(longRun, decision.days);
+  // O check-in pode ter definido um override (ex.: escalou para 2 dias).
+  const overrideDays = stored.carbloadOverride?.numberOfDays;
+  const effectiveDays = overrideDays === 1 || overrideDays === 2 ? overrideDays : decision.days;
+  const reasonCodes = overrideDays ? (stored.carbloadOverride?.reasonCodes || ['CHECKIN_OVERRIDE']) : decision.reasonCodes;
+  const appliesOn = computeCarbloadDays(longRun, effectiveDays);
   const baseMealIds = (stored.basePlan?.meals || []).map((m) => m.id);
   const weekMap = buildWeekMap({
     trainingWeek: stored.inputs?.trainingWeek ?? null,
@@ -284,7 +300,7 @@ export function buildPlanV2View(stored: PlanV2Stored, opts?: { escalate?: boolea
     weekMap,
     phase,
     daysToRace: dtr,
-    carbload: { longRunWeekday: longRun, numberOfDays: decision.days, appliesOn, reasonCodes: decision.reasonCodes },
+    carbload: { longRunWeekday: longRun, numberOfDays: effectiveDays, appliesOn, reasonCodes },
     todayWeekday: todayWeekday(now),
   };
 }

@@ -126,6 +126,27 @@ export function PlanV2Panel({ clientId, stored, onUpdated }: { clientId: string;
           </Tabs>
         </CardContent>
       </Card>
+
+      {Array.isArray(stored.patches) && stored.patches.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Histórico de ajustes (check-in)</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {[...stored.patches].reverse().map((p, i) => (
+              <div key={i} className="rounded-lg border p-2.5 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{new Date(p.createdAt).toLocaleDateString('pt-BR')}</span>
+                  {p.carbloadChange
+                    ? <Badge variant="outline" className="text-[10px]">Carbload {p.carbloadChange.fromDays}→{p.carbloadChange.toDays} dia(s)</Badge>
+                    : <Badge variant="secondary" className="text-[10px]">Mantido</Badge>}
+                </div>
+                {p.summaryForAthlete && <p className="text-foreground">{p.summaryForAthlete}</p>}
+                {p.signals?.length ? <p className="text-muted-foreground">Sinais: {p.signals.join(', ')}</p> : null}
+                {p.professionalReviewRequired && <p className="text-amber-600">⚠️ Requer sua avaliação direta.</p>}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
