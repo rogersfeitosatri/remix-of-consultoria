@@ -254,18 +254,17 @@ export class PaymentOrchestrator {
       });
       this.log("[8/9] Sync Zona Nutri disparada", { event: syncEvent });
 
-      // WhatsApp de boas-vindas apenas na primeira compra bem-sucedida
+      // WhatsApp de boas-vindas apenas na primeira compra bem-sucedida.
+      // ZN athletes NÃO existem em public.clients, então não podemos usar
+      // send-whatsapp (que exige clientId). Enviamos direto para o ZAPI e
+      // logamos em whatsapp_message_logs com client_id=null.
       if (isFirstPurchase && isPaid && athlete.phone) {
         try {
-          await this.supabase.functions.invoke("send-whatsapp", {
-            body: {
-              phone: athlete.phone,
-              message:
-                `Olá ${athlete.name ?? ""}! Seu acesso à ZN Assessoria foi ativado ✅\n` +
-                `Plano: ${subscription.plan_code} • válido até ${subscription.expires_at}.\n` +
-                `Em breve você receberá as instruções de acesso.`,
-              context: "zn_welcome",
-            },
+          await this.sendZnWelcomeWhatsapp({
+            ownerUserId,
+            athlete,
+            planCode: subscription.plan_code,
+            expiresAt: subscription.expires_at,
           });
           this.log("[whatsapp] Mensagem de boas-vindas enviada");
         } catch (e) {
@@ -310,5 +309,62 @@ export class PaymentOrchestrator {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Envia boas-vindas ZN direto no ZAPI (ZN athletes não estão em public.clients).
+   * Loga tentativa em whatsapp_message_logs com client_id=null e metadata.zn_athlete_id.
+   */
+  private async sendZnWelcomeWhatsapp(input: {
+    ownerUserId: string;
+    athlete: { id: string; name: string | null; phone: string | null; email: string };
+    planCode: string;
+    expiresAt: string | null;
+  }): Promise<void> {
+    const zapiInstanceId = Deno.env.get("ZAPI_INSTANCE_ID");
+    const zapiToken = Deno.env.get("ZAPI_TOKEN");
+    const zapiClientToken = Deno.env.get("ZAPI_CLIENT_TOKEN") ?? "";
+    if (!zapiInstanceId || !zapiToken) throw new Error("ZAPI credentials not configured");
+
+    // Normalize phone (E.164 BR, 12-13 digits starting with 55)
+    let digits = String(input.athlete.phone ?? "").replace(/\D/g, "");
+    while (digits.startsWith("0")) digits = digits.substring(1);
+    if (digits.length >= 14 && digits.startsWith("5555")) digits = digits.substring(2);
+    if (!digits.startsWith("55")) digits = "55" + digits;
+    if (digits.length !== 12 && digits.length !== 13) {
+      throw new Error(`Telefone inválido: "${input.athlete.phone}" → ${digits.length} dígitos`);
+    }
+
+    const message =
+      `Olá ${input.athlete.name ?? ""}! Seu acesso à ZN Assessoria foi ativado ✅\n` +
+      `Plano: ${input.planCode}${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}.\n` +
+      `Em instantes você receberá seu login e senha do app Zona Nutri.`;
+
+    const zapiUrl = `https://api.z-api.io/instances/${zapiInstanceId}/token/${zapiToken}/send-text`;
+    const res = await fetch(zapiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Client-Token": zapiClientToken },
+      body: JSON.stringify({ phone: digits, message }),
+    });
+    const zapiResult = await res.json().catch(() => ({}));
+
+    await this.supabase.from("whatsapp_message_logs").insert({
+      user_id: input.ownerUserId,
+      client_id: null,
+      message_type: "zn_welcome",
+      template_key: "zn_welcome",
+      to_phone: digits,
+      status: res.ok ? "sent" : "failed",
+      error_message: res.ok ? null : JSON.stringify(zapiResult),
+      payload_preview: message.substring(0, 500),
+      metadata: {
+        zn_athlete_id: input.athlete.id,
+        zn_athlete_email: input.athlete.email,
+        plan_code: input.planCode,
+        zapi_response: zapiResult,
+      },
+    });
+
+    if (!res.ok) throw new Error(`ZAPI error: ${JSON.stringify(zapiResult)}`);
   }
 }
