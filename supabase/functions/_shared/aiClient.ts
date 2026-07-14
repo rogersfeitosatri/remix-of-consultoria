@@ -75,7 +75,7 @@ function stripUnsupported(schema: any): any {
   return schema;
 }
 
-async function postChat(p: Provider, body: any, timeoutMs = 60000): Promise<any> {
+async function postChat(p: Provider, body: any, timeoutMs = 120000): Promise<any> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
