@@ -1,0 +1,2 @@
+ALTER TABLE public.clients DROP CONSTRAINT IF EXISTS clients_plan_type_check;
+ALTER TABLE public.clients ADD CONSTRAINT clients_plan_type_check CHECK (plan_type = ANY (ARRAY['consultoria'::text, 'premium'::text, 'zona_nutri_diet'::text]));
