@@ -24,6 +24,8 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { formatAnyAnswer } from '@/lib/formatAnamneseAnswer';
+import { isAnamneseCompletaForm } from '@/lib/anamneseCompletaQuestions';
+import { AnamneseCompletaAdminView } from '@/components/admin/AnamneseCompletaAdminView';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 
 interface AnamneseQuestion {
@@ -558,6 +560,13 @@ export default function AnamneseResponseDetail() {
                 </div>
               </CardHeader>
               <CardContent>
+                {isAnamneseCompletaForm((responseData as any)?.anamnese_forms) ? (
+                  <AnamneseCompletaAdminView
+                    response={responseData as any}
+                    questions={questions as any}
+                    onUpdated={() => queryClient.invalidateQueries({ queryKey: ['anamnese_response_detail', responseId] })}
+                  />
+                ) : (
                 <ScrollArea className="h-[600px] pr-4">
                   <div className="space-y-8">
                     {Object.entries(groupedQuestions).map(([section, sectionQuestions]) => (
@@ -586,6 +595,7 @@ export default function AnamneseResponseDetail() {
                     )}
                   </div>
                 </ScrollArea>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
