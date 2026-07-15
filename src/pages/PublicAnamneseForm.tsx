@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import logoRF from '@/assets/logo-rf.jpg';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,10 +16,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { isWizardAnamneseForm } from '@/lib/enduranceAnamneseQuestions';
+import { isAnamneseCompletaForm } from '@/lib/anamneseCompletaQuestions';
+import { isQuestionVisible } from '@/lib/anamneseConditions';
+import { QuestionRenderer } from '@/components/anamnese-completa/QuestionRenderer';
 import { usePublicZnPlans } from '@/hooks/usePublicZnPlans';
 
 interface Question {
   id: string;
+  question_key?: string | null;
   section: string;
   question_text: string;
   question_type: string;
@@ -31,6 +35,8 @@ interface Question {
   has_comment_field: boolean;
   comment_field_label: string | null;
   comment_field_required: boolean;
+  config?: Record<string, any> | null;
+  conditional_logic?: { show_if?: any } | null;
 }
 
 interface Form {
@@ -69,6 +75,14 @@ const PLAN_INFO_FALLBACK: Record<'monthly' | 'semiannual' | 'annual', { label: s
   annual:     { label: 'Anual',     price: 'R$ 419,90/ano',      sub: 'até 12x no cartão' },
 };
 
+function isBlankAnswer(value: any): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (Array.isArray(value)) return value.length === 0 || value.every(isBlankAnswer);
+  if (typeof value === 'object') return Object.keys(value).length === 0 || Object.values(value).every(isBlankAnswer);
+  return false;
+}
+
 export default function PublicAnamneseForm() {
   const { formId } = useParams<{ formId: string }>();
 
@@ -105,6 +119,19 @@ export default function PublicAnamneseForm() {
   const [comments, setComments] = useState<Record<string, string>>({});
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+
+  const isCompleta = isAnamneseCompletaForm(form);
+  const answersByKey = useMemo(() => {
+    const out: Record<string, any> = {};
+    questions.forEach((q) => {
+      out[q.question_key || q.id] = answers[q.id];
+    });
+    return out;
+  }, [questions, answers]);
+  const visibleQuestions = useMemo(
+    () => isCompleta ? questions.filter((q) => isQuestionVisible(q as any, answersByKey)) : questions,
+    [isCompleta, questions, answersByKey]
+  );
 
   useEffect(() => {
     const fetchForm = async () => {
@@ -149,10 +176,12 @@ export default function PublicAnamneseForm() {
     const initialComments: Record<string, string> = {};
     qs.forEach((q) => {
       const type = resolveQuestionType(q);
-      if (q.question_type === 'checkbox' || q.question_type === 'multiselect') {
+      if (q.question_type === 'checkbox' || q.question_type === 'multiselect' || q.question_type === 'chips' || q.question_type === 'file_upload' || q.question_type === 'structured_list') {
         initialAnswers[q.id] = [];
       } else if (q.question_type === 'scale') {
         initialAnswers[q.id] = Math.floor((q.scale_min + q.scale_max) / 2);
+      } else if (q.question_type === 'field_group' || q.question_type === 'symptom_grid' || q.question_type === 'frequency_grid') {
+        initialAnswers[q.id] = {};
       } else if (type === 'meal_items') {
         initialAnswers[q.id] = { horario: '', itens: [['']], bebidas: '' };
       } else if (type === 'training_week') {
@@ -316,16 +345,11 @@ export default function PublicAnamneseForm() {
 
     const missing = new Set<string>();
     const missingLabels: string[] = [];
-    for (const question of questions) {
+    for (const question of visibleQuestions) {
       let isMissing = false;
       if (question.is_required) {
         const answer = answers[question.id];
-        const empty =
-          answer === undefined ||
-          answer === null ||
-          (Array.isArray(answer) && answer.length === 0) ||
-          (typeof answer === 'string' && answer.trim() === '');
-        if (empty) isMissing = true;
+        if (isBlankAnswer(answer)) isMissing = true;
       }
       if (!isMissing && question.has_comment_field && question.comment_field_required) {
         const comment = comments[question.id];
@@ -485,7 +509,7 @@ export default function PublicAnamneseForm() {
 
   // Group questions by section while preserving order_index order
   const orderedSections: string[] = [];
-  const questionsBySection = questions.reduce((acc, q) => {
+  const questionsBySection = visibleQuestions.reduce((acc, q) => {
     if (!acc[q.section]) {
       acc[q.section] = [];
       orderedSections.push(q.section);
@@ -495,11 +519,11 @@ export default function PublicAnamneseForm() {
   }, {} as Record<string, Question[]>);
 
   // ── Modo wizard (1 pergunta por tela) ──────────────────────────────────────────
-  const isWizard = isWizardAnamneseForm(form);
+  const isWizard = isWizardAnamneseForm(form) || isCompleta;
   type WizStep = { kind: 'plan' } | { kind: 'question'; question: Question; day?: string };
   const questionSteps: WizStep[] = isWizard
-    ? questions.flatMap<WizStep>((q) =>
-        resolveQuestionType(q) === 'training_week'
+    ? visibleQuestions.flatMap<WizStep>((q) =>
+        !isCompleta && resolveQuestionType(q) === 'training_week'
           ? DIAS_SEMANA.map((dia) => ({ kind: 'question', question: q, day: dia as string }))
           : [{ kind: 'question', question: q }]
       )
@@ -521,8 +545,26 @@ export default function PublicAnamneseForm() {
   const wizProgress = wizardSteps.length > 0 ? ((currentStepIndex + 1) / wizardSteps.length) * 100 : 0;
   const isLastWizStep = currentStepIndex === wizardSteps.length - 1;
 
+  useEffect(() => {
+    if (wizardSteps.length > 0 && currentStepIndex >= wizardSteps.length) {
+      setCurrentStepIndex(wizardSteps.length - 1);
+    }
+  }, [wizardSteps.length, currentStepIndex]);
+
   // Renderiza o widget de entrada de uma pergunta (usado no modo wizard).
   const renderWidget = (question: Question, dayOverride?: string) => {
+    if (isCompleta) {
+      return (
+        <QuestionRenderer
+          question={question as any}
+          value={answers[question.id]}
+          onChange={(v) => handleAnswerChange(question.id, v)}
+          answersByKey={answersByKey}
+          clientId={null}
+        />
+      );
+    }
+
     const qType = resolveQuestionType(question);
     switch (qType) {
       case 'short_text':
@@ -611,11 +653,7 @@ export default function PublicAnamneseForm() {
   const validateWizQuestion = (question: Question): boolean => {
     if (question.is_required) {
       const answer = answers[question.id];
-      const empty =
-        answer === undefined || answer === null ||
-        (Array.isArray(answer) && answer.length === 0) ||
-        (typeof answer === 'string' && answer.trim() === '');
-      if (empty) {
+      if (isBlankAnswer(answer)) {
         toast.error(`Responda: ${question.question_text.replace(/[:?.\s]+$/, '')}`);
         return false;
       }
