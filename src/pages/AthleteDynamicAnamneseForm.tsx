@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 import { PersonStanding, ArrowLeft, ArrowRight, Check, Loader2, Send, LogOut, Plus, X } from 'lucide-react';
 import rogersProfile from '@/assets/rogers-profile.jpg';
 import { isWizardAnamneseForm } from '@/lib/enduranceAnamneseQuestions';
+import { isAnamneseCompletaForm } from '@/lib/anamneseCompletaQuestions';
+import AnamneseCompletaForm from '@/pages/AnamneseCompletaForm';
 
 // ── Constantes de treino (espelham PublicAnamneseForm) ──────────────────────────
 const DIAS_SEMANA = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] as const;
@@ -706,6 +708,15 @@ export default function AthleteDynamicAnamneseForm() {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[hsl(43,74%,49%)]"></div>
+      </div>
+    );
+  }
+
+  // ANAMNESE COMPLETA: renderiza o wizard rico dedicado (Fase 2).
+  if (form && questions.length > 0 && client?.id && isAnamneseCompletaForm(form)) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <AnamneseCompletaForm form={form as any} questions={questions as any} clientId={client.id} />
       </div>
     );
   }
