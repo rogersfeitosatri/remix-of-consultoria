@@ -228,9 +228,66 @@ export default function MealPlanDetail() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => { toast.success('Plano atualizado com base no último check-in!'); refresh(); },
+    onSuccess: () => { toast.success('Ajustes gerados. Revise e clique em "Aplicar ajustes ao plano".'); refresh(); },
     onError: (e: any) => toast.error(e.message || 'Erro ao atualizar plano'),
   });
+
+  // Aplica a proposta (pending_update) ao plano vigente. Guarda backup para desfazer.
+  const applyPendingUpdate = useMutation({
+    mutationFn: async () => {
+      if (!structured?.pending_update) throw new Error('Não há ajustes pendentes para aplicar.');
+      const pu = structured.pending_update;
+      const backup = {
+        created_at: new Date().toISOString(),
+        athlete_summary: structured.athlete_summary,
+        carb_estimation: structured.carb_estimation,
+        carb_progression: structured.carb_progression,
+        meal_plan: structured.meal_plan,
+        strategic_orientations: structured.strategic_orientations,
+        alerts: structured.alerts,
+      };
+      const next = {
+        ...structured,
+        athlete_summary: pu.athlete_summary ?? structured.athlete_summary,
+        carb_estimation: pu.carb_estimation ?? structured.carb_estimation,
+        carb_progression: pu.carb_progression ?? structured.carb_progression,
+        meal_plan: pu.meal_plan ?? structured.meal_plan,
+        strategic_orientations: pu.strategic_orientations ?? structured.strategic_orientations,
+        alerts: pu.alerts ?? structured.alerts,
+        pre_update_backup: backup,
+        pending_update: null,
+        _isNewFormat: true,
+        updated_at: new Date().toISOString(),
+      };
+      await persistStructured(next);
+    },
+    onSuccess: () => { toast.success('Ajustes aplicados ao plano alimentar.'); refresh(); },
+    onError: (e: any) => toast.error(e.message || 'Erro ao aplicar ajustes'),
+  });
+
+  // Desfaz a última aplicação usando o backup salvo.
+  const undoPendingUpdate = useMutation({
+    mutationFn: async () => {
+      if (!structured?.pre_update_backup) throw new Error('Não há aplicação para desfazer.');
+      const bk = structured.pre_update_backup;
+      const next = {
+        ...structured,
+        athlete_summary: bk.athlete_summary ?? structured.athlete_summary,
+        carb_estimation: bk.carb_estimation ?? structured.carb_estimation,
+        carb_progression: bk.carb_progression ?? structured.carb_progression,
+        meal_plan: bk.meal_plan ?? structured.meal_plan,
+        strategic_orientations: bk.strategic_orientations ?? structured.strategic_orientations,
+        alerts: bk.alerts ?? structured.alerts,
+        pre_update_backup: null,
+        _isNewFormat: true,
+        updated_at: new Date().toISOString(),
+      };
+      await persistStructured(next);
+    },
+    onSuccess: () => { toast.success('Aplicação desfeita — o plano voltou ao estado anterior.'); refresh(); },
+    onError: (e: any) => toast.error(e.message || 'Erro ao desfazer'),
+  });
+
 
   const generateV2 = useMutation({
     mutationFn: async () => {
@@ -688,6 +745,35 @@ export default function MealPlanDetail() {
                     </div>
                     <p className="text-sm text-foreground whitespace-pre-wrap">{structured.adjustment_message}</p>
                   </div>
+                )}
+
+                {/* Aplicar / Desfazer ajustes */}
+                {structured?.pending_update && (
+                  <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-2">
+                    <p className="text-xs text-foreground">
+                      Os ajustes acima estão como <strong>proposta</strong>. Clique em <em>Aplicar</em> para
+                      atualizar o plano alimentar (e liberar o envio ao Zona Nutri).
+                    </p>
+                    <Button
+                      className="w-full gap-2"
+                      onClick={() => applyPendingUpdate.mutate()}
+                      disabled={applyPendingUpdate.isPending}
+                    >
+                      {applyPendingUpdate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      Aplicar ajustes ao plano alimentar
+                    </Button>
+                  </div>
+                )}
+                {structured?.pre_update_backup && !structured?.pending_update && (
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => undoPendingUpdate.mutate()}
+                    disabled={undoPendingUpdate.isPending}
+                  >
+                    {undoPendingUpdate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Desfazer última aplicação
+                  </Button>
                 )}
               </CardContent>
             </Card>

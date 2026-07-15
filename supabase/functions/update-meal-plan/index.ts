@@ -154,19 +154,34 @@ TAREFA (siga as regras do sistema — ajustes conservadores, só o necessário):
       fallback: "lovable-gemini-pro",
     });
 
+    // Ajustes ficam como PROPOSTA (pending_update) até o admin clicar em
+    // "Aplicar ajustes ao plano". Mantém o plano atual intocado para envio ao
+    // Zona Nutri até a decisão explícita.
+    const hasChange = !analysisData.no_change_needed && !!analysisData.meal_plan;
+
+    const pending_update = hasChange
+      ? {
+          generated_at: new Date().toISOString(),
+          model: `${provider}/${model}`,
+          athlete_summary: analysisData.athlete_summary ?? currentPlan.athlete_summary,
+          carb_estimation: analysisData.carb_estimation ?? currentPlan.carb_estimation,
+          carb_progression: analysisData.carb_progression ?? currentPlan.carb_progression,
+          meal_plan: analysisData.meal_plan,
+          strategic_orientations: analysisData.strategic_orientations ?? currentPlan.strategic_orientations,
+          alerts: analysisData.alerts ?? currentPlan.alerts,
+        }
+      : null;
+
     const merged = {
       ...currentPlan,
-      athlete_summary: analysisData.athlete_summary ?? currentPlan.athlete_summary,
-      carb_estimation: analysisData.carb_estimation ?? currentPlan.carb_estimation,
-      carb_progression: analysisData.carb_progression ?? currentPlan.carb_progression,
-      meal_plan: analysisData.meal_plan ?? currentPlan.meal_plan,
-      strategic_orientations: analysisData.strategic_orientations ?? currentPlan.strategic_orientations,
-      alerts: analysisData.alerts ?? currentPlan.alerts,
+      // Plano atual permanece intocado — mostramos leitura, ajustes e mensagem
+      // no painel; a aplicação real acontece via "Aplicar ajustes ao plano".
       adjustment_message: analysisData.adjustment_message ?? "",
       checkin_reading: analysisData.checkin_reading ?? "",
       adjustments: analysisData.adjustments ?? [],
       attention_points: analysisData.attention_points ?? [],
       no_change_needed: analysisData.no_change_needed ?? false,
+      pending_update,
       _isNewFormat: true,
       last_update_reason: "checkin_update",
       updated_at: new Date().toISOString(),
