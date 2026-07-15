@@ -40,14 +40,6 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
   const sorted = useMemo(() => [...questions].sort((a, b) => a.order_index - b.order_index), [questions]);
   const keyById = useMemo(() => Object.fromEntries(sorted.map((q) => [q.id, q.question_key || q.id])), [sorted]);
 
-  // seções na ordem de aparição
-  const sections = useMemo(() => {
-    const seen: string[] = [];
-    for (const q of sorted) if (!seen.includes(q.section)) seen.push(q.section);
-    return seen;
-  }, [sorted]);
-  const totalSteps = sections.length + 1; // +1 = revisão
-
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [step, setStep] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -62,6 +54,13 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
     for (const q of sorted) out[q.question_key || q.id] = answers[q.id];
     return out;
   }, [answers, sorted]);
+
+  // Lista de perguntas atualmente visíveis (respeita conditional_logic).
+  const visibleQuestions = useMemo(
+    () => sorted.filter((q) => isQuestionVisible(q, answersByKey)),
+    [sorted, answersByKey],
+  );
+  const totalSteps = visibleQuestions.length + 1; // +1 = revisão
 
   // ─────────── carregar rascunho ou prefill ───────────
   useEffect(() => {
