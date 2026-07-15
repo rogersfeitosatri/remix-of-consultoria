@@ -281,18 +281,6 @@ export const ANAMNESE_COMPLETA_QUESTIONS: AnamneseCompletaQuestion[] = [
             'Ainda não realizo treinos que necessitem alimentação',
           ],
         },
-        {
-          key: 'produtos', label: 'Produtos/alimentos utilizados', type: 'structured_list', addLabel: 'Adicionar produto',
-          show_if: { key: 'self.consumos', op: 'includes_any', value: ['Bebida esportiva', 'Gel de carboidrato', 'Doce de leite', 'Rapadura', 'Paçoca', 'Frutas', 'Frutas secas', 'Eletrólitos ou cápsula de sal', 'Outro'] },
-          fields: [
-            { key: 'produto', label: 'Produto ou alimento', type: 'text', required: true },
-            { key: 'marca', label: 'Marca (se aplicável)', type: 'text' },
-            { key: 'quantidade_total', label: 'Quantidade total', type: 'text' },
-            { key: 'frequencia_hora', label: 'Frequência por hora', type: 'text' },
-            { key: 'liquidos_hora', label: 'Líquidos por hora', type: 'text' },
-            { key: 'cafeina', label: 'Contém cafeína?', type: 'select', options: ['Sim', 'Não', 'Não sei'] },
-          ],
-        },
       ],
     },
   },
