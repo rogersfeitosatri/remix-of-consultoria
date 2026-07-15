@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, ClipboardList, FileText, Edit, Trash2, Copy, CalendarCheck, Library, Sparkles, ClipboardCheck, Bike } from 'lucide-react';
 import { useCheckinForms, useDeleteCheckinForm, useCreateCheckinForm, useCreateDefaultCheckinForm } from '@/hooks/useCheckinForms';
-import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm, useCreateDefaultAnamneseForm, useCreateEnduranceAnamneseForm } from '@/hooks/useAnamneseForms';
+import { useAnamneseForms, useDeleteAnamneseForm, useCreateAnamneseForm, useCreateDefaultAnamneseForm, useCreateEnduranceAnamneseForm, useCreateAnamneseCompletaForm } from '@/hooks/useAnamneseForms';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -93,6 +93,7 @@ export default function Forms() {
   const createAnamneseForm = useCreateAnamneseForm();
   const createDefaultAnamneseForm = useCreateDefaultAnamneseForm();
   const createEnduranceAnamneseForm = useCreateEnduranceAnamneseForm();
+  const createAnamneseCompletaForm = useCreateAnamneseCompletaForm();
 
   // Badge counts
   const { data: pendingCheckinCount = 0 } = useQuery({
@@ -231,6 +232,16 @@ export default function Forms() {
     }
   };
 
+  const handleCreateAnamneseCompletaForm = async () => {
+    try {
+      const form = await createAnamneseCompletaForm.mutateAsync();
+      toast({ title: 'ANAMNESE COMPLETA criada!', description: 'Criada inativa (29 perguntas, wizard). Revise e ative quando quiser.' });
+      navigate(`/anamnese/${form.id}`);
+    } catch (error: any) {
+      toast({ title: 'Erro', description: error.message || 'Não foi possível criar. Verifique se a migration da Fase 1 foi aplicada.', variant: 'destructive' });
+    }
+  };
+
   const openNewFormDialog = (type: 'checkin' | 'anamnese') => {
     setNewFormType(type);
     setNewFormData({ title: '', description: '' });
@@ -263,6 +274,10 @@ export default function Forms() {
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCreateEnduranceAnamneseForm} disabled={createEnduranceAnamneseForm.isPending}>
             <Bike className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Endurance (wizard)</span>
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCreateAnamneseCompletaForm} disabled={createAnamneseCompletaForm.isPending}>
+            <ClipboardList className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Anamnese Completa</span>
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => openNewFormDialog('anamnese')}>
             <Plus className="h-3.5 w-3.5" />

@@ -76,9 +76,18 @@ const questionTypes = [
   { value: 'scale', label: 'Escala (1-10)' },
   { value: 'boolean', label: 'Sim/Não' },
   { value: 'date', label: 'Data' },
+  { value: 'time', label: 'Horário (HH:MM)' },
+  { value: 'chips', label: '🏷️ Tags / lista de itens' },
   { value: 'meal_items', label: '🍽️ Refeição (horário + alimentos)' },
   { value: 'training_week', label: '🏋️ Rotina de Treino Semanal' },
   { value: 'symptom_scale', label: '📊 Sintomas (frequência 0–5)' },
+  // Tipos da ANAMNESE COMPLETA (renderização rica na Fase 2)
+  { value: 'field_group', label: '🧩 Grupo de campos (condicionais)' },
+  { value: 'structured_list', label: '📋 Lista estruturada (repetível)' },
+  { value: 'meal_plan_editor', label: '🍴 Editor de refeições habituais' },
+  { value: 'symptom_grid', label: '🩺 Grade de sintomas (momento/freq/intensidade)' },
+  { value: 'frequency_grid', label: '📈 Grade de frequência alimentar' },
+  { value: 'file_upload', label: '📎 Anexo de arquivo (exames)' },
 ];
 
 export default function AnamneseFormBuilder() {

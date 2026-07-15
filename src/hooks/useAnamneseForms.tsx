@@ -6,6 +6,11 @@ import {
   ENDURANCE_ANAMNESE_TITLE,
   ENDURANCE_ANAMNESE_DESCRIPTION,
 } from '@/lib/enduranceAnamneseQuestions';
+import {
+  ANAMNESE_COMPLETA_QUESTIONS,
+  ANAMNESE_COMPLETA_TITLE,
+  ANAMNESE_COMPLETA_DESCRIPTION,
+} from '@/lib/anamneseCompletaQuestions';
 
 export interface AnamneseQuestion {
   id: string;
@@ -13,6 +18,7 @@ export interface AnamneseQuestion {
   section: string;
   question_text: string;
   question_type: string;
+  question_key?: string | null;
   options?: any;
   scale_min?: number;
   scale_max?: number;
@@ -21,6 +27,8 @@ export interface AnamneseQuestion {
   comment_field_label?: string;
   comment_field_required?: boolean;
   order_index: number;
+  conditional_logic?: any;
+  config?: any;
   created_at: string;
 }
 
@@ -31,15 +39,27 @@ export interface AnamneseForm {
   description: string | null;
   is_active: boolean;
   is_required: boolean;
+  version?: number;
+  single_question_wizard?: boolean;
   created_at: string;
   updated_at: string;
 }
+
+export type AnamneseResponseStatus = 'in_progress' | 'submitted' | 'reviewed' | 'archived';
 
 export interface AnamneseResponse {
   id: string;
   form_id: string;
   client_id: string;
   responses: Record<string, any>;
+  status?: AnamneseResponseStatus;
+  started_at?: string | null;
+  updated_at?: string | null;
+  form_version?: number | null;
+  internal_alerts?: any;
+  internal_notes?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
   submitted_at: string;
   ai_analysis?: Record<string, any>;
   ai_analyzed_at?: string;
@@ -385,6 +405,61 @@ export function useCreateEnduranceAnamneseForm() {
 
       if (questionsError) throw questionsError;
 
+      return form as unknown as AnamneseForm;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['anamnese-forms'] });
+    },
+  });
+}
+
+// Create the ANAMNESE COMPLETA model (29-question wizard) — semeado inativo.
+// Usa as colunas question_key/conditional_logic/config (migration da Fase 1).
+export function useCreateAnamneseCompletaForm() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      const { data: form, error: formError } = await supabase
+        .from('anamnese_forms' as any)
+        .insert({
+          user_id: user.id,
+          title: ANAMNESE_COMPLETA_TITLE,
+          description: ANAMNESE_COMPLETA_DESCRIPTION,
+          is_active: false, // não ativa automaticamente — não afeta o form atual
+        })
+        .select()
+        .single();
+
+      if (formError) throw formError;
+      const formId = (form as any).id;
+
+      const questions = ANAMNESE_COMPLETA_QUESTIONS.map((q, index) => ({
+        form_id: formId,
+        section: q.section,
+        question_text: q.question_text,
+        question_type: q.question_type,
+        question_key: q.question_key,
+        options: q.options ?? null,
+        scale_min: q.scale_min ?? null,
+        scale_max: q.scale_max ?? null,
+        is_required: q.is_required ?? false,
+        order_index: index,
+        has_comment_field: q.has_comment_field ?? false,
+        comment_field_label: q.comment_field_label ?? null,
+        comment_field_required: false,
+        conditional_logic: q.conditional_logic ?? null,
+        config: q.config ?? null,
+      }));
+
+      const { error: questionsError } = await supabase
+        .from('anamnese_questions' as any)
+        .insert(questions);
+
+      if (questionsError) throw questionsError;
       return form as unknown as AnamneseForm;
     },
     onSuccess: () => {
