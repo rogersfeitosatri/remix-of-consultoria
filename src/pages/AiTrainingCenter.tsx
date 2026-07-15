@@ -199,10 +199,14 @@ export default function AiTrainingCenter() {
           context_key: selectedContext,
           prompt_text: promptText,
           test_input: testInput,
+          provider: testProvider,
+          openai_model: openaiModel,
         },
       });
       if (error) throw error;
-      setTestResult(data?.result || data?.output || JSON.stringify(data, null, 2));
+      const usedProvider = data?.provider ? ` [${data.provider}/${data.model}]` : '';
+      setTestResult((data?.result || data?.output || JSON.stringify(data, null, 2)) + usedProvider);
+
     } catch (err: any) {
       setTestResult(`Erro: ${err.message || 'Falha ao gerar teste.'}`);
     } finally {
