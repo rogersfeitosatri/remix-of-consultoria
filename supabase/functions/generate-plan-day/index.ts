@@ -88,7 +88,13 @@ Deno.serve(async (req) => {
       if (cp?.prompt_text?.trim()) systemPrompt = cp.prompt_text.trim();
     } catch { /* default */ }
 
+    const refDiet: string = (job.admin_guidance?.reference_diet_text || "").toString().slice(0, 6000);
+    const refDietBlock = refDiet
+      ? `\nDIETA DE REFERÊNCIA (anexada pelo nutricionista — preserve refeições, horários, alimentos e porções sempre que possível; só mude o que a periodização exigir):\n"""\n${refDiet}\n"""\n`
+      : "";
+
     const buildPrompt = (correction?: string[]) => `Gere o CARDÁPIO de UM ÚNICO DIA (${WEEKDAY_LABEL[weekday]}). Não gere outros dias.
+
 
 BLUEPRINT DO DIA (siga as metas e níveis BAIXO/MÉDIO/ALTO):
 ${JSON.stringify(dayBp)}
