@@ -75,13 +75,24 @@ Deno.serve(async (req) => {
     } catch { /* default */ }
 
     const guidanceLines: string[] = [];
+    let referenceDietText = "";
+    let referenceDietSource = "";
     if (adminGuidance && typeof adminGuidance === "object") {
       const g = adminGuidance;
       if (g.meals_count) guidanceLines.push(`Número de refeições: ${g.meals_count}`);
       if (g.target_kcal) guidanceLines.push(`Meta calórica: ${g.target_kcal} kcal`);
       if (g.target_cho_gkg) guidanceLines.push(`Meta CHO: ${g.target_cho_gkg} g/kg`);
       if (g.custom_instructions) guidanceLines.push(`Instruções: ${g.custom_instructions}`);
+      if (typeof g.reference_diet_text === "string" && g.reference_diet_text.trim()) {
+        referenceDietText = g.reference_diet_text.trim().slice(0, 18000);
+        referenceDietSource = g.reference_diet_source || "PDF de referência";
+      }
     }
+
+    const referenceBlock = referenceDietText
+      ? `\n## DIETA DE REFERÊNCIA (${referenceDietSource})\nO nutricionista anexou uma dieta em PDF. USE-A como referência forte para: número/nomes/horários das refeições, preferências e restrições, alimentos habituais e tamanhos de porção. Ajuste apenas o que a periodização exigir (D0..D4, janelas em torno do treino, metas semanais).\n"""\n${referenceDietText}\n"""\n`
+      : "";
+
 
     const userPrompt = `Construa APENAS o BLUEPRINT SEMANAL de periodização nutricional (NÃO gere alimentos, cardápio nem quantidades nesta etapa).
 
