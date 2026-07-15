@@ -671,7 +671,7 @@ export default function MealPlanDetail() {
               <CardContent className="pt-4 space-y-3">
                 <Button
                   className="w-full gap-2"
-                  onClick={() => updateFromCheckin.mutate()}
+                  onClick={() => updateFromCheckin.mutate(undefined)}
                   disabled={busy || updateFromCheckin.isPending}
                 >
                   {updateFromCheckin.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
