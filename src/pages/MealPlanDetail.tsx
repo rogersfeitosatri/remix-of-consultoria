@@ -219,16 +219,20 @@ export default function MealPlanDetail() {
     onError: (e: any) => toast.error(e.message || 'Erro ao gerar plano'),
   });
 
+  const [adjustNote, setAdjustNote] = useState('');
   const updateFromCheckin = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (adminNote?: string) => {
       const { data, error } = await supabase.functions.invoke('update-meal-plan', {
-        body: { clientId },
+        body: { clientId, adminNote: adminNote?.trim() || undefined },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => { toast.success('Ajustes gerados. Revise e clique em "Aplicar ajustes ao plano".'); refresh(); },
+    onSuccess: (_d, variables) => {
+      toast.success(variables ? 'Plano reajustado com sua observação. Revise e aplique.' : 'Ajustes gerados. Revise e clique em "Aplicar ajustes ao plano".');
+      refresh();
+    },
     onError: (e: any) => toast.error(e.message || 'Erro ao atualizar plano'),
   });
 
