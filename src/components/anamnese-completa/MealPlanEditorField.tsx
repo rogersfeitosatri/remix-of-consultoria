@@ -227,7 +227,7 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
                       </div>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <Label className="text-xs">Alimento</Label>
+                          <Label className="text-xs">Alimento<span className="text-destructive"> *</span></Label>
                           <Input
                             value={food.food_name}
                             onChange={(e) => updateFood(mi, fi, { food_name: e.target.value })}
@@ -239,24 +239,25 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-1">
-                            <Label className="text-xs">Quantidade</Label>
+                            <Label className="text-xs">Porção<span className="text-destructive"> *</span></Label>
                             <Input
                               value={String(food.quantity ?? '')}
                               onChange={(e) => updateFood(mi, fi, { quantity: e.target.value })}
-                              placeholder="Ex.: 2"
+                              placeholder="Ex.: 2 ou 100"
+                              aria-required
                               disabled={disabled}
                               readOnly={disabled}
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs">Medida</Label>
+                            <Label className="text-xs">Medida<span className="text-destructive"> *</span></Label>
                             <Select
                               value={food.unit || undefined}
                               onValueChange={(v) => updateFood(mi, fi, { unit: v })}
                               disabled={disabled}
                             >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Medida" />
+                              <SelectTrigger aria-required>
+                                <SelectValue placeholder="Medida caseira ou gramas" />
                               </SelectTrigger>
                               <SelectContent>
                                 {units.map((o) => (
