@@ -559,6 +559,9 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
   const [quickBusyKey, setQuickBusyKey] = useState<string | null>(null);
   const [showQuickKey, setShowQuickKey] = useState<string | null>(null);
   const [editedAnalysis, setEditedAnalysis] = useState(() => deepClone(analysis));
+  // Planos importados (PDF/texto colado) devem ter alimentos/porções/medidas
+  // preservados na conversão para edição — nada de trocar por "match" do banco.
+  const isImportedSource = String((analysis as any)?.source || '').startsWith('imported');
   const [focusedMealIdx, setFocusedMealIdx] = useState<number | null>(null);
   const mealRefs = useRef<Array<HTMLDivElement | null>>([]);
 
