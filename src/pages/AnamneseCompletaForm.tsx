@@ -40,14 +40,6 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
   const sorted = useMemo(() => [...questions].sort((a, b) => a.order_index - b.order_index), [questions]);
   const keyById = useMemo(() => Object.fromEntries(sorted.map((q) => [q.id, q.question_key || q.id])), [sorted]);
 
-  // seções na ordem de aparição
-  const sections = useMemo(() => {
-    const seen: string[] = [];
-    for (const q of sorted) if (!seen.includes(q.section)) seen.push(q.section);
-    return seen;
-  }, [sorted]);
-  const totalSteps = sections.length + 1; // +1 = revisão
-
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [step, setStep] = useState(0);
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -62,6 +54,13 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
     for (const q of sorted) out[q.question_key || q.id] = answers[q.id];
     return out;
   }, [answers, sorted]);
+
+  // Lista de perguntas atualmente visíveis (respeita conditional_logic).
+  const visibleQuestions = useMemo(
+    () => sorted.filter((q) => isQuestionVisible(q, answersByKey)),
+    [sorted, answersByKey],
+  );
+  const totalSteps = visibleQuestions.length + 1; // +1 = revisão
 
   // ─────────── carregar rascunho ou prefill ───────────
   useEffect(() => {
@@ -153,7 +152,7 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
   }, [sorted, answersByKey, answers]);
 
   const gotoQuestion = (q: AnamneseQuestion) => {
-    const idx = sections.indexOf(q.section);
+    const idx = visibleQuestions.findIndex((x) => x.id === q.id);
     if (idx >= 0) setStep(idx);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -212,8 +211,17 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
     );
   }
 
-  const isReview = step === sections.length;
-  const stepProgress = ((step + 1) / totalSteps) * 100;
+  const isReview = step >= visibleQuestions.length;
+  const currentQuestion = !isReview ? visibleQuestions[step] : null;
+  const stepProgress = ((Math.min(step, visibleQuestions.length) + 1) / totalSteps) * 100;
+
+  // Se o step atual passou a apontar para uma pergunta que ficou oculta,
+  // ajusta o índice para não travar o wizard.
+  useEffect(() => {
+    if (!isReview && !currentQuestion && visibleQuestions.length > 0) {
+      setStep(Math.min(step, visibleQuestions.length));
+    }
+  }, [isReview, currentQuestion, visibleQuestions.length, step]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 pb-28">
@@ -224,34 +232,37 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
 
       <div className="mb-4 space-y-1">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>Etapa {step + 1} de {totalSteps}{!isReview && ` · ${sections[step]}`}</span>
+          <span>
+            Pergunta {Math.min(step + 1, visibleQuestions.length)} de {visibleQuestions.length}
+            {currentQuestion && ` · ${currentQuestion.section}`}
+          </span>
           {saving ? <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> salvando…</span> : draftId ? <span>rascunho salvo</span> : null}
         </div>
         <Progress value={stepProgress} />
       </div>
 
-      {!isReview ? (
-        <div className="space-y-4">
-          {sorted.filter((q) => q.section === sections[step] && isQuestionVisible(q, answersByKey)).map((q) => (
-            <Card key={q.id}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium">
-                  {q.question_text}{q.is_required && <span className="text-destructive"> *</span>}
-                </CardTitle>
-                {q.config?.helper && <p className="text-xs text-muted-foreground">{q.config.helper}</p>}
-              </CardHeader>
-              <CardContent>
-                <QuestionRenderer
-                  question={q as any}
-                  value={answers[q.id]}
-                  onChange={(v) => setAnswer(q.id, v)}
-                  answersByKey={answersByKey}
-                  clientId={clientId}
-                />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {!isReview && currentQuestion ? (
+        <Card key={currentQuestion.id}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium">
+              {currentQuestion.question_text}{currentQuestion.is_required && <span className="text-destructive"> *</span>}
+            </CardTitle>
+            {(currentQuestion.config?.helper || (currentQuestion as any).helper) && (
+              <p className="text-xs text-muted-foreground">
+                {currentQuestion.config?.helper || (currentQuestion as any).helper}
+              </p>
+            )}
+          </CardHeader>
+          <CardContent>
+            <QuestionRenderer
+              question={currentQuestion as any}
+              value={answers[currentQuestion.id]}
+              onChange={(v) => setAnswer(currentQuestion.id, v)}
+              answersByKey={answersByKey}
+              clientId={clientId}
+            />
+          </CardContent>
+        </Card>
       ) : (
         <ReviewStep sorted={sorted} answers={answers} answersByKey={answersByKey} keyById={keyById}
           pending={requiredPending} onEdit={gotoQuestion} />
