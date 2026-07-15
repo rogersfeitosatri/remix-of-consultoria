@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
-import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send } from 'lucide-react';
+import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send, Layers } from 'lucide-react';
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
 
@@ -663,7 +663,44 @@ export default function MealPlanDetail() {
               </>
             )}
 
-            {/* Pipeline em etapas (regerar) */}
+            {/* Gerar / substituir o plano — todas as formas num só lugar */}
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm flex items-center gap-2"><Wand2 className="h-4 w-4 text-primary" /> Gerar de novo ou substituir o plano</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-0">
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <Button variant="outline" className="w-full gap-2" onClick={() => analyzeMutation.mutate()} disabled={busy}>
+                    {analyzeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+                    Pela anamnese
+                  </Button>
+                  <Button variant="outline" className="w-full gap-2" onClick={() => generateV2.mutate()} disabled={busy || generateV2.isPending}>
+                    {generateV2.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
+                    Via v2 (base + camadas)
+                  </Button>
+                  <Button variant="outline" className="w-full gap-2" onClick={() => setImportOpen(true)} disabled={busy}>
+                    <FileUp className="h-4 w-4" />
+                    Importar de PDF / plano
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  <strong>Gerar</strong> substitui o plano atual (a IA usa a anamnese e as metas abaixo). <strong>Importar</strong> estrutura o PDF/plano atual sem inventar nada. Para a geração dia a dia, use <strong>“Gerar em etapas”</strong> abaixo.
+                </p>
+                <Collapsible open={guidanceOpen} onOpenChange={setGuidanceOpen}>
+                  <CollapsibleTrigger className="w-full">
+                    <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+                      <span className="flex items-center gap-2 text-muted-foreground"><Wand2 className="h-3.5 w-3.5" /> Ajustar metas (kcal / macros) antes de gerar</span>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${guidanceOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-3">
+                    {GuidanceInputs}
+                  </CollapsibleContent>
+                </Collapsible>
+              </CardContent>
+            </Card>
+
+            {/* Geração em etapas (persistente, dia a dia) */}
             <PlanPipelinePanel clientId={clientId!} onDone={refresh} />
 
             {/* Atualizar plano com base no último check-in */}
@@ -680,9 +717,6 @@ export default function MealPlanDetail() {
                 <p className="text-xs text-muted-foreground">
                   Importa o plano atual como base e a IA o revisa de forma conservadora com base no último check-in, histórico, objetivos, prova-alvo e dinâmica de treinos — ajustando só o necessário.
                 </p>
-                <button className="text-xs text-muted-foreground underline" onClick={() => setImportOpen(true)}>
-                  Substituir por outra dieta (importar do PDF/plano atual)
-                </button>
 
                 {/* Leitura do check-in */}
                 {structured?.checkin_reading && (
@@ -806,32 +840,6 @@ export default function MealPlanDetail() {
                 )}
               </CardContent>
             </Card>
-
-            <Collapsible open={guidanceOpen} onOpenChange={setGuidanceOpen}>
-              <Card>
-                <CollapsibleTrigger className="w-full">
-                  <CardHeader className="py-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm flex items-center gap-2"><Wand2 className="h-4 w-4 text-primary" /> Regerar com IA / metas</CardTitle>
-                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${guidanceOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent className="space-y-3 pt-0">
-                    {GuidanceInputs}
-                    <Button variant="outline" className="w-full gap-2" onClick={() => analyzeMutation.mutate()} disabled={busy}>
-                      {analyzeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-                      Reanalisar (substitui o plano atual)
-                    </Button>
-                    <Button variant="outline" className="w-full gap-2" onClick={() => generateV2.mutate()} disabled={busy || generateV2.isPending}>
-                      {generateV2.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                      Gerar/atualizar via v2 (base + camadas, encaixa por dia)
-                    </Button>
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
 
             {/* Seletor de dias da semana: plano base + variações */}
             {structured?.meal_plan?.meals && (
