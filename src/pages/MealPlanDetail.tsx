@@ -362,7 +362,7 @@ export default function MealPlanDetail() {
   useEffect(() => {
     if (searchParams.get('fromCheckin') === '1' && hasPlan && !autoRan && !updateFromCheckin.isPending) {
       setAutoRan(true);
-      updateFromCheckin.mutate();
+      updateFromCheckin.mutate(undefined);
       const next = new URLSearchParams(searchParams);
       next.delete('fromCheckin');
       setSearchParams(next, { replace: true });
