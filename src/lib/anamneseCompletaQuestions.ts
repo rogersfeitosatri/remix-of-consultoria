@@ -221,7 +221,7 @@ export const ANAMNESE_COMPLETA_QUESTIONS: AnamneseCompletaQuestion[] = [
         { key: 'nome', label: 'Nome da prova (opcional)', type: 'text', show_if: { key: 'self.possui', op: 'equals', value: 'Sim' } },
         { key: 'distancia', label: 'Distância', type: 'text', show_if: { key: 'self.possui', op: 'equals', value: 'Sim' } },
         { key: 'data', label: 'Data', type: 'date', show_if: { key: 'self.possui', op: 'equals', value: 'Sim' } },
-        { key: 'horario_largada', label: 'Horário da largada', type: 'time', show_if: { key: 'self.possui', op: 'equals', value: 'Sim' } },
+        
         { key: 'duracao_estimada', label: 'Duração estimada', type: 'text', show_if: { key: 'self.possui', op: 'equals', value: 'Sim' } },
         { key: 'prioridade', label: 'Prioridade da prova', type: 'select', options: ['A', 'B', 'C'], show_if: { key: 'self.possui', op: 'equals', value: 'Sim' } },
         { key: 'ja_fez_carbloading', label: 'Já realizou carbloading antes?', type: 'select', options: ['Sim', 'Não', 'Não sei o que é'], show_if: { key: 'self.possui', op: 'equals', value: 'Sim' } },
