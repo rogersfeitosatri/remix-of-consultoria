@@ -169,7 +169,7 @@ Retorne o plano completo corrigido mantendo a mesma estrutura. Ajuste as porçõ
       toolDescription: 'Submit the audited and adjusted meal plan',
       schema: AUDIT_SCHEMA,
       maxTokens: 4000,
-      fallback: 'lovable-gemini-pro',
+      fallback: 'openai-gpt4o-mini',
     });
 
     console.log(`Audit completed via ${provider}/${model}`);
