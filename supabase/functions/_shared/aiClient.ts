@@ -199,11 +199,14 @@ export interface JsonOpts {
   userPrompt: string;
   maxTokens?: number;
   fallback?: FallbackKind;
+  primary?: PrimaryProvider;
+  openaiModel?: string;
 }
 
 // Saída de texto livre (sem parsing) — usada pelo playground de teste de prompts.
 export async function callAiText(opts: JsonOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none');
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'gemini', opts.openaiModel);
+
   if (!providers.length) {
     throw new Error('Nenhuma chave de IA configurada. Defina GEMINI_API_KEY nas secrets.');
   }
