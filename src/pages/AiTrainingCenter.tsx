@@ -381,12 +381,42 @@ export default function AiTrainingCenter() {
                           />
                         </div>
 
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Provedor de IA</label>
+                            <select
+                              value={testProvider}
+                              onChange={(e) => setTestProvider(e.target.value as 'gemini' | 'openai')}
+                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            >
+                              <option value="gemini">Google Gemini 2.5 Flash</option>
+                              <option value="openai">OpenAI (ChatGPT)</option>
+                            </select>
+                          </div>
+                          {testProvider === 'openai' && (
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Modelo OpenAI</label>
+                              <select
+                                value={openaiModel}
+                                onChange={(e) => setOpenaiModel(e.target.value)}
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              >
+                                <option value="gpt-4o-mini">gpt-4o-mini (rápido/barato)</option>
+                                <option value="gpt-4o">gpt-4o (completo)</option>
+                                <option value="gpt-5-mini">gpt-5-mini</option>
+                                <option value="gpt-5">gpt-5 (mais capaz)</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
+
                         <Button
                           onClick={handleTest}
                           disabled={testLoading}
                           variant="outline"
                           className="gap-2"
                         >
+
                           {testLoading ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
