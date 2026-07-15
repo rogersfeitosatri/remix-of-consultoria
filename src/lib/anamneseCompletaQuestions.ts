@@ -476,7 +476,7 @@ export const ANAMNESE_COMPLETA_QUESTIONS: AnamneseCompletaQuestion[] = [
         'Lanche da tarde', 'Lanche pré-treino da tarde ou noite', 'Jantar ou refeição pós-treino', 'Ceia',
         'Beliscos ou alimentos fora das refeições',
       ],
-      mealFields: ['meal_name', 'time', 'days_per_week', 'training_relation'],
+      mealFields: ['meal_name', 'time'],
       foodFields: ['food_name', 'quantity', 'unit', 'preparation', 'brand'],
     },
   },
