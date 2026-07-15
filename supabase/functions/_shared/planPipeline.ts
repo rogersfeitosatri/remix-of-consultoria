@@ -30,33 +30,49 @@ export async function callAiJson(opts: {
   const perAttempt = opts.perAttemptMs ?? 110_000;
   const errs: string[] = [];
   for (const p of providers()) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), perAttempt);
-    try {
-      const res = await fetch(p.endpoint, {
-        method: "POST",
-        signal: controller.signal,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${p.apiKey}` },
-        body: JSON.stringify({
-          model: p.model,
-          messages: [
-            { role: "system", content: opts.systemPrompt },
-            { role: "user", content: opts.userPrompt },
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0.4,
-        }),
-      });
-      clearTimeout(timer);
-      if (!res.ok) { errs.push(`${p.name}:${res.status}`); continue; }
-      const body = await res.json();
-      const content = body?.choices?.[0]?.message?.content ?? "";
-      const parsed = parseJson(content);
-      if (parsed) return { data: parsed, provider: p.name, model: p.model };
-      errs.push(`${p.name}:parse`);
-    } catch (e) {
-      clearTimeout(timer);
-      errs.push(`${p.name}:${(e as Error).name === "AbortError" ? "timeout" : (e as Error).message}`);
+    // Até 3 tentativas por provedor com backoff em 429/5xx.
+    let attempt = 0;
+    while (attempt < 3) {
+      attempt++;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), perAttempt);
+      try {
+        const res = await fetch(p.endpoint, {
+          method: "POST",
+          signal: controller.signal,
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${p.apiKey}` },
+          body: JSON.stringify({
+            model: p.model,
+            messages: [
+              { role: "system", content: opts.systemPrompt },
+              { role: "user", content: opts.userPrompt },
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.4,
+          }),
+        });
+        clearTimeout(timer);
+        if (!res.ok) {
+          errs.push(`${p.name}:${res.status}#${attempt}`);
+          if ((res.status === 429 || res.status >= 500) && attempt < 3) {
+            await new Promise((r) => setTimeout(r, 1500 * attempt + Math.random() * 500));
+            continue;
+          }
+          break; // erro definitivo — próximo provedor
+        }
+        const body = await res.json();
+        const content = body?.choices?.[0]?.message?.content ?? "";
+        const parsed = parseJson(content);
+        if (parsed) return { data: parsed, provider: p.name, model: p.model };
+        errs.push(`${p.name}:parse#${attempt}`);
+        if (attempt < 3) { await new Promise((r) => setTimeout(r, 1000)); continue; }
+        break;
+      } catch (e) {
+        clearTimeout(timer);
+        const kind = (e as Error).name === "AbortError" ? "timeout" : (e as Error).message;
+        errs.push(`${p.name}:${kind}#${attempt}`);
+        break; // não retenta timeout/exceção — próximo provedor
+      }
     }
   }
   throw new Error(`Falha na IA (${errs.join(" | ")})`);
