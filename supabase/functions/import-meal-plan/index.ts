@@ -111,7 +111,8 @@ Deno.serve(async (req) => {
     console.error("import-meal-plan error:", error);
     const status = (error as any)?.status;
     const msg = error instanceof Error ? error.message : "Unknown error";
-    if (status === 429) return json({ error: "Limite de requisições da IA excedido." }, 429);
+    if (status === 429) return json({ error: msg }, 429);
+    if (status === 503) return json({ error: msg }, 503);
     return json({ error: msg }, 500);
   }
 });
