@@ -106,6 +106,8 @@ ${guidanceLines.length ? "Orientações do nutricionista: " + guidanceLines.join
 
 ## ANAMNESE (consumo atual, rotina, treinos, preferências, restrições)
 ${anamneseText || "Sem anamnese estruturada."}
+${referenceBlock}
+
 
 ## TAREFA
 Analise a rotina semanal de treinos (modalidade, duração, intensidade, turno, sessão anterior/seguinte), o consumo atual e o objetivo. Retorne SOMENTE um JSON:
