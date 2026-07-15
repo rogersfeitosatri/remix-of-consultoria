@@ -262,7 +262,30 @@ export default function AnamneseResponseDetail() {
     };
   };
 
-  const generatePDF = (mode: 'complete' | 'meals' | 'analysis') => {
+  const generatePDF = async (mode: 'complete' | 'meals' | 'analysis') => {
+    // Modo "analysis" agora usa layout Dietitian (minimalista, roxo/verde) via HTML→PDF.
+    if (mode === 'analysis') {
+      if (!responseData) { toast.error('Nenhum dado para exportar'); return; }
+      const sa = getStructuredAnalysis();
+      if (!sa) { toast.error('Análise não disponível'); return; }
+      const clientName = (responseData.clients as any)?.name || (responseData as any).respondent_name || 'Atleta';
+      const safeName = clientName.replace(/[^a-zA-Z0-9À-ÿ ]/g, '').replace(/\s+/g, '_');
+      try {
+        const { downloadMealPlanPdf, structuredAnalysisToPdfInput } = await import('@/lib/mealPlanPdf');
+        const input = structuredAnalysisToPdfInput(sa, clientName, {
+          startDate: format(parseISO(responseData.submitted_at), 'dd/MM/yyyy'),
+          signatureName: 'Rogers Feitosa',
+          crn: 'CRN 14885',
+        });
+        await downloadMealPlanPdf(input, safeName);
+        toast.success('PDF gerado!');
+      } catch (e: any) {
+        console.error(e);
+        toast.error(e?.message || 'Erro ao gerar PDF');
+      }
+      return;
+    }
+
     if (!responseData) { toast.error('Nenhum dado para exportar'); return; }
 
     const doc = new jsPDF();
