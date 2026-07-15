@@ -248,7 +248,7 @@ export const ANAMNESE_COMPLETA_QUESTIONS: AnamneseCompletaQuestion[] = [
         { key: 'horario', label: 'Horário aproximado', type: 'time', show_if: { key: 'self.situacao', op: 'in', value: ['Faço um lanche pequeno', 'Faço uma refeição completa', 'Depende do tipo de treino'] } },
         { key: 'alimentos', label: 'Alimentos e bebidas', type: 'textarea', show_if: { key: 'self.situacao', op: 'in', value: ['Faço um lanche pequeno', 'Faço uma refeição completa', 'Depende do tipo de treino'] } },
         { key: 'quantidades', label: 'Quantidades ou medidas caseiras', type: 'text', show_if: { key: 'self.situacao', op: 'in', value: ['Faço um lanche pequeno', 'Faço uma refeição completa', 'Depende do tipo de treino'] } },
-        { key: 'tempo_ate_treino', label: 'Tempo entre a alimentação e o treino', type: 'text', show_if: { key: 'self.situacao', op: 'in', value: ['Faço um lanche pequeno', 'Faço uma refeição completa', 'Depende do tipo de treino'] } },
+        
       ],
     },
   },
