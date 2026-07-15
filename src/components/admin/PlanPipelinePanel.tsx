@@ -171,7 +171,13 @@ export function PlanPipelinePanel({ clientId, onDone }: { clientId: string; onDo
               <p className="text-xs text-amber-600">Plano montado, mas alguns dias precisam de ajuste seu (marcados com “!”). Você já pode revisar/editar abaixo.</p>
             )}
             {(job.status === 'completed' || job.status === 'partially_failed') && (
-              <Button variant="outline" size="sm" className="w-full" onClick={onDone}>Ver plano gerado</Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" size="sm" className="flex-1" onClick={onDone}>Ver plano gerado</Button>
+                <Button size="sm" className="flex-1 gap-1.5" onClick={() => start.mutate(undefined)} disabled={start.isPending}>
+                  {start.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  Gerar novamente em etapas
+                </Button>
+              </div>
             )}
           </div>
         )}
