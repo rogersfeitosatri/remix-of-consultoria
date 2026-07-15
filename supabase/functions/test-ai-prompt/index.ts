@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { context_key, prompt_text, test_input } = await req.json();
+    const { context_key, prompt_text, test_input, provider, openai_model } = await req.json();
 
     if (!prompt_text || !String(prompt_text).trim()) {
       throw new Error('Informe um prompt para testar.');
@@ -24,14 +24,20 @@ Deno.serve(async (req) => {
       : `Gere um exemplo de saída para este prompt${context_key ? ` (contexto: ${context_key})` : ''}. `
         + `Use dados fictícios plausíveis de um atleta quando necessário.`;
 
-    const { data, provider, model } = await callAiText({
+    const primary = provider === 'openai' ? 'openai' : 'gemini';
+    const fallback = primary === 'openai' ? 'lovable-gemini-pro' : 'openai-gpt4o-mini';
+
+    const { data, provider: usedProvider, model } = await callAiText({
       systemPrompt,
       userPrompt,
       maxTokens: 1500,
-      fallback: 'lovable-gemini-pro',
+      primary,
+      openaiModel: openai_model,
+      fallback,
     });
 
-    return new Response(JSON.stringify({ result: data, provider, model }), {
+    return new Response(JSON.stringify({ result: data, provider: usedProvider, model }), {
+
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
