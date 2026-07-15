@@ -104,6 +104,8 @@ CONTEXTO — dia seguinte: ${nextBp ? JSON.stringify({ demand: nextBp.demand, tr
 
 ALIMENTOS PERMITIDOS (use PREFERENCIALMENTE nomes desta lista, para bater com o banco):
 ${foodList}
+${refDietBlock}
+
 
 ${correction && correction.length ? `CORREÇÃO NECESSÁRIA (ajuste APENAS o que resolve estes problemas, mantendo o resto):\n- ${correction.join("\n- ")}\n` : ""}
 Retorne SOMENTE um JSON deste dia:
