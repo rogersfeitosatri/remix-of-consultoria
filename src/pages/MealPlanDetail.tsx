@@ -219,16 +219,20 @@ export default function MealPlanDetail() {
     onError: (e: any) => toast.error(e.message || 'Erro ao gerar plano'),
   });
 
+  const [adjustNote, setAdjustNote] = useState('');
   const updateFromCheckin = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (adminNote?: string) => {
       const { data, error } = await supabase.functions.invoke('update-meal-plan', {
-        body: { clientId },
+        body: { clientId, adminNote: adminNote?.trim() || undefined },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => { toast.success('Ajustes gerados. Revise e clique em "Aplicar ajustes ao plano".'); refresh(); },
+    onSuccess: (_d, variables) => {
+      toast.success(variables ? 'Plano reajustado com sua observação. Revise e aplique.' : 'Ajustes gerados. Revise e clique em "Aplicar ajustes ao plano".');
+      refresh();
+    },
     onError: (e: any) => toast.error(e.message || 'Erro ao atualizar plano'),
   });
 
@@ -358,7 +362,7 @@ export default function MealPlanDetail() {
   useEffect(() => {
     if (searchParams.get('fromCheckin') === '1' && hasPlan && !autoRan && !updateFromCheckin.isPending) {
       setAutoRan(true);
-      updateFromCheckin.mutate();
+      updateFromCheckin.mutate(undefined);
       const next = new URLSearchParams(searchParams);
       next.delete('fromCheckin');
       setSearchParams(next, { replace: true });
@@ -667,7 +671,7 @@ export default function MealPlanDetail() {
               <CardContent className="pt-4 space-y-3">
                 <Button
                   className="w-full gap-2"
-                  onClick={() => updateFromCheckin.mutate()}
+                  onClick={() => updateFromCheckin.mutate(undefined)}
                   disabled={busy || updateFromCheckin.isPending}
                 >
                   {updateFromCheckin.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -749,19 +753,44 @@ export default function MealPlanDetail() {
 
                 {/* Aplicar / Desfazer ajustes */}
                 {structured?.pending_update && (
-                  <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-2">
+                  <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-3">
                     <p className="text-xs text-foreground">
-                      Os ajustes acima estão como <strong>proposta</strong>. Clique em <em>Aplicar</em> para
-                      atualizar o plano alimentar (e liberar o envio ao Zona Nutri).
+                      Os ajustes acima estão como <strong>proposta</strong>. Você pode adicionar uma
+                      observação abaixo para a IA reajustar antes de aplicar, ou clicar direto em
+                      <em> Aplicar</em> para atualizar o plano alimentar.
                     </p>
-                    <Button
-                      className="w-full gap-2"
-                      onClick={() => applyPendingUpdate.mutate()}
-                      disabled={applyPendingUpdate.isPending}
-                    >
-                      {applyPendingUpdate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                      Aplicar ajustes ao plano alimentar
-                    </Button>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground">
+                        Observação para a IA (opcional)
+                      </label>
+                      <Textarea
+                        value={adjustNote}
+                        onChange={(e) => setAdjustNote(e.target.value)}
+                        placeholder="Ex.: aumentar CHO no dia do longão, trocar o pré-treino por algo mais leve, priorizar proteína no café..."
+                        rows={3}
+                        className="text-sm"
+                        disabled={updateFromCheckin.isPending || applyPendingUpdate.isPending}
+                      />
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 gap-2"
+                        onClick={() => updateFromCheckin.mutate(adjustNote)}
+                        disabled={!adjustNote.trim() || updateFromCheckin.isPending || applyPendingUpdate.isPending}
+                      >
+                        {updateFromCheckin.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                        Reajustar com observação
+                      </Button>
+                      <Button
+                        className="flex-1 gap-2"
+                        onClick={() => { applyPendingUpdate.mutate(); setAdjustNote(''); }}
+                        disabled={applyPendingUpdate.isPending || updateFromCheckin.isPending}
+                      >
+                        {applyPendingUpdate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        Aplicar ajustes ao plano alimentar
+                      </Button>
+                    </div>
                   </div>
                 )}
                 {structured?.pre_update_backup && !structured?.pending_update && (
