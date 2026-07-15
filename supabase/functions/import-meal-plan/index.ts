@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
         toolName: "submit_imported_plan",
         toolDescription: "Structure the athlete's existing diet into the meal plan format",
         schema: IMPORT_SCHEMA,
-        fallback: "lovable-gemini-pro",
+        fallback: 'openai-gpt4o-mini',
       });
       structured = r.data; provider = r.provider; model = r.model;
     }

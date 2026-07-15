@@ -151,7 +151,7 @@ TAREFA (siga as regras do sistema — ajustes conservadores, só o necessário):
       toolName: "submit_updated_plan",
       toolDescription: "Submit the updated meal plan and orientations plus an adjustment message for the athlete",
       schema: UPDATE_SCHEMA,
-      fallback: "lovable-gemini-pro",
+      fallback: 'openai-gpt4o-mini',
     });
 
     // Ajustes ficam como PROPOSTA (pending_update) até o admin clicar em

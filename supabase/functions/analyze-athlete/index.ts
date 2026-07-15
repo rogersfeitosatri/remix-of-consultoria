@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
       toolName: 'submit_athlete_analysis',
       toolDescription: 'Submit the complete structured nutritional analysis for the athlete',
       schema: ANALYSIS_SCHEMA,
-      fallback: 'lovable-gemini-pro',
+      fallback: 'openai-gpt4o-mini',
     });
 
     console.log(`AI analysis received from ${provider}/${model} with sections:`, Object.keys(analysisData));

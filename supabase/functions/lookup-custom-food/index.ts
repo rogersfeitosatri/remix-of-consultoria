@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       toolDescription: 'Submit nutritional data for the food item',
       schema: SCHEMA,
       maxTokens: 1500,
-      fallback: 'lovable-gemini-pro',
+      fallback: 'openai-gpt4o-mini',
     });
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
