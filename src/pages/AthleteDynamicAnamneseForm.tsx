@@ -44,7 +44,7 @@ const INTENSIDADES_OPT = [
   { value: 'intenso', label: '🔴 Intenso' },
 ];
 const ENDURANCE_MODALIDADES = ['corrida', 'ciclismo', 'natacao', 'triathlon'];
-const emptyTrainingSession = () => ({ modalidade: '', turno: '', intensidade: '', longao: false });
+const emptyTrainingSession = () => ({ modalidade: '', turno: '', hora: '', intensidade: '', longao: false });
 
 function normalizeItens(itens: any): string[][] {
   if (!Array.isArray(itens) || itens.length === 0) return [['']];
@@ -169,10 +169,15 @@ function TrainingDayRenderer({ dia, value, onChange }: { dia: string; value: any
                   <SelectTrigger className="h-9 text-sm bg-gray-800 border-gray-700 text-white"><SelectValue placeholder="Modalidade…" /></SelectTrigger>
                   <SelectContent>{MODALIDADES_OPT.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
                 </Select>
-                <Select value={session.turno} onValueChange={(v) => setField(idx, 'turno', v)} disabled={isRepouso || !session.modalidade}>
-                  <SelectTrigger className="h-9 text-sm bg-gray-800 border-gray-700 text-white"><SelectValue placeholder="Turno…" /></SelectTrigger>
-                  <SelectContent>{TURNOS_OPT.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-                </Select>
+                <Input
+                  type="time"
+                  value={session.hora || ''}
+                  onChange={(e) => setField(idx, 'hora', e.target.value)}
+                  disabled={isRepouso || !session.modalidade}
+                  className="h-9 text-sm bg-gray-800 border-gray-700 text-white"
+                  placeholder="Hora"
+                />
+
                 <Select value={session.intensidade} onValueChange={(v) => setField(idx, 'intensidade', v)} disabled={isRepouso || !session.modalidade}>
                   <SelectTrigger className="h-9 text-sm bg-gray-800 border-gray-700 text-white"><SelectValue placeholder="Intensidade…" /></SelectTrigger>
                   <SelectContent>{INTENSIDADES_OPT.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
