@@ -189,42 +189,6 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
                     readOnly={disabled}
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Dias por semana</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={7}
-                    value={meal.days_per_week === '' ? '' : meal.days_per_week}
-                    onChange={(e) =>
-                      updateMeal(mi, {
-                        days_per_week: e.target.value === '' ? '' : Number(e.target.value),
-                      })
-                    }
-                    placeholder="0-7"
-                    disabled={disabled}
-                    readOnly={disabled}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Relação com o treino</Label>
-                  <Select
-                    value={meal.training_relation || undefined}
-                    onValueChange={(v) => updateMeal(mi, { training_relation: v })}
-                    disabled={disabled}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {trainingRelations.map((o) => (
-                        <SelectItem key={o} value={o}>
-                          {o}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
               {/* Lista de alimentos — oculta quando inativa */}
