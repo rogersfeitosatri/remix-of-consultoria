@@ -184,13 +184,54 @@ ${rules}`;
       await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
     }
   }
-  const err: any = new Error(
-    lastStatus === 429
-      ? "Cota do Gemini esgotada no momento. Aguarde alguns minutos ou cole o texto do plano em vez de enviar o PDF."
-      : `${lastErr} — modelo Gemini indisponível. Tente novamente em instantes ou cole o texto do plano.`
-  );
-  err.status = lastStatus === 429 ? 429 : 503;
-  throw err;
+
+  // Fallback: OpenAI (aceita PDF via input_file / file blocks). Usa gpt-4o.
+  try {
+    console.log("Gemini indisponível, tentando fallback OpenAI para PDF...");
+    return await extractFromPdfOpenAI(clean, instruction);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const err: any = new Error(
+      `Gemini indisponível (${lastStatus}) e fallback OpenAI falhou: ${msg}. Tente novamente em instantes.`
+    );
+    err.status = lastStatus === 429 ? 429 : 503;
+    throw err;
+  }
+}
+
+async function extractFromPdfOpenAI(pdfBase64: string, instruction: string): Promise<any> {
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) throw new Error("OPENAI_API_KEY não configurada.");
+  const dataUrl = `data:application/pdf;base64,${pdfBase64}`;
+  const body = {
+    model: "gpt-4o",
+    response_format: { type: "json_object" },
+    temperature: 0.2,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: instruction },
+          { type: "file", file: { filename: "plano.pdf", file_data: dataUrl } },
+        ],
+      },
+    ],
+  };
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify(body),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`OpenAI PDF [${res.status}]: ${JSON.stringify(j).slice(0, 300)}`);
+  const text = j?.choices?.[0]?.message?.content ?? "";
+  const cleaned = String(text).replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+  try { return JSON.parse(cleaned); }
+  catch {
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error("Resposta do OpenAI não pôde ser interpretada como JSON.");
+  }
 }
 
 const SYSTEM_PROMPT = `Você organiza dietas já prontas no formato estruturado de um sistema de nutrição esportiva. Sua tarefa é APENAS estruturar fielmente a dieta recebida — não é criar, nem otimizar, nem alterar quantidades. Mantenha alimentos, porções, medidas caseiras, substituições ("ou"), refeições e horários exatamente como no texto. Só estime macros/totais quando não estiverem no texto, deixando claro que é estimativa.`;
