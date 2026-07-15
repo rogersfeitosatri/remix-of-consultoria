@@ -1563,10 +1563,15 @@ function TrainingWeekRenderer({ value, onChange }: { value: any; onChange: (v: a
                         <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Modalidade…" /></SelectTrigger>
                         <SelectContent>{MODALIDADES_OPT.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
                       </Select>
-                      <Select value={session.turno} onValueChange={(v) => setField(dia, idx, 'turno', v)} disabled={isRepouso || !session.modalidade}>
-                        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Turno…" /></SelectTrigger>
-                        <SelectContent>{TURNOS_OPT.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <Input
+                        type="time"
+                        value={session.hora || ''}
+                        onChange={(e) => setField(dia, idx, 'hora', e.target.value)}
+                        disabled={isRepouso || !session.modalidade}
+                        className="h-9 text-sm"
+                        placeholder="Hora"
+                      />
+
                       <Select value={session.intensidade} onValueChange={(v) => setField(dia, idx, 'intensidade', v)} disabled={isRepouso || !session.modalidade}>
                         <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Intensidade…" /></SelectTrigger>
                         <SelectContent>{INTENSIDADES_OPT.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}</SelectContent>
