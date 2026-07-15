@@ -118,7 +118,7 @@ export function TrainingWeekDetailedField({ value, onChange, config, disabled }:
 
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Horário de início</Label>
+                      <Label className="text-xs text-muted-foreground">Hora do dia</Label>
                       <Input
                         type="time"
                         value={s.start_time}
