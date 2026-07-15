@@ -65,7 +65,7 @@ export interface AnamneseCompletaQuestion {
   conditional_logic?: { show_if: Condition };
 }
 
-export const ANAMNESE_COMPLETA_TITLE = 'ANAMNESE COMPLETA (wizard)';
+export const ANAMNESE_COMPLETA_TITLE = 'ANAMNESE COMPLETA';
 export const ANAMNESE_COMPLETA_DESCRIPTION =
   'Responda com atenção. As informações serão utilizadas para criar um plano alimentar compatível com sua rotina, seus treinos, seus objetivos, suas preferências e os alimentos que você já consome.';
 
