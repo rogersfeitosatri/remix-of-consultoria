@@ -131,6 +131,8 @@ export interface StructuredOpts {
   toolDescription: string;
   schema: any;
   fallback?: FallbackKind;
+  primary?: PrimaryProvider;
+  openaiModel?: string;
 }
 
 export interface AiResult {
@@ -141,7 +143,8 @@ export interface AiResult {
 
 // Saída estruturada via function-calling (parseia tool_calls[0].function.arguments).
 export async function callAiStructured(opts: StructuredOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none');
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'gemini', opts.openaiModel);
+
   if (!providers.length) {
     throw new Error('Nenhuma chave de IA configurada. Defina GEMINI_API_KEY nas secrets.');
   }
