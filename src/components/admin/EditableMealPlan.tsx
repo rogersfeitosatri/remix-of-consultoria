@@ -1216,7 +1216,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
 
     setIsConverting(true);
     try {
-      const results = await Promise.all(legacyTargets.map(convertTargetInPlace));
+      const results = await Promise.all(legacyTargets.map((t) => convertTargetInPlace(t, isImportedSource)));
       const totalConverted = results.reduce((a, r) => a + r.converted, 0);
       const totalUnconverted = results.reduce((a, r) => a + r.unconverted, 0);
       setEditedAnalysis(deepClone(base));
