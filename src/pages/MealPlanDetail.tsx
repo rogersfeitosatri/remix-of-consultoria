@@ -746,6 +746,35 @@ export default function MealPlanDetail() {
                     <p className="text-sm text-foreground whitespace-pre-wrap">{structured.adjustment_message}</p>
                   </div>
                 )}
+
+                {/* Aplicar / Desfazer ajustes */}
+                {structured?.pending_update && (
+                  <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-2">
+                    <p className="text-xs text-foreground">
+                      Os ajustes acima estão como <strong>proposta</strong>. Clique em <em>Aplicar</em> para
+                      atualizar o plano alimentar (e liberar o envio ao Zona Nutri).
+                    </p>
+                    <Button
+                      className="w-full gap-2"
+                      onClick={() => applyPendingUpdate.mutate()}
+                      disabled={applyPendingUpdate.isPending}
+                    >
+                      {applyPendingUpdate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                      Aplicar ajustes ao plano alimentar
+                    </Button>
+                  </div>
+                )}
+                {structured?.pre_update_backup && !structured?.pending_update && (
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => undoPendingUpdate.mutate()}
+                    disabled={undoPendingUpdate.isPending}
+                  >
+                    {undoPendingUpdate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Desfazer última aplicação
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
