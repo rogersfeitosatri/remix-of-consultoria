@@ -152,7 +152,7 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
   }, [sorted, answersByKey, answers]);
 
   const gotoQuestion = (q: AnamneseQuestion) => {
-    const idx = sections.indexOf(q.section);
+    const idx = visibleQuestions.findIndex((x) => x.id === q.id);
     if (idx >= 0) setStep(idx);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
