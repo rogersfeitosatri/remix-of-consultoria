@@ -1271,7 +1271,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         : next.meal_plan.meals[mealIdx];
       if (!target) return;
 
-      const { converted, unconverted } = await convertTargetInPlace(target);
+      const { converted, unconverted } = await convertTargetInPlace(target, isImportedSource);
       setEditedAnalysis(next);
 
       if (converted === 0) {
