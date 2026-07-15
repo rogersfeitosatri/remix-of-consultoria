@@ -154,12 +154,13 @@ ${rules}`;
     generationConfig: { response_mime_type: "application/json", temperature: 0.2 },
   };
 
-  // Tenta gemini-2.5-flash com retry; se 503/429/500 persistir, cai para gemini-2.5-pro.
-  const models = ["gemini-2.5-flash", "gemini-2.5-pro"];
+  // Tenta múltiplos modelos Gemini com retry; ordem: flash → flash-lite → pro.
+  const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"];
   let lastErr = "";
+  let lastStatus = 0;
   for (const model of models) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -176,12 +177,19 @@ ${rules}`;
           throw new Error("Não consegui interpretar o PDF como plano estruturado.");
         }
       }
+      lastStatus = res.status;
       lastErr = `Gemini PDF [${res.status}] (${model}): ${JSON.stringify(json).slice(0, 300)}`;
       if (![429, 500, 503, 504].includes(res.status)) throw new Error(lastErr);
       await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
     }
   }
-  throw new Error(`${lastErr} — modelo Gemini sobrecarregado. Tente novamente em instantes ou cole o texto do plano.`);
+  const err: any = new Error(
+    lastStatus === 429
+      ? "Cota do Gemini esgotada no momento. Aguarde alguns minutos ou cole o texto do plano em vez de enviar o PDF."
+      : `${lastErr} — modelo Gemini indisponível. Tente novamente em instantes ou cole o texto do plano.`
+  );
+  err.status = lastStatus === 429 ? 429 : 503;
+  throw err;
 }
 
 const SYSTEM_PROMPT = `Você organiza dietas já prontas no formato estruturado de um sistema de nutrição esportiva. Sua tarefa é APENAS estruturar fielmente a dieta recebida — não é criar, nem otimizar, nem alterar quantidades. Mantenha alimentos, porções, medidas caseiras, substituições ("ou"), refeições e horários exatamente como no texto. Só estime macros/totais quando não estiverem no texto, deixando claro que é estimativa.`;
