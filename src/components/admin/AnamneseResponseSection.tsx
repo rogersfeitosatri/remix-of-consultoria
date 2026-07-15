@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { formatStructuredAnswer } from '@/lib/formatAnamneseAnswer';
+import { formatAnyAnswer } from '@/lib/formatAnamneseAnswer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -136,29 +136,20 @@ export function AnamneseResponseSection({ clientId, clientName }: AnamneseRespon
   }, {} as Record<string, AnamneseQuestion[]>);
 
   const formatAnswer = (response: any): string => {
-    if (!response) return 'Não respondido';
-    
-    // Handle new format with answer and comment
-    if (typeof response === 'object' && response.answer !== undefined) {
-      const answer = response.answer;
-      const structured = formatStructuredAnswer(answer);
-      const answerText = structured ?? (Array.isArray(answer) ? answer.join(', ') : String(answer));
-      if (response.comment) {
-        return `${answerText} (Comentário: ${response.comment})`;
-      }
+    if (response === null || response === undefined || response === '') return 'Não respondido';
+
+    // Novo formato com answer + comment
+    if (typeof response === 'object' && !Array.isArray(response) && 'answer' in response) {
+      const body = formatAnyAnswer(response.answer);
+      const hasComment = response.comment && String(response.comment).trim();
+      if (body === '(não respondeu)' && !hasComment) return 'Não respondido';
+      const answerText = body === '(não respondeu)' ? '' : body;
+      if (hasComment) return `${answerText}${answerText ? ' ' : ''}(Comentário: ${String(response.comment).trim()})`;
       return answerText || 'Não respondido';
     }
 
-    // Structured object stored directly (sem wrapper answer/comment)
-    const structuredDirect = formatStructuredAnswer(response);
-    if (structuredDirect) return structuredDirect;
-
-    // Handle old format
-    if (Array.isArray(response)) {
-      return response.join(', ');
-    }
-
-    return String(response) || 'Não respondido';
+    const text = formatAnyAnswer(response);
+    return text === '(não respondeu)' ? 'Não respondido' : text;
   };
 
   if (loadingResponses) {
