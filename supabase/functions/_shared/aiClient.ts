@@ -234,7 +234,7 @@ export async function callAiText(opts: JsonOpts): Promise<AiResult> {
 
 // Saída JSON simples no conteúdo da mensagem (tolerante a cercas markdown ```json).
 export async function callAiJson(opts: JsonOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none');
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'gemini', opts.openaiModel);
   if (!providers.length) {
     throw new Error('Nenhuma chave de IA configurada. Defina GEMINI_API_KEY nas secrets.');
   }
