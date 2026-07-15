@@ -360,6 +360,7 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          version: number
         }
         Insert: {
           created_at?: string
@@ -371,6 +372,7 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          version?: number
         }
         Update: {
           created_at?: string
@@ -382,6 +384,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          version?: number
         }
         Relationships: []
       }
@@ -389,6 +392,8 @@ export type Database = {
         Row: {
           comment_field_label: string | null
           comment_field_required: boolean
+          conditional_logic: Json | null
+          config: Json | null
           created_at: string
           form_id: string
           has_comment_field: boolean
@@ -396,6 +401,7 @@ export type Database = {
           is_required: boolean
           options: Json | null
           order_index: number
+          question_key: string | null
           question_text: string
           question_type: string
           scale_max: number | null
@@ -405,6 +411,8 @@ export type Database = {
         Insert: {
           comment_field_label?: string | null
           comment_field_required?: boolean
+          conditional_logic?: Json | null
+          config?: Json | null
           created_at?: string
           form_id: string
           has_comment_field?: boolean
@@ -412,6 +420,7 @@ export type Database = {
           is_required?: boolean
           options?: Json | null
           order_index?: number
+          question_key?: string | null
           question_text: string
           question_type: string
           scale_max?: number | null
@@ -421,6 +430,8 @@ export type Database = {
         Update: {
           comment_field_label?: string | null
           comment_field_required?: boolean
+          conditional_logic?: Json | null
+          config?: Json | null
           created_at?: string
           form_id?: string
           has_comment_field?: boolean
@@ -428,6 +439,7 @@ export type Database = {
           is_required?: boolean
           options?: Json | null
           order_index?: number
+          question_key?: string | null
           question_text?: string
           question_type?: string
           scale_max?: number | null
@@ -450,33 +462,57 @@ export type Database = {
           ai_analyzed_at: string | null
           client_id: string | null
           form_id: string
+          form_version: number | null
           id: string
+          internal_alerts: Json | null
+          internal_notes: string | null
           respondent_email: string | null
           respondent_name: string | null
           responses: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          started_at: string | null
+          status: string
           submitted_at: string
+          updated_at: string
         }
         Insert: {
           ai_analysis?: Json | null
           ai_analyzed_at?: string | null
           client_id?: string | null
           form_id: string
+          form_version?: number | null
           id?: string
+          internal_alerts?: Json | null
+          internal_notes?: string | null
           respondent_email?: string | null
           respondent_name?: string | null
           responses: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          started_at?: string | null
+          status?: string
           submitted_at?: string
+          updated_at?: string
         }
         Update: {
           ai_analysis?: Json | null
           ai_analyzed_at?: string | null
           client_id?: string | null
           form_id?: string
+          form_version?: number | null
           id?: string
+          internal_alerts?: Json | null
+          internal_notes?: string | null
           respondent_email?: string | null
           respondent_name?: string | null
           responses?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          started_at?: string | null
+          status?: string
           submitted_at?: string
+          updated_at?: string
         }
         Relationships: [
           {
