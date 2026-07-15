@@ -180,13 +180,14 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Horário</Label>
+                  <Label className="text-xs">Horário<span className="text-destructive"> *</span></Label>
                   <Input
                     type="time"
                     value={meal.time}
                     onChange={(e) => updateMeal(mi, { time: e.target.value })}
                     disabled={disabled}
                     readOnly={disabled}
+                    aria-required
                   />
                 </div>
               </div>
