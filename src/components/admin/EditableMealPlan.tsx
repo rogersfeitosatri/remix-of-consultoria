@@ -401,15 +401,111 @@ function adjustSubstitutions(food: any, oldCalories: number) {
   }
 }
 
+// Preserve mode: parses the PDF text keeping the ORIGINAL name, quantity and
+// measure (e.g. "1 fatia de pão francês (100g)" → "1 fatia" of "pão francês",
+// 100g). Nutritional values come from the DB when the food exists, otherwise
+// we call `lookup-custom-food` (which also persists the food + measures in the
+// DB for next time). The food's own portion/measure is NEVER swapped by the
+// DB's closest match — the imported plan stays intact.
+async function lookupAndBuildFoodPreserve(text: string, group: string): Promise<SelectedFood | null> {
+  const raw = text.trim().replace(/\s*\(ex:.*?\)/i, '');
+  if (!raw) return null;
+
+  let qty = 1;
+  let measureLabel = '';
+  let name = '';
+  let weightG = 0;
+  let m: RegExpMatchArray | null;
+
+  if ((m = raw.match(/^(\d+(?:[.,]\d+)?)\s*g\s+(?:de\s+)?(.+)/i))) {
+    // "50g queijo minas" / "150 g macarrão"
+    weightG = parseFloat(m[1].replace(',', '.'));
+    qty = weightG;
+    measureLabel = 'g';
+    name = m[2].trim();
+  } else if ((m = raw.match(/^(\d+(?:[.,]\d+)?)\s+((?:colher(?:es)?(?:\s+de\s+(?:sopa|ch[aá]|sobremesa))?|x[ií]cara(?:s)?|fatia(?:s)?|pedaço(?:s)?|copo(?:s)?|pote(?:s)?|unidade(?:s)?|porç(?:ão|ões)|file(?:s)?|escumadeira(?:s)?|concha(?:s)?))\s+(?:de\s+)?(.+?)(?:\s*\((\d+(?:[.,]\d+)?)\s*g?\s*\))?$/i))) {
+    // "1 fatia de pão francês (100g)" / "2 colheres de sopa de arroz (50g)"
+    qty = parseFloat(m[1].replace(',', '.'));
+    measureLabel = m[2].trim().toLowerCase();
+    name = m[3].trim();
+    weightG = m[4] ? parseFloat(m[4].replace(',', '.')) : 0;
+  } else if ((m = raw.match(/^(\d+(?:[.,]\d+)?)\s+(.+?)(?:\s*\((\d+(?:[.,]\d+)?)\s*g?\s*\))?$/i))) {
+    // "2 ovos" / "1 banana média (100g)"
+    qty = parseFloat(m[1].replace(',', '.'));
+    name = m[2].trim();
+    measureLabel = qty > 1 ? 'unidades' : 'unidade';
+    weightG = m[3] ? parseFloat(m[3].replace(',', '.')) : 0;
+  } else {
+    name = raw;
+    const wg = raw.match(/\((\d+(?:[.,]\d+)?)\s*g\)/i);
+    weightG = wg ? parseFloat(wg[1].replace(',', '.')) : 0;
+    measureLabel = 'porção';
+  }
+
+  const displayName = name.replace(/\s+/g, ' ').trim();
+  const searchTerm = cleanFoodName(displayName);
+  if (!searchTerm) return null;
+
+  // 1) Try DB exact/loose match. 2) If not found, ask AI (persists to DB).
+  let food = await searchFoodInDb(searchTerm);
+  if (!food) food = await lookupCustomFoodFallback(searchTerm);
+  if (!food) return null;
+
+  // If no weight was provided, derive one from the food's own measures
+  // (matching the measureLabel from the PDF, then falling back sensibly).
+  if (weightG <= 0) {
+    try {
+      const { data: measures } = await (supabase as any)
+        .from('food_measures')
+        .select('*')
+        .eq('food_item_id', food.id);
+      const ml = (measures || []) as any[];
+      const label = measureLabel.toLowerCase();
+      const match =
+        ml.find((x: any) => x.measure_name.toLowerCase() === label) ||
+        ml.find((x: any) => x.measure_name.toLowerCase().includes(label)) ||
+        ml.find((x: any) => x.measure_name.toLowerCase().includes('unidade')) ||
+        ml[0];
+      if (match) weightG = match.measure_weight_g * qty;
+    } catch { /* keep 0 */ }
+  }
+  if (weightG <= 0) weightG = qty; // last-resort estimate
+
+  const factor = weightG / 100;
+  const perUnit = qty > 0 ? weightG / qty : weightG;
+
+  return {
+    temp_id: nextConvId(),
+    food_item_id: food.id,
+    name: displayName || food.name,
+    group,
+    measure_id: '',
+    measure_name: measureLabel,
+    measure_weight_g: Math.round(perUnit * 10) / 10,
+    quantity: Math.max(0.1, qty),
+    weight_g: Math.round(weightG * 10) / 10,
+    calories: Math.round(food.calories_per_100g * factor * 10) / 10,
+    protein_g: Math.round(food.protein_per_100g * factor * 10) / 10,
+    carbs_g: Math.round(food.carbs_per_100g * factor * 10) / 10,
+    fat_g: Math.round(food.fat_per_100g * factor * 10) / 10,
+    fiber_g: Math.round((food.fiber_per_100g || 0) * factor * 10) / 10,
+    calories_per_100g: food.calories_per_100g,
+  };
+}
+
 // Convert a single meal/option's legacy food_groups into structured foods, in place.
 // Returns counts so callers can report results.
-async function convertTargetInPlace(target: any): Promise<{ converted: number; unconverted: number }> {
+// `preserve` = true when the analysis was imported from a PDF: keeps the
+// atleta's foods/medidas/porções exatamente como estavam.
+async function convertTargetInPlace(target: any, preserve = false): Promise<{ converted: number; unconverted: number }> {
   const foodGroups = target?.food_groups || [];
   if (foodGroups.length === 0) return { converted: 0, unconverted: 0 };
 
   const newFoods: SelectedFood[] = [...(target.foods || [])];
   const unconvertedGroups: any[] = [];
   let converted = 0;
+
+  const build = preserve ? lookupAndBuildFoodPreserve : lookupAndBuildFood;
 
   for (const fg of foodGroups) {
     const groupName = mapLegacyGroup(fg.group || 'Outros');
@@ -427,7 +523,7 @@ async function convertTargetInPlace(target: any): Promise<{ converted: number; u
       for (let ai = 0; ai < alternatives.length; ai++) {
         const alt = alternatives[ai].trim().replace(/\s*\(ex:.*\)/i, '');
         if (!alt) continue;
-        const built = await lookupAndBuildFood(alt, groupName);
+        const built = await build(alt, groupName);
         if (!built) { if (ai === 0) { failed = true; break; } continue; }
         if (ai === 0) primaryFood = built; else subs.push(built);
       }
@@ -448,6 +544,7 @@ async function convertTargetInPlace(target: any): Promise<{ converted: number; u
   return { converted, unconverted: unconvertedGroups.length };
 }
 
+
 // Whether a meal/option still holds unconverted legacy text (and no structured foods yet).
 function targetIsPureLegacy(target: any): boolean {
   return (!target?.foods || target.foods.length === 0) && (target?.food_groups?.length > 0);
@@ -462,6 +559,9 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
   const [quickBusyKey, setQuickBusyKey] = useState<string | null>(null);
   const [showQuickKey, setShowQuickKey] = useState<string | null>(null);
   const [editedAnalysis, setEditedAnalysis] = useState(() => deepClone(analysis));
+  // Planos importados (PDF/texto colado) devem ter alimentos/porções/medidas
+  // preservados na conversão para edição — nada de trocar por "match" do banco.
+  const isImportedSource = String((analysis as any)?.source || '').startsWith('imported');
   const [focusedMealIdx, setFocusedMealIdx] = useState<number | null>(null);
   const mealRefs = useRef<Array<HTMLDivElement | null>>([]);
 
@@ -1116,7 +1216,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
 
     setIsConverting(true);
     try {
-      const results = await Promise.all(legacyTargets.map(convertTargetInPlace));
+      const results = await Promise.all(legacyTargets.map((t) => convertTargetInPlace(t, isImportedSource)));
       const totalConverted = results.reduce((a, r) => a + r.converted, 0);
       const totalUnconverted = results.reduce((a, r) => a + r.unconverted, 0);
       setEditedAnalysis(deepClone(base));
@@ -1171,7 +1271,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
         : next.meal_plan.meals[mealIdx];
       if (!target) return;
 
-      const { converted, unconverted } = await convertTargetInPlace(target);
+      const { converted, unconverted } = await convertTargetInPlace(target, isImportedSource);
       setEditedAnalysis(next);
 
       if (converted === 0) {
@@ -1199,7 +1299,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       for (const meal of mealsArr) {
         const targets = meal.options?.length > 0 ? meal.options : [meal];
         for (const t of targets) {
-          const res = await convertTargetInPlace(t);
+          const res = await convertTargetInPlace(t, isImportedSource);
           totalConverted += res.converted;
           totalUnconverted += res.unconverted;
         }
