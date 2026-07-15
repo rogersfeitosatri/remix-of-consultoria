@@ -7,7 +7,8 @@
 //   - OPENAI_API_KEY   (opcional — fallback das análises de checkin/evolução/metabólica)
 //   - LOVABLE_API_KEY  (opcional — fallback da análise de anamnese)
 
-export type FallbackKind = 'openai-gpt4o' | 'lovable-gemini-pro' | 'none';
+export type FallbackKind = 'openai-gpt4o' | 'openai-gpt4o-mini' | 'openai-gpt5' | 'openai-gpt5-mini' | 'lovable-gemini-pro' | 'none';
+export type PrimaryProvider = 'gemini' | 'openai';
 
 interface Provider {
   name: string;
@@ -32,16 +33,21 @@ function geminiProvider(): Provider {
   };
 }
 
+function openaiProvider(model = 'gpt-4o-mini'): Provider {
+  return {
+    name: 'openai',
+    endpoint: OPENAI_ENDPOINT,
+    apiKey: Deno.env.get('OPENAI_API_KEY'),
+    model,
+    sanitizeSchema: false,
+  };
+}
+
 function fallbackProvider(kind: FallbackKind): Provider | null {
-  if (kind === 'openai-gpt4o') {
-    return {
-      name: 'openai',
-      endpoint: OPENAI_ENDPOINT,
-      apiKey: Deno.env.get('OPENAI_API_KEY'),
-      model: 'gpt-4o',
-      sanitizeSchema: false,
-    };
-  }
+  if (kind === 'openai-gpt4o') return openaiProvider('gpt-4o');
+  if (kind === 'openai-gpt4o-mini') return openaiProvider('gpt-4o-mini');
+  if (kind === 'openai-gpt5') return openaiProvider('gpt-5');
+  if (kind === 'openai-gpt5-mini') return openaiProvider('gpt-5-mini');
   if (kind === 'lovable-gemini-pro') {
     return {
       name: 'lovable',
@@ -54,11 +60,12 @@ function fallbackProvider(kind: FallbackKind): Provider | null {
   return null;
 }
 
-function providersFor(fallback: FallbackKind): Provider[] {
-  return [geminiProvider(), fallbackProvider(fallback)].filter(
-    (p): p is Provider => !!p && !!p.apiKey,
-  );
+function providersFor(fallback: FallbackKind, primary: PrimaryProvider = 'gemini', openaiModel?: string): Provider[] {
+  const primaryProv = primary === 'openai' ? openaiProvider(openaiModel || 'gpt-4o-mini') : geminiProvider();
+  const list = [primaryProv, fallbackProvider(fallback)];
+  return list.filter((p): p is Provider => !!p && !!p.apiKey);
 }
+
 
 // O Gemini não aceita alguns campos de JSON Schema (additionalProperties, $schema).
 // Removemos recursivamente antes de enviar ao Gemini.
