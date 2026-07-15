@@ -1299,7 +1299,7 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       for (const meal of mealsArr) {
         const targets = meal.options?.length > 0 ? meal.options : [meal];
         for (const t of targets) {
-          const res = await convertTargetInPlace(t);
+          const res = await convertTargetInPlace(t, isImportedSource);
           totalConverted += res.converted;
           totalUnconverted += res.unconverted;
         }
