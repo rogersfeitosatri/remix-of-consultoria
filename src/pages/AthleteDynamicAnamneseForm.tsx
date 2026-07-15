@@ -44,7 +44,7 @@ const INTENSIDADES_OPT = [
   { value: 'intenso', label: '🔴 Intenso' },
 ];
 const ENDURANCE_MODALIDADES = ['corrida', 'ciclismo', 'natacao', 'triathlon'];
-const emptyTrainingSession = () => ({ modalidade: '', turno: '', intensidade: '', longao: false });
+const emptyTrainingSession = () => ({ modalidade: '', turno: '', hora: '', intensidade: '', longao: false });
 
 function normalizeItens(itens: any): string[][] {
   if (!Array.isArray(itens) || itens.length === 0) return [['']];
