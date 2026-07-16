@@ -567,11 +567,17 @@ export default function PublicAnamneseForm() {
   }, [wizardSteps.length, currentStepIndex]);
 
   // Renderiza o widget de entrada de uma pergunta (usado no modo wizard).
-  const renderWidget = (question: Question, dayOverride?: string) => {
+  const renderWidget = (question: Question, dayOverride?: string, mealIndex?: number) => {
     if (isCompleta) {
+      // Quando o wizard foca em uma refeição específica, injeta focusMealIndex
+      // via config para o MealPlanEditorField mostrar somente aquela.
+      const questionForRender =
+        mealIndex !== undefined && question.question_type === 'meal_plan_editor'
+          ? { ...question, config: { ...(question.config || {}), focusMealIndex: mealIndex } }
+          : question;
       return (
         <QuestionRenderer
-          question={question as any}
+          question={questionForRender as any}
           value={answers[question.id]}
           onChange={(v) => handleAnswerChange(question.id, v)}
           answersByKey={answersByKey}
