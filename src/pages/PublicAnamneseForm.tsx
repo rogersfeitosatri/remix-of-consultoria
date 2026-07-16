@@ -520,13 +520,28 @@ export default function PublicAnamneseForm() {
 
   // ── Modo wizard (1 pergunta por tela) ──────────────────────────────────────────
   const isWizard = isWizardAnamneseForm(form) || isCompleta;
-  type WizStep = { kind: 'plan' } | { kind: 'question'; question: Question; day?: string };
+  type WizStep =
+    | { kind: 'plan' }
+    | { kind: 'question'; question: Question; day?: string; mealIndex?: number; mealName?: string };
   const questionSteps: WizStep[] = isWizard
-    ? visibleQuestions.flatMap<WizStep>((q) =>
-        !isCompleta && resolveQuestionType(q) === 'training_week'
-          ? DIAS_SEMANA.map((dia) => ({ kind: 'question', question: q, day: dia as string }))
-          : [{ kind: 'question', question: q }]
-      )
+    ? visibleQuestions.flatMap<WizStep>((q) => {
+        if (!isCompleta && resolveQuestionType(q) === 'training_week') {
+          return DIAS_SEMANA.map((dia) => ({ kind: 'question', question: q, day: dia as string }));
+        }
+        // ANAMNESE COMPLETA: quebra o meal_plan_editor em 1 tela por refeição.
+        if (isCompleta && q.question_type === 'meal_plan_editor') {
+          const defaults: string[] = Array.isArray(q.config?.defaultMeals) ? q.config!.defaultMeals : [];
+          if (defaults.length > 0) {
+            return defaults.map((name, i) => ({
+              kind: 'question' as const,
+              question: q,
+              mealIndex: i,
+              mealName: name,
+            }));
+          }
+        }
+        return [{ kind: 'question', question: q }];
+      })
     : [];
   // No modo ZN o plano/CPF ganha uma tela dedicada como 1º passo, para que as
   // perguntas seguintes apareçam sozinhas (com o plano minimizado no topo).
@@ -552,11 +567,17 @@ export default function PublicAnamneseForm() {
   }, [wizardSteps.length, currentStepIndex]);
 
   // Renderiza o widget de entrada de uma pergunta (usado no modo wizard).
-  const renderWidget = (question: Question, dayOverride?: string) => {
+  const renderWidget = (question: Question, dayOverride?: string, mealIndex?: number) => {
     if (isCompleta) {
+      // Quando o wizard foca em uma refeição específica, injeta focusMealIndex
+      // via config para o MealPlanEditorField mostrar somente aquela.
+      const questionForRender =
+        mealIndex !== undefined && question.question_type === 'meal_plan_editor'
+          ? { ...question, config: { ...(question.config || {}), focusMealIndex: mealIndex } }
+          : question;
       return (
         <QuestionRenderer
-          question={question as any}
+          question={questionForRender as any}
           value={answers[question.id]}
           onChange={(v) => handleAnswerChange(question.id, v)}
           answersByKey={answersByKey}
@@ -672,6 +693,14 @@ export default function PublicAnamneseForm() {
     if (!step || step.kind !== 'question') return true;
     // training_week ocupa vários passos: só valida no último dia.
     const isLastDay = step.day === undefined || step.day === DIAS_SEMANA[DIAS_SEMANA.length - 1];
+    // meal_plan_editor também é dividido em várias telas (uma por refeição):
+    // só valida a pergunta inteira no último passo do bloco.
+    if (step.mealIndex !== undefined) {
+      const defaults: string[] = Array.isArray(step.question.config?.defaultMeals) ? step.question.config!.defaultMeals : [];
+      const isLastMeal = defaults.length === 0 || step.mealIndex === defaults.length - 1;
+      if (isLastMeal) return validateWizQuestion(step.question);
+      return true;
+    }
     if (isLastDay) return validateWizQuestion(step.question);
     return true;
   };
@@ -921,17 +950,19 @@ export default function PublicAnamneseForm() {
           )}
 
           {step.kind === 'question' && (
-            <Card className="mb-6" key={`${step.question.id}-${step.day || ''}`}>
+            <Card className="mb-6" key={`${step.question.id}-${step.day || ''}-${step.mealIndex ?? ''}`}>
               <CardHeader>
                 <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-1">
-                  {step.question.section?.replace(/_/g, ' ')}{step.day ? ` — ${step.day}` : ''}
+                  {step.question.section?.replace(/_/g, ' ')}
+                  {step.day ? ` — ${step.day}` : ''}
+                  {step.mealName ? ` — ${step.mealName}` : ''}
                 </p>
                 <CardTitle className={cn('text-lg', step.question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
-                  {step.question.question_text}
+                  {step.mealName ? step.mealName : step.question.question_text}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {renderWidget(step.question, step.day)}
+                {renderWidget(step.question, step.day, step.mealIndex)}
                 {step.question.has_comment_field && (
                   <div className="mt-4 pt-4 border-t border-border/50">
                     <Label htmlFor={`wiz-comment-${step.question.id}`} className={cn('text-sm text-muted-foreground', step.question.comment_field_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
@@ -947,27 +978,7 @@ export default function PublicAnamneseForm() {
           {isLastWizStep && (
             <Card className="mb-6 border-primary/30">
               <CardContent className="pt-6 space-y-4">
-                {!znMode && (
-                  <div>
-                    <Label htmlFor="wiz-cpf" className="text-sm">CPF (opcional)</Label>
-                    <Input
-                      id="wiz-cpf"
-                      inputMode="numeric"
-                      placeholder="000.000.000-00"
-                      value={znCpf}
-                      onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
-                        const masked = digits
-                          .replace(/(\d{3})(\d)/, '$1.$2')
-                          .replace(/(\d{3})(\d)/, '$1.$2')
-                          .replace(/(\d{3})(\d)/, '$1-$2');
-                        setZnCpf(masked);
-                      }}
-                      className="mt-2"
-                    />
-                  </div>
-                )}
-                <div className={cn('flex items-start gap-3', !znMode && 'pt-2 border-t border-border/50')}>
+                <div className="flex items-start gap-3">
                   <Checkbox id="wiz-terms" checked={termsAccepted} onCheckedChange={(c) => setTermsAccepted(c as boolean)} className="mt-1" />
                   <Label htmlFor="wiz-terms" className="font-normal cursor-pointer leading-relaxed">
                     Li e aceito os{' '}

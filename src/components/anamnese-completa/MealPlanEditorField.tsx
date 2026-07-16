@@ -49,6 +49,11 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
   const trainingRelations: string[] = Array.isArray(config?.trainingRelations)
     ? config!.trainingRelations
     : [];
+  // Modo wizard: quando focusMealIndex é definido, exibe apenas 1 refeição por vez
+  // e oculta os controles de reordenar / adicionar / remover refeição.
+  const focusMealIndex: number | undefined =
+    typeof config?.focusMealIndex === 'number' ? config!.focusMealIndex : undefined;
+  const focusMode = focusMealIndex !== undefined;
 
   // Deriva as refeições: usa o value quando existir, senão os padrões do config.
   const meals: Meal[] =
@@ -88,14 +93,22 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
   const delFood = (mi: number, fi: number) =>
     updateMeal(mi, { foods: meals[mi].foods.filter((_, j) => j !== fi) });
 
+  const renderedMeals = focusMode
+    ? meals
+        .map((m, i) => ({ m, i }))
+        .filter(({ i }) => i === focusMealIndex)
+    : meals.map((m, i) => ({ m, i }));
+
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
-        Ex.: 7h30, depois do treino: 2 pães franceses, 3 ovos mexidos, 1 banana e 1 xícara de café
-        com açúcar.
-      </p>
+      {!focusMode && (
+        <p className="text-xs text-muted-foreground">
+          Ex.: 7h30, depois do treino: 2 pães franceses, 3 ovos mexidos, 1 banana e 1 xícara de café
+          com açúcar.
+        </p>
+      )}
 
-      {meals.map((meal, mi) => {
+      {renderedMeals.map(({ m: meal, i: mi }) => {
         const off = !meal.enabled;
         return (
           <div key={mi} className="rounded-lg border p-3 space-y-3">
@@ -118,7 +131,7 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
                   </span>
                 </div>
               </div>
-              {!disabled && (
+              {!disabled && !focusMode && (
                 <div className="flex gap-1">
                   <Button
                     type="button"
@@ -310,7 +323,7 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
         );
       })}
 
-      {!disabled && (
+      {!disabled && !focusMode && (
         <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={addMeal}>
           <Plus className="h-3.5 w-3.5" /> Adicionar refeição
         </Button>
