@@ -274,14 +274,17 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Render the template with variables
+        // Render the template with variables.
+        // Se não houver link do Meet, {link} vira aviso curto — a mensagem SEMPRE sai.
+        const linkValue = appointment.google_meet_link
+          || '(o link da reunião será enviado em separado)';
         const rendered = renderTemplate(
           { title: template.title, body: template.body },
           {
             nome: client.name.split(' ')[0],
             data: formatDateBR(appointment.appointment_date),
             hora: formatTime(appointment.appointment_time),
-            link: appointment.google_meet_link!,
+            link: linkValue,
           }
         );
 
