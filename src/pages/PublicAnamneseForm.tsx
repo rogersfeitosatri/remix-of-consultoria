@@ -556,6 +556,15 @@ export default function PublicAnamneseForm() {
     const val = q ? answers[q.id] : '';
     return typeof val === 'string' ? val : '';
   };
+  // Fallback robusto: procura em todas as respostas texto uma string que se
+  // pareça com e-mail (útil caso a pergunta não seja localizada pelo rótulo).
+  const findEmailAnywhere = (): string => {
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    for (const v of Object.values(answers)) {
+      if (typeof v === 'string' && emailRe.test(v.trim())) return v.trim();
+    }
+    return '';
+  };
   const currentWizStep = wizardSteps[currentStepIndex];
   const wizProgress = wizardSteps.length > 0 ? ((currentStepIndex + 1) / wizardSteps.length) * 100 : 0;
   const isLastWizStep = currentStepIndex === wizardSteps.length - 1;
