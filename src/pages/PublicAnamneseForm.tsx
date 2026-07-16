@@ -325,13 +325,19 @@ export default function PublicAnamneseForm() {
       ? (findAnswerByText(/nome\s*completo/i) || findAnswerByText(/^nome/i) || findAnswerByText(/nome/i)).trim()
       : athleteName.trim();
     let effectiveEmail = wizard
-      ? (findAnswerByText(/e-?mail/i) || findAnswerByText(/@/)).trim()
+      ? (findAnswerByText(/e-?mail/i) || findEmailAnywhere()).trim()
       : athleteEmail.trim();
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!effectiveEmail || !emailRegex.test(effectiveEmail)) {
-      toast.error('Informe um e-mail válido no formulário');
-      return;
+      // Última tentativa: varre qualquer resposta de texto por um e-mail válido
+      const fallback = findEmailAnywhere();
+      if (fallback && emailRegex.test(fallback)) {
+        effectiveEmail = fallback;
+      } else {
+        toast.error('Informe um e-mail válido no formulário');
+        return;
+      }
     }
     if (!effectiveName) {
       // Sem pergunta de nome: usa o prefixo do e-mail como identificação inicial.
