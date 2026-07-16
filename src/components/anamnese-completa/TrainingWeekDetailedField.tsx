@@ -1,13 +1,15 @@
 // Pergunta 8 — "Semana habitual de treinamento".
 // Editor semanal Segunda→Domingo, múltiplas sessões por dia, cada sessão com
 // campos detalhados (horário, modalidade, tipo, duração, distância, RPE, notas).
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Copy } from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronDown } from 'lucide-react';
 import type { FieldProps } from './types';
 
 type NumOrEmpty = number | '';
