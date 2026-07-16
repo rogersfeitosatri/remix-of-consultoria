@@ -49,6 +49,11 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
   const trainingRelations: string[] = Array.isArray(config?.trainingRelations)
     ? config!.trainingRelations
     : [];
+  // Modo wizard: quando focusMealIndex é definido, exibe apenas 1 refeição por vez
+  // e oculta os controles de reordenar / adicionar / remover refeição.
+  const focusMealIndex: number | undefined =
+    typeof config?.focusMealIndex === 'number' ? config!.focusMealIndex : undefined;
+  const focusMode = focusMealIndex !== undefined;
 
   // Deriva as refeições: usa o value quando existir, senão os padrões do config.
   const meals: Meal[] =
