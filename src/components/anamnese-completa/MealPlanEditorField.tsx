@@ -93,14 +93,22 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
   const delFood = (mi: number, fi: number) =>
     updateMeal(mi, { foods: meals[mi].foods.filter((_, j) => j !== fi) });
 
+  const renderedMeals = focusMode
+    ? meals
+        .map((m, i) => ({ m, i }))
+        .filter(({ i }) => i === focusMealIndex)
+    : meals.map((m, i) => ({ m, i }));
+
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
-        Ex.: 7h30, depois do treino: 2 pães franceses, 3 ovos mexidos, 1 banana e 1 xícara de café
-        com açúcar.
-      </p>
+      {!focusMode && (
+        <p className="text-xs text-muted-foreground">
+          Ex.: 7h30, depois do treino: 2 pães franceses, 3 ovos mexidos, 1 banana e 1 xícara de café
+          com açúcar.
+        </p>
+      )}
 
-      {meals.map((meal, mi) => {
+      {renderedMeals.map(({ m: meal, i: mi }) => {
         const off = !meal.enabled;
         return (
           <div key={mi} className="rounded-lg border p-3 space-y-3">
