@@ -679,6 +679,7 @@ export default function SchedulingSettings() {
           </TabsContent>
 
           <TabsContent value="whatsapp" className="space-y-6">
+            <FeedbackWhatsappLinkCard />
             <WhatsAppControlCenter />
           </TabsContent>
         </Tabs>
