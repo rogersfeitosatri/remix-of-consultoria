@@ -236,39 +236,34 @@ export default function PublicBooking() {
         })
         .eq('id', consultationSchedule.id);
 
-      // Try to create Google Calendar event with Meet
+      // Try to create Google Calendar event with Meet (best-effort)
+      let meetLink: string | null = null;
       try {
         const { data: calendarResult, error: calendarError } = await supabase.functions.invoke('create-calendar-event', {
           body: { appointmentId: result.id }
         });
-        
-        if (calendarError) {
-          console.error('Error creating calendar event:', calendarError);
-        }
-        
-        const meetLink = calendarResult?.google_meet_link;
-        const meetStatus = calendarResult?.meet_status;
-        
-        // Only send WhatsApp if Meet was successfully created
-        if (meetLink && meetStatus === 'created') {
-          const clientPhone = consultationSchedule.clients.phone;
-          if (clientPhone) {
-            const formattedDate = format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR });
-            const message = `✅ *Consulta Confirmada!*\n\n📅 ${formattedDate}\n⏰ ${selectedTime}\n\n🔗 *Link da reunião:*\n${meetLink}\n\nAté breve!`;
-            
-            await supabase.functions.invoke('send-whatsapp', {
-              body: {
-                clientId: consultationSchedule.clients.id,
-                message
-              }
-            });
-          }
-        } else if (meetStatus === 'failed') {
-          // Meet failed - don't send WhatsApp, admin will be notified
-          console.log('Meet creation failed - WhatsApp not sent, admin will reprocess');
-        }
+        if (calendarError) console.error('Error creating calendar event:', calendarError);
+        meetLink = calendarResult?.google_meet_link || null;
       } catch (calendarErr) {
         console.error('Calendar creation error:', calendarErr);
+      }
+
+      // ALWAYS send confirmation WhatsApp — with or without Meet link.
+      // Ausência do Meet não pode bloquear a confirmação do agendamento (bug histórico).
+      try {
+        const clientPhone = consultationSchedule.clients.phone;
+        if (clientPhone) {
+          const formattedDate = format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR });
+          const linkBlock = meetLink
+            ? `\n\n🔗 *Link da reunião:*\n${meetLink}`
+            : `\n\n_O link da reunião será enviado assim que gerado._`;
+          const message = `✅ *Consulta Confirmada!*\n\n📅 ${formattedDate}\n⏰ ${selectedTime}${linkBlock}\n\nAté breve!`;
+          await supabase.functions.invoke('send-whatsapp', {
+            body: { clientId: consultationSchedule.clients.id, message },
+          });
+        }
+      } catch (waErr) {
+        console.error('WhatsApp confirmation send error:', waErr);
       }
 
       setConfirmed(true);
