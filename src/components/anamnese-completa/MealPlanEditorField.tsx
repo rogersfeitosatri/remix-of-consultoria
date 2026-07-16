@@ -131,7 +131,7 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
                   </span>
                 </div>
               </div>
-              {!disabled && (
+              {!disabled && !focusMode && (
                 <div className="flex gap-1">
                   <Button
                     type="button"
