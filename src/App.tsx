@@ -157,8 +157,8 @@ function AppRoutes() {
         <Route path="/np-checkin/:token" element={<PublicNpCheckin />} />
         <Route path="/termos" element={<Terms />} />
         <Route path="/onboarding" element={<PublicOnboarding />} />
-        <Route path="/zn/assinar" element={<Navigate to={`/anamnese-form/bb8b2171-5442-4286-ba6f-4580b0228820?zn=1${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('plano') ? `&plano=${new URLSearchParams(window.location.search).get('plano')}` : ''}`} replace />} />
-        <Route path="/zn/anamnese" element={<Navigate to={`/anamnese-form/bb8b2171-5442-4286-ba6f-4580b0228820?zn=1${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('plano') ? `&plano=${new URLSearchParams(window.location.search).get('plano')}` : ''}`} replace />} />
+        <Route path="/zn/assinar" element={<Navigate to={`/anamnese-form/cdb87aff-804f-4c5f-9b90-61923317531a?zn=1${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('plano') ? `&plano=${new URLSearchParams(window.location.search).get('plano')}` : ''}${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('cupom') ? `&cupom=${new URLSearchParams(window.location.search).get('cupom')}` : ''}`} replace />} />
+        <Route path="/zn/anamnese" element={<Navigate to={`/anamnese-form/cdb87aff-804f-4c5f-9b90-61923317531a?zn=1${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('plano') ? `&plano=${new URLSearchParams(window.location.search).get('plano')}` : ''}${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('cupom') ? `&cupom=${new URLSearchParams(window.location.search).get('cupom')}` : ''}`} replace />} />
         <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
         <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
