@@ -693,6 +693,14 @@ export default function PublicAnamneseForm() {
     if (!step || step.kind !== 'question') return true;
     // training_week ocupa vários passos: só valida no último dia.
     const isLastDay = step.day === undefined || step.day === DIAS_SEMANA[DIAS_SEMANA.length - 1];
+    // meal_plan_editor também é dividido em várias telas (uma por refeição):
+    // só valida a pergunta inteira no último passo do bloco.
+    if (step.mealIndex !== undefined) {
+      const defaults: string[] = Array.isArray(step.question.config?.defaultMeals) ? step.question.config!.defaultMeals : [];
+      const isLastMeal = defaults.length === 0 || step.mealIndex === defaults.length - 1;
+      if (isLastMeal) return validateWizQuestion(step.question);
+      return true;
+    }
     if (isLastDay) return validateWizQuestion(step.question);
     return true;
   };
