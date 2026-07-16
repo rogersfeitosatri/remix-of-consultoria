@@ -145,6 +145,8 @@ Deno.serve(async (req) => {
     console.log('Current São Paulo time (truncated):', saoPauloNow.toISOString());
     console.log('Looking for appointments between:', in4Min.toISOString(), 'and', in20Min.toISOString());
 
+    // Buscar TODOS os appointments confirmados dentro da janela, com ou sem Meet.
+    // A ausência do link do Meet NÃO pode bloquear o envio do lembrete de 15 min.
     const { data: appointments, error: appointmentsError } = await supabase
       .from('appointments')
       .select(`
@@ -158,7 +160,6 @@ Deno.serve(async (req) => {
       `)
       .eq('status', 'confirmed')
       .is('reminder_15m_sent_at', null)
-      .not('google_meet_link', 'is', null)
       .in('appointment_date', [todayStr, tomorrowStr]) as { data: AppointmentWithClient[] | null, error: unknown };
 
     if (appointmentsError) {
