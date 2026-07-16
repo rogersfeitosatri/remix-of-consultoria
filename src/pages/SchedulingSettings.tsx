@@ -40,6 +40,7 @@ import { GoogleOAuthSettings } from '@/components/scheduling/GoogleOAuthSettings
 import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog';
 import { Clock, Calendar as CalendarIcon, Link, Plus, Trash2, Copy, Check, Loader2, Ban, Settings, Video, UserPlus, Save, MessageSquare } from 'lucide-react';
 import { WhatsAppControlCenter } from '@/components/settings/WhatsAppControlCenter';
+import { FeedbackWhatsappLinkCard } from '@/components/scheduling/FeedbackWhatsappLinkCard';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
