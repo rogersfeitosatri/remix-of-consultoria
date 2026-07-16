@@ -950,17 +950,19 @@ export default function PublicAnamneseForm() {
           )}
 
           {step.kind === 'question' && (
-            <Card className="mb-6" key={`${step.question.id}-${step.day || ''}`}>
+            <Card className="mb-6" key={`${step.question.id}-${step.day || ''}-${step.mealIndex ?? ''}`}>
               <CardHeader>
                 <p className="text-xs uppercase tracking-wide text-primary font-semibold mb-1">
-                  {step.question.section?.replace(/_/g, ' ')}{step.day ? ` — ${step.day}` : ''}
+                  {step.question.section?.replace(/_/g, ' ')}
+                  {step.day ? ` — ${step.day}` : ''}
+                  {step.mealName ? ` — ${step.mealName}` : ''}
                 </p>
                 <CardTitle className={cn('text-lg', step.question.is_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
-                  {step.question.question_text}
+                  {step.mealName ? step.mealName : step.question.question_text}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {renderWidget(step.question, step.day)}
+                {renderWidget(step.question, step.day, step.mealIndex)}
                 {step.question.has_comment_field && (
                   <div className="mt-4 pt-4 border-t border-border/50">
                     <Label htmlFor={`wiz-comment-${step.question.id}`} className={cn('text-sm text-muted-foreground', step.question.comment_field_required && "after:content-['*'] after:ml-0.5 after:text-red-500")}>
