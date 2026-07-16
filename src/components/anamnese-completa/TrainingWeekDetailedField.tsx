@@ -59,10 +59,10 @@ export function TrainingWeekDetailedField({ value, onChange, config, disabled }:
   const week = normalizeWeek(value);
   const modalities: string[] = Array.isArray(config?.modalities) ? config!.modalities : DEFAULT_MODALITIES;
   const sessionTypes: string[] = Array.isArray(config?.sessionTypes) ? config!.sessionTypes : DEFAULT_SESSION_TYPES;
-  // Só abre por padrão os dias que já têm sessões preenchidas.
+  // Todos os dias iniciam recolhidos; o atleta clica para expandir.
   const [openDays, setOpenDays] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
-    for (const d of WEEKDAYS) init[d] = (week[d]?.length ?? 0) > 0;
+    for (const d of WEEKDAYS) init[d] = false;
     return init;
   });
   const toggleDay = (day: string) => setOpenDays((s) => ({ ...s, [day]: !s[day] }));
