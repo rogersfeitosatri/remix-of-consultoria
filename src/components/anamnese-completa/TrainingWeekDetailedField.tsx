@@ -59,6 +59,13 @@ export function TrainingWeekDetailedField({ value, onChange, config, disabled }:
   const week = normalizeWeek(value);
   const modalities: string[] = Array.isArray(config?.modalities) ? config!.modalities : DEFAULT_MODALITIES;
   const sessionTypes: string[] = Array.isArray(config?.sessionTypes) ? config!.sessionTypes : DEFAULT_SESSION_TYPES;
+  // Só abre por padrão os dias que já têm sessões preenchidas.
+  const [openDays, setOpenDays] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const d of WEEKDAYS) init[d] = (week[d]?.length ?? 0) > 0;
+    return init;
+  });
+  const toggleDay = (day: string) => setOpenDays((s) => ({ ...s, [day]: !s[day] }));
 
   const emit = (day: string, sessions: Session[]) => {
     onChange({ ...week, [day]: sessions });
@@ -67,25 +74,41 @@ export function TrainingWeekDetailedField({ value, onChange, config, disabled }:
   const updateSession = (day: string, i: number, patch: Partial<Session>) => {
     emit(day, week[day].map((s, j) => (j === i ? { ...s, ...patch } : s)));
   };
-  const addSession = (day: string) => emit(day, [...week[day], emptySession()]);
+  const addSession = (day: string) => {
+    setOpenDays((s) => ({ ...s, [day]: true }));
+    emit(day, [...week[day], emptySession()]);
+  };
   const dupSession = (day: string, i: number) =>
     emit(day, [...week[day].slice(0, i + 1), { ...week[day][i] }, ...week[day].slice(i + 1)]);
   const delSession = (day: string, i: number) =>
     emit(day, week[day].filter((_, j) => j !== i));
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {WEEKDAYS.map((day) => {
         const sessions = week[day];
+        const isOpen = !!openDays[day];
         return (
-          <Card key={day}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-semibold">{day}</CardTitle>
-              <Badge variant="secondary" className="text-xs">
-                {sessions.length} {sessions.length === 1 ? 'sessão' : 'sessões'}
-              </Badge>
-            </CardHeader>
-            <CardContent className="space-y-2">
+          <Collapsible key={day} open={isOpen} onOpenChange={() => toggleDay(day)}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <ChevronDown
+                      className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-0' : '-rotate-90'}`}
+                    />
+                    <span className="text-sm font-semibold">{day}</span>
+                  </div>
+                  <Badge variant={sessions.length ? 'secondary' : 'outline'} className="text-xs">
+                    {sessions.length === 0 ? 'Descanso' : `${sessions.length} ${sessions.length === 1 ? 'sessão' : 'sessões'}`}
+                  </Badge>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="space-y-2 pt-0">
               {sessions.length === 0 && (
                 <p className="text-sm text-muted-foreground">Nenhuma sessão (descanso)</p>
               )}
