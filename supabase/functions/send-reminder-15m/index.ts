@@ -369,36 +369,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Also check for appointments without Meet link and log them
-    const { data: pendingMeetAppointments } = await supabase
-      .from('appointments')
-      .select('id, appointment_date, appointment_time, client_id, user_id, clients(name, phone)')
-      .eq('status', 'confirmed')
-      .is('reminder_15m_sent_at', null)
-      .is('google_meet_link', null)
-      .in('appointment_date', [todayStr, tomorrowStr]);
-
-    for (const apt of pendingMeetAppointments || []) {
-      const aptDateTime = new Date(`${apt.appointment_date}T${apt.appointment_time}`);
-      if (aptDateTime >= in4Min && aptDateTime <= in20Min) {
-        const clientData = apt.clients as unknown as { name: string; phone: string } | null;
-        console.log('Appointment without Meet link:', apt.id);
-        
-        await supabase.from('whatsapp_message_logs').insert({
-          user_id: apt.user_id,
-          client_id: apt.client_id,
-          appointment_id: apt.id,
-          message_type: 'reminder_15m',
-          template_key: 'reminder_15m',
-          to_phone: clientData?.phone || 'N/A',
-          status: 'failed',
-          error_message: 'No Google Meet link',
-          metadata: { reason: 'pending_meet' }
-        });
-        
-        results.push({ appointmentId: apt.id, status: 'failed', error: 'No Google Meet link' });
-      }
-    }
+    // Nota: appointments sem Google Meet link agora são processados no loop principal
+    // (o texto do lembrete inclui um aviso quando o link está ausente).
 
     console.log('Processing complete. Results:', results);
 
