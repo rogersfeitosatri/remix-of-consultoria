@@ -264,8 +264,10 @@ export function TrainingWeekDetailedField({ value, onChange, config, disabled }:
                   <Plus className="h-3.5 w-3.5" /> Adicionar sessão
                 </Button>
               )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         );
       })}
     </div>
