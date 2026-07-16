@@ -520,13 +520,28 @@ export default function PublicAnamneseForm() {
 
   // ── Modo wizard (1 pergunta por tela) ──────────────────────────────────────────
   const isWizard = isWizardAnamneseForm(form) || isCompleta;
-  type WizStep = { kind: 'plan' } | { kind: 'question'; question: Question; day?: string };
+  type WizStep =
+    | { kind: 'plan' }
+    | { kind: 'question'; question: Question; day?: string; mealIndex?: number; mealName?: string };
   const questionSteps: WizStep[] = isWizard
-    ? visibleQuestions.flatMap<WizStep>((q) =>
-        !isCompleta && resolveQuestionType(q) === 'training_week'
-          ? DIAS_SEMANA.map((dia) => ({ kind: 'question', question: q, day: dia as string }))
-          : [{ kind: 'question', question: q }]
-      )
+    ? visibleQuestions.flatMap<WizStep>((q) => {
+        if (!isCompleta && resolveQuestionType(q) === 'training_week') {
+          return DIAS_SEMANA.map((dia) => ({ kind: 'question', question: q, day: dia as string }));
+        }
+        // ANAMNESE COMPLETA: quebra o meal_plan_editor em 1 tela por refeição.
+        if (isCompleta && q.question_type === 'meal_plan_editor') {
+          const defaults: string[] = Array.isArray(q.config?.defaultMeals) ? q.config!.defaultMeals : [];
+          if (defaults.length > 0) {
+            return defaults.map((name, i) => ({
+              kind: 'question' as const,
+              question: q,
+              mealIndex: i,
+              mealName: name,
+            }));
+          }
+        }
+        return [{ kind: 'question', question: q }];
+      })
     : [];
   // No modo ZN o plano/CPF ganha uma tela dedicada como 1º passo, para que as
   // perguntas seguintes apareçam sozinhas (com o plano minimizado no topo).
