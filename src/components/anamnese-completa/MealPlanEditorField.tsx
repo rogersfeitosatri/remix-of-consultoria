@@ -323,7 +323,7 @@ export function MealPlanEditorField({ value, onChange, config, disabled }: Field
         );
       })}
 
-      {!disabled && (
+      {!disabled && !focusMode && (
         <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={addMeal}>
           <Plus className="h-3.5 w-3.5" /> Adicionar refeição
         </Button>
