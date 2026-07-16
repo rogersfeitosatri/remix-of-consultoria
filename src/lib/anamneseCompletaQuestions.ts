@@ -246,28 +246,11 @@ export const ANAMNESE_COMPLETA_QUESTIONS: AnamneseCompletaQuestion[] = [
           ],
         },
         { key: 'horario', label: 'Horário aproximado', type: 'time', show_if: { key: 'self.situacao', op: 'in', value: ['Faço um lanche pequeno', 'Faço uma refeição completa', 'Depende do tipo de treino'] } },
-        { key: 'alimentos', label: 'Alimentos e bebidas', type: 'textarea', show_if: { key: 'self.situacao', op: 'in', value: ['Faço um lanche pequeno', 'Faço uma refeição completa', 'Depende do tipo de treino'] } },
-        { key: 'quantidades', label: 'Quantidades ou medidas caseiras', type: 'text', show_if: { key: 'self.situacao', op: 'in', value: ['Faço um lanche pequeno', 'Faço uma refeição completa', 'Depende do tipo de treino'] } },
-        
+        { key: 'alimentos_bebidas_quantidades', label: 'Alimentos, bebidas, quantidades e porções', type: 'textarea', placeholder: 'Ex.: 1 pão francês com queijo, 200 ml de café com leite, 1 banana...', show_if: { key: 'self.situacao', op: 'in', value: ['Faço um lanche pequeno', 'Faço uma refeição completa', 'Depende do tipo de treino'] } },
       ],
     },
   },
-  {
-    question_key: 'intervalo_refeicao_treino', section: E3, question_text: 'Tempo entre a última refeição e o treino',
-    question_type: 'field_group',
-    config: {
-      fields: [
-        {
-          key: 'intervalo', label: 'Quanto tempo, normalmente?', type: 'select', required: true,
-          options: [
-            'Menos de 30 minutos', 'Entre 30 e 60 minutos', 'Entre 1 e 2 horas', 'Entre 2 e 3 horas',
-            'Mais de 3 horas', 'Varia conforme o dia', 'Normalmente treino sem comer',
-          ],
-        },
-        { key: 'quando_varia', label: 'Em quais treinos ou horários isso muda?', type: 'text', show_if: { key: 'self.intervalo', op: 'equals', value: 'Varia conforme o dia' } },
-      ],
-    },
-  },
+
   {
     question_key: 'intra_treino', section: E3, question_text: 'Alimentação durante treinos mais longos',
     question_type: 'field_group',
