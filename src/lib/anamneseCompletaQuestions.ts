@@ -252,6 +252,24 @@ export const ANAMNESE_COMPLETA_QUESTIONS: AnamneseCompletaQuestion[] = [
   },
 
   {
+    question_key: 'intervalo_refeicao_treino', section: E3, question_text: 'Tempo entre a última refeição e o treino',
+    question_type: 'field_group',
+    config: {
+      fields: [
+        {
+          key: 'intervalo', label: 'Quanto tempo, normalmente?', type: 'select', required: true,
+          options: [
+            'Menos de 30 minutos', 'Entre 30 e 60 minutos', 'Entre 1 e 2 horas', 'Entre 2 e 3 horas',
+            'Mais de 3 horas', 'Varia conforme o dia', 'Normalmente treino sem comer',
+          ],
+        },
+        { key: 'quando_varia', label: 'Em quais treinos ou horários isso muda?', type: 'text', show_if: { key: 'self.intervalo', op: 'equals', value: 'Varia conforme o dia' } },
+      ],
+    },
+  },
+
+
+  {
     question_key: 'intra_treino', section: E3, question_text: 'Alimentação durante treinos mais longos',
     question_type: 'field_group',
     config: {
