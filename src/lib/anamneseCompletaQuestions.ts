@@ -468,17 +468,13 @@ export const ANAMNESE_COMPLETA_QUESTIONS: AnamneseCompletaQuestion[] = [
   {
     question_key: 'alimentacao_habitual', section: E6, question_text: 'Alimentação em um dia habitual',
     question_type: 'meal_plan_editor', is_required: true,
-    helper: 'Ex.: “7h30, depois do treino: 2 pães franceses, 3 ovos mexidos, 1 banana e 1 xícara de café com açúcar.” Esta é a referência principal para montar a Opção 1 de cada refeição.',
+    helper: 'Para cada refeição informe o horário e o que costuma comer (alimento, quantidade e unidade de medida). Você pode adicionar uma opção alternativa (para dias em que come diferente) e substituições habituais para cada alimento.',
     config: {
-      units: MEDIDAS_CASEIRAS,
-      trainingRelations: TRAINING_RELATION,
+      simpleMode: true,
+      units: ['Gramas', 'Colher', 'Colher de sopa', 'Colher de chá', 'Concha', 'Unidade', 'Fatia', 'Copo', 'Xícara', 'ml'],
       defaultMeals: [
-        'Lanche pré-treino', 'Café da manhã ou café da manhã pós-treino', 'Lanche da manhã', 'Almoço',
-        'Lanche da tarde', 'Lanche pré-treino da tarde ou noite', 'Jantar ou refeição pós-treino', 'Ceia',
-        'Beliscos ou alimentos fora das refeições',
+        'Café da manhã', 'Lanche da manhã', 'Almoço', 'Lanche da tarde', 'Jantar', 'Ceia',
       ],
-      mealFields: ['meal_name', 'time'],
-      foodFields: ['food_name', 'quantity', 'unit', 'preparation', 'brand'],
     },
   },
   {

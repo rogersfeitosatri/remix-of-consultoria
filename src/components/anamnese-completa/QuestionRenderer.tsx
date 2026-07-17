@@ -10,6 +10,7 @@ import { ChipsInput } from './PrimitiveInputs';
 import { FieldGroupField } from './FieldGroupField';
 import { StructuredListField } from './StructuredListField';
 import { MealPlanEditorField } from './MealPlanEditorField';
+import { SimpleMealField } from './SimpleMealField';
 import { SymptomGridField } from './SymptomGridField';
 import { FrequencyGridField } from './FrequencyGridField';
 import { TrainingWeekDetailedField } from './TrainingWeekDetailedField';
@@ -43,7 +44,10 @@ export function QuestionRenderer({
   switch (question.question_type) {
     case 'field_group': return <FieldGroupField {...fp} />;
     case 'structured_list': return <StructuredListField field={{ key: 'items', label: '', type: 'structured_list', fields: question.config?.fields || [], addLabel: question.config?.addLabel }} value={value} onChange={onChange} selfScope={{}} answersByKey={answersByKey} disabled={disabled} clientId={clientId} />;
-    case 'meal_plan_editor': return <MealPlanEditorField {...fp} />;
+    case 'meal_plan_editor':
+      return question.config?.simpleMode
+        ? <SimpleMealField {...fp} />
+        : <MealPlanEditorField {...fp} />;
     case 'symptom_grid': return <SymptomGridField {...fp} />;
     case 'frequency_grid': return <FrequencyGridField {...fp} />;
     case 'training_week': return <TrainingWeekDetailedField {...fp} />;
