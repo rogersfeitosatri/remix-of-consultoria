@@ -104,14 +104,34 @@ export function normalizeAnamneseCompleta(
   const meals = Array.isArray(g('alimentacao_habitual')) ? g('alimentacao_habitual') : [];
   const habitual_meals = meals
     .filter((m: any) => m && m.enabled !== false)
-    .map((m: any) => ({
-      meal_name: m.meal_name || '', time: m.time || '', days_per_week: num(m.days_per_week) ?? 0,
-      training_relation: m.training_relation || '',
-      foods: (Array.isArray(m.foods) ? m.foods : []).map((f: any) => ({
-        food_name: f.food_name || '', quantity: num(f.quantity) ?? f.quantity ?? 0,
-        unit: f.unit || '', preparation: f.preparation || '', brand: f.brand || '',
-      })),
-    }));
+    .map((m: any) => {
+      // Novo formato (simpleMode): options[].foods[] com substituições.
+      // Formato antigo: foods[] direto na refeição.
+      const optionsRaw = Array.isArray(m.options) ? m.options : null;
+      const flatFoodsRaw = optionsRaw
+        ? optionsRaw.flatMap((op: any) => Array.isArray(op?.foods) ? op.foods : [])
+        : (Array.isArray(m.foods) ? m.foods : []);
+      const options = optionsRaw
+        ? optionsRaw.map((op: any, idx: number) => ({
+            label: idx === 0 ? 'principal' : 'alternativa',
+            foods: (Array.isArray(op?.foods) ? op.foods : []).map((f: any) => ({
+              food_name: f.food_name || '', quantity: num(f.quantity) ?? f.quantity ?? 0,
+              unit: f.unit || '',
+              substitutions: Array.isArray(f.substitutions) ? f.substitutions.filter(Boolean) : [],
+            })),
+          }))
+        : undefined;
+      return {
+        meal_name: m.meal_name || '', time: m.time || '', days_per_week: num(m.days_per_week) ?? 0,
+        training_relation: m.training_relation || '',
+        foods: flatFoodsRaw.map((f: any) => ({
+          food_name: f.food_name || '', quantity: num(f.quantity) ?? f.quantity ?? 0,
+          unit: f.unit || '', preparation: f.preparation || '', brand: f.brand || '',
+          substitutions: Array.isArray(f.substitutions) ? f.substitutions.filter(Boolean) : [],
+        })),
+        ...(options ? { options } : {}),
+      };
+    });
 
   const pre = grp('pre_treino_matinal');
   const restr = grp('restricoes');
