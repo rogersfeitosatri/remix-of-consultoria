@@ -135,167 +135,201 @@ export function SimpleMealField({ value, onChange, config, disabled }: FieldProp
     ? meals.map((m, i) => ({ m, i })).filter(({ i }) => i === focusMealIndex)
     : meals.map((m, i) => ({ m, i }));
 
+  const toggleSkip = (mi: number) => {
+    const current = meals[mi];
+    if (current.skipped) {
+      updateMeal(mi, { skipped: false, enabled: true });
+    } else {
+      updateMeal(mi, {
+        skipped: true,
+        enabled: false,
+        time: '',
+        options: [emptyOption()],
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {shown.map(({ m: meal, i: mi }) => (
         <div key={mi} className="rounded-lg border p-3 space-y-4">
           {/* Cabeçalho da refeição */}
-          <div className="flex items-center gap-2">
-            <Utensils className="h-4 w-4 text-primary" />
-            <h4 className="text-base font-semibold">{meal.meal_name}</h4>
-          </div>
-
-          {/* Horário */}
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label className="text-xs">
-                Horário<span className="text-destructive"> *</span>
-              </Label>
-              <Input
-                type="time"
-                value={meal.time}
-                onChange={(e) => updateMeal(mi, { time: e.target.value })}
-                disabled={disabled}
-                readOnly={disabled}
-                aria-required
-              />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Utensils className="h-4 w-4 text-primary" />
+              <h4 className="text-base font-semibold">{meal.meal_name}</h4>
             </div>
+            {!disabled && (
+              <Button
+                type="button"
+                variant={meal.skipped ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => toggleSkip(mi)}
+              >
+                {meal.skipped ? 'Faço essa refeição' : 'Não faço essa refeição'}
+              </Button>
+            )}
           </div>
 
-          {/* Opções */}
-          {meal.options.map((option, oi) => (
-            <div key={oi} className="rounded-md border bg-muted/30 p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant={oi === 0 ? 'default' : 'secondary'}>
-                    {oi === 0 ? 'Opção principal' : 'Opção alternativa'}
-                  </Badge>
-                  {oi > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      (para dias em que você come diferente)
-                    </span>
-                  )}
+          {meal.skipped ? (
+            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              Você marcou que <strong>não faz</strong> essa refeição. Clique em "Faço essa refeição" para preencher.
+            </div>
+          ) : (
+            <>
+              {/* Horário */}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">
+                    Horário<span className="text-destructive"> *</span>
+                  </Label>
+                  <Input
+                    type="time"
+                    value={meal.time}
+                    onChange={(e) => updateMeal(mi, { time: e.target.value })}
+                    disabled={disabled}
+                    readOnly={disabled}
+                    aria-required
+                  />
                 </div>
-                {!disabled && oi > 0 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-destructive"
-                    onClick={() => delOption(mi, oi)}
-                    aria-label="Remover opção alternativa"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
               </div>
 
-              <Label className="text-xs text-muted-foreground">O que costuma comer</Label>
-
-              {option.foods.map((food, fi) => (
-                <div key={fi} className="rounded-md border bg-background p-2 space-y-2">
+              {/* Opções */}
+              {meal.options.map((option, oi) => (
+                <div key={oi} className="rounded-md border bg-muted/30 p-3 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Alimento {fi + 1}</span>
-                    {!disabled && option.foods.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant={oi === 0 ? 'default' : 'secondary'}>
+                        {oi === 0 ? 'Opção principal' : 'Opção alternativa'}
+                      </Badge>
+                      {oi > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          (para dias em que você come diferente)
+                        </span>
+                      )}
+                    </div>
+                    {!disabled && oi > 0 && (
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 text-destructive"
-                        onClick={() => delFood(mi, oi, fi)}
-                        aria-label="Remover alimento"
+                        className="h-7 w-7 text-destructive"
+                        onClick={() => delOption(mi, oi)}
+                        aria-label="Remover opção alternativa"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
 
-                  <div className="grid gap-2 sm:grid-cols-6">
-                    <div className="space-y-1 sm:col-span-3">
-                      <Label className="text-xs">
-                        Alimento<span className="text-destructive"> *</span>
-                      </Label>
-                      <Input
-                        value={food.food_name}
-                        onChange={(e) => updateFood(mi, oi, fi, { food_name: e.target.value })}
-                        placeholder="Ex.: Arroz"
-                        disabled={disabled}
-                        readOnly={disabled}
-                        aria-required
-                      />
-                    </div>
-                    <div className="space-y-1 sm:col-span-1">
-                      <Label className="text-xs">
-                        Quantidade<span className="text-destructive"> *</span>
-                      </Label>
-                      <Input
-                        value={food.quantity}
-                        onChange={(e) => updateFood(mi, oi, fi, { quantity: e.target.value })}
-                        placeholder="4"
-                        disabled={disabled}
-                        readOnly={disabled}
-                        aria-required
-                      />
-                    </div>
-                    <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-xs">
-                        Unidade<span className="text-destructive"> *</span>
-                      </Label>
-                      <Select
-                        value={food.unit || undefined}
-                        onValueChange={(v) => updateFood(mi, oi, fi, { unit: v })}
-                        disabled={disabled}
-                      >
-                        <SelectTrigger aria-required>
-                          <SelectValue placeholder="Medida" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {units.map((u) => (
-                            <SelectItem key={u} value={u}>{u}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                  <Label className="text-xs text-muted-foreground">O que costuma comer</Label>
 
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">
-                      Substituições habituais (opcional)
-                    </Label>
-                    <ChipsInput
-                      value={food.substitutions || []}
-                      onChange={(v) => updateFood(mi, oi, fi, { substitutions: v })}
-                      disabled={disabled}
-                      placeholder="Ex.: Macarrão, Batata, Cuscuz"
-                    />
-                  </div>
+                  {option.foods.map((food, fi) => (
+                    <div key={fi} className="rounded-md border bg-background p-2 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Alimento {fi + 1}</span>
+                        {!disabled && option.foods.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive"
+                            onClick={() => delFood(mi, oi, fi)}
+                            aria-label="Remover alimento"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-6">
+                        <div className="space-y-1 sm:col-span-3">
+                          <Label className="text-xs">
+                            Alimento<span className="text-destructive"> *</span>
+                          </Label>
+                          <Input
+                            value={food.food_name}
+                            onChange={(e) => updateFood(mi, oi, fi, { food_name: e.target.value })}
+                            placeholder="Ex.: Arroz"
+                            disabled={disabled}
+                            readOnly={disabled}
+                            aria-required
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-1">
+                          <Label className="text-xs">
+                            Quantidade<span className="text-destructive"> *</span>
+                          </Label>
+                          <Input
+                            value={food.quantity}
+                            onChange={(e) => updateFood(mi, oi, fi, { quantity: e.target.value })}
+                            placeholder="4"
+                            disabled={disabled}
+                            readOnly={disabled}
+                            aria-required
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <Label className="text-xs">
+                            Unidade<span className="text-destructive"> *</span>
+                          </Label>
+                          <Select
+                            value={food.unit || undefined}
+                            onValueChange={(v) => updateFood(mi, oi, fi, { unit: v })}
+                            disabled={disabled}
+                          >
+                            <SelectTrigger aria-required>
+                              <SelectValue placeholder="Medida" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {units.map((u) => (
+                                <SelectItem key={u} value={u}>{u}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">
+                          Substituições habituais (opcional)
+                        </Label>
+                        <ChipsInput
+                          value={food.substitutions || []}
+                          onChange={(v) => updateFood(mi, oi, fi, { substitutions: v })}
+                          disabled={disabled}
+                          placeholder="Ex.: Macarrão, Batata, Cuscuz"
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  {!disabled && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => addFood(mi, oi)}
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Adicionar alimento
+                    </Button>
+                  )}
                 </div>
               ))}
 
-              {!disabled && (
+              {!disabled && meal.options.length < 2 && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="gap-1.5"
-                  onClick={() => addFood(mi, oi)}
+                  onClick={() => addOption(mi)}
                 >
-                  <Plus className="h-3.5 w-3.5" /> Adicionar alimento
+                  <Plus className="h-3.5 w-3.5" /> Adicionar outra opção
                 </Button>
               )}
-            </div>
-          ))}
-
-          {!disabled && meal.options.length < 2 && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => addOption(mi)}
-            >
-              <Plus className="h-3.5 w-3.5" /> Adicionar outra opção
-            </Button>
+            </>
           )}
         </div>
       ))}
