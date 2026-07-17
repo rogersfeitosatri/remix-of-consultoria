@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
 
     const subPayload: Record<string, unknown> = {
       customer: customerId,
-      billingType: "UNDEFINED", // deixa o Asaas oferecer PIX + Cartão no checkout
+      billingType: "CREDIT_CARD", // SOMENTE cartão de crédito nas renovações
       cycle: plan.cycle,
       value: effectiveValue,
       nextDueDate: subscriptionNextDue,
@@ -261,7 +261,7 @@ Deno.serve(async (req) => {
       externalReference: `zn:${znAthlete.id}`,
     };
     if (isInstallmentPlan) {
-      // Permite parcelamento também nos ciclos futuros da assinatura.
+      // Permite ao atleta parcelar no cartão até Nx também nas renovações.
       subPayload.maxInstallmentCount = plan.installments;
     }
     const subscription = await asaas("/subscriptions", {
@@ -269,11 +269,14 @@ Deno.serve(async (req) => {
       body: JSON.stringify(subPayload),
     });
 
-    // 6) Link de pagamento
+    // 6) Link de pagamento — cobrança ÚNICA do valor integral, SOMENTE cartão.
+    //    O checkout do Asaas oferece o parcelamento nativo do cartão (à vista
+    //    ou em até Nx) mas o valor é debitado integral no ato da compra.
+    //    NÃO usar installmentCount/totalValue (isso pré-divide em N cobranças
+    //    mensais e libera PIX/Boleto no checkout — não é o comportamento desejado).
     let paymentLink: string | null = null;
 
     if (isInstallmentPlan) {
-      // Cobrança do período atual com opção de parcelamento no cartão.
       const firstValue = firstPaymentValue ?? effectiveValue;
       const dueDate = (() => {
         const d = new Date(); d.setDate(d.getDate() + 7);
@@ -284,22 +287,18 @@ Deno.serve(async (req) => {
           method: "POST",
           body: JSON.stringify({
             customer: customerId,
-            billingType: "UNDEFINED",
+            billingType: "CREDIT_CARD", // SOMENTE cartão (sem PIX/Boleto)
             dueDate,
+            value: firstValue, // valor INTEGRAL do plano (ex.: 299,00 / 419,90)
             description:
-              `ZN Assessoria - Plano ${plan.label} (até ${plan.installments}x no cartão)` +
+              `ZN Assessoria - Plano ${plan.label} (parcele em até ${plan.installments}x no cartão)` +
               (coupon ? ` (cupom ${coupon.code})` : ""),
             externalReference: `zn:${znAthlete.id}`,
-            totalValue: firstValue,
-            installmentCount: plan.installments,
           }),
         });
-        // /payments com installmentCount devolve `invoiceUrl` na 1ª parcela.
-        paymentLink = oneTime?.invoiceUrl
-          ?? oneTime?.payments?.[0]?.invoiceUrl
-          ?? null;
+        paymentLink = oneTime?.invoiceUrl ?? null;
       } catch (e) {
-        console.warn("zn-anamnese-submit: falha ao criar cobrança parcelada, caindo para 1ª cobrança da assinatura:", (e as Error).message);
+        console.warn("zn-anamnese-submit: falha ao criar cobrança do período, caindo para 1ª cobrança da assinatura:", (e as Error).message);
       }
     }
 
