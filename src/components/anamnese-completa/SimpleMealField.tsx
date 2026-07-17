@@ -34,6 +34,8 @@ export type SimpleMeal = {
   meal_name: string;
   time: string;
   options: SimpleOption[];
+  skipped?: boolean;
+  enabled?: boolean;
 };
 
 const DEFAULT_UNITS = [
@@ -77,6 +79,8 @@ function coerceMeal(raw: any, fallbackName: string): SimpleMeal {
     meal_name: raw.meal_name || fallbackName,
     time: raw.time || '',
     options,
+    skipped: raw.skipped === true,
+    enabled: raw.enabled === false ? false : true,
   };
 }
 
