@@ -10,6 +10,7 @@ import { ChipsInput } from './PrimitiveInputs';
 import { FieldGroupField } from './FieldGroupField';
 import { StructuredListField } from './StructuredListField';
 import { MealPlanEditorField } from './MealPlanEditorField';
+import { SimpleMealField } from './SimpleMealField';
 import { SymptomGridField } from './SymptomGridField';
 import { FrequencyGridField } from './FrequencyGridField';
 import { TrainingWeekDetailedField } from './TrainingWeekDetailedField';
