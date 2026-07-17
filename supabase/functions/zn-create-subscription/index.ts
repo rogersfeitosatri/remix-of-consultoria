@@ -194,7 +194,10 @@ Deno.serve(async (req) => {
       body: JSON.stringify(subPayload),
     });
 
-    // 3) Link de pagamento
+    // 3) Link de pagamento — cobrança ÚNICA do valor integral, SOMENTE cartão.
+    //    O checkout do Asaas oferece o parcelamento nativo (até Nx) no cartão,
+    //    mas o valor é DEBITADO integral no ato. NÃO usar installmentCount/totalValue
+    //    (isso pré-divide em N boletos e libera PIX/Boleto no checkout).
     let paymentLink: string | null = null;
     if (isInstallmentPlan) {
       const dueDate = new Date();
@@ -206,15 +209,14 @@ Deno.serve(async (req) => {
             customer: customerId,
             billingType: "CREDIT_CARD", // SOMENTE cartão (sem PIX/Boleto)
             dueDate: dueDate.toISOString().slice(0, 10),
-            description: `ZN Assessoria - Plano ${plan.label} (até ${plan.installments}x no cartão)`,
+            value: plan.value, // valor INTEGRAL do plano (ex.: 299,00 / 419,90)
+            description: `ZN Assessoria - Plano ${plan.label} (parcele em até ${plan.installments}x no cartão)`,
             externalReference: `zn:${athlete.id}`,
-            totalValue: plan.value,
-            installmentCount: plan.installments,
           }),
         });
-        paymentLink = oneTime?.invoiceUrl ?? oneTime?.payments?.[0]?.invoiceUrl ?? null;
+        paymentLink = oneTime?.invoiceUrl ?? null;
       } catch (e) {
-        console.warn("zn-create-subscription: falha ao criar cobrança parcelada:", (e as Error).message);
+        console.warn("zn-create-subscription: falha ao criar cobrança do período:", (e as Error).message);
       }
     }
     if (!paymentLink) {
