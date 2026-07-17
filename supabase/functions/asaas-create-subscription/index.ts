@@ -16,6 +16,15 @@ const CYCLE_MAP: Record<string, string> = {
   annual: "YEARLY",
 };
 
+// Máximo de parcelas no cartão por ciclo (parcelamento nativo do Asaas).
+// Mensal = à vista (1). Os demais permitem parcelar até o nº de meses do ciclo.
+const MAX_INSTALLMENTS: Record<string, number> = {
+  monthly: 1,
+  quarterly: 3,
+  semiannual: 6,
+  annual: 12,
+};
+
 async function asaas(path: string, init: RequestInit = {}) {
   const res = await fetch(`${ASAAS_BASE}${path}`, {
     ...init,
@@ -92,20 +101,26 @@ Deno.serve(async (req) => {
       customerId = customer.id;
     }
 
-    // 2) Cria assinatura (cartão de crédito)
+    // 2) Cria assinatura — SOMENTE Cartão de Crédito (sem PIX/Boleto).
+    // `monthly_value` guarda o VALOR TOTAL da assinatura (rótulo "Valor Total"),
+    // então enviamos o valor integral do ciclo — NÃO dividimos. O parcelamento
+    // em até `maxInstallmentCount` (nativo do Asaas) é oferecido no checkout.
     const nextDue = new Date();
     nextDue.setDate(nextDue.getDate() + 1); // primeira cobrança amanhã
+    const maxInstallments = MAX_INSTALLMENTS[client.plan_duration] ?? 1;
+    const subPayload: Record<string, unknown> = {
+      customer: customerId,
+      billingType: "CREDIT_CARD",
+      cycle,
+      value: Number(client.monthly_value),
+      nextDueDate: nextDue.toISOString().slice(0, 10),
+      description: `Plano ${client.plan_type} - ${client.name}`,
+      externalReference: client.id,
+    };
+    if (maxInstallments > 1) subPayload.maxInstallmentCount = maxInstallments;
     const subscription = await asaas("/subscriptions", {
       method: "POST",
-      body: JSON.stringify({
-        customer: customerId,
-        billingType: "CREDIT_CARD",
-        cycle,
-        value: Number(client.monthly_value),
-        nextDueDate: nextDue.toISOString().slice(0, 10),
-        description: `Plano ${client.plan_type} - ${client.name}`,
-        externalReference: client.id,
-      }),
+      body: JSON.stringify(subPayload),
     });
 
     // 3) Salva vínculo no client
