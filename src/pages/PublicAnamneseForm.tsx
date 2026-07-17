@@ -427,7 +427,12 @@ export default function PublicAnamneseForm() {
         });
 
         if (fnError) throw fnError;
-        if ((data as any)?.error) throw new Error((data as any).error);
+        if ((data as any)?.error === 'already_active') {
+          toast.error((data as any).message || 'Já existe uma assinatura ativa para este e-mail.');
+          setSubmitting(false);
+          return;
+        }
+        if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
 
         const paymentLink = (data as any)?.payment_link as string | null;
         if (paymentLink) {
