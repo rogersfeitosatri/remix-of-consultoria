@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
           error: "already_active",
           message: "Já existe uma assinatura ativa para este e-mail. Verifique seu WhatsApp.",
         }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
