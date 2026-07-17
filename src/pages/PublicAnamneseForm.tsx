@@ -708,10 +708,20 @@ export default function PublicAnamneseForm() {
     if (!step || step.kind !== 'question') return true;
     // training_week ocupa vários passos: só valida no último dia.
     const isLastDay = step.day === undefined || step.day === DIAS_SEMANA[DIAS_SEMANA.length - 1];
-    // meal_plan_editor também é dividido em várias telas (uma por refeição):
-    // só valida a pergunta inteira no último passo do bloco.
+    // meal_plan_editor também é dividido em várias telas (uma por refeição).
     if (step.mealIndex !== undefined) {
-      const defaults: string[] = Array.isArray(step.question.config?.defaultMeals) ? step.question.config!.defaultMeals : [];
+      const cfg = step.question.config || {};
+      const defaults: string[] = Array.isArray(cfg.defaultMeals) ? cfg.defaultMeals : [];
+      const mealName = defaults[step.mealIndex] || step.mealName || 'refeição';
+      // No modo simples validamos a refeição CORRENTE em cada passo (obrigatório).
+      if (cfg.simpleMode && step.question.is_required) {
+        const arr = answers[step.question.id];
+        const meal = Array.isArray(arr) ? arr[step.mealIndex] : null;
+        const err = validateSimpleMeal(meal, mealName);
+        if (err) { toast.error(err); return false; }
+        return true;
+      }
+      // Modo antigo: valida apenas no último passo do bloco.
       const isLastMeal = defaults.length === 0 || step.mealIndex === defaults.length - 1;
       if (isLastMeal) return validateWizQuestion(step.question);
       return true;
