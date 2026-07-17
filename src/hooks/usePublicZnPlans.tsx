@@ -13,9 +13,9 @@ export interface PublicZnPlan {
 
 const SUFFIX: Record<ZnPlanCode, string> = { monthly: '/mês', semiannual: '/semestre', annual: '/ano' };
 const INSTALLMENTS: Record<ZnPlanCode, string> = {
-  monthly: 'PIX ou 1x no cartão',
-  semiannual: 'até 6x no cartão',
-  annual: 'até 12x no cartão',
+  monthly: 'Cartão de crédito',
+  semiannual: 'Cartão de crédito · à vista ou até 6x',
+  annual: 'Cartão de crédito · à vista ou até 12x',
 };
 
 export function fmtBRL(v: number) {

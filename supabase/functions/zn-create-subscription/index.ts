@@ -171,15 +171,20 @@ Deno.serve(async (req) => {
       subNextDue.setDate(subNextDue.getDate() + 1);
     }
 
+    // Assinatura (Subscription) — SOMENTE Cartão de Crédito (sem PIX/Boleto).
+    // Enviamos o valor TOTAL da assinatura (não dividido); o parcelamento em até
+    // `maxInstallmentCount` (nativo do Asaas) é oferecido no checkout, à vista ou
+    // parcelado. A renovação ocorre automaticamente a cada `cycle`.
     const subPayload: Record<string, unknown> = {
       customer: customerId,
-      billingType: "UNDEFINED",
+      billingType: "CREDIT_CARD", // SOMENTE cartão de crédito (sem PIX/Boleto)
       cycle: plan.cycle,
-      value: plan.value,
+      value: plan.value, // valor integral da assinatura (ex.: 299,00 no semestral)
       nextDueDate: subNextDue.toISOString().slice(0, 10),
       description: `ZN Assessoria - Plano ${plan.label}`,
       externalReference: `zn:${athlete.id}`,
     };
+    // Parcelamento nativo do Asaas nas renovações (à vista ou até Nx no cartão).
     if (isInstallmentPlan) {
       subPayload.maxInstallmentCount = plan.installments;
     }
@@ -199,7 +204,7 @@ Deno.serve(async (req) => {
           method: "POST",
           body: JSON.stringify({
             customer: customerId,
-            billingType: "UNDEFINED",
+            billingType: "CREDIT_CARD", // SOMENTE cartão (sem PIX/Boleto)
             dueDate: dueDate.toISOString().slice(0, 10),
             description: `ZN Assessoria - Plano ${plan.label} (até ${plan.installments}x no cartão)`,
             externalReference: `zn:${athlete.id}`,

@@ -71,9 +71,9 @@ const PLAN_PARAM_MAP: Record<string, 'monthly' | 'semiannual' | 'annual'> = {
 };
 
 const PLAN_INFO_FALLBACK: Record<'monthly' | 'semiannual' | 'annual', { label: string; price: string; sub: string }> = {
-  monthly:    { label: 'Mensal',    price: 'R$ 69,90/mês',      sub: 'PIX ou 1x no cartão' },
-  semiannual: { label: 'Semestral', price: 'R$ 299,00/semestre', sub: 'até 6x no cartão' },
-  annual:     { label: 'Anual',     price: 'R$ 419,90/ano',      sub: 'até 12x no cartão' },
+  monthly:    { label: 'Mensal',    price: 'R$ 69,90/mês',      sub: 'Cartão de crédito' },
+  semiannual: { label: 'Semestral', price: 'R$ 299,00/semestre', sub: 'Cartão de crédito · à vista ou até 6x' },
+  annual:     { label: 'Anual',     price: 'R$ 419,90/ano',      sub: 'Cartão de crédito · à vista ou até 12x' },
 };
 
 function isBlankAnswer(value: any): boolean {
@@ -881,7 +881,7 @@ export default function PublicAnamneseForm() {
                 </p>
                 <CardTitle className="text-lg">Seu plano e CPF</CardTitle>
                 <CardDescription>
-                  Ao final da anamnese você será direcionado para o pagamento seguro via Asaas (PIX, cartão ou boleto).
+                  Ao final da anamnese você será direcionado para o pagamento seguro via Asaas (cartão de crédito, à vista ou parcelado).
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

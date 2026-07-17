@@ -13,9 +13,9 @@ import { usePublicZnPlans, fmtBRL as fmtBRLShort } from '@/hooks/usePublicZnPlan
 type PlanCode = 'monthly' | 'semiannual' | 'annual';
 
 const PLANS_FALLBACK: Record<PlanCode, { label: string; price: string; installments: string }> = {
-  monthly: { label: 'Mensal', price: 'R$ 69,90', installments: 'PIX ou 1x no cartão' },
-  semiannual: { label: 'Semestral', price: 'R$ 299,00', installments: 'PIX ou até 6x no cartão' },
-  annual: { label: 'Anual', price: 'R$ 419,90', installments: 'PIX ou até 12x no cartão' },
+  monthly: { label: 'Mensal', price: 'R$ 69,90', installments: 'Cartão de crédito' },
+  semiannual: { label: 'Semestral', price: 'R$ 299,00', installments: 'Cartão de crédito · à vista ou até 6x' },
+  annual: { label: 'Anual', price: 'R$ 419,90', installments: 'Cartão de crédito · à vista ou até 12x' },
 };
 
 const parsePlan = (raw: string | null): PlanCode => {
