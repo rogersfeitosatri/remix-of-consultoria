@@ -282,7 +282,26 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
           </Button>
           <div className="ml-auto">
             {!isReview ? (
-              <Button onClick={() => { setStep((s) => s + 1); window.scrollTo({ top: 0 }); }} className="gap-1.5">
+              <Button onClick={() => {
+                // Bloqueia avanço quando a etapa atual tem campos obrigatórios pendentes.
+                const q = currentQuestion;
+                if (q && q.is_required) {
+                  const cfg: any = q.config || {};
+                  const ans = answers[q.id];
+                  if (q.question_type === 'meal_plan_editor' && cfg.simpleMode) {
+                    const defaults: string[] = Array.isArray(cfg.defaultMeals) ? cfg.defaultMeals : [];
+                    const arr = Array.isArray(ans) ? ans : [];
+                    for (let i = 0; i < defaults.length; i++) {
+                      const err = validateSimpleMeal(arr[i], defaults[i]);
+                      if (err) { toast.error(err); return; }
+                    }
+                  } else if (isBlank(ans)) {
+                    toast.error(`Responda: “${q.question_text}”.`);
+                    return;
+                  }
+                }
+                setStep((s) => s + 1); window.scrollTo({ top: 0 });
+              }} className="gap-1.5">
                 Continuar <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
