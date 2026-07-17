@@ -19,6 +19,7 @@ import { isWizardAnamneseForm } from '@/lib/enduranceAnamneseQuestions';
 import { isAnamneseCompletaForm } from '@/lib/anamneseCompletaQuestions';
 import { isQuestionVisible } from '@/lib/anamneseConditions';
 import { QuestionRenderer } from '@/components/anamnese-completa/QuestionRenderer';
+import { validateSimpleMeal } from '@/components/anamnese-completa/SimpleMealField';
 import { usePublicZnPlans } from '@/hooks/usePublicZnPlans';
 
 interface Question {
