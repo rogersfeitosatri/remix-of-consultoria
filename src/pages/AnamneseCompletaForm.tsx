@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, Save, Send, Loader2, CheckCircle2, ListChecks } from 'lucide-react';
 import { QuestionRenderer } from '@/components/anamnese-completa/QuestionRenderer';
+import { validateSimpleMeal } from '@/components/anamnese-completa/SimpleMealField';
 import { isQuestionVisible } from '@/lib/anamneseConditions';
 import { formatAnyAnswer } from '@/lib/formatAnamneseAnswer';
 import type { AnamneseForm, AnamneseQuestion } from '@/hooks/useAnamneseForms';
