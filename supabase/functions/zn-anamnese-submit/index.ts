@@ -232,20 +232,36 @@ Deno.serve(async (req) => {
     }
 
     // 5) Assinatura Asaas
-    // Com cupom de meses grátis, a 1ª cobrança é adiada para depois do período.
-    const nextDueStr = freeMonths > 0
-      ? addMonthsISO(new Date(), freeMonths)
-      : (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })();
+    // Estratégia:
+    //  - MENSAL: subscription MONTHLY cobrando R$X todo mês (1ª cobrança amanhã).
+    //  - SEMESTRAL / ANUAL: o "plano" é um pagamento único do período completo
+    //    (R$299 / R$419,90). Para permitir parcelamento no cartão até Nx (6 ou 12),
+    //    criamos um /payments avulso com installmentCount + totalValue e
+    //    billingType UNDEFINED (checkout oferece PIX 1x OU cartão em até Nx),
+    //    e adiamos o 1º ciclo da subscription para depois do período pago
+    //    (para renovação automática). Assim o atleta vê no checkout do Asaas
+    //    as opções À vista OU 2x, 3x ... até Nx no cartão, conforme o plano.
+    const isInstallmentPlan = (plan.installments ?? 1) > 1;
+
+    // 1ª cobrança do próximo ciclo (renovação). Para planos parcelados, começa
+    // após o período pago para não duplicar cobrança.
+    const subscriptionNextDue = isInstallmentPlan
+      ? addMonthsISO(new Date(), (p.duration_months ?? 6) + (freeMonths || 0))
+      : (freeMonths > 0
+        ? addMonthsISO(new Date(), freeMonths)
+        : (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })());
+
     const subPayload: Record<string, unknown> = {
       customer: customerId,
-      billingType: "CREDIT_CARD",
+      billingType: "UNDEFINED", // deixa o Asaas oferecer PIX + Cartão no checkout
       cycle: plan.cycle,
       value: effectiveValue,
-      nextDueDate: nextDueStr,
+      nextDueDate: subscriptionNextDue,
       description: `ZN Assessoria - Plano ${plan.label}` + (coupon ? ` (cupom ${coupon.code})` : ""),
       externalReference: `zn:${znAthlete.id}`,
     };
-    if (plan.installments && plan.installments > 1) {
+    if (isInstallmentPlan) {
+      // Permite parcelamento também nos ciclos futuros da assinatura.
       subPayload.maxInstallmentCount = plan.installments;
     }
     const subscription = await asaas("/subscriptions", {
@@ -253,25 +269,60 @@ Deno.serve(async (req) => {
       body: JSON.stringify(subPayload),
     });
 
-    // 6) 1ª cobrança → invoiceUrl (e, se cupom 'first', ajusta o valor só dela)
+    // 6) Link de pagamento
     let paymentLink: string | null = null;
-    try {
-      const payments = await asaas(`/subscriptions/${subscription.id}/payments`);
-      const first = payments?.data?.[0] ?? null;
-      if (first && firstPaymentValue != null && firstPaymentValue !== plan.value) {
-        try {
-          const updated = await asaas(`/payments/${first.id}`, {
-            method: "POST",
-            body: JSON.stringify({ value: firstPaymentValue }),
-          });
-          paymentLink = updated?.invoiceUrl ?? first.invoiceUrl ?? null;
-        } catch (_) {
-          paymentLink = first.invoiceUrl ?? null;
-        }
-      } else {
-        paymentLink = first?.invoiceUrl ?? null;
+
+    if (isInstallmentPlan) {
+      // Cobrança do período atual com opção de parcelamento no cartão.
+      const firstValue = firstPaymentValue ?? effectiveValue;
+      const dueDate = (() => {
+        const d = new Date(); d.setDate(d.getDate() + 7);
+        return d.toISOString().slice(0, 10);
+      })();
+      try {
+        const oneTime = await asaas("/payments", {
+          method: "POST",
+          body: JSON.stringify({
+            customer: customerId,
+            billingType: "UNDEFINED",
+            dueDate,
+            description:
+              `ZN Assessoria - Plano ${plan.label} (até ${plan.installments}x no cartão)` +
+              (coupon ? ` (cupom ${coupon.code})` : ""),
+            externalReference: `zn:${znAthlete.id}`,
+            totalValue: firstValue,
+            installmentCount: plan.installments,
+          }),
+        });
+        // /payments com installmentCount devolve `invoiceUrl` na 1ª parcela.
+        paymentLink = oneTime?.invoiceUrl
+          ?? oneTime?.payments?.[0]?.invoiceUrl
+          ?? null;
+      } catch (e) {
+        console.warn("zn-anamnese-submit: falha ao criar cobrança parcelada, caindo para 1ª cobrança da assinatura:", (e as Error).message);
       }
-    } catch (_) { /* ignore */ }
+    }
+
+    if (!paymentLink) {
+      // Fluxo mensal (ou fallback): usar 1ª cobrança da subscription.
+      try {
+        const payments = await asaas(`/subscriptions/${subscription.id}/payments`);
+        const first = payments?.data?.[0] ?? null;
+        if (first && firstPaymentValue != null && firstPaymentValue !== plan.value) {
+          try {
+            const updated = await asaas(`/payments/${first.id}`, {
+              method: "POST",
+              body: JSON.stringify({ value: firstPaymentValue }),
+            });
+            paymentLink = updated?.invoiceUrl ?? first.invoiceUrl ?? null;
+          } catch (_) {
+            paymentLink = first.invoiceUrl ?? null;
+          }
+        } else {
+          paymentLink = first?.invoiceUrl ?? null;
+        }
+      } catch (_) { /* ignore */ }
+    }
 
     await supabase
       .from("zn_athletes")
