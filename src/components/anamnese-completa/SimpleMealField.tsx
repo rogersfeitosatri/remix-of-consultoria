@@ -339,8 +339,9 @@ export function SimpleMealField({ value, onChange, config, disabled }: FieldProp
 
 // Valida uma refeição do formato simple. Retorna null se OK ou string com o erro.
 export function validateSimpleMeal(meal: any, mealName: string): string | null {
-  if (!meal || typeof meal !== 'object') return `Preencha a refeição "${mealName}"`;
-  if (!meal.time || !String(meal.time).trim()) return `Informe o horário de "${mealName}"`;
+  if (!meal || typeof meal !== 'object') return `Preencha a refeição "${mealName}" ou marque "Não faço essa refeição"`;
+  if (meal.skipped === true || meal.enabled === false) return null;
+  if (!meal.time || !String(meal.time).trim()) return `Informe o horário de "${mealName}" (ou marque "Não faço essa refeição")`;
   const options = Array.isArray(meal.options) ? meal.options : [];
   if (!options.length) return `Adicione pelo menos um alimento em "${mealName}"`;
   for (let oi = 0; oi < options.length; oi++) {
