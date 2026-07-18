@@ -31,25 +31,27 @@ import { parseText } from '@/lib/smartPlan/parse';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
+import { WeekOverview } from '@/components/mealplan-v3/WeekOverview';
 
-type DayKey = 'all' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+type DayKey = 'all' | 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom';
 
 const DAY_TABS: { key: DayKey; short: string; long: string }[] = [
   { key: 'all', short: 'Todos', long: 'Todos os dias' },
-  { key: 'mon', short: 'Seg', long: 'Segunda' },
-  { key: 'tue', short: 'Ter', long: 'Terça' },
-  { key: 'wed', short: 'Qua', long: 'Quarta' },
-  { key: 'thu', short: 'Qui', long: 'Quinta' },
-  { key: 'fri', short: 'Sex', long: 'Sexta' },
-  { key: 'sat', short: 'Sáb', long: 'Sábado' },
-  { key: 'sun', short: 'Dom', long: 'Domingo' },
+  { key: 'seg', short: 'Seg', long: 'Segunda' },
+  { key: 'ter', short: 'Ter', long: 'Terça' },
+  { key: 'qua', short: 'Qua', long: 'Quarta' },
+  { key: 'qui', short: 'Qui', long: 'Quinta' },
+  { key: 'sex', short: 'Sex', long: 'Sexta' },
+  { key: 'sab', short: 'Sáb', long: 'Sábado' },
+  { key: 'dom', short: 'Dom', long: 'Domingo' },
 ];
 
 type PlanTexts = Record<DayKey, string>;
 
 const EMPTY_TEXTS: PlanTexts = {
-  all: '', mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '',
+  all: '', seg: '', ter: '', qua: '', qui: '', sex: '', sab: '', dom: '',
 };
+
 
 export default function MealPlanEditor() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -417,6 +419,10 @@ export default function MealPlanEditor() {
             })}
           </TabsList>
         </Tabs>
+
+        <WeekOverview texts={texts} active={activeDay} onSelect={(k) => setActiveDay(k)} weightKg={weightKg} />
+
+
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
           <Card>
