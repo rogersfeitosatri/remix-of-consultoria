@@ -277,7 +277,40 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     return [];
   }, [mode, foodResults.data, measures.data, pendingFood, manualQuery, applyFood, applyMeasure, searchWithAi]);
 
+  const stripMarkerOnEnter = (): boolean => {
+    // Ao apertar Enter numa linha iniciada por @ (título) ou # (observação),
+    // remove o marcador e mantém apenas o texto. `#` vira `> ` (convenção
+    // interna de nota preservada pelo parser/serializer).
+    const c = getLineCtx(value, caret);
+    const raw = c.lineText;
+    const leading = raw.match(/^\s*/)?.[0] ?? '';
+    const body = raw.slice(leading.length);
+    let replaced: string | null = null;
+    if (body.startsWith('@')) {
+      replaced = leading + body.replace(/^@\s*/, '');
+    } else if (body.startsWith('#')) {
+      replaced = leading + '> ' + body.replace(/^#\s*/, '');
+    }
+    if (replaced === null || replaced === raw) return false;
+    const before = value.slice(0, c.lineStart);
+    const after = value.slice(c.lineEnd);
+    const next = before + replaced + '\n' + after;
+    const newCaret = before.length + replaced.length + 1;
+    onChange(next);
+    requestAnimationFrame(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.setSelectionRange(newCaret, newCaret);
+      setCaret(newCaret);
+    });
+    return true;
+  };
+
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter em linha com @ ou # sempre limpa o marcador (mesmo sem popover).
+    if (e.key === 'Enter' && !e.shiftKey && mode === 'idle') {
+      if (stripMarkerOnEnter()) { e.preventDefault(); return; }
+    }
     if (mode === 'idle' || items.length === 0) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx((i) => Math.min(items.length - 1, i + 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(0, i - 1)); }
