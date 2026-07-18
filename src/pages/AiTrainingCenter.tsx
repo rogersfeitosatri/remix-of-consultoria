@@ -29,6 +29,7 @@ import {
   FileUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MealPlanSkillPanel } from '@/components/admin/MealPlanSkillPanel';
 
 interface ContextConfig {
   key: string;
@@ -336,23 +337,31 @@ export default function AiTrainingCenter() {
                       </CollapsibleContent>
                     </Collapsible>
 
-                    {/* Save Button */}
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={() => saveMutation.mutate()}
-                        disabled={saveMutation.isPending}
-                        className="gap-2"
-                      >
-                        {saveMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                        Salvar Prompt
-                      </Button>
-                    </div>
+                    {/* Save Button — nos demais contextos. No Plano Alimentar o
+                        salvamento é feito por versão no painel da habilidade. */}
+                    {ctx.key !== 'meal_plan_generation' && (
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={() => saveMutation.mutate()}
+                          disabled={saveMutation.isPending}
+                          className="gap-2"
+                        >
+                          {saveMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="h-4 w-4" />
+                          )}
+                          Salvar Prompt
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
+
+                {/* Habilidade "Plano alimentar": versões + módulos + prontidão */}
+                {ctx.key === 'meal_plan_generation' && (
+                  <MealPlanSkillPanel promptText={promptText} setPromptText={setPromptText} />
+                )}
 
                 {/* Test Playground */}
                 <Collapsible open={playgroundOpen} onOpenChange={setPlaygroundOpen}>
