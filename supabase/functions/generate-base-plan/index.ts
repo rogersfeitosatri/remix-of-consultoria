@@ -218,7 +218,10 @@ Deno.serve(async (req) => {
       questions = qs || [];
     }
     const { trainingWeek, longRunWeekday } = extractTraining(anamnese, questions);
-    const weightKg = extractWeightKg(anamnese, questions) ?? profile?.weight_kg ?? profile?.current_weight ?? client.current_weight ?? null;
+    // Peso: override manual do nutri VENCE; senão anamnese; senão perfil/cliente.
+    const manualW = Number(client.manual_weight_kg);
+    const weightKg = (isFinite(manualW) && manualW > 20 && manualW < 300 ? manualW : null)
+      ?? extractWeightKg(anamnese, questions) ?? profile?.weight_kg ?? profile?.current_weight ?? client.current_weight ?? null;
     // Resumo textual da semana de treino (dia: sessões) para a IA periodizar.
     const trainingSummary = trainingWeek && typeof trainingWeek === "object"
       ? Object.entries(trainingWeek as Record<string, any>).map(([dia, sess]) => {
