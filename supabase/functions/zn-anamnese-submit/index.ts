@@ -283,20 +283,26 @@ Deno.serve(async (req) => {
         return d.toISOString().slice(0, 10);
       })();
       try {
+        // Parcelamento no cartão de crédito (autorização única do valor
+        // integral; o emissor do cartão divide para o atleta em até Nx).
+        // Com billingType=CREDIT_CARD + installmentCount + totalValue, o
+        // checkout do Asaas fica exclusivo de cartão (sem PIX/Boleto).
         const oneTime = await asaas("/payments", {
           method: "POST",
           body: JSON.stringify({
             customer: customerId,
-            billingType: "CREDIT_CARD", // SOMENTE cartão (sem PIX/Boleto)
+            billingType: "CREDIT_CARD",
             dueDate,
-            value: firstValue, // valor INTEGRAL do plano (ex.: 299,00 / 419,90)
+            totalValue: firstValue, // valor INTEGRAL do plano (ex.: 299,00 / 419,90)
+            installmentCount: plan.installments, // até Nx no cartão
             description:
               `ZN Assessoria - Plano ${plan.label} (parcele em até ${plan.installments}x no cartão)` +
               (coupon ? ` (cupom ${coupon.code})` : ""),
             externalReference: `zn:${znAthlete.id}`,
           }),
         });
-        paymentLink = oneTime?.invoiceUrl ?? null;
+        // Asaas devolve invoiceUrl da 1ª parcela; usamos como link do checkout.
+        paymentLink = oneTime?.invoiceUrl ?? oneTime?.paymentLink ?? null;
       } catch (e) {
         console.warn("zn-anamnese-submit: falha ao criar cobrança do período, caindo para 1ª cobrança da assinatura:", (e as Error).message);
       }

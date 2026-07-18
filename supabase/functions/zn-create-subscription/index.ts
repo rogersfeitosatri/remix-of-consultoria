@@ -203,18 +203,23 @@ Deno.serve(async (req) => {
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7);
       try {
+        // Parcelamento nativo no cartão de crédito: autorização única do valor
+        // integral do plano; o emissor do cartão divide para o atleta em até Nx.
+        // billingType=CREDIT_CARD + installmentCount + totalValue faz o checkout
+        // do Asaas ficar EXCLUSIVO de cartão (sem PIX/Boleto).
         const oneTime = await asaas("/payments", {
           method: "POST",
           body: JSON.stringify({
             customer: customerId,
-            billingType: "CREDIT_CARD", // SOMENTE cartão (sem PIX/Boleto)
+            billingType: "CREDIT_CARD",
             dueDate: dueDate.toISOString().slice(0, 10),
-            value: plan.value, // valor INTEGRAL do plano (ex.: 299,00 / 419,90)
+            totalValue: plan.value, // valor INTEGRAL do plano (ex.: 299,00 / 419,90)
+            installmentCount: plan.installments, // até Nx no cartão
             description: `ZN Assessoria - Plano ${plan.label} (parcele em até ${plan.installments}x no cartão)`,
             externalReference: `zn:${athlete.id}`,
           }),
         });
-        paymentLink = oneTime?.invoiceUrl ?? null;
+        paymentLink = oneTime?.invoiceUrl ?? oneTime?.paymentLink ?? null;
       } catch (e) {
         console.warn("zn-create-subscription: falha ao criar cobrança do período:", (e as Error).message);
       }
