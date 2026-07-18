@@ -453,6 +453,7 @@ export default function MealPlanDetail() {
   // Peso manual (quando não há anamnese/check-in) + aviso ao atleta
   const [weightInput, setWeightInput] = useState('');
   const [savingWeight, setSavingWeight] = useState(false);
+  const [editWeight, setEditWeight] = useState(false);
   const saveManualWeight = async () => {
     const w = parseFloat(weightInput.replace(',', '.'));
     if (isNaN(w) || w < 20 || w > 300) { toast.error('Informe um peso válido (kg).'); return; }
@@ -532,6 +533,14 @@ export default function MealPlanDetail() {
                   >
                     <RefreshCw className="h-3 w-3" /> Atualizar do check-in
                   </button>
+                  <button
+                    type="button"
+                    title="Corrigir/editar o peso usado nos cálculos"
+                    onClick={() => { setWeightInput(String(athleteWeightKg)); setEditWeight(true); }}
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-muted text-[10px] text-primary"
+                  >
+                    <Scale className="h-3 w-3" /> Editar peso
+                  </button>
                 </span>
               )}
 
@@ -565,14 +574,16 @@ export default function MealPlanDetail() {
           )}
         </div>
 
-        {/* Peso manual — quando não há anamnese/check-in com peso */}
-        {!athleteWeightKg && (
+        {/* Peso manual — quando não há peso OU quando o nutri clica em "Editar peso" */}
+        {(!athleteWeightKg || editWeight) && (
           <Card className="border-amber-500/40 bg-amber-500/[0.04]">
             <CardContent className="py-3 flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="flex items-center gap-2 flex-1">
                 <Scale className="h-4 w-4 text-amber-600 shrink-0" />
                 <p className="text-sm">
-                  Sem peso de anamnese/check-in. <span className="text-muted-foreground">Informe o peso para calcular g/kg.</span>
+                  {athleteWeightKg
+                    ? <>Corrigir o peso usado nos cálculos <span className="text-muted-foreground">(sobrepõe anamnese/check-in até você limpar).</span></>
+                    : <>Sem peso de anamnese/check-in. <span className="text-muted-foreground">Informe o peso para calcular g/kg.</span></>}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -584,9 +595,16 @@ export default function MealPlanDetail() {
                   placeholder="kg"
                   className="w-24 h-9"
                 />
-                <Button size="sm" className="gap-1.5" onClick={saveManualWeight} disabled={savingWeight}>
+                <Button size="sm" className="gap-1.5" onClick={async () => { await saveManualWeight(); setEditWeight(false); }} disabled={savingWeight}>
                   {savingWeight ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar
                 </Button>
+                {editWeight && (
+                  <Button size="sm" variant="ghost" onClick={async () => {
+                    await (supabase as any).from('clients').update({ manual_weight_kg: null }).eq('id', clientId);
+                    await queryClient.invalidateQueries({ queryKey: ['athlete-weight', clientId] });
+                    setEditWeight(false); toast.success('Peso voltou ao automático (anamnese/check-in).');
+                  }}>Voltar ao automático</Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"

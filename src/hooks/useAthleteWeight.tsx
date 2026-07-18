@@ -36,6 +36,15 @@ export function useAthleteWeight(clientId?: string | null) {
         const w = parseFloat(s.replace(/[^\d.]/g, ''));
         return !isNaN(w) && w > 20 && w < 300 ? w : null;
       };
+
+      // 0) Override manual do nutri — quando informado, VENCE (correção explícita).
+      try {
+        const { data } = await (supabase as any)
+          .from('clients').select('manual_weight_kg').eq('id', clientId).maybeSingle();
+        const w = data?.manual_weight_kg ? parseFloat(String(data.manual_weight_kg).replace(',', '.')) : null;
+        if (w && !isNaN(w) && w > 20 && w < 300) return { weightKg: w, source: 'manual' };
+      } catch { /* fallthrough */ }
+
       try {
         const { data: rows } = await supabase
           .from('checkin_responses')
