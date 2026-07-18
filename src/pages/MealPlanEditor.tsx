@@ -7,22 +7,23 @@
 //   pelas outras telas e pelo envio ao Zona Nutri).
 // - Botão "Enviar ao Zona Nutri" chama a edge function existente.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Upload, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SmartPlanEditor } from '@/components/mealplan-v3/SmartPlanEditor';
 import { TotalsPanel } from '@/components/mealplan-v3/TotalsPanel';
 import { useSmartPlanDraft } from '@/hooks/useSmartPlanDraft';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
-import { mealsToText } from '@/lib/smartPlan/fromMeals';
+import { mealsToAst, mealsToText } from '@/lib/smartPlan/fromMeals';
 import { parseText } from '@/lib/smartPlan/parse';
-import { astToMeals } from '@/lib/smartPlan/serialize';
+import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
+import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 
 export default function MealPlanEditor() {
   const { clientId } = useParams<{ clientId: string }>();
