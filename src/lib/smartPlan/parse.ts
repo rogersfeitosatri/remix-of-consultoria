@@ -108,6 +108,25 @@ export function parseText(text: string): PlanAst {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
+    // Marcador explícito de título de refeição: linha iniciada por "@".
+    if (trimmed.startsWith('@')) {
+      const body = trimmed.replace(/^@\s*/, '');
+      const { time, rest } = extractTime(body);
+      current = { name: rest || 'Refeição', time, groups: [] };
+      meals.push(current);
+      continue;
+    }
+    // Observação livre: linhas iniciadas por "#" ou "> " NUNCA são alimento.
+    if (trimmed.startsWith('#') || trimmed.startsWith('>')) {
+      const note = trimmed.replace(/^[#>]\s*/, '');
+      if (!current) {
+        current = { name: 'Refeição', time: null, groups: [] };
+        meals.push(current);
+      }
+      current.notes = current.notes ? `${current.notes}\n${note}` : note;
+      continue;
+    }
+
     if (looksLikeMealTitle(trimmed)) {
       const { time, rest } = extractTime(trimmed);
       current = { name: rest || 'Refeição', time, groups: [] };
