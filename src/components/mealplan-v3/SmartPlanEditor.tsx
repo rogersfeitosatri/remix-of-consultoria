@@ -332,12 +332,13 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
         onKeyUp={handleSelect}
         onClick={handleSelect}
         onKeyDown={handleKey}
-        placeholder={`07:00 — Café da manhã
+        placeholder={`@ 07:00 Café da manhã
 Pão francês - 1 unidade ou Cuscuz - 100 g
 Ovo de galinha - 2 unidades
 Banana - 1 unidade ou Maçã - 1 unidade
+# Beber 500 ml de água ao acordar
 
-12:30 — Almoço
+@ 12:30 Almoço
 Arroz - 4 colheres de sopa ou Macarrão - 120 g
 Frango grelhado - 150 g
 Salada crua à vontade`}
