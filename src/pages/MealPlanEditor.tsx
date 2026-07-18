@@ -113,6 +113,14 @@ export default function MealPlanEditor() {
       await enrichAst(ast, enrichCache.current);
       const meals = astToMeals(ast);
       const currentRaw = (analysisRow?.raw_response as any) || {};
+      // snapshot antes de sobrescrever, para permitir "Desfazer"
+      try {
+        localStorage.setItem(backupKey, JSON.stringify({
+          raw_response: currentRaw,
+          savedAt: new Date().toISOString(),
+        }));
+        setHasBackup(true);
+      } catch { /* noop */ }
       const nextRaw = {
         ...currentRaw,
         meal_plan: { ...(currentRaw.meal_plan || {}), meals },
@@ -125,7 +133,7 @@ export default function MealPlanEditor() {
         const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: nextRaw });
         if (error) throw error;
       }
-      toast.success('Plano salvo.');
+      toast.success('Plano salvo. Você pode desfazer se precisar.');
       qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
       qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
     } catch (e: any) {
@@ -134,6 +142,54 @@ export default function MealPlanEditor() {
       setSaving(false);
     }
   };
+
+  const undoSave = async () => {
+    if (!clientId || !analysisRow?.id) return;
+    try {
+      const raw = localStorage.getItem(backupKey);
+      if (!raw) { toast.error('Sem backup para desfazer.'); return; }
+      const { raw_response } = JSON.parse(raw);
+      const { error } = await supabase.from('ai_analyses').update({ raw_response }).eq('id', analysisRow.id);
+      if (error) throw error;
+      // recarrega texto do estado anterior
+      const meals = raw_response?.meal_plan?.meals || raw_response?.meals || [];
+      setText(Array.isArray(meals) && meals.length ? mealsToText(meals) : '');
+      localStorage.removeItem(backupKey);
+      setHasBackup(false);
+      toast.success('Último salvamento desfeito.');
+      qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
+    } catch (e: any) {
+      toast.error(`Não foi possível desfazer: ${e.message || e}`);
+    }
+  };
+
+  const generateWithAI = async () => {
+    if (!clientId) return;
+    if (text.trim().length > 0 && !window.confirm('Isto substituirá o texto atual pelo plano gerado pela IA. Continuar?')) return;
+    try {
+      setGenerating(true);
+      const { data, error } = await supabase.functions.invoke('generate-base-plan', { body: { clientId } });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      // recarrega a linha do banco (a função grava em ai_analyses)
+      await qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
+      const { data: fresh } = await supabase
+        .from('ai_analyses').select('raw_response').eq('client_id', clientId)
+        .order('updated_at', { ascending: false }).limit(1).maybeSingle();
+      const meals = (fresh?.raw_response as any)?.meal_plan?.meals || (fresh?.raw_response as any)?.meals || [];
+      if (Array.isArray(meals) && meals.length) {
+        setText(mealsToText(meals));
+        toast.success('Plano gerado pela IA carregado no editor.');
+      } else {
+        toast.error('A IA não retornou refeições reconhecíveis.');
+      }
+    } catch (e: any) {
+      toast.error(`Falha na geração: ${e.message || e}`);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
 
   const importPdf = async (file: File) => {
     try {
