@@ -451,6 +451,9 @@ export default function MealPlanEditor() {
                   <Button size="sm" variant="outline" onClick={exportPdf}>
                     <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
                   </Button>
+                  <Button size="sm" variant="outline" onClick={openReplicate} disabled={!text.trim()}>
+                    <Repeat className="h-3 w-3 mr-1" /> Replicar para...
+                  </Button>
                   {text.trim() && (
                     <Button size="sm" variant="ghost" onClick={clearDay} title="Limpar aba">
                       <Trash2 className="h-3 w-3" />
