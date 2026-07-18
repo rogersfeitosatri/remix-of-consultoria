@@ -13,7 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SmartPlanEditor } from '@/components/mealplan-v3/SmartPlanEditor';
@@ -24,6 +24,7 @@ import { mealsToText } from '@/lib/smartPlan/fromMeals';
 import { parseText } from '@/lib/smartPlan/parse';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
+import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
 
 export default function MealPlanEditor() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -213,6 +214,21 @@ export default function MealPlanEditor() {
     }
   };
 
+  const exportPdf = async () => {
+    if (!clientId) return;
+    try {
+      const ast = parseText(text);
+      await enrichAst(ast, enrichCache.current);
+      const meals = astToMeals(ast);
+      if (!meals.length) { toast.error('Nada para exportar. Escreva o plano primeiro.'); return; }
+      const input = structuredAnalysisToPdfInput({ meal_plan: { meals } }, client?.name || 'Atleta');
+      const safe = (client?.name || 'atleta').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      await downloadMealPlanPdf(input, safe);
+    } catch (e: any) {
+      toast.error(`Falha ao exportar PDF: ${e.message || e}`);
+    }
+  };
+
   const sendToZonaNutri = async () => {
     if (!clientId) return;
     try {
@@ -262,6 +278,9 @@ export default function MealPlanEditor() {
                   <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing}>
                     {importing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Upload className="h-3 w-3 mr-1" />}
                     Importar PDF/MD
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={exportPdf}>
+                    <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
                   </Button>
                   {hasBackup && (
                     <Button size="sm" variant="ghost" onClick={undoSave}>
