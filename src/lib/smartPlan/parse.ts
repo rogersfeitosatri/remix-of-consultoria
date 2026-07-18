@@ -83,12 +83,12 @@ export function parseToken(raw: string): FoodToken {
   return { name: namePart, quantity: qty, measure, raw };
 }
 
-function firstDivider(s: string): { index: number; len: number } | -1 {
+function firstDivider(s: string): { index: number; len: number } | null {
   const dividers = [' — ', ' - ', ' – ', ' : ', ':', ' = '];
-  let best: { index: number; len: number } | -1 = -1;
+  let best: { index: number; len: number } | null = null;
   for (const d of dividers) {
     const i = s.indexOf(d);
-    if (i >= 0 && (best === -1 || i < best.index)) best = { index: i, len: d.length };
+    if (i >= 0 && (best === null || i < best.index)) best = { index: i, len: d.length };
   }
   return best;
 }
