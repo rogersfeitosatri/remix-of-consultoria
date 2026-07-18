@@ -184,12 +184,25 @@ export default function MealPlanEditor() {
             <CardContent className="p-3 md:p-4">
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span>Digite o plano como um documento. <b>Enter</b> = novo alimento. <b>ou</b> = substituição. <b>HH:MM Nome</b> = nova refeição.</span>
-                <a
-                  href={`/meal-plans/${clientId}`}
-                  className="ml-auto inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  Editor clássico <ExternalLink className="h-3 w-3" />
-                </a>
+                <div className="ml-auto flex items-center gap-2">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="application/pdf,.md,.txt"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) importPdf(f); }}
+                  />
+                  <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing}>
+                    {importing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Upload className="h-3 w-3 mr-1" />}
+                    Importar PDF/MD
+                  </Button>
+                  <a
+                    href={`/meal-plans/${clientId}`}
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Editor clássico <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </div>
               <SmartPlanEditor value={text} onChange={setText} />
             </CardContent>
@@ -197,7 +210,7 @@ export default function MealPlanEditor() {
 
           <div className="lg:block">
             <TotalsPanel
-              text={text}
+              text={enrichedTotalsText || text}
               weightKg={weightKg}
               saveState={saving ? 'saving' : state}
               onSave={savePlan}
