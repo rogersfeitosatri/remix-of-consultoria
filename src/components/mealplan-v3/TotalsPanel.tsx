@@ -91,14 +91,25 @@ export function TotalsPanel({
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({ label, value, sub, status }: { label: string; value: string; sub?: string; status?: 'low' | 'ok' | 'high' | null }) {
+  const ring = status === 'ok' ? 'ring-1 ring-emerald-500/40 bg-emerald-500/5'
+    : status === 'low' ? 'ring-1 ring-amber-500/40 bg-amber-500/5'
+    : status === 'high' ? 'ring-1 ring-rose-500/40 bg-rose-500/5'
+    : '';
   return (
-    <div className="rounded bg-muted/40 px-2 py-1.5">
+    <div className={`rounded bg-muted/40 px-2 py-1.5 ${ring}`}>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="font-semibold text-sm">{value}</div>
       {sub && <div className="text-[10px] text-muted-foreground">{sub}</div>}
     </div>
   );
+}
+
+function rangeStatus(v: number | null, min: number, max: number): 'low' | 'ok' | 'high' | null {
+  if (v == null || !Number.isFinite(v)) return null;
+  if (v < min) return 'low';
+  if (v > max) return 'high';
+  return 'ok';
 }
 
 function StatusBadge({ state }: { state: 'idle' | 'saving' | 'saved' | 'error' }) {
