@@ -24,7 +24,11 @@ export function useAthleteWeight(clientId?: string | null) {
       // e lemos a resposta correspondente em cada check-in recente.
       const parseWeight = (raw: any): number | null => {
         if (raw == null || raw === '') return null;
-        const val = typeof raw === 'object' && 'answer' in raw ? raw.answer : raw;
+        let val: any = typeof raw === 'object' && raw !== null && 'answer' in raw ? raw.answer : raw;
+        // ANAMNESE COMPLETA: peso vem em { peso_kg, altura_cm } (field_group).
+        if (val && typeof val === 'object' && !Array.isArray(val)) {
+          val = val.peso_kg ?? val.peso ?? val.weight_kg ?? val.current_weight ?? null;
+        }
         if (val == null || val === '') return null;
         // Normaliza "67,5" / "67.500" / "67.5 kg" → 67.5
         let s = String(val).toLowerCase().replace(/kg/g, '').trim();

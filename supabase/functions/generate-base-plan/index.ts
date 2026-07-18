@@ -3,7 +3,7 @@
 // determinístico (src/lib/planV2.ts). Guarda em ai_analyses.raw_response com
 // planModelVersion: 2. Não gera 7 dias.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { callAiJson } from "../_shared/planPipeline.ts";
+import { callAiJson, loadFoodTable, matchFood, foodMacros } from "../_shared/planPipeline.ts";
 import { loadMealPlanSkill, logGeneration } from "../_shared/skillPrompt.ts";
 
 const corsHeaders = {
@@ -36,20 +36,59 @@ function extractTraining(anamnese: any, questions: any[]): { trainingWeek: any; 
   return { trainingWeek: tw, longRunWeekday: longRun };
 }
 
+// Peso da anamnese (ANAMNESE COMPLETA: peso_altura.peso_kg; formulários antigos:
+// pergunta de "peso atual"). Sobrepõe o valor possivelmente defasado do perfil.
+function extractWeightKg(anamnese: any, questions: any[]): number | null {
+  if (!anamnese?.responses) return null;
+  const qs = questions || [];
+  const q = qs.find((x: any) => /peso/i.test(x.question_text || "") && /atual/i.test(x.question_text || ""))
+    || qs.find((x: any) => /peso e altura|peso.*altura/i.test(x.question_text || ""))
+    || qs.find((x: any) => /peso/i.test(x.question_text || ""));
+  if (!q) return null;
+  let a: any = anamnese.responses[q.id];
+  a = a && typeof a === "object" && "answer" in a ? a.answer : a;
+  if (a && typeof a === "object") a = a.peso_kg ?? a.peso ?? a.weight_kg ?? a.current_weight;
+  const n = Number(String(a ?? "").replace(",", ".").replace(/[^\d.]/g, ""));
+  return isFinite(n) && n > 20 && n < 300 ? n : null;
+}
+
 function foodText(f: any): string {
   return `${f.name}${f.grams ? ` ${Math.round(Number(f.grams))}g` : ""}${f.measure ? ` (${f.measure})` : ""}`;
 }
-// Converte o plano-base v2 para o formato v1 (meal_plan.meals) para renderização.
-function mirrorToMealPlan(meals: any[]): any[] {
+// Alimento estruturado (com macros por porção casadas no banco de alimentos),
+// para o editor mostrar e recalcular. Sem match → macros 0 (nutri completa via IA/banco).
+function structFood(f: any, table: any[]): any {
+  const grams = Number(f.grams) || 0;
+  const match = matchFood(f.name || "", table);
+  const mm = match && grams ? foodMacros(grams, match) : null;
+  return {
+    name: f.name || "", grams: grams || null, measure: f.measure || null,
+    food_item_id: match?.id ?? undefined,
+    calories: mm ? Math.round(mm.kcal) : 0,
+    protein_g: mm ? Math.round(mm.protein_g * 10) / 10 : 0,
+    carbs_g: mm ? Math.round(mm.cho_g * 10) / 10 : 0,
+    fat_g: mm ? Math.round(mm.fat_g * 10) / 10 : 0,
+    nutrient_source: match ? "Banco" : undefined,
+  };
+}
+// Converte o plano-base v2 para o formato v1 (meal_plan.meals) para renderização
+// e edição: opções estruturadas (foods com macros) + food_groups (texto legado).
+function mirrorToMealPlan(meals: any[], table: any[]): any[] {
   return (meals || []).map((m: any) => {
+    const rawOptions = [m.mainOption, ...(m.substitutions || [])].filter(Boolean);
+    const options = rawOptions.map((o: any, i: number) => ({
+      label: i === 0 ? "Opção 1" : `Opção ${i + 1}`,
+      foods: (o.foods || []).map((f: any) => structFood(f, table)),
+    }));
     const mainTxt = (m.mainOption?.foods || []).map(foodText).join(" + ");
     const subTxts = (m.substitutions || []).map((o: any) => (o.foods || []).map(foodText).join(" + ")).filter(Boolean);
-    const options = [mainTxt, ...subTxts].filter(Boolean).join(" ou ");
+    const optionsTxt = [mainTxt, ...subTxts].filter(Boolean).join(" ou ");
     const mm = m.macros || {};
     return {
       meal_name: m.name, horario: m.defaultTime || "",
       timing_note: (m.generalInstructions || [])[0] || "",
-      food_groups: [{ group: m.name, options }],
+      options, foods: options[0]?.foods ?? [],
+      food_groups: [{ group: m.name, options: optionsTxt }],
       meal_macros: mm.kcal != null ? `~${Math.round(mm.kcal)} kcal, CHO ${Math.round(mm.cho_g || 0)}g, PTN ${Math.round(mm.protein_g || 0)}g, LIP ${Math.round(mm.fat_g || 0)}g` : "",
     };
   });
@@ -93,8 +132,8 @@ function carbBlockText(carbBlocks: any[]): string {
   return (opt?.foods || []).map(foodText).join(" + ");
 }
 // Constrói meal_plan.day_variations só para os dias que diferem da base.
-function buildDayVariations(basePlan: any, trainingWeek: any, longRunWeekday: string | null, dailyTotals: any): Record<string, any> {
-  const baseMeals = mirrorToMealPlan(basePlan.meals);
+function buildDayVariations(basePlan: any, trainingWeek: any, longRunWeekday: string | null, dailyTotals: any, table: any[]): Record<string, any> {
+  const baseMeals = mirrorToMealPlan(basePlan.meals, table);
   const carbSet = new Set(carbloadDaysFor(longRunWeekday, 1));
   const carbTxt = carbBlockText(basePlan.carbBlocks);
   const variations: Record<string, any> = {};
@@ -163,6 +202,16 @@ Deno.serve(async (req) => {
       questions = qs || [];
     }
     const { trainingWeek, longRunWeekday } = extractTraining(anamnese, questions);
+    const weightKg = extractWeightKg(anamnese, questions) ?? profile?.weight_kg ?? profile?.current_weight ?? client.current_weight ?? null;
+    // Resumo textual da semana de treino (dia: sessões) para a IA periodizar.
+    const trainingSummary = trainingWeek && typeof trainingWeek === "object"
+      ? Object.entries(trainingWeek as Record<string, any>).map(([dia, sess]) => {
+          const arr = Array.isArray(sess) ? sess : sess ? [sess] : [];
+          const parts = arr.filter((s: any) => s?.modalidade && s.modalidade !== "repouso")
+            .map((s: any) => `${s.modalidade}${s.turno ? " " + s.turno : ""}${s.intensidade ? " " + s.intensidade : ""}${s.longao ? " (LONGÃO)" : ""}`);
+          return parts.length ? `- ${dia}: ${parts.join(" + ")}` : `- ${dia}: descanso`;
+        }).join("\n")
+      : "";
 
     // Contexto compacto da anamnese (hábitos/preferências) — texto curto.
     let anamneseText = "";
@@ -189,10 +238,14 @@ Deno.serve(async (req) => {
     const userPrompt = `Gere APENAS o PLANO-BASE (um único conjunto de refeições, NÃO gere 7 dias diferentes). As variações por dia de treino são aplicadas depois pelo sistema.
 
 ## ATLETA
-Nome: ${profile?.full_name || client.name} | Peso: ${profile?.weight_kg || profile?.current_weight || client.current_weight || "N/I"} kg
+Nome: ${profile?.full_name || client.name} | Peso: ${weightKg || "N/I"} kg
 Objetivo: ${profile?.main_goal || profile?.goal || client.goal || "N/I"}
 Prova-alvo: ${profile?.target_race || client.target_race || "N/I"} ${profile?.target_deadline ? "(data " + profile.target_deadline + ")" : ""}
+Dia do longão: ${longRunWeekday || "N/I"}
 ${guidance ? "Orientações do nutricionista: " + guidance : ""}
+
+## ROTINA SEMANAL DE TREINO (para periodizar carboidratos e definir kcal/kg pela Skill)
+${trainingSummary || "N/I"}
 
 ## ANAMNESE (hábitos, preferências, restrições)
 ${anamneseText || "N/I"}
@@ -254,10 +307,12 @@ Regras: cada refeição aparece UMA vez, com id único. Use alimentos que o atle
     };
     // Espelha o plano-base no formato v1 (meal_plan.meals) para o app do atleta,
     // o envio ao Zona Nutri e telas legadas renderizarem sem mudança.
-    const mealPlanMeals = mirrorToMealPlan(basePlan.meals);
+    // Banco de alimentos para casar macros por porção (editor mostra e recalcula).
+    const foodTable = await loadFoodTable(supabase);
+    const mealPlanMeals = mirrorToMealPlan(basePlan.meals, foodTable);
     // Encaixa o plano em cada dia da semana (carbload/longão/qualidade) para que o
     // envio ao Zona Nutri vá per_day. Dias sem diferença caem na base no envio.
-    const dayVariations = buildDayVariations(basePlan, trainingWeek, longRunWeekday, basePlan.dailyTargets);
+    const dayVariations = buildDayVariations(basePlan, trainingWeek, longRunWeekday, basePlan.dailyTargets, foodTable);
 
     const stored = {
       planModelVersion: 2, status: usedFallback ? "requires_review" : "active",
