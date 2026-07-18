@@ -419,6 +419,10 @@ export default function MealPlanEditor() {
           </TabsList>
         </Tabs>
 
+        <WeekOverview texts={texts} active={activeDay} onSelect={(k) => setActiveDay(k)} weightKg={weightKg} />
+
+
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
           <Card>
             <CardContent className="p-3 md:p-4">
