@@ -92,7 +92,7 @@ export default function MealPlanEditor() {
         const { error } = await supabase.from('ai_analyses').update({ raw_response: nextRaw }).eq('id', analysisRow.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('ai_analyses').insert({ client_id: clientId, raw_response: nextRaw });
+        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: nextRaw });
         if (error) throw error;
       }
       toast.success('Plano salvo.');
