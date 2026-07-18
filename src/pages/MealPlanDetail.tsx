@@ -990,7 +990,15 @@ export default function MealPlanDetail() {
                       onSave={saveInlinePlan}
                       savedAt={structured.updated_at}
                     />
-                    <button className="text-xs text-muted-foreground underline" onClick={() => setUseClassicEditor(true)}>usar o editor clássico (avançado)</button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button className="text-xs text-muted-foreground underline" onClick={() => setUseClassicEditor(true)}>usar o editor clássico (avançado)</button>
+                      <a
+                        href={`/meal-plans/${clientId}/editor`}
+                        className="text-xs text-primary underline"
+                      >
+                        abrir editor inteligente (V3) →
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>
