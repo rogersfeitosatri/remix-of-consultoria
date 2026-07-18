@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Undo2, Redo2, Plus, Trash2, Copy, ChevronUp, ChevronDown, Loader2, Check, Utensils, X } from 'lucide-react';
 import { sumFoods, perKg, roundNutrients, type Nutrients } from '@/lib/nutritionCalc';
+import { FoodAiDialog } from './FoodAiDialog';
 
 type Food = { name: string; grams?: number | null; measure?: string | null; calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number; substitutions?: string[] };
 type Option = { label?: string; foods: Food[] };
@@ -157,6 +158,7 @@ export function PlanInlineEditor({ analysis, athleteWeightKg, onSave, savedAt }:
                         <Input value={f.name} placeholder="Alimento" onChange={(e) => mutFood(mi, oi, fi, { ...f, name: e.target.value })} className="h-8 flex-1" />
                         <Input type="number" value={f.grams ?? ''} placeholder="g" onChange={(e) => mutFood(mi, oi, fi, rescale(f, e.target.value === '' ? 0 : Number(e.target.value)))} className="h-8 w-20" />
                         <Input value={f.measure ?? ''} placeholder="medida" onChange={(e) => mutFood(mi, oi, fi, { ...f, measure: e.target.value })} className="h-8 w-28" />
+                        <FoodAiDialog food={f} onApply={(nf) => mutFood(mi, oi, fi, nf)} />
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive shrink-0" onClick={() => delFood(mi, oi, fi)}><Trash2 className="h-3.5 w-3.5" /></Button>
                       </div>
                       {/* substituições (chips) */}
