@@ -11,6 +11,7 @@ import { Undo2, Redo2, Plus, Trash2, Copy, ChevronUp, ChevronDown, Loader2, Chec
 import { sumFoods, perKg, roundNutrients, summarizePlanBase, type Nutrients } from '@/lib/nutritionCalc';
 import { AlertTriangle, Info } from 'lucide-react';
 import { FoodAiDialog } from './FoodAiDialog';
+import { MealAiDialog } from './MealAiDialog';
 
 type Food = { name: string; grams?: number | null; measure?: string | null; calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number; substitutions?: string[] };
 type Option = { label?: string; foods: Food[] };
@@ -134,6 +135,7 @@ export function PlanInlineEditor({ analysis, athleteWeightKg, onSave, savedAt }:
   const addOption = (mi: number) => apply(meals.map((m, i) => i !== mi ? m : { ...m, options: [...m.options, { label: `Opção ${m.options.length + 1}`, foods: [] }] }));
   const dupOption = (mi: number, oi: number) => apply(meals.map((m, i) => i !== mi ? m : { ...m, options: [...m.options.slice(0, oi + 1), { ...m.options[oi], label: `Opção ${m.options.length + 1}`, foods: m.options[oi].foods.map((f) => ({ ...f })) }, ...m.options.slice(oi + 1)] }));
   const delOption = (mi: number, oi: number) => apply(meals.map((m, i) => i !== mi ? m : { ...m, options: m.options.length > 1 ? m.options.filter((_, j) => j !== oi) : m.options }));
+  const setMealOptions = (mi: number, options: any[]) => apply(meals.map((m, i) => i === mi ? { ...m, options: options.map((o, k) => ({ label: o.label || `Opção ${k + 1}`, foods: (o.foods || []).map((f: any) => ({ ...f })) })) } : m));
   const addMeal = () => apply([...meals, { meal_name: 'Nova refeição', horario: '', options: [{ label: 'Opção 1', foods: [] }] }]);
   const dupMeal = (mi: number) => apply([...meals.slice(0, mi + 1), JSON.parse(JSON.stringify(meals[mi])), ...meals.slice(mi + 1)]);
   const delMeal = (mi: number) => { if (confirm('Remover esta refeição?')) apply(meals.filter((_, i) => i !== mi)); };
@@ -170,6 +172,7 @@ export function PlanInlineEditor({ analysis, athleteWeightKg, onSave, savedAt }:
               <Input value={m.meal_name} onChange={(e) => mutMeal(mi, { meal_name: e.target.value })} className="h-8 font-medium" />
               <Input type="time" value={m.horario} onChange={(e) => mutMeal(mi, { horario: e.target.value })} className="h-8 w-28" />
               <div className="flex gap-0.5 shrink-0">
+                <MealAiDialog meal={m} weightKg={athleteWeightKg} targetKcal={targetKcal} onApply={(options) => setMealOptions(mi, options)} />
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveMeal(mi, -1)} disabled={mi === 0}><ChevronUp className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveMeal(mi, 1)} disabled={mi === meals.length - 1}><ChevronDown className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => dupMeal(mi)}><Copy className="h-4 w-4" /></Button>
