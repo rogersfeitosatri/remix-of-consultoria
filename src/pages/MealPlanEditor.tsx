@@ -76,12 +76,34 @@ export default function MealPlanEditor() {
 
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const enrichCache = useRef(makeEnrichCache());
+  const [enrichedTotalsText, setEnrichedTotalsText] = useState<string>('');
+
+  // Enriquecimento debounced: ao parar de digitar por 700 ms, resolve
+  // alimentos no banco e atualiza o texto usado pelo TotalsPanel (sem alterar
+  // o texto do editor). Isso mantém a digitação fluida e traz macros reais.
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      try {
+        const ast = parseText(text);
+        await enrichAst(ast, enrichCache.current);
+        // Reserializa preservando texto original é complexo — para o painel
+        // basta um texto equivalente que carregue os macros no parse.
+        // Usamos astToText porque planTotals lê o AST parseado.
+        setEnrichedTotalsText(astToText(ast));
+      } catch { /* silencioso */ }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [text]);
 
   const savePlan = async () => {
     if (!clientId) return;
     try {
       setSaving(true);
       const ast = parseText(text);
+      await enrichAst(ast, enrichCache.current);
       const meals = astToMeals(ast);
       const currentRaw = (analysisRow?.raw_response as any) || {};
       const nextRaw = {
@@ -103,6 +125,28 @@ export default function MealPlanEditor() {
       toast.error(`Não foi possível salvar: ${e.message || e}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const importPdf = async (file: File) => {
+    try {
+      setImporting(true);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('client_id', clientId!);
+      const { data, error } = await supabase.functions.invoke('import-meal-plan', { body: fd });
+      if (error) throw error;
+      const meals = (data as any)?.meals || (data as any)?.meal_plan?.meals;
+      if (!Array.isArray(meals) || !meals.length) throw new Error('PDF sem refeições reconhecíveis');
+      const imported = mealsToText(meals);
+      // acrescenta ao texto atual em uma seção nova
+      setText((text ? `${text}\n\n` : '') + imported);
+      toast.success(`PDF importado: ${meals.length} refeições.`);
+    } catch (e: any) {
+      toast.error(`Falha ao importar: ${e.message || e}`);
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
