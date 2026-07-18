@@ -108,23 +108,42 @@ export async function loadFoodTable(supabase: SupabaseClient): Promise<FoodRow[]
   }));
 }
 
+// Stopwords que NÃO devem contar como token na correspondência de alimentos.
+// Antes, "Leite sem lactose" casava com "Whey Isolado sem lactose" porque
+// "sem" e "lactose" pontuavam. Agora só tokens de conteúdo pontuam.
+const FOOD_STOPWORDS = new Set([
+  "sem", "com", "para", "das", "dos", "por", "que", "uma", "uns", "umas",
+  "lactose", "gluten", "acucar", "sal", "adicao", "adicionado", "adicionada",
+  "light", "diet", "zero", "integral", "desnatado", "semidesnatado", "natural",
+  "puro", "pura", "cru", "crua", "cozido", "cozida", "assado", "assada", "grelhado", "grelhada",
+  "fresco", "fresca", "seco", "seca", "morno", "morna", "quente", "frio", "fria",
+  "pequeno", "pequena", "medio", "media", "grande", "grosso", "grossa", "fino", "fina",
+  "colher", "colheres", "xicara", "xicaras", "concha", "unidade", "unidades", "fatia", "fatias",
+  "sopa", "cha",
+]);
+
 // Melhor correspondência por sobreposição de tokens (retorna null se fraca).
+// Regra dura: pelo menos UM token de conteúdo (não-stopword, ≥3 chars) do
+// alimento pedido precisa aparecer no nome do candidato. Isso impede que
+// "Leite sem lactose" seja casado com "Whey ... sem lactose".
 export function matchFood(name: string, table: FoodRow[]): FoodRow | null {
   const n = norm(name);
   if (!n) return null;
   const exact = table.find((f) => f.norm === n);
   if (exact) return exact;
-  const tokens = n.split(" ").filter((t) => t.length >= 3);
-  if (!tokens.length) return null;
+  const rawTokens = n.split(" ").filter((t) => t.length >= 3);
+  const contentTokens = rawTokens.filter((t) => !FOOD_STOPWORDS.has(t));
+  if (!contentTokens.length) return null;
   let best: FoodRow | null = null; let bestScore = 0;
   for (const f of table) {
     let score = 0;
-    for (const t of tokens) if (f.norm.includes(t)) score++;
-    // bônus se o nome do alimento estiver contido na descrição
-    if (n.includes(f.norm) || f.norm.includes(tokens[0])) score += 0.5;
+    for (const t of contentTokens) if (f.norm.includes(t)) score++;
+    if (!score) continue; // exige ao menos 1 token de conteúdo em comum
+    if (f.norm.includes(contentTokens[0])) score += 0.5;
+    if (n.includes(f.norm)) score += 0.5;
     if (score > bestScore) { bestScore = score; best = f; }
   }
-  return bestScore >= Math.max(1, tokens.length * 0.5) ? best : null;
+  return bestScore >= Math.max(1, contentTokens.length * 0.5) ? best : null;
 }
 
 export interface Macros { kcal: number; cho_g: number; protein_g: number; fat_g: number; fiber_g: number; }

@@ -147,7 +147,65 @@ function carbBlockText(carbBlocks: any[]): string {
   const opt = (b.options || [])[0];
   return (opt?.foods || []).map(foodText).join(" + ");
 }
-// Constrói meal_plan.day_variations só para os dias que diferem da base.
+// Classe do macro dominante para escalar CHO por dia (usa macros por porção
+// já calculados em structFood, então funciona para o meal_plan.meals espelhado).
+function foodMainClass(f: any): "carb" | "protein" | "fat" | "other" {
+  const c = (Number(f.carbs_g) || 0) * 4;
+  const p = (Number(f.protein_g) || 0) * 4;
+  const fa = (Number(f.fat_g) || 0) * 9;
+  if (c === 0 && p === 0 && fa === 0) return "other";
+  if (c >= p && c >= fa) return "carb";
+  if (p >= fa) return "protein";
+  return "fat";
+}
+function scaleFoodGrams(f: any, factor: number): any {
+  if (!f || !isFinite(factor) || factor === 1) return { ...f };
+  const grams = Number(f.grams);
+  if (!isFinite(grams) || grams <= 0) return { ...f };
+  const g = Math.max(1, Math.round(grams * factor));
+  const k = g / grams;
+  return {
+    ...f,
+    grams: g,
+    // se havia medida em "Xg", atualiza para a nova gramagem
+    measure: typeof f.measure === "string" && /^\s*\d+\s*g\s*$/i.test(f.measure) ? `${g} g` : f.measure,
+    calories: Number(f.calories) ? Math.round((Number(f.calories) || 0) * k) : f.calories,
+    protein_g: Number(f.protein_g) ? Math.round(((Number(f.protein_g) || 0) * k) * 10) / 10 : f.protein_g,
+    carbs_g: Number(f.carbs_g) ? Math.round(((Number(f.carbs_g) || 0) * k) * 10) / 10 : f.carbs_g,
+    fat_g: Number(f.fat_g) ? Math.round(((Number(f.fat_g) || 0) * k) * 10) / 10 : f.fat_g,
+  };
+}
+// Aplica um fator só nos CARBS de cada refeição, para diferenciar dias de
+// treino x descanso sem quebrar a estrutura do plano-base.
+function scaleMealCarbs(meal: any, carbFactor: number): any {
+  const copy = JSON.parse(JSON.stringify(meal));
+  const doList = (list: any[]) => (list || []).map((f: any) => foodMainClass(f) === "carb" ? scaleFoodGrams(f, carbFactor) : f);
+  copy.foods = doList(copy.foods);
+  copy.options = (copy.options || []).map((o: any) => ({ ...o, foods: doList(o.foods || []) }));
+  // Atualiza food_groups textual só para o carbo aumentar/diminuir visualmente.
+  if (Array.isArray(copy.food_groups) && Array.isArray(copy.foods)) {
+    copy.food_groups = copy.foods.map((f: any) => ({
+      group: f.name,
+      options: `${f.name}${f.grams ? ` ${f.grams}g` : ""}${(f.substitutions || []).length ? ` ou ${f.substitutions.join("; ")}` : ""}`,
+    }));
+  }
+  // Recalcula meal_macros do total das opções (primeira opção).
+  const opt = (copy.options || [])[0];
+  if (opt?.foods?.length) {
+    const t = opt.foods.reduce((a: any, f: any) => ({
+      kcal: a.kcal + (Number(f.calories) || 0),
+      cho: a.cho + (Number(f.carbs_g) || 0),
+      ptn: a.ptn + (Number(f.protein_g) || 0),
+      lip: a.lip + (Number(f.fat_g) || 0),
+    }), { kcal: 0, cho: 0, ptn: 0, lip: 0 });
+    copy.meal_macros = `~${Math.round(t.kcal)} kcal, CHO ${Math.round(t.cho)}g, PTN ${Math.round(t.ptn)}g, LIP ${Math.round(t.lip)}g`;
+  }
+  return copy;
+}
+
+// Constrói meal_plan.day_variations para TODOS os dias da semana, ajustando o
+// CHO conforme o tipo de dia (longão/carbload/qualidade/base/descanso). Assim
+// o atleta vê um plano de verdade diferente ao selecionar cada dia.
 function buildDayVariations(basePlan: any, trainingWeek: any, longRunWeekday: string | null, dailyTotals: any, table: any[]): Record<string, any> {
   const baseMeals = mirrorToMealPlan(basePlan.meals, table);
   const carbSet = new Set(carbloadDaysFor(longRunWeekday, 1));
@@ -157,23 +215,34 @@ function buildDayVariations(basePlan: any, trainingWeek: any, longRunWeekday: st
     const sessions = sessionsForWeekday(trainingWeek, wdEn).filter((s: any) => s?.modalidade && s.modalidade !== "repouso");
     const isLongRun = wdEn === longRunWeekday || sessions.some((s: any) => s?.longao);
     const isCarbload = carbSet.has(wdEn);
-    const isQuality = sessions.some((s: any) => /intenso/i.test(s?.intensidade || ""));
-    if (!isLongRun && !isCarbload && !isQuality) continue; // dia-base → cai na base no envio
+    const isQuality = sessions.some((s: any) => /intenso|forte|alt/i.test(s?.intensidade || ""));
+    const isRest = sessions.length === 0;
 
     let dayNote = "";
-    if (isCarbload) dayNote = "Preparação para o longão: use a opção completa de carboidrato e evite alimentos novos.";
-    else if (isLongRun) dayNote = "Dia de longão: capriche no carboidrato de fácil digestão antes do treino e recupere com CHO + proteína.";
-    else if (isQuality) dayNote = "Treino de qualidade: priorize a opção completa de carboidrato para render bem.";
+    let carbFactor = 1;
+    let dayTag = "Base";
+    if (isLongRun) { dayNote = "Dia de longão: capriche no carboidrato de fácil digestão antes do treino e recupere com CHO + proteína."; carbFactor = 1.4; dayTag = "Longão"; }
+    else if (isCarbload) { dayNote = "Preparação para o longão: aumente o carboidrato do dia e evite alimentos novos."; carbFactor = 1.3; dayTag = "Carbload"; }
+    else if (isQuality) { dayNote = "Treino de qualidade: priorize o carboidrato para render bem."; carbFactor = 1.2; dayTag = "Qualidade"; }
+    else if (isRest) { dayNote = "Dia sem treino: reduza um pouco o carboidrato e mantenha proteína e gorduras boas."; carbFactor = 0.85; dayTag = "Descanso"; }
+    else { dayNote = "Treino leve/moderado: siga o plano-base."; carbFactor = 1; dayTag = "Base"; }
 
-    const meals = baseMeals.map((m: any, i: number) => (i === 0 ? { ...m, timing_note: dayNote || m.timing_note } : { ...m }));
+    const meals = baseMeals.map((m: any, i: number) => {
+      const scaled = scaleMealCarbs(m, carbFactor);
+      return i === 0 ? { ...scaled, timing_note: dayNote || scaled.timing_note } : scaled;
+    });
     if (isCarbload && carbTxt) {
       meals.push({
         meal_name: "Reforço de carboidrato (carbload)", horario: "", timing_note: "Bloco adicional nos dias de preparação para o longão.",
         food_groups: [{ group: "Carbload", options: carbTxt }], meal_macros: "",
       });
     }
+    // Recalcula daily_totals aproximado só ajustando CHO/kcal em função do fator médio.
+    const dt = { ...(dailyTotals || {}) };
+    if (dt.cho_g) dt.cho_g = Math.round(Number(dt.cho_g) * carbFactor);
+    if (dt.kcal) dt.kcal = Math.round(Number(dt.kcal) + ((Number(dailyTotals?.cho_g) || 0) * (carbFactor - 1) * 4));
     const key = EN_TO_PT_KEY[wdEn];
-    variations[key] = { label: PT_LABEL[key], meals, daily_totals: dailyTotals || {} };
+    variations[key] = { label: `${PT_LABEL[key]} · ${dayTag}`, meals, daily_totals: dt };
   }
   return variations;
 }
