@@ -18,15 +18,44 @@ type Meal = { meal_name: string; horario?: string; timing_note?: string; options
 
 const AUTOSAVE_MS = 1200;
 
+// "Pão francês 50g" / "Arroz — 100 g" → { name, grams }
+function parseFoodText(t: string): Food {
+  const s = String(t || '').trim();
+  const m = s.match(/^(.*?)[\s—-]*?(\d+(?:[.,]\d+)?)\s*g\b/i);
+  if (m) return { name: m[1].replace(/[—\-]+$/, '').trim(), grams: parseFloat(m[2].replace(',', '.')) };
+  return { name: s };
+}
+// Fallback: monta opções/alimentos a partir de food_groups (texto legado).
+function optionsFromGroups(groups: any[]): Option[] | null {
+  if (!Array.isArray(groups) || !groups.length) return null;
+  // v2: um único grupo com a refeição inteira em texto ("A + B ou C + D")
+  if (groups.length === 1 && /\s\+\s/.test(String(groups[0]?.options || ''))) {
+    const alts = String(groups[0].options).split(/\s+ou\s+/i);
+    return alts.map((alt, i) => ({ label: `Opção ${i + 1}`, foods: alt.split(/\s*\+\s*/).map(parseFoodText).filter((f) => f.name) }));
+  }
+  // importado: cada grupo é um alimento (substituições após "ou")
+  const foods = groups.map((g) => {
+    const parts = String(g?.options || g?.group || '').split(/\s+ou\s+/i);
+    const f = parseFoodText(parts[0] || '');
+    if (parts.length > 1) f.substitutions = parts.slice(1).map((s) => s.trim()).filter(Boolean);
+    return f;
+  }).filter((f) => f.name);
+  return foods.length ? [{ label: 'Opção 1', foods }] : null;
+}
+
 function normalizeMeals(mp: any): Meal[] {
   const meals: any[] = mp?.meals || [];
-  return meals.map((m) => ({
-    meal_name: m.meal_name || 'Refeição',
-    horario: m.horario || '',
-    timing_note: m.timing_note || '',
-    options: (Array.isArray(m.options) && m.options.length ? m.options : [{ label: 'Opção 1', foods: m.foods || [] }])
-      .map((o: any, i: number) => ({ label: o.label || `Opção ${i + 1}`, foods: (Array.isArray(o.foods) ? o.foods : []).map((f: any) => ({ ...f })) })),
-  }));
+  return meals.map((m) => {
+    const rawOptions = (Array.isArray(m.options) && m.options.length)
+      ? m.options
+      : (Array.isArray(m.foods) && m.foods.length)
+        ? [{ label: 'Opção 1', foods: m.foods }]
+        : (optionsFromGroups(m.food_groups) || [{ label: 'Opção 1', foods: [] }]);
+    return {
+      meal_name: m.meal_name || 'Refeição', horario: m.horario || '', timing_note: m.timing_note || '',
+      options: rawOptions.map((o: any, i: number) => ({ label: o.label || `Opção ${i + 1}`, foods: (Array.isArray(o.foods) ? o.foods : []).map((f: any) => ({ ...f })) })),
+    };
+  });
 }
 
 function foodNutrients(f: Food): Nutrients {
