@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 import { PlanReadOnlyView } from '@/components/admin/PlanReadOnlyView';
+import { PlanFinalizationPanel } from '@/components/admin/PlanFinalizationPanel';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send, Layers, MoreVertical, CircleCheck, CircleDashed } from 'lucide-react';
@@ -907,6 +908,16 @@ export default function MealPlanDetail() {
                   )}
                 </CardContent>
               </Card>
+            )}
+
+            {/* Finalização e publicação (aprovar → finalizar em Markdown → publicar) */}
+            {structured?.meal_plan?.meals && (
+              <PlanFinalizationPanel
+                analysis={structured}
+                athleteWeightKg={athleteWeightKg}
+                persist={async (next) => { await persistStructured(next); refresh(); }}
+                onNotify={() => notifyAthlete.mutate(false)}
+              />
             )}
 
             {/* Plano alimentar: Visualizar (read-only, macros + g/kg) ou Editar */}
