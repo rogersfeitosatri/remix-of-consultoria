@@ -114,7 +114,7 @@ export default function MealPlans() {
             {rows.map(({ client, hasPlan, updatedAt }) => (
               <button
                 key={client.id}
-                onClick={() => navigate(`/meal-plans/${client.id}`)}
+                onClick={() => navigate(`/meal-plans/${client.id}/editor`)}
                 className="w-full flex items-center gap-3 rounded-xl border bg-card p-3 text-left hover:bg-accent/50 transition-colors"
               >
                 <div className="h-10 w-10 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center shrink-0">
