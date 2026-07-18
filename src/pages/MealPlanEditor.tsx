@@ -488,6 +488,50 @@ export default function MealPlanEditor() {
           </div>
         </div>
       </div>
+
+      <Dialog open={replicateOpen} onOpenChange={setReplicateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Replicar {DAY_TABS.find(d => d.key === activeDay)?.long} para...
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              O texto da aba atual substituirá o conteúdo dos dias selecionados.
+            </p>
+            <div className="flex items-center gap-2 rounded-md border p-3 bg-muted/30">
+              <Checkbox
+                id="rep-as-base"
+                checked={replicateAsBase}
+                onCheckedChange={(v) => setReplicateAsBase(!!v)}
+                disabled={activeDay === 'all'}
+              />
+              <Label htmlFor="rep-as-base" className="text-sm cursor-pointer">
+                Definir como <b>Todos os dias</b> (plano base)
+              </Label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {DAY_TABS.filter(d => d.key !== 'all' && d.key !== activeDay).map(d => (
+                <label key={d.key} className="flex items-center gap-2 rounded-md border p-2 cursor-pointer hover:bg-muted/40">
+                  <Checkbox
+                    checked={replicateTargets.includes(d.key)}
+                    onCheckedChange={() => toggleTarget(d.key)}
+                  />
+                  <span className="text-sm">{d.long}</span>
+                </label>
+              ))}
+            </div>
+            <Button size="sm" variant="ghost" onClick={selectAllTargets}>
+              Selecionar todos os dias
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReplicateOpen(false)}>Cancelar</Button>
+            <Button onClick={applyReplicate}>Replicar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
