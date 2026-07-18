@@ -214,6 +214,21 @@ export default function MealPlanEditor() {
     }
   };
 
+  const exportPdf = async () => {
+    if (!clientId) return;
+    try {
+      const ast = parseText(text);
+      await enrichAst(ast, enrichCache.current);
+      const meals = astToMeals(ast);
+      if (!meals.length) { toast.error('Nada para exportar. Escreva o plano primeiro.'); return; }
+      const input = structuredAnalysisToPdfInput({ meal_plan: { meals } }, client?.name || 'Atleta');
+      const safe = (client?.name || 'atleta').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      await downloadMealPlanPdf(input, safe);
+    } catch (e: any) {
+      toast.error(`Falha ao exportar PDF: ${e.message || e}`);
+    }
+  };
+
   const sendToZonaNutri = async () => {
     if (!clientId) return;
     try {
