@@ -31,6 +31,7 @@ import { parseText } from '@/lib/smartPlan/parse';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
+import { WeekOverview } from '@/components/mealplan-v3/WeekOverview';
 
 type DayKey = 'all' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
