@@ -20,7 +20,7 @@ import { SmartPlanEditor } from '@/components/mealplan-v3/SmartPlanEditor';
 import { TotalsPanel } from '@/components/mealplan-v3/TotalsPanel';
 import { useSmartPlanDraft } from '@/hooks/useSmartPlanDraft';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
-import { mealsToAst, mealsToText } from '@/lib/smartPlan/fromMeals';
+import { mealsToText } from '@/lib/smartPlan/fromMeals';
 import { parseText } from '@/lib/smartPlan/parse';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
