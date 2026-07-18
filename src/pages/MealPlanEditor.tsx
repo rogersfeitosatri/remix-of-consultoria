@@ -255,10 +255,19 @@ export default function MealPlanEditor() {
                     className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) importPdf(f); }}
                   />
+                  <Button size="sm" variant="secondary" onClick={generateWithAI} disabled={generating}>
+                    {generating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                    Gerar com IA
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing}>
                     {importing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Upload className="h-3 w-3 mr-1" />}
                     Importar PDF/MD
                   </Button>
+                  {hasBackup && (
+                    <Button size="sm" variant="ghost" onClick={undoSave}>
+                      <Undo2 className="h-3 w-3 mr-1" /> Desfazer salvamento
+                    </Button>
+                  )}
                   <a
                     href={`/meal-plans/${clientId}`}
                     className="inline-flex items-center gap-1 text-primary hover:underline"
