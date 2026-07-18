@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
     if (authError || !user) throw new Error('Unauthorized');
 
-    const { foodName } = await req.json();
+    const { foodName, preview } = await req.json();
     if (!foodName?.trim()) throw new Error('foodName is required');
 
     const SCHEMA = {
@@ -62,6 +62,13 @@ Deno.serve(async (req) => {
       maxTokens: 1500,
       fallback: 'openai-gpt4o-mini',
     });
+
+    // Modo prévia: retorna os dados SEM cadastrar (o nutricionista confirma antes).
+    if (preview) {
+      return new Response(JSON.stringify({ success: true, preview: true, food: foodData }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
