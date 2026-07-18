@@ -42,11 +42,16 @@ export function TotalsPanel({
         <div className="grid grid-cols-2 gap-2">
           <Stat label="Calorias" value={`${fmt(totals.kcal)} kcal`} sub={kg ? `${fmt(totals.kcal / kg, 1)} kcal/kg` : ''} />
           <Stat label="Peso ref." value={kg ? `${kg} kg` : '—'} sub={kg ? '' : 'Informe na aba do plano'} />
-          <Stat label="Carboidratos" value={`${fmt(totals.cho)} g`} sub={gkg(totals.cho) != null ? `${fmt(gkg(totals.cho)!, 1)} g/kg` : ''} />
-          <Stat label="Proteínas" value={`${fmt(totals.ptn)} g`} sub={gkg(totals.ptn) != null ? `${fmt(gkg(totals.ptn)!, 1)} g/kg` : ''} />
-          <Stat label="Gorduras" value={`${fmt(totals.lip)} g`} sub={gkg(totals.lip) != null ? `${fmt(gkg(totals.lip)!, 1)} g/kg` : ''} />
+          <Stat label="Carboidratos" value={`${fmt(totals.cho)} g`} sub={gkg(totals.cho) != null ? `${fmt(gkg(totals.cho)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.cho), 5, 7)} />
+          <Stat label="Proteínas" value={`${fmt(totals.ptn)} g`} sub={gkg(totals.ptn) != null ? `${fmt(gkg(totals.ptn)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.ptn), 1.6, 2.0)} />
+          <Stat label="Gorduras" value={`${fmt(totals.lip)} g`} sub={gkg(totals.lip) != null ? `${fmt(gkg(totals.lip)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.lip), 0.8, 1.2)} />
           <Stat label="Refeições" value={String(meals.length)} sub={`${meals.reduce((a, m: any) => a + (m.foods?.length || 0), 0)} itens`} />
         </div>
+        {kg && (
+          <p className="text-[10px] text-muted-foreground -mt-1">
+            Faixas de referência endurance (g/kg): CHO 5–7 · PTN 1,6–2,0 · LIP 0,8–1,2
+          </p>
+        )}
 
         <Collapsible>
           <CollapsibleTrigger asChild>
@@ -86,14 +91,25 @@ export function TotalsPanel({
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({ label, value, sub, status }: { label: string; value: string; sub?: string; status?: 'low' | 'ok' | 'high' | null }) {
+  const ring = status === 'ok' ? 'ring-1 ring-emerald-500/40 bg-emerald-500/5'
+    : status === 'low' ? 'ring-1 ring-amber-500/40 bg-amber-500/5'
+    : status === 'high' ? 'ring-1 ring-rose-500/40 bg-rose-500/5'
+    : '';
   return (
-    <div className="rounded bg-muted/40 px-2 py-1.5">
+    <div className={`rounded bg-muted/40 px-2 py-1.5 ${ring}`}>
       <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="font-semibold text-sm">{value}</div>
       {sub && <div className="text-[10px] text-muted-foreground">{sub}</div>}
     </div>
   );
+}
+
+function rangeStatus(v: number | null, min: number, max: number): 'low' | 'ok' | 'high' | null {
+  if (v == null || !Number.isFinite(v)) return null;
+  if (v < min) return 'low';
+  if (v > max) return 'high';
+  return 'ok';
 }
 
 function StatusBadge({ state }: { state: 'idle' | 'saving' | 'saved' | 'error' }) {
