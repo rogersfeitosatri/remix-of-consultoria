@@ -1,11 +1,11 @@
-// Página do Editor Inteligente de Plano Alimentar (Fase 1).
+// Página do Editor Inteligente de Plano Alimentar (Fase 2 — multi-dia).
 // Rota: /meal-plans/:clientId/editor
-// - Carrega o plano existente (ai_analyses.raw_response.meal_plan.meals) e
-//   converte para texto do editor. Se não houver plano, começa em branco.
-// - Autosave em localStorage (rascunho). Botão "Salvar plano" persiste em
-//   ai_analyses.raw_response.meal_plan.meals (mesmo formato canônico usado
-//   pelas outras telas e pelo envio ao Zona Nutri).
-// - Botão "Enviar ao Zona Nutri" chama a edge function existente.
+// - "Todos os dias" é o plano base (compatível com o formato legado em
+//   ai_analyses.raw_response.meal_plan.meals).
+// - Overrides por dia da semana ficam em raw_response.meal_plan.day_variations
+//   (mapa { mon: [meals], tue: [...], ... }). Consumidores existentes seguem
+//   lendo `meals`.
+// - Cada aba tem seu próprio texto e rascunho local independente.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -13,18 +13,40 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import {
+  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2,
+} from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SmartPlanEditor } from '@/components/mealplan-v3/SmartPlanEditor';
 import { TotalsPanel } from '@/components/mealplan-v3/TotalsPanel';
-import { useSmartPlanDraft } from '@/hooks/useSmartPlanDraft';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { mealsToText } from '@/lib/smartPlan/fromMeals';
 import { parseText } from '@/lib/smartPlan/parse';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
+
+type DayKey = 'all' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+const DAY_TABS: { key: DayKey; short: string; long: string }[] = [
+  { key: 'all', short: 'Todos', long: 'Todos os dias' },
+  { key: 'mon', short: 'Seg', long: 'Segunda' },
+  { key: 'tue', short: 'Ter', long: 'Terça' },
+  { key: 'wed', short: 'Qua', long: 'Quarta' },
+  { key: 'thu', short: 'Qui', long: 'Quinta' },
+  { key: 'fri', short: 'Sex', long: 'Sexta' },
+  { key: 'sat', short: 'Sáb', long: 'Sábado' },
+  { key: 'sun', short: 'Dom', long: 'Domingo' },
+];
+
+type PlanTexts = Record<DayKey, string>;
+
+const EMPTY_TEXTS: PlanTexts = {
+  all: '', mon: '', tue: '', wed: '', thu: '', fri: '', sat: '', sun: '',
+};
 
 export default function MealPlanEditor() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -52,25 +74,66 @@ export default function MealPlanEditor() {
     },
   });
 
-  const initialText = useMemo(() => {
+  // Constrói o estado inicial a partir do banco.
+  const initialTexts = useMemo<PlanTexts>(() => {
+    const out: PlanTexts = { ...EMPTY_TEXTS };
     try {
       const raw = analysisRow?.raw_response as any;
       const meals = raw?.meal_plan?.meals || raw?.meals || [];
-      if (Array.isArray(meals) && meals.length) return mealsToText(meals);
-    } catch { /* fallthrough */ }
-    return '';
+      if (Array.isArray(meals) && meals.length) out.all = mealsToText(meals);
+      const variations = raw?.meal_plan?.day_variations || {};
+      for (const k of Object.keys(variations)) {
+        if ((DAY_TABS.map(d => d.key) as string[]).includes(k) && k !== 'all') {
+          const dm = variations[k];
+          if (Array.isArray(dm) && dm.length) out[k as DayKey] = mealsToText(dm);
+        }
+      }
+    } catch { /* noop */ }
+    return out;
   }, [analysisRow]);
 
-  const { text, setText, state } = useSmartPlanDraft(clientId, initialText);
-  // Sincroniza rascunho local com o carregado quando o carregamento termina.
-  useEffect(() => {
-    if (!analysisRow) return;
-    // só carrega do banco se o rascunho local estiver vazio
+  const draftKey = clientId ? `smart-plan-draft-v2:${clientId}` : null;
+  const [texts, setTexts] = useState<PlanTexts>(() => {
+    if (!draftKey) return EMPTY_TEXTS;
     try {
-      const key = `smart-plan-draft:${clientId}`;
-      if (!localStorage.getItem(key) && initialText) setText(initialText);
+      const raw = localStorage.getItem(draftKey);
+      if (raw) return { ...EMPTY_TEXTS, ...JSON.parse(raw) };
     } catch { /* noop */ }
-  }, [analysisRow, initialText, clientId, setText]);
+    return EMPTY_TEXTS;
+  });
+  const [activeDay, setActiveDay] = useState<DayKey>('all');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Hidrata do banco quando não há rascunho local.
+  useEffect(() => {
+    if (!analysisRow || !draftKey) return;
+    try {
+      if (!localStorage.getItem(draftKey)) {
+        setTexts(initialTexts);
+      }
+    } catch { /* noop */ }
+  }, [analysisRow, initialTexts, draftKey]);
+
+  // Autosave em localStorage.
+  useEffect(() => {
+    if (!draftKey) return;
+    setSaveState('saving');
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try { localStorage.setItem(draftKey, JSON.stringify(texts)); setSaveState('saved'); }
+      catch { setSaveState('error'); }
+    }, 500);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [texts, draftKey]);
+
+  const text = texts[activeDay];
+  const setText = (v: string | ((prev: string) => string)) => {
+    setTexts(prev => ({
+      ...prev,
+      [activeDay]: typeof v === 'function' ? (v as (p: string) => string)(prev[activeDay]) : v,
+    }));
+  };
 
   const { data: weightInfo } = useAthleteWeight(clientId);
   const weightKg = weightInfo?.weightKg ?? null;
@@ -89,32 +152,40 @@ export default function MealPlanEditor() {
     try { setHasBackup(!!localStorage.getItem(backupKey)); } catch { /* noop */ }
   }, [backupKey]);
 
-  // Enriquecimento debounced: ao parar de digitar por 700 ms, resolve
-  // alimentos no banco e atualiza o texto usado pelo TotalsPanel (sem alterar
-  // o texto do editor). Isso mantém a digitação fluida e traz macros reais.
+  // Enriquecimento para o painel de totais do dia ativo.
   useEffect(() => {
     const t = setTimeout(async () => {
       try {
         const ast = parseText(text);
         await enrichAst(ast, enrichCache.current);
-        // Reserializa preservando texto original é complexo — para o painel
-        // basta um texto equivalente que carregue os macros no parse.
-        // Usamos astToText porque planTotals lê o AST parseado.
         setEnrichedTotalsText(astToText(ast));
       } catch { /* silencioso */ }
     }, 700);
     return () => clearTimeout(t);
   }, [text]);
 
+  // Conta quais dias têm override preenchido.
+  const overrideDays = useMemo(() => {
+    return (DAY_TABS.filter(d => d.key !== 'all').map(d => d.key) as DayKey[])
+      .filter(k => texts[k].trim().length > 0);
+  }, [texts]);
+
   const savePlan = async () => {
     if (!clientId) return;
     try {
       setSaving(true);
-      const ast = parseText(text);
-      await enrichAst(ast, enrichCache.current);
-      const meals = astToMeals(ast);
+      // Base (Todos os dias)
+      const baseAst = parseText(texts.all);
+      await enrichAst(baseAst, enrichCache.current);
+      const baseMeals = astToMeals(baseAst);
+      // Overrides por dia
+      const dayVariations: Record<string, any> = {};
+      for (const k of overrideDays) {
+        const ast = parseText(texts[k]);
+        await enrichAst(ast, enrichCache.current);
+        dayVariations[k] = astToMeals(ast);
+      }
       const currentRaw = (analysisRow?.raw_response as any) || {};
-      // snapshot antes de sobrescrever, para permitir "Desfazer"
       try {
         localStorage.setItem(backupKey, JSON.stringify({
           raw_response: currentRaw,
@@ -124,7 +195,11 @@ export default function MealPlanEditor() {
       } catch { /* noop */ }
       const nextRaw = {
         ...currentRaw,
-        meal_plan: { ...(currentRaw.meal_plan || {}), meals },
+        meal_plan: {
+          ...(currentRaw.meal_plan || {}),
+          meals: baseMeals,
+          day_variations: dayVariations,
+        },
         editor: 'smart-plan-v3',
       };
       if (analysisRow?.id) {
@@ -134,7 +209,9 @@ export default function MealPlanEditor() {
         const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: nextRaw });
         if (error) throw error;
       }
-      toast.success('Plano salvo. Você pode desfazer se precisar.');
+      toast.success(overrideDays.length
+        ? `Plano salvo (base + ${overrideDays.length} variação(ões) de dia).`
+        : 'Plano salvo.');
       qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
       qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
     } catch (e: any) {
@@ -152,9 +229,18 @@ export default function MealPlanEditor() {
       const { raw_response } = JSON.parse(raw);
       const { error } = await supabase.from('ai_analyses').update({ raw_response }).eq('id', analysisRow.id);
       if (error) throw error;
-      // recarrega texto do estado anterior
+      // Reconstrói textos a partir do estado anterior.
       const meals = raw_response?.meal_plan?.meals || raw_response?.meals || [];
-      setText(Array.isArray(meals) && meals.length ? mealsToText(meals) : '');
+      const variations = raw_response?.meal_plan?.day_variations || {};
+      const restored: PlanTexts = { ...EMPTY_TEXTS };
+      if (Array.isArray(meals) && meals.length) restored.all = mealsToText(meals);
+      for (const k of Object.keys(variations)) {
+        if (k !== 'all' && (DAY_TABS.map(d => d.key) as string[]).includes(k)) {
+          const dm = variations[k];
+          if (Array.isArray(dm) && dm.length) restored[k as DayKey] = mealsToText(dm);
+        }
+      }
+      setTexts(restored);
       localStorage.removeItem(backupKey);
       setHasBackup(false);
       toast.success('Último salvamento desfeito.');
@@ -166,13 +252,12 @@ export default function MealPlanEditor() {
 
   const generateWithAI = async () => {
     if (!clientId) return;
-    if (text.trim().length > 0 && !window.confirm('Isto substituirá o texto atual pelo plano gerado pela IA. Continuar?')) return;
+    if (text.trim().length > 0 && !window.confirm('Isto substituirá o texto da aba atual pelo plano gerado pela IA. Continuar?')) return;
     try {
       setGenerating(true);
       const { data, error } = await supabase.functions.invoke('generate-base-plan', { body: { clientId } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      // recarrega a linha do banco (a função grava em ai_analyses)
       await qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
       const { data: fresh } = await supabase
         .from('ai_analyses').select('raw_response').eq('client_id', clientId)
@@ -180,7 +265,7 @@ export default function MealPlanEditor() {
       const meals = (fresh?.raw_response as any)?.meal_plan?.meals || (fresh?.raw_response as any)?.meals || [];
       if (Array.isArray(meals) && meals.length) {
         setText(mealsToText(meals));
-        toast.success('Plano gerado pela IA carregado no editor.');
+        toast.success('Plano gerado pela IA carregado na aba atual.');
       } else {
         toast.error('A IA não retornou refeições reconhecíveis.');
       }
@@ -190,7 +275,6 @@ export default function MealPlanEditor() {
       setGenerating(false);
     }
   };
-
 
   const importPdf = async (file: File) => {
     try {
@@ -203,9 +287,8 @@ export default function MealPlanEditor() {
       const meals = (data as any)?.meals || (data as any)?.meal_plan?.meals;
       if (!Array.isArray(meals) || !meals.length) throw new Error('PDF sem refeições reconhecíveis');
       const imported = mealsToText(meals);
-      // acrescenta ao texto atual em uma seção nova
       setText((text ? `${text}\n\n` : '') + imported);
-      toast.success(`PDF importado: ${meals.length} refeições.`);
+      toast.success(`PDF importado na aba atual: ${meals.length} refeições.`);
     } catch (e: any) {
       toast.error(`Falha ao importar: ${e.message || e}`);
     } finally {
@@ -221,12 +304,27 @@ export default function MealPlanEditor() {
       await enrichAst(ast, enrichCache.current);
       const meals = astToMeals(ast);
       if (!meals.length) { toast.error('Nada para exportar. Escreva o plano primeiro.'); return; }
-      const input = structuredAnalysisToPdfInput({ meal_plan: { meals } }, client?.name || 'Atleta');
-      const safe = (client?.name || 'atleta').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      const label = DAY_TABS.find(d => d.key === activeDay)?.long || 'Plano';
+      const input = structuredAnalysisToPdfInput({ meal_plan: { meals } }, `${client?.name || 'Atleta'} — ${label}`);
+      const safe = `${(client?.name || 'atleta').toLowerCase().replace(/[^a-z0-9]+/g, '_')}_${activeDay}`;
       await downloadMealPlanPdf(input, safe);
     } catch (e: any) {
       toast.error(`Falha ao exportar PDF: ${e.message || e}`);
     }
+  };
+
+  const copyFromAll = () => {
+    if (activeDay === 'all') return;
+    if (!texts.all.trim()) { toast.error('A aba "Todos os dias" está vazia.'); return; }
+    if (text.trim().length > 0 && !window.confirm('Isto substituirá o texto da aba atual. Continuar?')) return;
+    setText(texts.all);
+    toast.success('Texto copiado do plano base.');
+  };
+
+  const clearDay = () => {
+    if (!text.trim()) return;
+    if (!window.confirm('Limpar o texto desta aba?')) return;
+    setText('');
   };
 
   const sendToZonaNutri = async () => {
@@ -258,11 +356,33 @@ export default function MealPlanEditor() {
           </div>
         </div>
 
+        {/* Abas de dias */}
+        <Tabs value={activeDay} onValueChange={(v) => setActiveDay(v as DayKey)} className="mb-3">
+          <TabsList className="flex flex-wrap h-auto">
+            {DAY_TABS.map(d => {
+              const has = texts[d.key].trim().length > 0;
+              return (
+                <TabsTrigger key={d.key} value={d.key} className="relative">
+                  <span className="hidden md:inline">{d.long}</span>
+                  <span className="md:hidden">{d.short}</span>
+                  {has && d.key !== 'all' && (
+                    <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">•</Badge>
+                  )}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
+
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
           <Card>
             <CardContent className="p-3 md:p-4">
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>Digite o plano como um documento. <b>Enter</b> = novo alimento. <b>ou</b> = substituição. <b>HH:MM Nome</b> = nova refeição.</span>
+                <span>
+                  {activeDay === 'all'
+                    ? 'Plano base — aplicado nos dias sem variação específica.'
+                    : `Variação de ${DAY_TABS.find(d => d.key === activeDay)?.long}. Se vazio, o dia usa o plano base.`}
+                </span>
                 <div className="ml-auto flex items-center gap-2">
                   <input
                     ref={fileRef}
@@ -275,6 +395,11 @@ export default function MealPlanEditor() {
                     {generating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
                     Gerar com IA
                   </Button>
+                  {activeDay !== 'all' && (
+                    <Button size="sm" variant="outline" onClick={copyFromAll}>
+                      <Copy className="h-3 w-3 mr-1" /> Copiar base
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing}>
                     {importing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Upload className="h-3 w-3 mr-1" />}
                     Importar PDF/MD
@@ -282,6 +407,11 @@ export default function MealPlanEditor() {
                   <Button size="sm" variant="outline" onClick={exportPdf}>
                     <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
                   </Button>
+                  {text.trim() && (
+                    <Button size="sm" variant="ghost" onClick={clearDay} title="Limpar aba">
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                   {hasBackup && (
                     <Button size="sm" variant="ghost" onClick={undoSave}>
                       <Undo2 className="h-3 w-3 mr-1" /> Desfazer salvamento
@@ -303,7 +433,7 @@ export default function MealPlanEditor() {
             <TotalsPanel
               text={enrichedTotalsText || text}
               weightKg={weightKg}
-              saveState={saving ? 'saving' : state}
+              saveState={saving ? 'saving' : saveState}
               onSave={savePlan}
               onSendZonaNutri={sendToZonaNutri}
               sending={sending}
