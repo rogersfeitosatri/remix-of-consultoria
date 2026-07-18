@@ -4,6 +4,7 @@
 // planModelVersion: 2. Não gera 7 dias.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiJson } from "../_shared/planPipeline.ts";
+import { loadMealPlanSkill, logGeneration } from "../_shared/skillPrompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -177,11 +178,10 @@ Deno.serve(async (req) => {
       anamneseText = lines.join("\n").slice(0, 6000);
     }
 
-    let systemPrompt = "Você é um nutricionista esportivo de endurance. Gere um plano ÚNICO e prático (não gere 7 dias).";
-    try {
-      const { data: cp } = await supabase.from("ai_prompts").select("prompt_text").eq("user_id", client.user_id).eq("context_key", "meal_plan_generation").maybeSingle();
-      if (cp?.prompt_text?.trim()) systemPrompt = cp.prompt_text.trim();
-    } catch { /* default */ }
+    // Prompt efetivo da habilidade "Plano alimentar": prompt ativo + módulos
+    // obrigatórios ATIVOS (nunca o de PDF). A geração é registrada no fim.
+    const skill = await loadMealPlanSkill(supabase, client.user_id, "Você é um nutricionista esportivo de endurance. Gere um plano ÚNICO e prático (não gere 7 dias).");
+    const systemPrompt = skill.effectivePrompt;
 
     const guidance = adminGuidance && typeof adminGuidance === "object"
       ? Object.entries(adminGuidance).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join("; ") : "";
@@ -280,7 +280,13 @@ Regras: cada refeição aparece UMA vez, com id único. Use alimentos que o atle
     if (existingRow) await supabase.from("ai_analyses").update(record).eq("id", existingRow.id);
     else await supabase.from("ai_analyses").insert(record);
 
-    return json({ success: true, planModelVersion: 2, longRunWeekday, status: stored.status, usedFallback });
+    // Registra a versão exata do prompt/módulos usada nesta geração.
+    await logGeneration(supabase, {
+      ownerUserId: client.user_id, clientId, skill, model: `v2-base/${model}`,
+      meta: { usedFallback, provider, planVersionNumber: stored.planVersionNumber, includedModules: skill.includedModuleKeys },
+    });
+
+    return json({ success: true, planModelVersion: 2, longRunWeekday, status: stored.status, usedFallback, promptVersion: skill.promptVersion, includedModules: skill.includedModuleKeys });
   } catch (error) {
     console.error("generate-base-plan:", error);
     return json({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
