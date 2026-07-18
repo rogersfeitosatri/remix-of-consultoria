@@ -322,30 +322,162 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_generation_log: {
+        Row: {
+          client_id: string | null
+          context_key: string
+          created_at: string
+          effective_prompt_chars: number | null
+          effective_prompt_hash: string | null
+          id: string
+          meta: Json | null
+          model: string | null
+          module_versions: Json | null
+          prompt_version_number: number | null
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          context_key?: string
+          created_at?: string
+          effective_prompt_chars?: number | null
+          effective_prompt_hash?: string | null
+          id?: string
+          meta?: Json | null
+          model?: string | null
+          module_versions?: Json | null
+          prompt_version_number?: number | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string | null
+          context_key?: string
+          created_at?: string
+          effective_prompt_chars?: number | null
+          effective_prompt_hash?: string | null
+          id?: string
+          meta?: Json | null
+          model?: string | null
+          module_versions?: Json | null
+          prompt_version_number?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_prompt_versions: {
+        Row: {
+          author_id: string | null
+          author_name: string | null
+          context_key: string
+          created_at: string
+          id: string
+          is_active: boolean
+          note: string | null
+          prompt_text: string
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          author_id?: string | null
+          author_name?: string | null
+          context_key: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          note?: string | null
+          prompt_text?: string
+          user_id: string
+          version_number: number
+        }
+        Update: {
+          author_id?: string | null
+          author_name?: string | null
+          context_key?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          note?: string | null
+          prompt_text?: string
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: []
+      }
       ai_prompts: {
         Row: {
+          active_version_number: number | null
           context_key: string
           created_at: string
           id: string
           prompt_text: string
           updated_at: string
+          updated_by: string | null
           user_id: string
         }
         Insert: {
+          active_version_number?: number | null
           context_key: string
           created_at?: string
           id?: string
           prompt_text?: string
           updated_at?: string
+          updated_by?: string | null
           user_id: string
         }
         Update: {
+          active_version_number?: number | null
           context_key?: string
           created_at?: string
           id?: string
           prompt_text?: string
           updated_at?: string
+          updated_by?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      ai_skill_modules: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          module_key: string
+          required: boolean
+          skill_key: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          module_key: string
+          required?: boolean
+          skill_key?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+          version_number?: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          module_key?: string
+          required?: boolean
+          skill_key?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+          version_number?: number
         }
         Relationships: []
       }
