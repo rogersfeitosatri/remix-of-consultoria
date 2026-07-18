@@ -126,9 +126,11 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
 
   const ctx = useMemo(() => getLineCtx(value, caret), [value, caret]);
 
-  // Detecta modo (título → sem sugestão; senão food ou measure).
+  // Detecta modo (título/observação com @/# → sem sugestão; senão food/measure).
   useEffect(() => {
-    if (!ctx.lineText.trim() || looksLikeTitleLine(ctx.lineText)) {
+    const trimmed = ctx.lineText.trimStart();
+    const isMarker = trimmed.startsWith('@') || trimmed.startsWith('#') || trimmed.startsWith('>');
+    if (!ctx.lineText.trim() || isMarker || looksLikeTitleLine(ctx.lineText)) {
       setMode('idle'); return;
     }
     const { query, hasDivider } = foodQueryOfSegment(ctx.segText.slice(0, ctx.segCaret));
