@@ -279,6 +279,9 @@ export default function MealPlanEditor() {
                     {importing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Upload className="h-3 w-3 mr-1" />}
                     Importar PDF/MD
                   </Button>
+                  <Button size="sm" variant="outline" onClick={exportPdf}>
+                    <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
+                  </Button>
                   {hasBackup && (
                     <Button size="sm" variant="ghost" onClick={undoSave}>
                       <Undo2 className="h-3 w-3 mr-1" /> Desfazer salvamento
