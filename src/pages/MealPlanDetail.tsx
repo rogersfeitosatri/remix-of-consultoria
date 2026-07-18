@@ -318,18 +318,20 @@ export default function MealPlanDetail() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState('');
+  const [importIsMarkdown, setImportIsMarkdown] = useState(false);
   const [importPdf, setImportPdf] = useState<{ name: string; base64: string } | null>(null);
   const importDiet = useMutation({
     mutationFn: async () => {
       const body: any = { clientId };
       if (importPdf) body.pdfBase64 = importPdf.base64;
+      else if (importIsMarkdown) body.markdown = importText; // preserva o original
       else body.planText = importText;
       const { data, error } = await supabase.functions.invoke('import-meal-plan', { body });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => { toast.success('Dieta importada! Já aparece em Plano Alimentar.'); setImportOpen(false); setImportText(''); setImportPdf(null); refresh(); },
+    onSuccess: () => { toast.success('Dieta importada! Já aparece em Plano Alimentar.'); setImportOpen(false); setImportText(''); setImportIsMarkdown(false); setImportPdf(null); refresh(); },
     onError: (e: any) => toast.error(e.message || 'Erro ao importar dieta'),
   });
 
@@ -928,15 +930,37 @@ export default function MealPlanDetail() {
               </div>
 
               {!importPdf && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Ou cole o texto da dieta:</p>
-                  <Textarea
-                    value={importText}
-                    onChange={(e) => setImportText(e.target.value)}
-                    rows={8}
-                    placeholder={"Ex.:\nCafé da manhã (07h)\n- 2 fatias de pão francês (100g) ou 1 tapioca (80g)\n- 2 ovos\n\nAlmoço (12h)\n- Arroz 4 col. sopa ou batata 2 unid.\n..."}
-                    className="font-mono text-xs"
-                  />
+                <div className="space-y-2">
+                  <div className="rounded-lg border border-dashed p-3">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
+                      <FileUp className="h-3.5 w-3.5 text-primary" /> Importar Markdown (.md) — preserva o original
+                    </label>
+                    <input
+                      type="file"
+                      accept=".md,.markdown,text/markdown,text/plain"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const text = await file.text();
+                        setImportText(text); setImportIsMarkdown(true);
+                      }}
+                      className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-primary file:text-primary-foreground file:px-3 file:py-1.5 file:text-xs file:font-medium"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Ou cole o texto/Markdown da dieta:</p>
+                    <Textarea
+                      value={importText}
+                      onChange={(e) => setImportText(e.target.value)}
+                      rows={8}
+                      placeholder={"Ex.:\nCafé da manhã (07h)\n- 2 fatias de pão francês (100g) ou 1 tapioca (80g)\n- 2 ovos\n\nAlmoço (12h)\n- Arroz 4 col. sopa ou batata 2 unid.\n..."}
+                      className="font-mono text-xs"
+                    />
+                    <label className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <input type="checkbox" checked={importIsMarkdown} onChange={(e) => setImportIsMarkdown(e.target.checked)} />
+                      É Markdown — preservar o original importado
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
