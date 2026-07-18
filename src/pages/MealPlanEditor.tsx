@@ -77,9 +77,16 @@ export default function MealPlanEditor() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [hasBackup, setHasBackup] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const enrichCache = useRef(makeEnrichCache());
   const [enrichedTotalsText, setEnrichedTotalsText] = useState<string>('');
+
+  const backupKey = `smart-plan-backup:${clientId}`;
+  useEffect(() => {
+    try { setHasBackup(!!localStorage.getItem(backupKey)); } catch { /* noop */ }
+  }, [backupKey]);
 
   // Enriquecimento debounced: ao parar de digitar por 700 ms, resolve
   // alimentos no banco e atualiza o texto usado pelo TotalsPanel (sem alterar
