@@ -16,7 +16,8 @@ import { toast } from 'sonner';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
-import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send, Layers } from 'lucide-react';
+import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send, Layers, MoreVertical, CircleCheck, CircleDashed } from 'lucide-react';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
 
@@ -421,6 +422,8 @@ export default function MealPlanDetail() {
     (anamnese as any)?.current_weight ??
     (client as any)?.current_weight ??
     null;
+  // Anamnese disponível para a IA? (heurística pelo status do atleta / presença de anamnese)
+  const anamneseOk = !!anamnese || ((client as any)?.athlete_status && (client as any).athlete_status !== 'pending_anamnese');
   const mealSchedule = anamnese ? {
     cafe_da_manha: (anamnese as any).meal_breakfast,
     lanche_manha: (anamnese as any).meal_morning_snack,
@@ -591,61 +594,76 @@ export default function MealPlanDetail() {
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
         ) : !hasPlan ? (
-          /* Ainda não há plano → duas formas de criar */
+          /* Ainda não há plano → uma ação principal + secundárias + menu */
           <div className="space-y-4">
-            <Card className="border-primary/40 bg-primary/5">
-              <CardContent className="pt-4 flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">Gerar plano-base (novo modelo v2)</p>
-                  <p className="text-xs text-muted-foreground">Uma única chamada de IA gera o plano-base; a dinâmica por dia de treino e o carbload são aplicados automaticamente pelo sistema (sem gerar 7 dietas).</p>
-                </div>
-                <Button className="gap-2 shrink-0" onClick={() => generateV2.mutate()} disabled={busy || generateV2.isPending}>
-                  {generateV2.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  Gerar plano-base
-                </Button>
+            {/* Dados para a IA (não inventa o que falta) */}
+            <Card>
+              <CardContent className="py-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+                <span className="font-medium">Dados para a IA:</span>
+                <span className="inline-flex items-center gap-1.5">
+                  {anamneseOk ? <CircleCheck className="h-4 w-4 text-emerald-600" /> : <CircleDashed className="h-4 w-4 text-amber-600" />}
+                  Anamnese: <strong>{anamneseOk ? 'disponível' : 'pendente'}</strong>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  {athleteWeightKg ? <CircleCheck className="h-4 w-4 text-emerald-600" /> : <CircleDashed className="h-4 w-4 text-amber-600" />}
+                  Peso: <strong>{athleteWeightKg ? `${athleteWeightKg} kg` : 'não informado'}</strong>
+                </span>
               </CardContent>
             </Card>
 
-            <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-              Ou pelos modos anteriores:
-              <span className="text-foreground"> (1) Importar a dieta atual</span> ou
-              <span className="text-foreground"> (2) Gerar pela anamnese</span>.
-            </div>
-            <div className="grid md:grid-cols-2 gap-4">
-              {/* 1) Importar dieta atual */}
-              <Card className="border-primary/30">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2"><FileUp className="h-4 w-4 text-primary" /> 1. Importar dieta atual</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">O atleta já tem uma dieta? Cole o texto dela (do PDF/plano atual) e o sistema estrutura em refeições, alimentos, porções e substituições. Essa dieta vira o Plano Alimentar.</p>
-                  <Button className="w-full gap-2" onClick={() => setImportOpen(true)} disabled={busy}>
-                    <FileUp className="h-4 w-4" /> Importar dieta
-                  </Button>
-                </CardContent>
-              </Card>
+            {/* Ação principal + secundárias + menu de 3 pontos */}
+            <Card className="border-primary/40 bg-primary/5">
+              <CardContent className="py-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold">Gerar plano com base na anamnese</p>
+                    <p className="text-xs text-muted-foreground">A IA usa a anamnese, o peso e a habilidade ativa da Central de IA para montar um rascunho — a dinâmica por dia de treino e o carbload são aplicados pelo sistema. Você revisa antes de publicar.</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button className="gap-2" onClick={() => generateV2.mutate()} disabled={busy || generateV2.isPending}>
+                      {generateV2.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      Gerar plano
+                    </Button>
+                    <Button variant="outline" className="gap-2" onClick={() => setImportOpen(true)} disabled={busy}>
+                      <FileUp className="h-4 w-4" /> Importar
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" disabled={busy}><MoreVertical className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Outras formas de criar</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => analyzeMutation.mutate()}>
+                          <Brain className="h-4 w-4 mr-2" /> Gerar pela anamnese (com metas)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                          <FileUp className="h-4 w-4 mr-2" /> Importar Markdown / PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => createFromScratch.mutate()}>
+                          <FilePlus2 className="h-4 w-4 mr-2" /> Criar plano em branco
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+                {!anamneseOk && (
+                  <p className="text-xs text-amber-600">Anamnese pendente — a IA não inventa dados faltantes. Você pode gerar mesmo assim (revise o rascunho) ou importar um plano existente.</p>
+                )}
+                <Collapsible open={guidanceOpen} onOpenChange={setGuidanceOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-1.5 px-0 text-muted-foreground">
+                      <Wand2 className="h-3.5 w-3.5" /> Metas (opcional) — usadas ao “Gerar pela anamnese”
+                      <ChevronDown className={`h-4 w-4 transition-transform ${guidanceOpen ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-2">{GuidanceInputs}</CollapsibleContent>
+                </Collapsible>
+              </CardContent>
+            </Card>
 
-              {/* 2) Gerar pela anamnese */}
-              <Card className="border-primary/30">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> 2. Gerar pela anamnese (IA)</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">Não tem dieta ainda? A IA analisa a anamnese e monta o plano original. Ajuste as metas abaixo (opcional).</p>
-                  {GuidanceInputs}
-                  <Button className="w-full gap-2" onClick={() => analyzeMutation.mutate()} disabled={busy}>
-                    {analyzeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-                    Gerar plano pela anamnese
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
+            {/* Geração em etapas (persistente) — opção avançada */}
             <PlanPipelinePanel clientId={clientId!} onDone={refresh} />
-
-            <button className="text-xs text-muted-foreground underline" onClick={() => createFromScratch.mutate()} disabled={busy}>
-              ou criar um plano em branco para montar manualmente
-            </button>
           </div>
         ) : (
           <>
