@@ -71,24 +71,40 @@ function structFood(f: any, table: any[]): any {
     nutrient_source: match ? "Banco" : undefined,
   };
 }
-// Converte o plano-base v2 para o formato v1 (meal_plan.meals) para renderização
-// e edição: opções estruturadas (foods com macros) + food_groups (texto legado).
+// Classe do alimento pelo macro dominante (energia) — para casar substituições.
+function foodClass(f: any): "carb" | "protein" | "fat" {
+  const c = (Number(f.carbs_g) || 0) * 4, p = (Number(f.protein_g) || 0) * 4, fa = (Number(f.fat_g) || 0) * 9;
+  if (c >= p && c >= fa) return "carb";
+  if (p >= fa) return "protein";
+  return "fat";
+}
+function subLabel(f: any): string {
+  return `${f.name}${f.grams ? ` — ${Math.round(Number(f.grams))} g` : f.measure ? ` — ${f.measure}` : ""}`;
+}
+// Converte o plano-base v2 para v1. IMPORTANTE: as `substitutions` do v2 são
+// TROCAS DE INGREDIENTE (arroz→macarrão, carne→frango) e NÃO refeições completas.
+// Então montamos UMA opção completa (Opção 1) e embutimos cada substituição no
+// alimento de mesma função nutricional (nunca criando "Opção 2" incompleta).
 function mirrorToMealPlan(meals: any[], table: any[]): any[] {
   return (meals || []).map((m: any) => {
-    const rawOptions = [m.mainOption, ...(m.substitutions || [])].filter(Boolean);
-    const options = rawOptions.map((o: any, i: number) => ({
-      label: i === 0 ? "Opção 1" : `Opção ${i + 1}`,
-      foods: (o.foods || []).map((f: any) => structFood(f, table)),
-    }));
-    const mainTxt = (m.mainOption?.foods || []).map(foodText).join(" + ");
-    const subTxts = (m.substitutions || []).map((o: any) => (o.foods || []).map(foodText).join(" + ")).filter(Boolean);
-    const optionsTxt = [mainTxt, ...subTxts].filter(Boolean).join(" ou ");
+    const mainFoods = (m.mainOption?.foods || []).map((f: any) => structFood(f, table));
+    // anexa substituições ao alimento principal de mesma classe (fallback: 1º)
+    for (const sub of (m.substitutions || [])) {
+      for (const sf of (sub.foods || [])) {
+        const s = structFood(sf, table);
+        const cls = foodClass(s);
+        const target = mainFoods.find((mf: any) => foodClass(mf) === cls) || mainFoods[0];
+        if (target) target.substitutions = [...(target.substitutions || []), subLabel(s)];
+      }
+    }
+    const options = [{ label: "Opção 1", foods: mainFoods }];
+    const mainTxt = mainFoods.map((f: any) => `${f.name}${f.grams ? ` ${f.grams}g` : ""}${(f.substitutions || []).length ? ` ou ${f.substitutions.join("; ")}` : ""}`).join(" + ");
     const mm = m.macros || {};
     return {
       meal_name: m.name, horario: m.defaultTime || "",
       timing_note: (m.generalInstructions || [])[0] || "",
-      options, foods: options[0]?.foods ?? [],
-      food_groups: [{ group: m.name, options: optionsTxt }],
+      options, foods: mainFoods,
+      food_groups: mainFoods.map((f: any) => ({ group: f.name, options: [`${f.name}${f.grams ? ` ${f.grams}g` : ""}`, ...(f.substitutions || [])].join(" ou ") })),
       meal_macros: mm.kcal != null ? `~${Math.round(mm.kcal)} kcal, CHO ${Math.round(mm.cho_g || 0)}g, PTN ${Math.round(mm.protein_g || 0)}g, LIP ${Math.round(mm.fat_g || 0)}g` : "",
     };
   });
