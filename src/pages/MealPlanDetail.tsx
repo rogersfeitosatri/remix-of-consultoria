@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
+import { PlanReadOnlyView } from '@/components/admin/PlanReadOnlyView';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send, Layers, MoreVertical, CircleCheck, CircleDashed } from 'lucide-react';
@@ -109,6 +110,7 @@ export default function MealPlanDetail() {
 
   // --- Dias da semana: plano base + variações por dia ---
   const [selectedDay, setSelectedDay] = useState<string>('base'); // 'base' | 'seg'..'dom'
+  const [planMode, setPlanMode] = useState<'view' | 'edit'>('view'); // Visualizar | Editar
   const dayVariations: Record<string, any> = structured?.meal_plan?.day_variations || {};
   const activeVariation = selectedDay !== 'base' ? dayVariations[selectedDay] : null;
 
@@ -907,17 +909,37 @@ export default function MealPlanDetail() {
               </Card>
             )}
 
-            {/* Meal plan editor (calories, g/kg, recalc, structured foods) */}
+            {/* Plano alimentar: Visualizar (read-only, macros + g/kg) ou Editar */}
             {structured?.meal_plan?.meals && (
-              <EditableMealPlan
-                key={`mp-${structured.updated_at}-${selectedDay}-${activeVariation ? 'var' : 'base'}`}
-                analysis={effectiveAnalysis}
-                clientId={clientId!}
-                athleteWeightKg={athleteWeightKg}
-                mealSchedule={mealSchedule}
-                onUpdated={refresh}
-                onSavePlan={activeVariation ? onSaveDayVariation : undefined}
-              />
+              <div className="space-y-3">
+                <div className="inline-flex rounded-lg border p-0.5 bg-muted/40">
+                  <button
+                    onClick={() => setPlanMode('view')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${planMode === 'view' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+                  >Visualizar</button>
+                  <button
+                    onClick={() => setPlanMode('edit')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${planMode === 'edit' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+                  >Editar</button>
+                </div>
+                {planMode === 'view' ? (
+                  <PlanReadOnlyView
+                    analysis={effectiveAnalysis}
+                    athleteWeightKg={athleteWeightKg}
+                    weightSource={weightInfo?.source === 'checkin' ? 'último check-in' : weightInfo?.source === 'anamnese' ? 'anamnese' : weightInfo?.source === 'manual' ? 'manual' : null}
+                  />
+                ) : (
+                  <EditableMealPlan
+                    key={`mp-${structured.updated_at}-${selectedDay}-${activeVariation ? 'var' : 'base'}`}
+                    analysis={effectiveAnalysis}
+                    clientId={clientId!}
+                    athleteWeightKg={athleteWeightKg}
+                    mealSchedule={mealSchedule}
+                    onUpdated={refresh}
+                    onSavePlan={activeVariation ? onSaveDayVariation : undefined}
+                  />
+                )}
+              </div>
             )}
 
             {/* Orientations & supplementation (editable) */}
