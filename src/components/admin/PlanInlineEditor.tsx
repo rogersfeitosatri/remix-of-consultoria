@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Undo2, Redo2, Plus, Trash2, Copy, ChevronUp, ChevronDown, Loader2, Check, Utensils, X } from 'lucide-react';
-import { sumFoods, perKg, roundNutrients, type Nutrients } from '@/lib/nutritionCalc';
+import { sumFoods, perKg, roundNutrients, summarizePlanBase, type Nutrients } from '@/lib/nutritionCalc';
+import { AlertTriangle, Info } from 'lucide-react';
 import { FoodAiDialog } from './FoodAiDialog';
 
 type Food = { name: string; grams?: number | null; measure?: string | null; calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number; substitutions?: string[] };
@@ -63,6 +64,7 @@ function toMealPlan(meals: Meal[], base: any): any {
 export function PlanInlineEditor({ analysis, athleteWeightKg, onSave, savedAt }: {
   analysis: any; athleteWeightKg?: number | null; onSave: (mealPlan: any) => Promise<void>; savedAt?: string | null;
 }) {
+  const targetKcal = Number(analysis?.meal_plan?.daily_totals?.kcal) || null;
   const initial = useMemo(() => normalizeMeals(analysis?.meal_plan), [analysis?.meal_plan]);
   const [hist, setHist] = useState<Meal[][]>([initial]);
   const [idx, setIdx] = useState(0);
@@ -113,6 +115,12 @@ export function PlanInlineEditor({ analysis, athleteWeightKg, onSave, savedAt }:
 
   const dayTotals = useMemo(() => roundNutrients(meals.reduce((acc, m) => sumFoods([acc, sumFoods((m.options[0]?.foods || []).map(foodNutrients))]), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 } as Nutrients), 0), [meals]);
   const pk = perKg(dayTotals, athleteWeightKg);
+
+  // Auditoria ao vivo (equivalência entre opções + fechamento do dia vs. meta)
+  const audit = useMemo(() => summarizePlanBase({
+    meals: meals.map((m) => ({ name: m.meal_name, optionTotals: m.options.map((o) => sumFoods(o.foods.map(foodNutrients))) })),
+    weightKg: athleteWeightKg, mode: 'weekly', targetKcal,
+  }), [meals, athleteWeightKg, targetKcal]);
 
   return (
     <div className="space-y-3">
@@ -196,6 +204,21 @@ export function PlanInlineEditor({ analysis, athleteWeightKg, onSave, savedAt }:
       ))}
 
       <Button variant="outline" className="w-full gap-2" onClick={addMeal}><Plus className="h-4 w-4" /> Adicionar refeição</Button>
+
+      {/* Auditoria ao vivo (recalcula a cada edição) */}
+      {audit.findings.length > 0 && (
+        <Card className={audit.hasBlock ? 'border-red-500/40' : 'border-amber-500/40'}>
+          <CardContent className="py-2.5 space-y-1">
+            <p className="text-xs font-semibold flex items-center gap-1.5">
+              {audit.hasBlock ? <AlertTriangle className="h-3.5 w-3.5 text-red-600" /> : <Info className="h-3.5 w-3.5 text-amber-600" />}
+              Auditoria ({audit.findings.length})
+            </p>
+            {audit.findings.map((f, i) => (
+              <p key={i} className={`text-xs ${f.level === 'block' ? 'text-red-600' : f.level === 'warn' ? 'text-amber-600' : 'text-sky-600'}`}>• {f.message}</p>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Totais do plano (Opção 1 de cada refeição) */}
       <Card className="border-primary/30">
