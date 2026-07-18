@@ -330,6 +330,47 @@ export default function MealPlanEditor() {
     setText('');
   };
 
+  // Replicação: aba atual -> outros dias selecionados
+  const [replicateOpen, setReplicateOpen] = useState(false);
+  const [replicateTargets, setReplicateTargets] = useState<DayKey[]>([]);
+  const [replicateAsBase, setReplicateAsBase] = useState(false);
+
+  const openReplicate = () => {
+    if (!text.trim()) { toast.error('Aba atual está vazia.'); return; }
+    setReplicateTargets([]);
+    setReplicateAsBase(false);
+    setReplicateOpen(true);
+  };
+
+  const applyReplicate = () => {
+    const source = text;
+    setTexts(prev => {
+      const next = { ...prev };
+      if (replicateAsBase) next.all = source;
+      for (const k of replicateTargets) {
+        if (k !== activeDay) next[k] = source;
+      }
+      return next;
+    });
+    const count = replicateTargets.filter(k => k !== activeDay).length + (replicateAsBase ? 1 : 0);
+    toast.success(count > 0
+      ? `Plano replicado em ${count} destino(s).`
+      : 'Nenhum destino selecionado.');
+    setReplicateOpen(false);
+  };
+
+  const toggleTarget = (k: DayKey) => {
+    setReplicateTargets(prev => prev.includes(k) ? prev.filter(x => x !== k) : [...prev, k]);
+  };
+
+  const selectAllTargets = () => {
+    const all = DAY_TABS
+      .filter(d => d.key !== 'all' && d.key !== activeDay)
+      .map(d => d.key) as DayKey[];
+    setReplicateTargets(all);
+  };
+
+
   const sendToZonaNutri = async () => {
     if (!clientId) return;
     try {
