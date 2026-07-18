@@ -66,7 +66,7 @@ export function parseToken(raw: string): FoodToken {
   const splitIdx = firstDivider(s);
   let namePart = s;
   let qtyPart = '';
-  if (splitIdx >= 0) {
+  if (splitIdx) {
     namePart = s.slice(0, splitIdx.index).trim();
     qtyPart = s.slice(splitIdx.index + splitIdx.len).trim();
   } else {
