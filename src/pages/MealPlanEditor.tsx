@@ -7,13 +7,13 @@
 //   pelas outras telas e pelo envio ao Zona Nutri).
 // - Botão "Enviar ao Zona Nutri" chama a edge function existente.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Upload, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SmartPlanEditor } from '@/components/mealplan-v3/SmartPlanEditor';
@@ -22,7 +22,8 @@ import { useSmartPlanDraft } from '@/hooks/useSmartPlanDraft';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { mealsToText } from '@/lib/smartPlan/fromMeals';
 import { parseText } from '@/lib/smartPlan/parse';
-import { astToMeals } from '@/lib/smartPlan/serialize';
+import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
+import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 
 export default function MealPlanEditor() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -75,12 +76,34 @@ export default function MealPlanEditor() {
 
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const enrichCache = useRef(makeEnrichCache());
+  const [enrichedTotalsText, setEnrichedTotalsText] = useState<string>('');
+
+  // Enriquecimento debounced: ao parar de digitar por 700 ms, resolve
+  // alimentos no banco e atualiza o texto usado pelo TotalsPanel (sem alterar
+  // o texto do editor). Isso mantém a digitação fluida e traz macros reais.
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      try {
+        const ast = parseText(text);
+        await enrichAst(ast, enrichCache.current);
+        // Reserializa preservando texto original é complexo — para o painel
+        // basta um texto equivalente que carregue os macros no parse.
+        // Usamos astToText porque planTotals lê o AST parseado.
+        setEnrichedTotalsText(astToText(ast));
+      } catch { /* silencioso */ }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [text]);
 
   const savePlan = async () => {
     if (!clientId) return;
     try {
       setSaving(true);
       const ast = parseText(text);
+      await enrichAst(ast, enrichCache.current);
       const meals = astToMeals(ast);
       const currentRaw = (analysisRow?.raw_response as any) || {};
       const nextRaw = {
@@ -102,6 +125,28 @@ export default function MealPlanEditor() {
       toast.error(`Não foi possível salvar: ${e.message || e}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const importPdf = async (file: File) => {
+    try {
+      setImporting(true);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('client_id', clientId!);
+      const { data, error } = await supabase.functions.invoke('import-meal-plan', { body: fd });
+      if (error) throw error;
+      const meals = (data as any)?.meals || (data as any)?.meal_plan?.meals;
+      if (!Array.isArray(meals) || !meals.length) throw new Error('PDF sem refeições reconhecíveis');
+      const imported = mealsToText(meals);
+      // acrescenta ao texto atual em uma seção nova
+      setText((text ? `${text}\n\n` : '') + imported);
+      toast.success(`PDF importado: ${meals.length} refeições.`);
+    } catch (e: any) {
+      toast.error(`Falha ao importar: ${e.message || e}`);
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
@@ -139,12 +184,25 @@ export default function MealPlanEditor() {
             <CardContent className="p-3 md:p-4">
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span>Digite o plano como um documento. <b>Enter</b> = novo alimento. <b>ou</b> = substituição. <b>HH:MM Nome</b> = nova refeição.</span>
-                <a
-                  href={`/meal-plans/${clientId}`}
-                  className="ml-auto inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  Editor clássico <ExternalLink className="h-3 w-3" />
-                </a>
+                <div className="ml-auto flex items-center gap-2">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="application/pdf,.md,.txt"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) importPdf(f); }}
+                  />
+                  <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing}>
+                    {importing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Upload className="h-3 w-3 mr-1" />}
+                    Importar PDF/MD
+                  </Button>
+                  <a
+                    href={`/meal-plans/${clientId}`}
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Editor clássico <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </div>
               <SmartPlanEditor value={text} onChange={setText} />
             </CardContent>
@@ -152,7 +210,7 @@ export default function MealPlanEditor() {
 
           <div className="lg:block">
             <TotalsPanel
-              text={text}
+              text={enrichedTotalsText || text}
               weightKg={weightKg}
               saveState={saving ? 'saving' : state}
               onSave={savePlan}
