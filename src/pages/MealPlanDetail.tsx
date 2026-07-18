@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 import { PlanReadOnlyView } from '@/components/admin/PlanReadOnlyView';
 import { PlanFinalizationPanel } from '@/components/admin/PlanFinalizationPanel';
+import { PlanInlineEditor } from '@/components/admin/PlanInlineEditor';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send, Layers, MoreVertical, CircleCheck, CircleDashed } from 'lucide-react';
@@ -112,6 +113,16 @@ export default function MealPlanDetail() {
   // --- Dias da semana: plano base + variações por dia ---
   const [selectedDay, setSelectedDay] = useState<string>('base'); // 'base' | 'seg'..'dom'
   const [planMode, setPlanMode] = useState<'view' | 'edit'>('view'); // Visualizar | Editar
+  const [useClassicEditor, setUseClassicEditor] = useState(false); // fallback pro editor antigo
+
+  // Salvamento do novo editor inline (autosave) — respeita variação do dia.
+  const saveInlinePlan = async (mealPlan: any) => {
+    if (activeVariation) { await onSaveDayVariation(mealPlan); return; }
+    const next = JSON.parse(JSON.stringify(structured));
+    next.meal_plan.meals = mealPlan.meals;
+    next.meal_plan.daily_totals = mealPlan.daily_totals;
+    await persistStructured(next);
+  };
   const dayVariations: Record<string, any> = structured?.meal_plan?.day_variations || {};
   const activeVariation = selectedDay !== 'base' ? dayVariations[selectedDay] : null;
 
@@ -939,16 +950,30 @@ export default function MealPlanDetail() {
                     athleteWeightKg={athleteWeightKg}
                     weightSource={weightInfo?.source === 'checkin' ? 'último check-in' : weightInfo?.source === 'anamnese' ? 'anamnese' : weightInfo?.source === 'manual' ? 'manual' : null}
                   />
+                ) : useClassicEditor ? (
+                  <div className="space-y-2">
+                    <EditableMealPlan
+                      key={`mp-${structured.updated_at}-${selectedDay}-${activeVariation ? 'var' : 'base'}`}
+                      analysis={effectiveAnalysis}
+                      clientId={clientId!}
+                      athleteWeightKg={athleteWeightKg}
+                      mealSchedule={mealSchedule}
+                      onUpdated={refresh}
+                      onSavePlan={activeVariation ? onSaveDayVariation : undefined}
+                    />
+                    <button className="text-xs text-primary underline" onClick={() => setUseClassicEditor(false)}>usar o novo editor</button>
+                  </div>
                 ) : (
-                  <EditableMealPlan
-                    key={`mp-${structured.updated_at}-${selectedDay}-${activeVariation ? 'var' : 'base'}`}
-                    analysis={effectiveAnalysis}
-                    clientId={clientId!}
-                    athleteWeightKg={athleteWeightKg}
-                    mealSchedule={mealSchedule}
-                    onUpdated={refresh}
-                    onSavePlan={activeVariation ? onSaveDayVariation : undefined}
-                  />
+                  <div className="space-y-2">
+                    <PlanInlineEditor
+                      key={`inline-${selectedDay}-${activeVariation ? 'var' : 'base'}`}
+                      analysis={effectiveAnalysis}
+                      athleteWeightKg={athleteWeightKg}
+                      onSave={saveInlinePlan}
+                      savedAt={structured.updated_at}
+                    />
+                    <button className="text-xs text-muted-foreground underline" onClick={() => setUseClassicEditor(true)}>usar o editor clássico (avançado)</button>
+                  </div>
                 )}
               </div>
             )}
