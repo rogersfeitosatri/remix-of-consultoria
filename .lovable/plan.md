@@ -1,90 +1,130 @@
-# Wizard público de assinatura ZN + Auto-onboarding
 
-## Objetivo
-Substituir os 3 links fixos do Asaas por um funil próprio: atleta escolhe plano na landing `zonanutri.com/diet` → wizard enxuto em `rogersfeitosa.com.br/zn/assinar` → sistema cria cadastro, gera cobrança Asaas e devolve link de pagamento. Após pagamento, fluxo automático já existente (webhook → ativação → sync Zona Nutri → WhatsApp) assume.
+# Refatoração do Plano Alimentar — Auditoria + Proposta
 
----
+## 1. Auditoria do que existe hoje
 
-## 1. Wizard público (frontend)
+### Páginas e componentes principais
+- `src/pages/MealPlans.tsx` (156 linhas): lista/seleção de atleta.
+- `src/pages/MealPlanDetail.tsx` (1.081 linhas): tela do plano por atleta, com abas, envio ao Zona Nutri, importação, geração por IA (V2/anamnese), aplicar/desfazer proposta.
+- `src/components/admin/EditableMealPlan.tsx` (2.189 linhas): editor atual — cada refeição/alimento/opção é um card com vários botões, dropdowns e modais (o "muitos cliques" que o usuário quer eliminar).
+- `PlanInlineEditor.tsx` (267 linhas): tentativa parcial de edição inline, hoje pouco usada.
+- `PlanReadOnlyView.tsx` (137 linhas): visualização estruturada, calcula macros a partir de `foods[]`.
+- `FoodSearchAutocomplete.tsx` (516 linhas) + `FoodAiDialog.tsx` + `MealAiDialog.tsx`: busca de alimentos e diálogos de IA.
+- `MealPlanSkillPanel.tsx`, `PlanFinalizationPanel.tsx`, `PlanPipelinePanel.tsx`, `PlanV2Panel.tsx`: painéis auxiliares de geração/finalização/pipeline.
 
-Nova página `src/pages/PublicZnSubscribe.tsx` na rota `/zn/assinar?plano=mensal|semestral|anual`.
+### Modelo de dados (o que dá para reaproveitar)
+- Tabelas: `food_items`, `food_measures`, `substitution_groups`, `client_plan_history`, campos JSON no `clients` (plano atual + proposta) — todos permanecem.
+- Estrutura de refeição usada em todo o app (`PlanReadOnlyView`, envio ao Zona Nutri, PDF, importação):
+  - `meals[]` → `{ meal_name, horario, timing_note, options: [{ foods: [...] }], food_groups[], meal_macros }`
+  - Cada `food` já traz: `name, grams, measure, calories, protein_g, carbs_g, fat_g, substitutions[]`.
+- `src/lib/planV2.ts` define o formato v2 (base + camadas semanais/carbload). Continua válido para a geração por IA — muda só o editor.
+- Hooks: `useFoodSearch`, `useFoodMeasures`, `useLookupCustomFood` (IA para alimento novo) — reutilizáveis 100%.
 
-Formato wizard em 3 passos, mobile-first, com barra de progresso.
+### Edge functions envolvidas
+- Geração: `generate-base-plan`, `generate-plan-day`, `update-meal-plan`, `adjust-meal-ai`, `finalize-plan`, `audit-meal-plan`, `checkin-plan-patch`.
+- Importação: `import-meal-plan` (PDF/Markdown, com fallback Gemini→OpenAI).
+- Alimentos: `lookup-custom-food` (IA).
+- Zona Nutri: `send-meal-plan-to-zona-nutri`, `notify-meal-plan-ready`.
+- **Nada disso muda.** O novo editor só troca a UI que produz/consome o mesmo `meals[]`.
 
-**Passo 1 — Identificação**
-- Nome completo
-- E-mail
-- WhatsApp (máscara E.164, validação BR)
-- CPF (obrigatório, com validação de dígito)
+### Problemas concretos do editor atual
+1. Cada alimento exige 5–8 cliques (abrir card → escolher grupo → autocomplete → medida → quantidade → substituição → salvar).
+2. Fluxo desktop e mobile são o mesmo grid pesado — no celular vira scroll infinito.
+3. Substituições vivem em cards separados, sem noção de "grupo/linha".
+4. Não há edição contínua nem salvamento incremental por linha; salva o plano inteiro.
+5. Importação já retorna o formato correto, mas a UI de revisão é a mesma do editor pesado.
 
-**Passo 2 — Perfil rápido**
-- Objetivo de composição corporal (select: perder peso / manter / ganhar peso)
-- Prova alvo? (sim/não). Se sim: qual prova + data
-- Peso atual (kg) + altura (cm)
+## 2. Proposta — Editor Inteligente de Plano
 
-**Passo 3 — Confirmação**
-- Resumo do plano escolhido + valor + condições de parcelamento
-- Botão "Ir para pagamento" → chama edge function → redireciona pro `invoiceUrl` do Asaas
+### Princípios
+- Um único `contenteditable` (rich text controlado), estilo Notion/Linear.
+- Modelo interno = **AST** (blocos de refeição → linhas de grupo → tokens alimento/quantidade/medida/"ou").
+- Ao digitar, o parser reconstrói o AST a partir do texto; ao selecionar sugestão, atualiza o AST e re-renderiza o texto formatado. Sem modais.
+- Compilação `AST ⇄ meals[]` (formato canônico do sistema) — Zona Nutri, PDF, IA e leitura continuam funcionando sem mudanças.
 
-Design herda tokens do `index.css` (mesma estética da `PlansLanding`).
+### Gramática da linha
+```text
+HH:MM — Nome da refeição              ← título de refeição (novo bloco)
+Alimento - Quantidade Medida [ ou Alimento - Quantidade Medida ]*   ← grupo (1 linha)
+Alimento - Quantidade Medida         ← novo grupo (Enter cria linha nova)
+```
+Reconhece variações: `—`, `-`, `:`, sem separador, "OU"/"/"/"ou então". Título aceita `HH:MM` antes ou depois do nome.
 
-## 2. Edge function `zn-create-subscription`
+### Sugestões contextuais (popover ancorado no cursor)
+- Estado 1 — digitando **nome do alimento**: `useFoodSearch(query)` + recentes/favoritos do nutricionista + item final "🔎 Buscar com IA" (chama `lookup-custom-food`, aprovar e cadastrar).
+- Estado 2 — depois de `-` ou espaço numérico: mostra `useFoodMeasures(foodId)` + gramas comuns.
+- Navegação: ↑/↓/Enter/Tab/clique/toque. Sem botão "confirmar".
 
-Nova função pública (sem JWT) em `supabase/functions/zn-create-subscription/index.ts`.
+### Grupo (linha) e substituições
+- Toda a linha é 1 grupo. Primeiro token = principal; itens após `ou` = substituições.
+- Toggle "Recalcular substituições automaticamente" (default ligado). Ao editar quantidade do principal, recalcula equivalência por macro dominante (carb/prot/gord/misto) com base em `calories_per_100g` e `carbs_per_100g|protein_per_100g|fat_per_100g` já existentes. Toast discreto com "desfazer".
 
-Recebe: `{ plan_choice, name, email, phone, cpf, body_goal, target_race, target_race_date, weight, height }`.
+### Layout
+- **Desktop**: editor central + painel lateral fino (peso, meta, totais por refeição/dia em g/kg, versão, botão "Enviar ao Zona Nutri", status de salvamento).
+- **Mobile**: editor em tela cheia; barra flutuante acima do teclado com as sugestões; sheet colapsável no rodapé com totais.
+- Linhas longas quebram visualmente com indentação nos "ou".
 
-Fluxo:
-1. Valida payload com Zod
-2. Resolve `owner_user_id` (admin dono do módulo ZN — usa o mesmo `ADMIN_USER_ID` que já é referenciado no PaymentOrchestrator)
-3. Chama `AthleteService.findOrCreate` → cria/reutiliza registro em `zn_athletes` com `status='pending'`, `plan_choice`, campos do perfil
-4. Cria customer no Asaas (`POST /customers`) se ainda não existe
-5. Cria assinatura Asaas com `externalReference="zn:{athlete_id}"`, ciclo e valor conforme tabela:
-   | Plano | Valor | Ciclo | Parcelas |
-   |---|---|---|---|
-   | Mensal | 69,90 | MONTHLY | 1x |
-   | Semestral | 299,00 | SEMIANNUALLY | até 6x |
-   | Anual | 419,90 | YEARLY | até 12x |
-6. Busca `invoiceUrl` da primeira cobrança e retorna ao cliente
+### Salvamento
+- Debounce 800ms → grava JSON `meals[]` no campo já existente do `clients` (ou tabela de rascunho). Indicador discreto "Salvando…/Salvo".
+- Local backup em `localStorage` por atleta contra queda de conexão.
 
-## 3. Blindagem do webhook (multi-tenant Asaas)
+### Importação
+- `import-meal-plan` continua retornando `meals[]`. O resultado passa por um serializer AST → texto e abre direto no novo editor. Alimentos não resolvidos ficam sublinhados; clique abre popover com sugestões / IA / cadastrar.
 
-`PaymentOrchestrator.ts` passa a exigir `externalReference` começando com `zn:` OU `subscription.value` batendo com um dos 3 valores ZN. Eventos que não casam → `status: skipped, reason: 'not_zn_subscription'`. Isso permite que sua conta Asaas seja usada para outros serviços sem contaminar o módulo ZN.
+### Zona Nutri
+- Botão único no painel lateral chama `send-meal-plan-to-zona-nutri` com o mesmo payload atual. Nada muda no contrato.
 
-## 4. Schema — novos campos em `zn_athletes`
+## 3. Arquitetura técnica
 
-Migration adicionando (sem alterar dados existentes):
-- `plan_choice` text (monthly/semestral/annual escolhido no wizard)
-- `body_goal` text (lose/maintain/gain)
-- `target_race` text, `target_race_date` date
-- `weight_kg` numeric, `height_cm` numeric
-- `subscription_started_at` timestamptz (nullable — preenchido quando `PAYMENT_CONFIRMED` chega)
+Novos arquivos (isolados; nada removido nesta fase):
+```text
+src/lib/smartPlan/
+  ├─ ast.ts              // tipos: MealBlock, GroupLine, FoodToken
+  ├─ parse.ts            // texto → AST (linha a linha, tolerante)
+  ├─ serialize.ts        // AST → texto formatado + AST → meals[]
+  ├─ fromMeals.ts        // meals[] → AST (import + rascunho existente)
+  ├─ equivalence.ts      // recálculo de substituições por macro dominante
+  └─ measures.ts         // resolução alimento↔medida↔gramas↔macros
+src/components/mealplan-v3/
+  ├─ SmartPlanEditor.tsx // ContentEditable controlado
+  ├─ SuggestionPopover.tsx
+  ├─ TotalsSidebar.tsx   // desktop
+  ├─ TotalsSheet.tsx     // mobile
+  └─ PlanPageV3.tsx      // nova aba/rota
+src/hooks/
+  ├─ useSmartPlanDraft.ts// autosave + backup local
+  └─ useFoodSuggestions.ts // combina useFoodSearch + recentes + IA
+```
 
-## 5. Aba "Leads" em `/clients`
+Rota nova coexiste com a antiga por trás de flag até validação. Migração de dados = zero (formato canônico `meals[]` idêntico).
 
-- Cron diário `zn-mark-leads`: marca `zn_athletes` com `status='pending'` há +7 dias como `status='lead'`
-- Nova aba na página `Clients.tsx`: Ativos / Congelados / Inativos / **Leads**
-- Lista mostra: nome, plano escolhido, WhatsApp, dias desde inscrição, botões: "Reenviar link de pagamento" (regenera invoice Asaas) e "Excluir lead"
+Reaproveitamento direto: `useFoodSearch`, `useFoodMeasures`, `useLookupCustomFood`, `PlanReadOnlyView` (para "Visualização estruturada"), `nutritionCalc.ts`, `send-meal-plan-to-zona-nutri`, `import-meal-plan`, `lookup-custom-food`.
 
-## 6. Migração para produção Asaas (etapa final, após testes em sandbox)
+## 4. Fases de entrega
 
-Após o wizard funcionar em sandbox:
-1. Trocar `ASAAS_ENV` para `production`
-2. Trocar `ASAAS_API_KEY` para chave de produção
-3. Cadastrar webhook `https://<projeto>.supabase.co/functions/v1/asaas-webhook` no painel de produção do Asaas
-4. Atualizar botões da landing `zonanutri.com/diet` para apontar pra `rogersfeitosa.com.br/zn/assinar?plano=...`
-5. Excluir os 3 links fixos antigos do Asaas
+**Fase 1 — Protótipo do editor (o que quero implementar primeiro):**
+1. AST + parser + serializer.
+2. `SmartPlanEditor` com título de refeição, alimento com sugestão, quantidade+medida, `ou` gerando substituição, Enter criando grupo novo.
+3. Sincronização principal ↔ substituições com toggle e undo.
+4. Totais por refeição e por dia em tempo real.
+5. Autosave de rascunho.
+6. Rota nova `/plano-alimentar/:athleteId/editor` como aba paralela; nada da UI atual é removido.
 
-## O que fica de fora deste plano
-- Envio automático de credenciais do Zona Nutri: já coberto pelo sync existente (`ExternalSyncService`) — o Zona Nutri é quem cria login e envia; nada muda aqui.
-- Alterações no fluxo de check-in / anamnese completa da consultoria — o atleta ZN preenche a anamnese completa depois, dentro do app, como já acontece.
+**Fase 2 (depois de validado):** importação (PDF/MD) abrindo direto no editor, painel lateral desktop, sheet mobile, envio ao Zona Nutri, versão.
 
----
+**Fase 3:** simplificar a área do atleta para 4 abas (Plano, Check-ins, Avaliações corporais, Exames) — sem migração destrutiva.
 
-## Detalhes técnicos (para revisão técnica opcional)
+**Fase 4:** Avaliações corporais e Exames laboratoriais (módulos novos).
 
-- Rota pública adicionada em `App.tsx` via `lazy()` (regra do projeto).
-- Wizard usa `react-hook-form` + `zod` (padrão do projeto).
-- `zn-create-subscription` importa `AthleteService` e `asaasRequest` de `_shared/`.
-- Cron `zn-mark-leads` roda diariamente às 03:00 America/Fortaleza via `pg_cron` + `net.http_post` chamando a edge function.
-- Verificação anti-duplicidade: se e-mail já existe em `zn_athletes` com `status in ('active','pending')`, wizard bloqueia com mensagem "Já existe cadastro — verifique seu WhatsApp".
+## 5. Riscos e mitigação
+- Parser de linha livre com sinônimos pt-BR → cobrir com testes (`smartPlan.spec.ts`) para cada padrão listado no brief.
+- Contenteditable no iOS/Android (seleção, autocorreção) → usar `beforeinput` + estado controlado em React; degradar para `<textarea>` inteligente se necessário.
+- Recálculo de equivalência pode confundir em alimentos mistos → default conservador + undo sempre visível.
+- Não sobrescrever plano enviado ao Zona Nutri → nova versão gravada em `client_plan_history` como já ocorre hoje.
+
+## 6. Confirmações antes de eu codar a Fase 1
+1. Rota paralela `/plano-alimentar/:id/editor` (aba "Editor inteligente" ao lado do atual) para eu validar sem quebrar planos existentes. OK?
+2. Persistência da Fase 1 = mesmo campo JSON do plano atual do cliente (`clients.meal_plan` / rascunho já existente). OK?
+3. Manter o editor antigo intocado até você aprovar o novo. OK?
+
+Se confirmar (ou disser "segue"), começo pela Fase 1 exatamente como descrito.
