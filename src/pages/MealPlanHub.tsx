@@ -83,8 +83,12 @@ export default function MealPlanHub() {
   const draft = useMemo(() => readDraft(clientId), [clientId, analyses]);
 
   const openEditor = () => navigate(`/meal-plans/${clientId}/editor`);
-  const openClientTab = (tab?: string) =>
-    navigate(`/clients/${clientId}${tab ? `?tab=${tab}` : ''}`);
+  const openClientTab = (tab?: string) => {
+    const params = new URLSearchParams();
+    params.set('from', 'meal-plan-hub');
+    if (tab) params.set('tab', tab);
+    navigate(`/clients/${clientId}?${params.toString()}`);
+  };
 
   const actions: Array<{ icon: any; title: string; desc: string; onClick: () => void }> = [
     { icon: User, title: 'Dados do atleta', desc: 'Perfil, plano, contato', onClick: () => openClientTab() },
