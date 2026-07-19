@@ -462,13 +462,17 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
           onSelect: () => applyFood(s as unknown as FoodItem),
         });
       }
-      for (const f of rows) {
-        if (seen.has(f.id)) continue;
+      // Alimentos favoritados (⭐) aparecem antes dos demais, preservando a
+      // ordem retornada pela busca. Cada item traz o toggle de favorito.
+      const favoriteRows = rows.filter((f) => favorites.has(f.id) && !seen.has(f.id));
+      const restRows = rows.filter((f) => !favorites.has(f.id) && !seen.has(f.id));
+      for (const f of [...favoriteRows, ...restRows]) {
         list.push({
           key: f.id,
-          label: f.name,
+          label: `${favorites.has(f.id) ? '★ ' : ''}${f.name}`,
           hint: `${Math.round(f.calories_per_100g)}kcal/100g · C${Math.round(f.carbs_per_100g)}·P${Math.round(f.protein_per_100g)}·G${Math.round(f.fat_per_100g)}`,
           onSelect: () => applyFood(f),
+          favorite: { active: favorites.has(f.id), onToggle: () => toggleFavorite(f.id) },
         });
       }
       if (manualQuery.length >= 2) {
