@@ -226,6 +226,63 @@ export default function MealPlanEditor() {
     }
   };
 
+  // Salva o conteúdo atual como PROPOSTA (pending_update) — o admin aplica/desfaz
+  // depois na página de detalhe do plano (MealPlanDetail).
+  const saveAsProposal = async () => {
+    if (!clientId || !analysisRow?.id) { toast.error('Salve o plano ao menos uma vez antes de propor.'); return; }
+    try {
+      setSaving(true);
+      const baseAst = parseText(texts.all);
+      await enrichAst(baseAst, enrichCache.current);
+      const baseMeals = astToMeals(baseAst);
+      const dayVariations: Record<string, any> = {};
+      for (const k of overrideDays) {
+        const ast = parseText(texts[k]);
+        await enrichAst(ast, enrichCache.current);
+        dayVariations[k] = astToMeals(ast);
+      }
+      const currentRaw = (analysisRow?.raw_response as any) || {};
+      const pending_update = {
+        source: 'smart-plan-v3',
+        created_at: new Date().toISOString(),
+        meal_plan: {
+          ...(currentRaw.meal_plan || {}),
+          meals: baseMeals,
+          day_variations: dayVariations,
+        },
+      };
+      const nextRaw = { ...currentRaw, pending_update };
+      const { error } = await supabase.from('ai_analyses').update({ raw_response: nextRaw }).eq('id', analysisRow.id);
+      if (error) throw error;
+      toast.success('Proposta salva. Abra o plano do atleta e clique em "Aplicar ajustes".');
+      qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
+      qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
+    } catch (e: any) {
+      toast.error(`Falha ao salvar proposta: ${e.message || e}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Insere um esqueleto de refeição no final do texto da aba atual.
+  const insertMealSkeleton = (name: string, time: string) => {
+    const skeleton = `@ ${time} ${name}\n`;
+    setText(prev => {
+      const sep = prev.length === 0 ? '' : (prev.endsWith('\n\n') ? '' : prev.endsWith('\n') ? '\n' : '\n\n');
+      return prev + sep + skeleton;
+    });
+  };
+  const QUICK_MEALS: { label: string; time: string }[] = [
+    { label: 'Café da manhã', time: '07:00' },
+    { label: 'Lanche da manhã', time: '10:00' },
+    { label: 'Pré-treino', time: '11:30' },
+    { label: 'Almoço', time: '12:30' },
+    { label: 'Pós-treino', time: '15:00' },
+    { label: 'Lanche da tarde', time: '16:30' },
+    { label: 'Jantar', time: '19:30' },
+    { label: 'Ceia', time: '22:00' },
+  ];
+
   const undoSave = async () => {
     if (!clientId || !analysisRow?.id) return;
     try {
