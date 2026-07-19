@@ -195,7 +195,7 @@ export default function AthleteAnalysis() {
       <Layout>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Cliente não encontrado.</p>
-          <Button onClick={() => navigate('/clients')} className="mt-4">
+          <Button onClick={() => navigate(backTarget)} className="mt-4">
             Voltar para Clientes
           </Button>
         </div>
@@ -212,7 +212,7 @@ export default function AthleteAnalysis() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/clients')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate(backTarget)}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
