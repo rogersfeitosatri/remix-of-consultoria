@@ -116,6 +116,19 @@ function looksLikeTitleLine(line: string): boolean {
     .some((k) => lower.startsWith(k));
 }
 
+const FAV_STORAGE_KEY = 'mealplan-v3:food-favorites:v1';
+function loadFavorites(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FAV_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch { return new Set(); }
+}
+function saveFavorites(s: Set<string>) {
+  try { localStorage.setItem(FAV_STORAGE_KEY, JSON.stringify(Array.from(s))); } catch { /* noop */ }
+}
+
 export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs = true }: SmartPlanEditorProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
@@ -125,6 +138,15 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
   const [popPos, setPopPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [pendingFood, setPendingFood] = useState<FoodItem | null>(null);
   const [manualQuery, setManualQuery] = useState('');
+  const [favorites, setFavorites] = useState<Set<string>>(() => loadFavorites());
+  const toggleFavorite = useCallback((id: string) => {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      saveFavorites(next);
+      return next;
+    });
+  }, []);
   const { lookupFood, isLooking } = useLookupCustomFood();
 
   const ctx = useMemo(() => getLineCtx(value, caret), [value, caret]);
