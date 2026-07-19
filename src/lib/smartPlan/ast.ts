@@ -30,13 +30,27 @@ export interface GroupLine {
   tokens: FoodToken[];
 }
 
+/** Opção de composição da refeição. Uma refeição pode ter várias opções
+ *  (ex.: "Opção 1", "Opção 2") — mas apenas a marcada como `primary` entra
+ *  nos cálculos do dia/plano. */
+export interface MealOption {
+  /** Rótulo livre (ex.: "Opção 1"). Ausente = usa índice. */
+  name?: string;
+  /** Se true, é a opção usada para calcular kcal/macros do dia. */
+  primary?: boolean;
+  /** Grupos de alimentos desta opção. */
+  groups: GroupLine[];
+}
+
 export interface MealBlock {
   /** Título livre da refeição (ex.: "Café da manhã"). */
   name: string;
   /** Horário no formato "HH:MM" quando reconhecido. */
   time?: string | null;
-  /** Grupos de alimentos (uma linha = um grupo). */
+  /** Grupos de alimentos da OPÇÃO PRINCIPAL (compat com consumidores antigos). */
   groups: GroupLine[];
+  /** Todas as opções da refeição. Presente somente quando >1 opção. */
+  options?: MealOption[];
   /** Observações/orientações livres da refeição. */
   notes?: string;
 }
