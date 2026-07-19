@@ -261,7 +261,10 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     const nameStart = c.segStart;
     const beforeSeg = value.slice(0, nameStart);
     const afterCaret = value.slice(c.segStart + c.segCaret);
-    const newSeg = `${q.query} - ${qtyPrefix}${cleanLabel} (${fmt(per)}g cada · ${fmt(total)}g)`;
+    const isGramUnit = per === 1 || /^\s*(g|gramas?)\s*$/i.test(cleanLabel);
+    const newSeg = isGramUnit
+      ? `${q.query} - ${qtyPrefix}${cleanLabel} (${fmt(total)}g)`
+      : `${q.query} - ${qtyPrefix}${cleanLabel} (${fmt(per)}g cada · ${fmt(total)}g)`;
     insertAtCaret(beforeSeg, newSeg, afterCaret);
     if (food) {
       const nutrients = calcNutrients(food, grams * qty);
@@ -274,17 +277,37 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     setMode('idle');
   }, [value, caret, insertAtCaret]);
 
-  /** Recalcula "(Xg cada · Yg)" com base na quantidade digitada antes da medida. */
+  /** Recalcula o sufixo em gramas com base na quantidade digitada.
+   *  Suporta dois formatos:
+   *   - "(Xg cada · Yg)" → medidas caseiras (Y = qty × X)
+   *   - "(Yg)" quando a medida é grama/g → Y = qty */
   const recomputeTotals = useCallback((text: string): string => {
-    const rx = /(\d+(?:[.,]\d+)?)(\s+)([^\n()]+?)\s*\((\d+(?:[.,]\d+)?)\s*g\s*cada\s*·\s*(\d+(?:[.,]\d+)?)\s*g\)/g;
-    return text.replace(rx, (_m, qtyStr: string, sp: string, label: string, perStr: string) => {
-      const qty = Number(qtyStr.replace(',', '.'));
-      const per = Number(perStr.replace(',', '.'));
-      if (!Number.isFinite(qty) || !Number.isFinite(per)) return _m;
-      const total = Math.round(qty * per * 10) / 10;
-      const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toString().replace('.', ','));
-      return `${qtyStr}${sp}${label.trimEnd()} (${fmt(per)}g cada · ${fmt(total)}g)`;
-    });
+    const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toString().replace('.', ','));
+    // 1) formato completo com "cada"
+    let out = text.replace(
+      /(\d+(?:[.,]\d+)?)(\s+)([^\n()]+?)\s*\((\d+(?:[.,]\d+)?)\s*g\s*cada\s*·\s*(\d+(?:[.,]\d+)?)\s*g\)/g,
+      (_m, qtyStr: string, sp: string, label: string, perStr: string) => {
+        const qty = Number(qtyStr.replace(',', '.'));
+        const per = Number(perStr.replace(',', '.'));
+        if (!Number.isFinite(qty) || !Number.isFinite(per)) return _m;
+        const total = Math.round(qty * per * 10) / 10;
+        // Se a medida é em gramas, colapsa para "(Yg)" simples.
+        if (per === 1 || /^\s*(g|gramas?)\s*$/i.test(label.trim())) {
+          return `${qtyStr}${sp}${label.trimEnd()} (${fmt(total)}g)`;
+        }
+        return `${qtyStr}${sp}${label.trimEnd()} (${fmt(per)}g cada · ${fmt(total)}g)`;
+      },
+    );
+    // 2) formato simples "(Yg)" quando a medida é grama — total = qty
+    out = out.replace(
+      /(\d+(?:[.,]\d+)?)(\s+)(g|gramas?)\s*\((\d+(?:[.,]\d+)?)\s*g\)/gi,
+      (_m, qtyStr: string, sp: string, label: string) => {
+        const qty = Number(qtyStr.replace(',', '.'));
+        if (!Number.isFinite(qty)) return _m;
+        return `${qtyStr}${sp}${label} (${fmt(qty)}g)`;
+      },
+    );
+    return out;
   }, []);
 
   const searchWithAi = useCallback(async () => {
