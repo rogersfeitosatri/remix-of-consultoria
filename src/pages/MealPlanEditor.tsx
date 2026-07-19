@@ -669,6 +669,8 @@ export default function MealPlanEditor() {
           <div className="lg:block">
             <TotalsPanel
               text={enrichedTotalsText || text}
+              enrichedMeals={enrichedMeals}
+              enrichedTotals={enrichedTotals}
               weightKg={weightKg}
               saveState={saving ? 'saving' : saveState}
               onSave={savePlan}
