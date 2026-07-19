@@ -376,6 +376,100 @@ export default function MealPlanEditor() {
     }
   };
 
+  // Item 2 — Exportar semana inteira em um único PDF. Para cada dia usa a
+  // variação, se existir; caso contrário, cai no plano base. Prefixa o nome de
+  // cada refeição com o dia da semana para manter tudo em um documento único.
+  const exportWeekPdf = async () => {
+    if (!clientId) return;
+    try {
+      const days = DAY_TABS.filter(d => d.key !== 'all');
+      const allMeals: any[] = [];
+      for (const d of days) {
+        const src = texts[d.key].trim() ? texts[d.key] : texts.all;
+        if (!src.trim()) continue;
+        const ast = parseText(src);
+        await enrichAst(ast, enrichCache.current);
+        const meals = astToMeals(ast);
+        for (const m of meals) {
+          allMeals.push({ ...m, meal_name: `${d.long} • ${m.meal_name}` });
+        }
+      }
+      if (!allMeals.length) { toast.error('Nada para exportar na semana.'); return; }
+      const input = structuredAnalysisToPdfInput(
+        { meal_plan: { meals: allMeals } },
+        `${client?.name || 'Atleta'} — Semana completa`,
+      );
+      const safe = `${(client?.name || 'atleta').toLowerCase().replace(/[^a-z0-9]+/g, '_')}_semana`;
+      await downloadMealPlanPdf(input, safe);
+      toast.success('PDF da semana gerado.');
+    } catch (e: any) {
+      toast.error(`Falha ao exportar semana: ${e.message || e}`);
+    }
+  };
+
+  // Item 6 — Ajuste automático por g/kg alvo. Escala as quantidades dos
+  // alimentos da aba ativa para atingir o alvo do macro escolhido. Como a
+  // escala é proporcional a TODOS os tokens, os outros macros mudam junto —
+  // isso é intencional: mantém a proporção do plano montado pelo nutri.
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustMacro, setAdjustMacro] = useState<'cho' | 'ptn' | 'lip'>('cho');
+  const [adjustTargetGkg, setAdjustTargetGkg] = useState<string>('6');
+  const [adjustPreview, setAdjustPreview] = useState<{ current: number; factor: number } | null>(null);
+
+  const openAdjust = async () => {
+    if (!weightKg) { toast.error('Peso do atleta não disponível para calcular g/kg.'); return; }
+    if (!text.trim()) { toast.error('Aba atual está vazia.'); return; }
+    setAdjustPreview(null);
+    setAdjustOpen(true);
+  };
+
+  const computeAdjustPreview = async () => {
+    try {
+      if (!weightKg) return;
+      const target = Number(String(adjustTargetGkg).replace(',', '.'));
+      if (!isFinite(target) || target <= 0) { toast.error('Informe um alvo válido.'); return; }
+      const ast = parseText(text);
+      await enrichAst(ast, enrichCache.current);
+      let sum = 0;
+      for (const m of ast.meals) for (const g of m.groups) for (const t of g.tokens) {
+        // Só o alimento principal (primeiro token) conta — substituições são opcionais.
+        if (g.tokens[0] === t) {
+          const macro = adjustMacro === 'cho' ? (t.carbs_g || 0) : adjustMacro === 'ptn' ? (t.protein_g || 0) : (t.fat_g || 0);
+          sum += macro;
+        }
+      }
+      const currentGkg = sum / weightKg;
+      const factor = currentGkg > 0 ? target / currentGkg : 0;
+      setAdjustPreview({ current: currentGkg, factor });
+    } catch (e: any) {
+      toast.error(`Falha ao calcular: ${e.message || e}`);
+    }
+  };
+
+  const applyAdjust = async () => {
+    try {
+      if (!adjustPreview || !isFinite(adjustPreview.factor) || adjustPreview.factor <= 0) {
+        toast.error('Calcule a prévia antes de aplicar.');
+        return;
+      }
+      const factor = adjustPreview.factor;
+      const ast = parseText(text);
+      for (const m of ast.meals) for (const g of m.groups) for (const t of g.tokens) {
+        if (t.quantity != null && isFinite(t.quantity)) {
+          const scaled = t.quantity * factor;
+          t.quantity = Math.round(scaled * 100) / 100;
+        }
+      }
+      const next = astToText(ast);
+      setText(next);
+      toast.success(`Quantidades escaladas por ${factor.toFixed(2)}× para atingir o alvo.`);
+      setAdjustOpen(false);
+    } catch (e: any) {
+      toast.error(`Falha ao aplicar ajuste: ${e.message || e}`);
+    }
+  };
+
+
   const copyFromAll = () => {
     if (activeDay === 'all') return;
     if (!texts.all.trim()) { toast.error('A aba "Todos os dias" está vazia.'); return; }
