@@ -409,12 +409,25 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
   const items: SuggestionItem[] = useMemo(() => {
     if (mode === 'food') {
       const rows = foodResults.data || [];
-      const list: SuggestionItem[] = rows.map((f) => ({
-        key: f.id,
-        label: f.name,
-        hint: f.category,
-        onSelect: () => applyFood(f),
-      }));
+      const seen = new Set<string>();
+      const list: SuggestionItem[] = [];
+      // Substitutos aprendidos aparecem no topo quando estamos após " ou ".
+      const learned = learnedSubs.data || [];
+      const q = manualQuery.trim().toLowerCase();
+      for (const s of learned) {
+        if (q && !s.name.toLowerCase().includes(q)) continue;
+        seen.add(s.sub_food_id);
+        list.push({
+          key: `learned-${s.sub_food_id}`,
+          label: `⭐ ${s.name}`,
+          hint: `usado ${s.uses_count}×`,
+          onSelect: () => applyFood(s as unknown as FoodItem),
+        });
+      }
+      for (const f of rows) {
+        if (seen.has(f.id)) continue;
+        list.push({ key: f.id, label: f.name, hint: f.category, onSelect: () => applyFood(f) });
+      }
       if (manualQuery.length >= 2) {
         list.push({
           key: '__ai__',
