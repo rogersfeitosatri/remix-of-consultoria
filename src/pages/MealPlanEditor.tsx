@@ -189,6 +189,7 @@ export default function MealPlanEditor() {
   const [enrichedTotalsText, setEnrichedTotalsText] = useState<string>('');
   const [enrichedMeals, setEnrichedMeals] = useState<any[] | undefined>(undefined);
   const [enrichedTotals, setEnrichedTotals] = useState<{ kcal: number; cho: number; ptn: number; lip: number } | undefined>(undefined);
+  const [enrichedTotalsByDay, setEnrichedTotalsByDay] = useState<Partial<Record<DayKey, { kcal: number; cho: number; ptn: number; lip: number }>>>({});
 
   const backupKey = `smart-plan-backup:${clientId}`;
   useEffect(() => {
@@ -203,13 +204,44 @@ export default function MealPlanEditor() {
         const ast = parseText(text);
         await enrichAst(ast, enrichCache.current);
         const { astToMeals, planTotals } = await import('@/lib/smartPlan/serialize');
-        setEnrichedMeals(astToMeals(ast));
-        setEnrichedTotals(planTotals(ast));
+        const meals = astToMeals(ast);
+        const totals = planTotals(ast);
+        setEnrichedMeals(meals);
+        setEnrichedTotals(totals);
         setEnrichedTotalsText(astToText(ast));
+        // Espelha os totais do dia ativo no mapa semanal para atualização
+        // instantânea do WeekOverview sem esperar o efeito de todos os dias.
+        setEnrichedTotalsByDay((prev) => ({ ...prev, [activeDay]: totals }));
       } catch { /* silencioso */ }
-    }, 500);
+    }, 400);
     return () => clearTimeout(t);
-  }, [text]);
+  }, [text, activeDay]);
+
+  // Enriquecimento em segundo plano para TODOS os dias com override + base,
+  // permitindo que o WeekOverview mostre kcal/macros reais em tempo real.
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      try {
+        const { planTotals } = await import('@/lib/smartPlan/serialize');
+        const entries: [DayKey, { kcal: number; cho: number; ptn: number; lip: number }][] = [];
+        const daysToScan: DayKey[] = ['all', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
+        for (const k of daysToScan) {
+          const txt = texts[k];
+          if (!txt || !txt.trim()) continue;
+          const ast = parseText(txt);
+          await enrichAst(ast, enrichCache.current);
+          entries.push([k, planTotals(ast)]);
+        }
+        setEnrichedTotalsByDay((prev) => {
+          const next = { ...prev };
+          for (const [k, v] of entries) next[k] = v;
+          return next;
+        });
+      } catch { /* silencioso */ }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [texts]);
+
 
   // Conta quais dias têm override preenchido.
   const overrideDays = useMemo(() => {
