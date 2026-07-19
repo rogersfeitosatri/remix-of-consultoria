@@ -609,6 +609,12 @@ export default function MealPlanEditor() {
                   <Button size="sm" variant="outline" onClick={exportPdf}>
                     <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
                   </Button>
+                  <Button size="sm" variant="outline" onClick={exportWeekPdf}>
+                    <CalendarDays className="h-3 w-3 mr-1" /> Exportar semana
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={openAdjust} disabled={!text.trim() || !weightKg}>
+                    <Scale className="h-3 w-3 mr-1" /> Ajustar g/kg
+                  </Button>
                   <Button size="sm" variant="outline" onClick={saveAsProposal} disabled={saving}>
                     <ClipboardCheck className="h-3 w-3 mr-1" /> Salvar como proposta
                   </Button>
