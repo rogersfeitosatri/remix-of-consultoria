@@ -514,6 +514,9 @@ export default function MealPlanEditor() {
                   <Button size="sm" variant="outline" onClick={exportPdf}>
                     <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
                   </Button>
+                  <Button size="sm" variant="outline" onClick={saveAsProposal} disabled={saving}>
+                    <ClipboardCheck className="h-3 w-3 mr-1" /> Salvar como proposta
+                  </Button>
                   <Button size="sm" variant="outline" onClick={openReplicate} disabled={!text.trim()}>
                     <Repeat className="h-3 w-3 mr-1" /> Replicar para...
                   </Button>
