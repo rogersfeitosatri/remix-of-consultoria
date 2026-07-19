@@ -792,7 +792,9 @@ export default function MealPlanEditor() {
                   </Button>
                 ))}
               </div>
+              <MealOptionsBar text={text} onChange={setText} />
               <SmartPlanEditor value={text} onChange={setText} />
+
             </CardContent>
           </Card>
 
