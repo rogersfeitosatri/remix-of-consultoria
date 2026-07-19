@@ -75,8 +75,10 @@ export default function ClientDetail() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fromPeriodization = searchParams.get('from') === 'periodization';
+  const fromMealPlanHub = searchParams.get('from') === 'meal-plan-hub';
   const goBack = () => {
     if (fromPeriodization && clientId) navigate(`/nutritional-periodization?client=${clientId}`);
+    else if (fromMealPlanHub && clientId) navigate(`/meal-plans/${clientId}`);
     else navigate('/clients');
   };
   
