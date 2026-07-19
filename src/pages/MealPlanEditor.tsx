@@ -590,69 +590,91 @@ export default function MealPlanEditor() {
 
         <WeekOverview texts={texts} active={activeDay} onSelect={(k) => setActiveDay(k)} weightKg={weightKg} />
 
-
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
-          <Card>
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
+          <Card className="min-w-0 overflow-hidden">
             <CardContent className="p-3 md:p-4">
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>
+                <span className="flex-1 min-w-0">
                   {activeDay === 'all'
                     ? 'Plano base — aplicado nos dias sem variação específica.'
-                    : `Variação de ${DAY_TABS.find(d => d.key === activeDay)?.long}. Se vazio, o dia usa o plano base.`}
+                    : `Variação de ${DAY_TABS.find(d => d.key === activeDay)?.long}. Se vazio, usa o plano base.`}
                 </span>
-                <div className="ml-auto flex items-center gap-2">
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="application/pdf,.md,.txt"
-                    className="hidden"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) importPdf(f); }}
-                  />
-                  <Button size="sm" variant="secondary" onClick={generateWithAI} disabled={generating}>
-                    {generating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
-                    Gerar com IA
-                  </Button>
-                  {activeDay !== 'all' && (
-                    <Button size="sm" variant="outline" onClick={copyFromAll}>
-                      <Copy className="h-3 w-3 mr-1" /> Copiar base
-                    </Button>
-                  )}
-                  <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing}>
-                    {importing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Upload className="h-3 w-3 mr-1" />}
-                    Importar PDF/MD
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={exportPdf}>
-                    <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={exportWeekPdf}>
-                    <CalendarDays className="h-3 w-3 mr-1" /> Exportar semana
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={openAdjust} disabled={!text.trim() || !weightKg}>
-                    <Scale className="h-3 w-3 mr-1" /> Ajustar g/kg
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={saveAsProposal} disabled={saving}>
-                    <ClipboardCheck className="h-3 w-3 mr-1" /> Salvar como proposta
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={openReplicate} disabled={!text.trim()}>
-                    <Repeat className="h-3 w-3 mr-1" /> Replicar para...
-                  </Button>
-                  {text.trim() && (
-                    <Button size="sm" variant="ghost" onClick={clearDay} title="Limpar aba">
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  )}
-                  {hasBackup && (
-                    <Button size="sm" variant="ghost" onClick={undoSave}>
-                      <Undo2 className="h-3 w-3 mr-1" /> Desfazer salvamento
-                    </Button>
-                  )}
-                  <a
-                    href={`/meal-plans/${clientId}/classic`}
-                    className="inline-flex items-center gap-1 text-primary hover:underline"
-                  >
-                    Editor clássico <ExternalLink className="h-3 w-3" />
-                  </a>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="application/pdf,.md,.txt"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) importPdf(f); }}
+                />
+                {/* Toolbar compacta, ícones + tooltip. Rola no mobile. */}
+                <div className="w-full -mx-1 overflow-x-auto">
+                  <div className="flex items-center gap-1 px-1 py-0.5">
+                    <ToolIconButton label="Gerar com IA" onClick={generateWithAI} disabled={generating} loading={generating} variant="secondary">
+                      <Sparkles className="h-4 w-4" />
+                    </ToolIconButton>
+                    {activeDay !== 'all' && (
+                      <ToolIconButton label="Copiar do plano base" onClick={copyFromAll}>
+                        <Copy className="h-4 w-4" />
+                      </ToolIconButton>
+                    )}
+                    <ToolIconButton label="Importar PDF/MD" onClick={() => fileRef.current?.click()} disabled={importing} loading={importing}>
+                      <Upload className="h-4 w-4" />
+                    </ToolIconButton>
+                    <ToolIconButton label="Exportar PDF" onClick={exportPdf}>
+                      <FileDown className="h-4 w-4" />
+                    </ToolIconButton>
+                    <ToolIconButton label="Exportar semana" onClick={exportWeekPdf}>
+                      <CalendarDays className="h-4 w-4" />
+                    </ToolIconButton>
+                    <ToolIconButton label="Ajustar g/kg" onClick={openAdjust} disabled={!text.trim() || !weightKg}>
+                      <Scale className="h-4 w-4" />
+                    </ToolIconButton>
+                    <ToolIconButton label="Salvar como proposta" onClick={saveAsProposal} disabled={saving}>
+                      <ClipboardCheck className="h-4 w-4" />
+                    </ToolIconButton>
+                    <ToolIconButton label="Replicar para outros dias" onClick={openReplicate} disabled={!text.trim()}>
+                      <Repeat className="h-4 w-4" />
+                    </ToolIconButton>
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <span>
+                          <ToolIconButton label="Ver anamnese do atleta">
+                            <FileText className="h-4 w-4" />
+                          </ToolIconButton>
+                        </span>
+                      </SheetTrigger>
+                      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+                        <SheetHeader>
+                          <SheetTitle>Anamnese — {client?.name || 'Atleta'}</SheetTitle>
+                        </SheetHeader>
+                        <div className="mt-4">
+                          {clientId && <AnamneseResponseSection clientId={clientId} clientName={client?.name || ''} />}
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                    {text.trim() && (
+                      <ToolIconButton label="Limpar aba" onClick={clearDay} variant="ghost">
+                        <Trash2 className="h-4 w-4" />
+                      </ToolIconButton>
+                    )}
+                    {hasBackup && (
+                      <ToolIconButton label="Desfazer salvamento" onClick={undoSave} variant="ghost">
+                        <Undo2 className="h-4 w-4" />
+                      </ToolIconButton>
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <a
+                          href={`/meal-plans/${clientId}/classic`}
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md border text-muted-foreground hover:bg-muted"
+                          aria-label="Editor clássico"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </TooltipTrigger>
+                      <TooltipContent>Editor clássico</TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
               </div>
               <div className="mb-2 rounded-md border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground leading-relaxed">
@@ -676,7 +698,7 @@ export default function MealPlanEditor() {
             </CardContent>
           </Card>
 
-          <div className="lg:block">
+          <div className="min-w-0">
             <TotalsPanel
               text={enrichedTotalsText || text}
               enrichedMeals={enrichedMeals}
@@ -690,6 +712,7 @@ export default function MealPlanEditor() {
           </div>
         </div>
       </div>
+
 
       <Dialog open={replicateOpen} onOpenChange={setReplicateOpen}>
         <DialogContent>
