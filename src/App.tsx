@@ -172,7 +172,9 @@ function AppRoutes() {
         <Route path="/meal-plans" element={<ProtectedRoute adminOnly><MealPlans /></ProtectedRoute>} />
        <Route path="/meal-plans/:clientId" element={<ProtectedRoute adminOnly><MealPlanHub /></ProtectedRoute>} />
        <Route path="/meal-plans/:clientId/classic" element={<ProtectedRoute adminOnly><MealPlanDetail /></ProtectedRoute>} />
-       <Route path="/meal-plans/:clientId/editor" element={<ProtectedRoute adminOnly><MealPlanEditor /></ProtectedRoute>} />
+      <Route path="/meal-plans/:clientId/editor" element={<ProtectedRoute adminOnly><MealPlanEditor /></ProtectedRoute>} />
+      <Route path="/meal-plans/:clientId/lab-exams" element={<ProtectedRoute adminOnly><AthleteLabExams /></ProtectedRoute>} />
+      <Route path="/meal-plans/:clientId/assessments" element={<ProtectedRoute adminOnly><AthleteAssessments /></ProtectedRoute>} />
         <Route path="/periodization" element={<ProtectedRoute adminOnly><NutritionalPeriodization /></ProtectedRoute>} />
         <Route path="/metabolic-web" element={<ProtectedRoute adminOnly><MetabolicWeb /></ProtectedRoute>} />
         <Route path="/clients/:clientId" element={<ProtectedRoute adminOnly><ClientDetail /></ProtectedRoute>} />
