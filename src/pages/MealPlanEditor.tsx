@@ -541,6 +541,20 @@ export default function MealPlanEditor() {
               <div className="mb-2 rounded-md border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground leading-relaxed">
                 <b>Dicas:</b> comece a linha com <code className="px-1 rounded bg-background border">@</code> para nomear uma refeição (ex.: <code className="px-1 rounded bg-background border">@ 07:00 Café da manhã</code>) e com <code className="px-1 rounded bg-background border">#</code> para uma observação. Ao pressionar Enter, o marcador some. Use <b>"ou"</b> na mesma linha para substituições.
               </div>
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-muted-foreground mr-1">Adicionar refeição:</span>
+                {QUICK_MEALS.map((m) => (
+                  <Button
+                    key={m.label}
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs border"
+                    onClick={() => insertMealSkeleton(m.label, m.time)}
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> {m.label}
+                  </Button>
+                ))}
+              </div>
               <SmartPlanEditor value={text} onChange={setText} />
             </CardContent>
           </Card>
