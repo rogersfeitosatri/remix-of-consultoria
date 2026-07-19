@@ -57,6 +57,36 @@ const EMPTY_TEXTS: PlanTexts = {
   all: '', seg: '', ter: '', qua: '', qui: '', sex: '', sab: '', dom: '',
 };
 
+// Botão de barra de ferramentas: apenas ícone (32x32), com tooltip no hover.
+function ToolIconButton({
+  label, children, onClick, disabled, loading, variant = 'outline',
+}: {
+  label: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  variant?: 'outline' | 'secondary' | 'ghost';
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          size="icon"
+          variant={variant}
+          onClick={onClick}
+          disabled={disabled}
+          aria-label={label}
+          className="h-8 w-8 shrink-0"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 
 export default function MealPlanEditor() {
   const { clientId } = useParams<{ clientId: string }>();
