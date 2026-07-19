@@ -94,8 +94,8 @@ export default function MealPlanHub() {
     { icon: User, title: 'Dados do atleta', desc: 'Perfil, plano, contato', onClick: () => openClientTab() },
     { icon: ClipboardCheck, title: 'Anamnese', desc: 'Respostas do formulário', onClick: () => openClientTab('anamnese') },
     { icon: MessageCircle, title: 'Histórico de check-ins', desc: 'Respostas recebidas', onClick: () => openClientTab('history') },
-    { icon: TrendingUp, title: 'Avaliações', desc: 'Evolução e gráficos', onClick: () => openClientTab('evolution') },
-    { icon: FlaskConical, title: 'Exames', desc: 'Análise nutricional da IA', onClick: () => navigate(`/clients/${clientId}/analysis?from=meal-plan-hub`) },
+    { icon: TrendingUp, title: 'Avaliações', desc: 'Composição corporal (PDF/IA ou manual)', onClick: () => navigate(`/meal-plans/${clientId}/assessments`) },
+    { icon: FlaskConical, title: 'Exames', desc: 'Pedido e resultados laboratoriais', onClick: () => navigate(`/meal-plans/${clientId}/lab-exams`) },
   ];
 
   return (
