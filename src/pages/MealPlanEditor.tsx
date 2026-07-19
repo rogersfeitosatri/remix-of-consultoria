@@ -772,11 +772,6 @@ export default function MealPlanEditor() {
                 </div>
               </div>
 
-              {/* Dicas de edição */}
-              <div className="mb-3 rounded-md border bg-muted/40 px-3 py-2 text-[11px] md:text-xs text-muted-foreground leading-relaxed">
-                <b>Dicas:</b> comece a linha com <code className="px-1 rounded bg-background border">@</code> para nomear uma refeição (ex.: <code className="px-1 rounded bg-background border">@ 07:00 Café da manhã</code>) e com <code className="px-1 rounded bg-background border">#</code> para uma observação. Ao pressionar Enter, o marcador some. Use <b>"ou"</b> na mesma linha para substituições.
-              </div>
-
               {/* Atalhos de refeição */}
               <div className="mb-3 flex flex-wrap items-center gap-1.5">
                 <span className="text-[11px] md:text-xs text-muted-foreground mr-1">Adicionar refeição:</span>
@@ -792,8 +787,10 @@ export default function MealPlanEditor() {
                   </Button>
                 ))}
               </div>
+
               <MealCardsView text={text} onChange={setText} />
-              <SmartPlanEditor value={text} onChange={setText} />
+
+
 
             </CardContent>
           </Card>
