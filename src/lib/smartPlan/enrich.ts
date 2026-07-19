@@ -68,6 +68,14 @@ function normalize(s: string): string {
 }
 
 function gramsFromToken(token: FoodToken, measures: FoodMeasure[]): number {
+  // Autoridade: sufixo "(Xg)" na medida (formato escrito pelo editor V3
+  // após applyMeasure/applyFood — já é o TOTAL resolvido). Prevalece sobre
+  // heurísticas para garantir kcal/macros exatos em tempo real.
+  const parenTotal = (token.measure || '').match(/\(\s*(\d+(?:[.,]\d+)?)\s*g\s*\)/i);
+  if (parenTotal) {
+    const g = Number(parenTotal[1].replace(',', '.'));
+    if (Number.isFinite(g) && g > 0) return g;
+  }
   const q = Number(token.quantity ?? 1) || 1;
   const m = normalize(token.measure || '');
   if (!m) return q; // sem medida assumimos gramas

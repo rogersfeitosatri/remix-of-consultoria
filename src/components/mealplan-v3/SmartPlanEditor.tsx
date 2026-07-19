@@ -116,6 +116,19 @@ function looksLikeTitleLine(line: string): boolean {
     .some((k) => lower.startsWith(k));
 }
 
+const FAV_STORAGE_KEY = 'mealplan-v3:food-favorites:v1';
+function loadFavorites(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FAV_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch { return new Set(); }
+}
+function saveFavorites(s: Set<string>) {
+  try { localStorage.setItem(FAV_STORAGE_KEY, JSON.stringify(Array.from(s))); } catch { /* noop */ }
+}
+
 export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs = true }: SmartPlanEditorProps) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
@@ -125,6 +138,15 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
   const [popPos, setPopPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [pendingFood, setPendingFood] = useState<FoodItem | null>(null);
   const [manualQuery, setManualQuery] = useState('');
+  const [favorites, setFavorites] = useState<Set<string>>(() => loadFavorites());
+  const toggleFavorite = useCallback((id: string) => {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      saveFavorites(next);
+      return next;
+    });
+  }, []);
   const { lookupFood, isLooking } = useLookupCustomFood();
 
   const ctx = useMemo(() => getLineCtx(value, caret), [value, caret]);
@@ -440,13 +462,17 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
           onSelect: () => applyFood(s as unknown as FoodItem),
         });
       }
-      for (const f of rows) {
-        if (seen.has(f.id)) continue;
+      // Alimentos favoritados (⭐) aparecem antes dos demais, preservando a
+      // ordem retornada pela busca. Cada item traz o toggle de favorito.
+      const favoriteRows = rows.filter((f) => favorites.has(f.id) && !seen.has(f.id));
+      const restRows = rows.filter((f) => !favorites.has(f.id) && !seen.has(f.id));
+      for (const f of [...favoriteRows, ...restRows]) {
         list.push({
           key: f.id,
-          label: f.name,
+          label: `${favorites.has(f.id) ? '★ ' : ''}${f.name}`,
           hint: `${Math.round(f.calories_per_100g)}kcal/100g · C${Math.round(f.carbs_per_100g)}·P${Math.round(f.protein_per_100g)}·G${Math.round(f.fat_per_100g)}`,
           onSelect: () => applyFood(f),
+          favorite: { active: favorites.has(f.id), onToggle: () => toggleFavorite(f.id) },
         });
       }
       if (manualQuery.length >= 2) {
@@ -480,7 +506,7 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
       return list;
     }
     return [];
-  }, [mode, foodResults.data, measures.data, pendingFood, manualQuery, applyFood, applyMeasure, searchWithAi, learnedSubs.data, typedQty, macroHint, ctx]);
+  }, [mode, foodResults.data, measures.data, pendingFood, manualQuery, applyFood, applyMeasure, searchWithAi, learnedSubs.data, typedQty, macroHint, ctx, favorites, toggleFavorite]);
 
   const stripMarkerOnEnter = (): boolean => {
     // Ao apertar Enter numa linha iniciada por @ (título) ou # (observação),

@@ -22,21 +22,28 @@ function fmt(n: number) {
 }
 
 export function WeekOverview({
-  texts, active, onSelect, weightKg,
+  texts, active, onSelect, weightKg, enrichedTotalsByDay,
 }: {
   texts: Record<DayKey, string>;
   active: DayKey;
   onSelect: (k: DayKey) => void;
   weightKg: number | null;
+  /** Totais já enriquecidos por dia (kcal/macros reais do banco). Preferidos
+   *  sobre os cálculos a partir do texto — este componente NÃO enriquece. */
+  enrichedTotalsByDay?: Partial<Record<DayKey, { kcal: number; cho: number; ptn: number; lip: number }>>;
 }) {
   const rows = useMemo(() => {
-    const base = planTotals(parseText(texts.all || ''));
+    const baseFromText = planTotals(parseText(texts.all || ''));
+    const base = enrichedTotalsByDay?.all ?? baseFromText;
     return WEEK.map(d => {
       const hasOverride = texts[d.key].trim().length > 0;
-      const totals = hasOverride ? planTotals(parseText(texts[d.key])) : base;
+      const enrichedDay = enrichedTotalsByDay?.[d.key];
+      const totals = hasOverride
+        ? (enrichedDay ?? planTotals(parseText(texts[d.key])))
+        : base;
       return { ...d, hasOverride, totals };
     });
-  }, [texts]);
+  }, [texts, enrichedTotalsByDay]);
 
   const kg = weightKg && weightKg > 0 ? weightKg : null;
 
