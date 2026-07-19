@@ -32,6 +32,7 @@ import { parseText } from '@/lib/smartPlan/parse';
 import type { PlanAst, FoodToken } from '@/lib/smartPlan/ast';
 import { SuggestionPopover, type SuggestionItem } from './SuggestionPopover';
 import { recalcGroupSubstitutions } from '@/lib/smartPlan/equivalence';
+import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 
 type Mode = 'idle' | 'food' | 'measure';
 
@@ -194,15 +195,48 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     });
   }, [onChange]);
 
+  // Cache local para enriquecer o alimento principal quando estamos numa
+  // substituição — assim conseguimos calcular a porção equivalente em kcal.
+  const subEnrichCache = useRef(makeEnrichCache());
+
   // Aplica seleção de alimento: substitui a "query" pela {nome} + " - "
-  const applyFood = useCallback((food: FoodItem) => {
+  // Se estivermos após " ou " (substituição), calcula automaticamente a
+  // porção equivalente em CALORIAS ao alimento principal do grupo e insere
+  // já resolvido (Nome - N g), pulando o popover de medidas. 100% editável
+  // depois pelo nutri.
+  const applyFood = useCallback(async (food: FoodItem) => {
     const c = getLineCtx(value, caret);
     const segAbsStart = c.segStart;
     const segAbsCaret = c.segStart + c.segCaret;
     const beforeSeg = value.slice(0, segAbsStart);
     const afterCaret = value.slice(segAbsCaret);
-    // preserva prefixo (ex.: já digitado antes do nome? não; segmento começa
-    // depois do último " ou "), então reconstrói: nome + " - "
+
+    const isSubstitution = c.segStart > c.lineStart; // segmento inicia após " ou "
+
+    if (isSubstitution && food.calories_per_100g > 0) {
+      try {
+        // Extrai texto do principal (parte da linha antes do primeiro " ou ").
+        const mainText = c.lineText.split(/\s+ou\s+/i)[0]?.trim() || '';
+        if (mainText) {
+          const ast = parseText(mainText);
+          await enrichAst(ast, subEnrichCache.current);
+          const mainTok = ast.meals[0]?.groups[0]?.tokens[0];
+          const mainKcal = mainTok?.calories || 0;
+          if (mainKcal > 0) {
+            const grams = Math.max(1, Math.round((mainKcal / food.calories_per_100g) * 100));
+            const per = grams;
+            const insert = `${food.name} - 1 porção (${per}g cada · ${grams}g)`;
+            setPendingFood(null);
+            setMode('idle');
+            insertAtCaret(beforeSeg, insert, afterCaret);
+            toast.success(`Substituição equivalente: ~${Math.round(mainKcal)} kcal em ${grams} g de ${food.name}`, { duration: 2000 });
+            return;
+          }
+        }
+      } catch { /* fallback abaixo */ }
+    }
+
+    // Fluxo padrão: nome + " - " e abre popover de medidas.
     const insert = `${food.name} - `;
     setPendingFood(food);
     insertAtCaret(beforeSeg, insert, afterCaret);
