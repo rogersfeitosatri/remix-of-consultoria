@@ -210,20 +210,24 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
 
   const applyMeasure = useCallback((measureLabel: string, grams: number, food: FoodItem | null) => {
     const c = getLineCtx(value, caret);
-    // Substitui o "sufixo" atual (depois do divisor) pela medida.
+    // Substitui o "sufixo" atual (depois do divisor) pela medida, preservando
+    // a quantidade numérica já digitada (ex.: "banana - 1" + "Unidade média"
+    // → "banana - 1 Unidade média").
     const seg = c.segText.slice(0, c.segCaret);
     const q = foodQueryOfSegment(seg);
     if (!q.hasDivider) return;
-    // reconstrói o segmento: "Nome - <medida>"
+    const typed = q.afterDivider.trim();
+    const qtyMatch = typed.match(/^(\d+(?:[.,]\d+)?)/);
+    const qty = qtyMatch ? Number(qtyMatch[1].replace(',', '.')) : 1;
+    const qtyPrefix = qtyMatch ? `${qtyMatch[1]} ` : '';
     const nameStart = c.segStart;
     const beforeSeg = value.slice(0, nameStart);
     const afterCaret = value.slice(c.segStart + c.segCaret);
-    const newSeg = `${q.query} - ${measureLabel}`;
+    const newSeg = `${q.query} - ${qtyPrefix}${measureLabel}`;
     insertAtCaret(beforeSeg, newSeg, afterCaret);
     if (food) {
-      const nutrients = calcNutrients(food, grams);
-      // Toast leve com macros (não invasivo)
-      toast.success(`${food.name} × ${measureLabel}`, {
+      const nutrients = calcNutrients(food, grams * qty);
+      toast.success(`${food.name} × ${qtyPrefix}${measureLabel}`.trim(), {
         description: `${Math.round(nutrients.calories)} kcal · CHO ${nutrients.carbs_g}g · PTN ${nutrients.protein_g}g · GORD ${nutrients.fat_g}g`,
         duration: 1800,
       });
