@@ -651,7 +651,7 @@ export default function MealPlanEditor() {
           </TabsList>
         </Tabs>
 
-        <WeekOverview texts={texts} active={activeDay} onSelect={(k) => setActiveDay(k)} weightKg={weightKg} />
+        <WeekOverview texts={texts} active={activeDay} onSelect={(k) => setActiveDay(k)} weightKg={weightKg} enrichedTotalsByDay={enrichedTotalsByDay} />
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
           <Card className="min-w-0 overflow-hidden">
