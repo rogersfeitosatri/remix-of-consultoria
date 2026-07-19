@@ -423,7 +423,7 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
         ref={taRef}
         value={value}
         onChange={(e) => {
-          const next = recomputeTotals(e.target.value);
+          const next = recomputeTotals(value, e.target.value);
           onChange(next);
           setCaret(e.target.selectionStart);
         }}
