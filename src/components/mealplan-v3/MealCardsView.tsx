@@ -78,15 +78,21 @@ export function MealCardsView({ text, onChange }: Props) {
     onChange(astToText(next));
   };
 
-  const addOption = (mealIdx: number) =>
-    mutate((a) => {
-      const meal = a.meals[mealIdx];
-      const opts = optionsOf(meal).map((o) => ({ ...o, groups: [...o.groups] }));
-      opts.push({ name: `Opção ${opts.length + 1}`, primary: false, groups: [] });
-      meal.options = opts;
-      const primary = opts.find((o) => o.primary) || opts[0];
-      meal.groups = primary.groups;
-    });
+  const addOption = (mealIdx: number) => {
+    // Cria a nova opção e já entra no modo edição dela, com autocomplete pronto.
+    const next = parseText(text || '');
+    const meal = next.meals[mealIdx];
+    if (!meal) return;
+    const opts = optionsOf(meal).map((o) => ({ ...o, groups: [...o.groups] }));
+    const newIdx = opts.length;
+    opts.push({ name: `Opção ${opts.length + 1}`, primary: false, groups: [] });
+    meal.options = opts;
+    const primary = opts.find((o) => o.primary) || opts[0];
+    meal.groups = primary.groups;
+    onChange(astToText(next));
+    setEditText('');
+    setEditing({ mi: mealIdx, oi: newIdx });
+  };
 
   const setPrimary = (mealIdx: number, optIdx: number) =>
     mutate((a) => {
@@ -109,6 +115,16 @@ export function MealCardsView({ text, onChange }: Props) {
       meal.groups = primary.groups;
     });
 
+  const removeMeal = (mealIdx: number) => {
+    const meal = ast.meals[mealIdx];
+    const label = meal ? `${meal.time ? meal.time + ' · ' : ''}${meal.name}` : 'esta refeição';
+    if (!confirm(`Excluir "${label}"? Todas as opções desta refeição serão removidas.`)) return;
+    cancelEdit();
+    mutate((a) => {
+      a.meals.splice(mealIdx, 1);
+    });
+  };
+
   const startEdit = (mi: number, oi: number) => {
     const meal = ast.meals[mi];
     if (!meal) return;
@@ -125,8 +141,12 @@ export function MealCardsView({ text, onChange }: Props) {
   const saveEdit = () => {
     if (!editing) return;
     const { mi, oi } = editing;
-    // Parseia cada linha do editor como um GroupLine.
-    const lines = editText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    // Filtra marcadores de título/opção/nota: aqui só entram linhas de alimento.
+    const lines = editText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .filter((l) => !l.startsWith('@') && !l.startsWith('#') && !l.startsWith('>') && !/^==\s*/.test(l));
     const groups = lines.map(parseGroupLine);
     mutate((a) => {
       const meal = a.meals[mi];
