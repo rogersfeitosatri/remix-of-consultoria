@@ -2,13 +2,15 @@
 // textarea. Sem Radix — usa posicionamento absoluto para ficar próximo ao
 // caret e funcionar bem no celular.
 import { useEffect, useRef } from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles, Star } from 'lucide-react';
 
 export interface SuggestionItem {
   key: string;
   label: string;
   hint?: string;
   onSelect: () => void;
+  /** Se presente, mostra uma estrelinha alternável (favorito) à direita. */
+  favorite?: { active: boolean; onToggle: () => void };
 }
 
 export function SuggestionPopover({
