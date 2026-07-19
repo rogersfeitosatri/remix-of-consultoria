@@ -41,9 +41,14 @@ async function findFood(name: string, cache: EnrichCache): Promise<FoodItem | nu
   const key = name.trim().toLowerCase();
   if (!key) return null;
   if (cache.foodByKey.has(key)) return cache.foodByKey.get(key) ?? null;
-  const q = tokens(name)[0] || name;
+  // Palavra-âncora para o ilike: mantém acentos (o Postgres ilike NÃO é
+  // acento-insensível — buscar "pao" não casa com "Pão francês"). Escolhe
+  // a primeira palavra "significativa" da versão original.
+  const raw = (name || '').trim();
+  const rawWords = raw.split(/\s+/).filter((w) => w.length > 1 && !STOP.has(normalize(w)));
+  const q = (rawWords[0] || raw).replace(/[%_]/g, ''); // evita curingas do LIKE
   const { data } = await (supabase as any)
-    .from('food_items').select('*').ilike('name', `%${q}%`).limit(15);
+    .from('food_items').select('*').ilike('name', `%${q}%`).limit(20);
   const rows = (data || []) as FoodItem[];
   let best: FoodItem | null = null; let bestScore = 0;
   for (const r of rows) {
