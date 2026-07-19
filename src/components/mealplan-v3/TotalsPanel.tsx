@@ -14,6 +14,7 @@ function fmt(n: number, digits = 0) {
 
 export function TotalsPanel({
   text, weightKg, saveState, onSave, onSendZonaNutri, sending,
+  enrichedMeals, enrichedTotals,
 }: {
   text: string;
   weightKg: number | null;
@@ -21,11 +22,17 @@ export function TotalsPanel({
   onSave?: () => void;
   onSendZonaNutri?: () => void;
   sending?: boolean;
+  /** Meals já enriquecidos (com calories/grams). Preferidos sobre `text`. */
+  enrichedMeals?: any[];
+  enrichedTotals?: { kcal: number; cho: number; ptn: number; lip: number };
 }) {
   const { meals, totals } = useMemo(() => {
+    if (enrichedMeals && enrichedTotals) {
+      return { meals: enrichedMeals, totals: enrichedTotals };
+    }
     const ast = parseText(text);
     return { meals: astToMeals(ast), totals: planTotals(ast) };
-  }, [text]);
+  }, [text, enrichedMeals, enrichedTotals]);
 
   const kg = weightKg && weightKg > 0 ? weightKg : null;
   const gkg = (v: number) => kg ? Math.round((v / kg) * 100) / 100 : null;
