@@ -73,7 +73,7 @@ export default function ClientDetail() {
   const { user } = useAuth();
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fromPeriodization = searchParams.get('from') === 'periodization';
   const fromMealPlanHub = searchParams.get('from') === 'meal-plan-hub';
   const goBack = () => {
