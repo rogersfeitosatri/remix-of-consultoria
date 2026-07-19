@@ -95,7 +95,7 @@ export default function MealPlanHub() {
     { icon: ClipboardCheck, title: 'Anamnese', desc: 'Respostas do formulário', onClick: () => openClientTab('anamnese') },
     { icon: MessageCircle, title: 'Histórico de check-ins', desc: 'Respostas recebidas', onClick: () => openClientTab('history') },
     { icon: TrendingUp, title: 'Avaliações', desc: 'Evolução e gráficos', onClick: () => openClientTab('evolution') },
-    { icon: FlaskConical, title: 'Exames', desc: 'Análise nutricional da IA', onClick: () => navigate(`/clients/${clientId}/analysis`) },
+    { icon: FlaskConical, title: 'Exames', desc: 'Análise nutricional da IA', onClick: () => navigate(`/clients/${clientId}/analysis?from=meal-plan-hub`) },
   ];
 
   return (
