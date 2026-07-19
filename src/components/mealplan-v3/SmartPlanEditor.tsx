@@ -28,6 +28,8 @@ import {
   type FoodItem,
   type FoodMeasure,
 } from '@/hooks/useFoodSearch';
+import { supabase } from '@/integrations/supabase/client';
+import { useLearnedSubstitutions } from '@/hooks/useSubstitutionHistory';
 import { parseText } from '@/lib/smartPlan/parse';
 import type { PlanAst, FoodToken } from '@/lib/smartPlan/ast';
 import { SuggestionPopover, type SuggestionItem } from './SuggestionPopover';
@@ -140,9 +142,33 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     setManualQuery(query);
   }, [ctx]);
 
+  // Cache para enriquecer o alimento principal em contexto de substituição.
+  const subEnrichCache = useRef(makeEnrichCache());
+
   // Consultas de sugestão
   const foodResults = useFoodSearch(mode === 'food' ? manualQuery : '');
   const measures = useFoodMeasures(mode === 'measure' ? pendingFood?.id ?? null : null);
+
+  // Identifica o alimento principal do grupo atual (quando estamos digitando
+  // uma substituição) para sugerir substitutos aprendidos pelo nutricionista.
+  const [mainFoodId, setMainFoodId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancel = false;
+    const isSub = ctx.segStart > ctx.lineStart;
+    if (mode !== 'food' || !isSub) { setMainFoodId(null); return; }
+    (async () => {
+      try {
+        const mainText = ctx.lineText.split(/\s+ou\s+/i)[0]?.trim() || '';
+        if (!mainText) { setMainFoodId(null); return; }
+        const ast = parseText(mainText);
+        await enrichAst(ast, subEnrichCache.current);
+        const tok = ast.meals[0]?.groups[0]?.tokens[0];
+        if (!cancel) setMainFoodId(tok?.foodItemId ?? null);
+      } catch { if (!cancel) setMainFoodId(null); }
+    })();
+    return () => { cancel = true; };
+  }, [mode, ctx]);
+  const learnedSubs = useLearnedSubstitutions(mainFoodId);
 
   // Reposiciona popover próximo ao caret
   useEffect(() => {
@@ -195,9 +221,6 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     });
   }, [onChange]);
 
-  // Cache local para enriquecer o alimento principal quando estamos numa
-  // substituição — assim conseguimos calcular a porção equivalente em kcal.
-  const subEnrichCache = useRef(makeEnrichCache());
 
   // Aplica seleção de alimento: substitui a "query" pela {nome} + " - "
   // Se estivermos após " ou " (substituição), calcula automaticamente a
@@ -223,8 +246,55 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
           const mainTok = ast.meals[0]?.groups[0]?.tokens[0];
           const mainKcal = mainTok?.calories || 0;
           if (mainKcal > 0) {
-            const grams = Math.max(1, Math.round((mainKcal / food.calories_per_100g) * 100));
-            const insert = `${food.name} - 1 porção (${grams}g)`;
+            const targetGrams = Math.max(1, (mainKcal / food.calories_per_100g) * 100);
+
+            // Busca medidas do alimento; se houver uma medida "por unidade"
+            // (fatia, unidade, colher, porção, etc.), arredonda a quantidade
+            // para o múltiplo de 0,5 mais próximo — evita ex.: "1,3 fatias".
+            let unitMeasure: FoodMeasure | null = null;
+            try {
+              const { data: measuresRows } = await (supabase as any)
+                .from('food_measures')
+                .select('*')
+                .eq('food_item_id', food.id)
+                .order('measure_weight_g', { ascending: true });
+              const rows = (measuresRows || []) as FoodMeasure[];
+              // "unit-like": nome NÃO é apenas g/ml e peso razoável (≤ 300 g).
+              const isGramLike = (n: string) => /^\s*(g|gr|gramas?|ml)\s*$/i.test(n);
+              const candidates = rows.filter((r) => !isGramLike(r.measure_name) && r.measure_weight_g > 0 && r.measure_weight_g <= 300);
+              if (candidates.length > 0) {
+                // Preferir a medida cuja qtd resultante mais se aproxima de
+                // um valor "redondo" (0,5 / 1 / 1,5 / 2). Escolhe a que gera
+                // o menor erro relativo após o arredondamento em 0,5.
+                let best: { m: FoodMeasure; qty: number; err: number } | null = null;
+                for (const m of candidates) {
+                  const rawQty = targetGrams / m.measure_weight_g;
+                  if (rawQty < 0.25) continue; // muito pequeno — próxima medida
+                  const qty = Math.max(0.5, Math.round(rawQty * 2) / 2);
+                  const err = Math.abs(qty - rawQty) / rawQty;
+                  if (!best || err < best.err) best = { m, qty, err };
+                }
+                if (best) unitMeasure = best.m;
+                // Recalcula qty final
+                if (unitMeasure) {
+                  const rawQty = targetGrams / unitMeasure.measure_weight_g;
+                  const qty = Math.max(0.5, Math.round(rawQty * 2) / 2);
+                  const total = Math.round(qty * unitMeasure.measure_weight_g * 10) / 10;
+                  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toString().replace('.', ','));
+                  const cleanLabel = unitMeasure.measure_name.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                  const insert = `${food.name} - ${fmt(qty)} ${cleanLabel} (${fmt(total)}g)`;
+                  setPendingFood(null);
+                  setMode('idle');
+                  insertAtCaret(beforeSeg, insert, afterCaret);
+                  toast.success(`Substituição equivalente: ~${Math.round(mainKcal)} kcal · ${fmt(qty)} ${cleanLabel} de ${food.name}`, { duration: 2000 });
+                  return;
+                }
+              }
+            } catch { /* segue para fallback em gramas */ }
+
+            // Sem medida unitária — insere em gramas (editável).
+            const grams = Math.max(1, Math.round(targetGrams));
+            const insert = `${food.name} - ${grams} Gramas (${grams}g)`;
             setPendingFood(null);
             setMode('idle');
             insertAtCaret(beforeSeg, insert, afterCaret);
@@ -234,6 +304,7 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
         }
       } catch { /* fallback abaixo */ }
     }
+
 
     // Fluxo padrão: nome + " - " e abre popover de medidas.
     const insert = `${food.name} - `;
@@ -338,12 +409,25 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
   const items: SuggestionItem[] = useMemo(() => {
     if (mode === 'food') {
       const rows = foodResults.data || [];
-      const list: SuggestionItem[] = rows.map((f) => ({
-        key: f.id,
-        label: f.name,
-        hint: f.category,
-        onSelect: () => applyFood(f),
-      }));
+      const seen = new Set<string>();
+      const list: SuggestionItem[] = [];
+      // Substitutos aprendidos aparecem no topo quando estamos após " ou ".
+      const learned = learnedSubs.data || [];
+      const q = manualQuery.trim().toLowerCase();
+      for (const s of learned) {
+        if (q && !s.name.toLowerCase().includes(q)) continue;
+        seen.add(s.sub_food_id);
+        list.push({
+          key: `learned-${s.sub_food_id}`,
+          label: `⭐ ${s.name}`,
+          hint: `usado ${s.uses_count}×`,
+          onSelect: () => applyFood(s as unknown as FoodItem),
+        });
+      }
+      for (const f of rows) {
+        if (seen.has(f.id)) continue;
+        list.push({ key: f.id, label: f.name, hint: f.category, onSelect: () => applyFood(f) });
+      }
       if (manualQuery.length >= 2) {
         list.push({
           key: '__ai__',
@@ -369,7 +453,7 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
       return list;
     }
     return [];
-  }, [mode, foodResults.data, measures.data, pendingFood, manualQuery, applyFood, applyMeasure, searchWithAi]);
+  }, [mode, foodResults.data, measures.data, pendingFood, manualQuery, applyFood, applyMeasure, searchWithAi, learnedSubs.data]);
 
   const stripMarkerOnEnter = (): boolean => {
     // Ao apertar Enter numa linha iniciada por @ (título) ou # (observação),

@@ -5533,6 +5533,36 @@ export type Database = {
           },
         ]
       }
+      plan_substitution_history: {
+        Row: {
+          created_at: string
+          id: string
+          last_used_at: string
+          main_food_id: string
+          nutritionist_id: string
+          sub_food_id: string
+          uses_count: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_used_at?: string
+          main_food_id: string
+          nutritionist_id: string
+          sub_food_id: string
+          uses_count?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_used_at?: string
+          main_food_id?: string
+          nutritionist_id?: string
+          sub_food_id?: string
+          uses_count?: number
+        }
+        Relationships: []
+      }
       plan_templates: {
         Row: {
           checkin_frequency: string | null

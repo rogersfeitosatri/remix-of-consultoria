@@ -33,6 +33,7 @@ import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
 import { WeekOverview } from '@/components/mealplan-v3/WeekOverview';
+import { useRecordSubstitutions } from '@/hooks/useSubstitutionHistory';
 
 type DayKey = 'all' | 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom';
 
@@ -182,6 +183,8 @@ export default function MealPlanEditor() {
       .filter(k => texts[k].trim().length > 0);
   }, [texts]);
 
+  const recordSubs = useRecordSubstitutions();
+
   const savePlan = async () => {
     if (!clientId) return;
     try {
@@ -192,11 +195,15 @@ export default function MealPlanEditor() {
       const baseMeals = astToMeals(baseAst);
       // Overrides por dia
       const dayVariations: Record<string, any> = {};
+      const dayAsts = [baseAst];
       for (const k of overrideDays) {
         const ast = parseText(texts[k]);
         await enrichAst(ast, enrichCache.current);
         dayVariations[k] = astToMeals(ast);
+        dayAsts.push(ast);
       }
+      // Registra as substituições usadas — a IA aprende com o histórico.
+      void recordSubs(dayAsts);
       const currentRaw = (analysisRow?.raw_response as any) || {};
       try {
         localStorage.setItem(backupKey, JSON.stringify({
