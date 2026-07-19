@@ -221,9 +221,6 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     });
   }, [onChange]);
 
-  // Cache local para enriquecer o alimento principal quando estamos numa
-  // substituição — assim conseguimos calcular a porção equivalente em kcal.
-  const subEnrichCache = useRef(makeEnrichCache());
 
   // Aplica seleção de alimento: substitui a "query" pela {nome} + " - "
   // Se estivermos após " ou " (substituição), calcula automaticamente a
