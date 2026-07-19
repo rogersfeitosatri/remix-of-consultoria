@@ -260,10 +260,7 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     const nameStart = c.segStart;
     const beforeSeg = value.slice(0, nameStart);
     const afterCaret = value.slice(c.segStart + c.segCaret);
-    const isGramUnit = per === 1 || /^\s*(g|gramas?)\s*$/i.test(cleanLabel);
-    const newSeg = isGramUnit
-      ? `${q.query} - ${qtyPrefix}${cleanLabel} (${fmt(total)}g)`
-      : `${q.query} - ${qtyPrefix}${cleanLabel} (${fmt(per)}g cada · ${fmt(total)}g)`;
+    const newSeg = `${q.query} - ${qtyPrefix}${cleanLabel} (${fmt(total)}g)`;
     insertAtCaret(beforeSeg, newSeg, afterCaret);
     if (food) {
       const nutrients = calcNutrients(food, grams * qty);
