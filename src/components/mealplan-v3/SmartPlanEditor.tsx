@@ -142,6 +142,9 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     setManualQuery(query);
   }, [ctx]);
 
+  // Cache para enriquecer o alimento principal em contexto de substituição.
+  const subEnrichCache = useRef(makeEnrichCache());
+
   // Consultas de sugestão
   const foodResults = useFoodSearch(mode === 'food' ? manualQuery : '');
   const measures = useFoodMeasures(mode === 'measure' ? pendingFood?.id ?? null : null);
