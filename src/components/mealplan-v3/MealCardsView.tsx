@@ -75,6 +75,7 @@ export function MealCardsView({ text, onChange }: Props) {
   const mutate = (fn: (a: PlanAst) => void) => {
     const next = parseText(text || '');
     fn(next);
+    setAst(next); // atualização síncrona — evita "trava" enquanto o efeito debounced não roda
     onChange(astToText(next));
   };
 
@@ -89,10 +90,12 @@ export function MealCardsView({ text, onChange }: Props) {
     meal.options = opts;
     const primary = opts.find((o) => o.primary) || opts[0];
     meal.groups = primary.groups;
+    setAst(next); // reflete imediatamente na UI
     onChange(astToText(next));
     setEditText('');
     setEditing({ mi: mealIdx, oi: newIdx });
   };
+
 
   const setPrimary = (mealIdx: number, optIdx: number) =>
     mutate((a) => {
