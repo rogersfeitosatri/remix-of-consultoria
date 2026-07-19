@@ -146,6 +146,27 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
   const foodResults = useFoodSearch(mode === 'food' ? manualQuery : '');
   const measures = useFoodMeasures(mode === 'measure' ? pendingFood?.id ?? null : null);
 
+  // Identifica o alimento principal do grupo atual (quando estamos digitando
+  // uma substituição) para sugerir substitutos aprendidos pelo nutricionista.
+  const [mainFoodId, setMainFoodId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancel = false;
+    const isSub = ctx.segStart > ctx.lineStart;
+    if (mode !== 'food' || !isSub) { setMainFoodId(null); return; }
+    (async () => {
+      try {
+        const mainText = ctx.lineText.split(/\s+ou\s+/i)[0]?.trim() || '';
+        if (!mainText) { setMainFoodId(null); return; }
+        const ast = parseText(mainText);
+        await enrichAst(ast, subEnrichCache.current);
+        const tok = ast.meals[0]?.groups[0]?.tokens[0];
+        if (!cancel) setMainFoodId(tok?.foodItemId ?? null);
+      } catch { if (!cancel) setMainFoodId(null); }
+    })();
+    return () => { cancel = true; };
+  }, [mode, ctx]);
+  const learnedSubs = useLearnedSubstitutions(mainFoodId);
+
   // Reposiciona popover próximo ao caret
   useEffect(() => {
     if (mode === 'idle') return;
