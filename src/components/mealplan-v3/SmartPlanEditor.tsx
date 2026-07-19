@@ -224,8 +224,7 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
           const mainKcal = mainTok?.calories || 0;
           if (mainKcal > 0) {
             const grams = Math.max(1, Math.round((mainKcal / food.calories_per_100g) * 100));
-            const per = grams;
-            const insert = `${food.name} - 1 porção (${per}g cada · ${grams}g)`;
+            const insert = `${food.name} - 1 porção (${grams}g)`;
             setPendingFood(null);
             setMode('idle');
             insertAtCaret(beforeSeg, insert, afterCaret);
