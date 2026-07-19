@@ -405,6 +405,22 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     applyFood(f);
   }, [manualQuery, lookupFood, applyFood]);
 
+  // Quantidade já digitada pelo nutri no segmento atual (após " - "),
+  // usada para pré-visualizar macros da porção no popover de medidas.
+  const typedQty = useMemo(() => {
+    if (mode !== 'measure') return 1;
+    const seg = ctx.segText.slice(0, ctx.segCaret);
+    const q = foodQueryOfSegment(seg);
+    if (!q.hasDivider) return 1;
+    const m = q.afterDivider.trim().match(/^(\d+(?:[.,]\d+)?)/);
+    return m ? Math.max(0.1, Number(m[1].replace(',', '.'))) : 1;
+  }, [mode, ctx]);
+
+  const macroHint = useCallback((food: FoodItem, grams: number) => {
+    const n = calcNutrients(food, grams);
+    return `${Math.round(n.calories)}kcal·C${Math.round(n.carbs_g)}·P${Math.round(n.protein_g)}·G${Math.round(n.fat_g)}`;
+  }, []);
+
   // Itens do popover
   const items: SuggestionItem[] = useMemo(() => {
     if (mode === 'food') {
@@ -420,13 +436,18 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
         list.push({
           key: `learned-${s.sub_food_id}`,
           label: `⭐ ${s.name}`,
-          hint: `usado ${s.uses_count}×`,
+          hint: `${s.uses_count}× · ${Math.round(s.calories_per_100g)}kcal/100g`,
           onSelect: () => applyFood(s as unknown as FoodItem),
         });
       }
       for (const f of rows) {
         if (seen.has(f.id)) continue;
-        list.push({ key: f.id, label: f.name, hint: f.category, onSelect: () => applyFood(f) });
+        list.push({
+          key: f.id,
+          label: f.name,
+          hint: `${Math.round(f.calories_per_100g)}kcal/100g · C${Math.round(f.carbs_per_100g)}·P${Math.round(f.protein_per_100g)}·G${Math.round(f.fat_per_100g)}`,
+          onSelect: () => applyFood(f),
+        });
       }
       if (manualQuery.length >= 2) {
         list.push({
@@ -439,21 +460,27 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     }
     if (mode === 'measure' && pendingFood) {
       const rows = measures.data || [];
-      const list: SuggestionItem[] = rows.map((m) => ({
-        key: m.id,
-        label: `${m.measure_name} · ${Math.round(m.measure_weight_g)} g`,
-        onSelect: () => applyMeasure(m.measure_name, m.measure_weight_g, pendingFood),
-      }));
+      const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toString().replace('.', ','));
+      const list: SuggestionItem[] = rows.map((m) => {
+        const totalG = m.measure_weight_g * typedQty;
+        return {
+          key: m.id,
+          label: `${m.measure_name} · ${fmt(Math.round(m.measure_weight_g * 10) / 10)} g${typedQty !== 1 ? ` (×${fmt(typedQty)} = ${fmt(Math.round(totalG * 10) / 10)}g)` : ''}`,
+          hint: macroHint(pendingFood, totalG),
+          onSelect: () => applyMeasure(m.measure_name, m.measure_weight_g, pendingFood),
+        };
+      });
       // Gramas comuns
       [50, 100, 150, 200].forEach((g) => list.push({
         key: `g${g}`,
         label: `${g} g`,
+        hint: macroHint(pendingFood, g * typedQty),
         onSelect: () => applyMeasure(`${g} g`, g, pendingFood),
       }));
       return list;
     }
     return [];
-  }, [mode, foodResults.data, measures.data, pendingFood, manualQuery, applyFood, applyMeasure, searchWithAi, learnedSubs.data]);
+  }, [mode, foodResults.data, measures.data, pendingFood, manualQuery, applyFood, applyMeasure, searchWithAi, learnedSubs.data, typedQty, macroHint, ctx]);
 
   const stripMarkerOnEnter = (): boolean => {
     // Ao apertar Enter numa linha iniciada por @ (título) ou # (observação),
