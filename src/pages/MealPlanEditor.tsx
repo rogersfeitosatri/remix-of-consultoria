@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
-  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat,
+  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat, ClipboardCheck, Plus,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -225,6 +225,63 @@ export default function MealPlanEditor() {
       setSaving(false);
     }
   };
+
+  // Salva o conteúdo atual como PROPOSTA (pending_update) — o admin aplica/desfaz
+  // depois na página de detalhe do plano (MealPlanDetail).
+  const saveAsProposal = async () => {
+    if (!clientId || !analysisRow?.id) { toast.error('Salve o plano ao menos uma vez antes de propor.'); return; }
+    try {
+      setSaving(true);
+      const baseAst = parseText(texts.all);
+      await enrichAst(baseAst, enrichCache.current);
+      const baseMeals = astToMeals(baseAst);
+      const dayVariations: Record<string, any> = {};
+      for (const k of overrideDays) {
+        const ast = parseText(texts[k]);
+        await enrichAst(ast, enrichCache.current);
+        dayVariations[k] = astToMeals(ast);
+      }
+      const currentRaw = (analysisRow?.raw_response as any) || {};
+      const pending_update = {
+        source: 'smart-plan-v3',
+        created_at: new Date().toISOString(),
+        meal_plan: {
+          ...(currentRaw.meal_plan || {}),
+          meals: baseMeals,
+          day_variations: dayVariations,
+        },
+      };
+      const nextRaw = { ...currentRaw, pending_update };
+      const { error } = await supabase.from('ai_analyses').update({ raw_response: nextRaw }).eq('id', analysisRow.id);
+      if (error) throw error;
+      toast.success('Proposta salva. Abra o plano do atleta e clique em "Aplicar ajustes".');
+      qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
+      qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
+    } catch (e: any) {
+      toast.error(`Falha ao salvar proposta: ${e.message || e}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Insere um esqueleto de refeição no final do texto da aba atual.
+  const insertMealSkeleton = (name: string, time: string) => {
+    const skeleton = `@ ${time} ${name}\n`;
+    setText(prev => {
+      const sep = prev.length === 0 ? '' : (prev.endsWith('\n\n') ? '' : prev.endsWith('\n') ? '\n' : '\n\n');
+      return prev + sep + skeleton;
+    });
+  };
+  const QUICK_MEALS: { label: string; time: string }[] = [
+    { label: 'Café da manhã', time: '07:00' },
+    { label: 'Lanche da manhã', time: '10:00' },
+    { label: 'Pré-treino', time: '11:30' },
+    { label: 'Almoço', time: '12:30' },
+    { label: 'Pós-treino', time: '15:00' },
+    { label: 'Lanche da tarde', time: '16:30' },
+    { label: 'Jantar', time: '19:30' },
+    { label: 'Ceia', time: '22:00' },
+  ];
 
   const undoSave = async () => {
     if (!clientId || !analysisRow?.id) return;
@@ -457,6 +514,9 @@ export default function MealPlanEditor() {
                   <Button size="sm" variant="outline" onClick={exportPdf}>
                     <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
                   </Button>
+                  <Button size="sm" variant="outline" onClick={saveAsProposal} disabled={saving}>
+                    <ClipboardCheck className="h-3 w-3 mr-1" /> Salvar como proposta
+                  </Button>
                   <Button size="sm" variant="outline" onClick={openReplicate} disabled={!text.trim()}>
                     <Repeat className="h-3 w-3 mr-1" /> Replicar para...
                   </Button>
@@ -480,6 +540,20 @@ export default function MealPlanEditor() {
               </div>
               <div className="mb-2 rounded-md border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground leading-relaxed">
                 <b>Dicas:</b> comece a linha com <code className="px-1 rounded bg-background border">@</code> para nomear uma refeição (ex.: <code className="px-1 rounded bg-background border">@ 07:00 Café da manhã</code>) e com <code className="px-1 rounded bg-background border">#</code> para uma observação. Ao pressionar Enter, o marcador some. Use <b>"ou"</b> na mesma linha para substituições.
+              </div>
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-muted-foreground mr-1">Adicionar refeição:</span>
+                {QUICK_MEALS.map((m) => (
+                  <Button
+                    key={m.label}
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs border"
+                    onClick={() => insertMealSkeleton(m.label, m.time)}
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> {m.label}
+                  </Button>
+                ))}
               </div>
               <SmartPlanEditor value={text} onChange={setText} />
             </CardContent>
