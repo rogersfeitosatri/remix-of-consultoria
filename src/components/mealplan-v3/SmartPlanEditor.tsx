@@ -32,6 +32,7 @@ import { parseText } from '@/lib/smartPlan/parse';
 import type { PlanAst, FoodToken } from '@/lib/smartPlan/ast';
 import { SuggestionPopover, type SuggestionItem } from './SuggestionPopover';
 import { recalcGroupSubstitutions } from '@/lib/smartPlan/equivalence';
+import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 
 type Mode = 'idle' | 'food' | 'measure';
 
