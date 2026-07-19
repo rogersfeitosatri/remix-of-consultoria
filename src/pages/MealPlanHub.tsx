@@ -83,15 +83,19 @@ export default function MealPlanHub() {
   const draft = useMemo(() => readDraft(clientId), [clientId, analyses]);
 
   const openEditor = () => navigate(`/meal-plans/${clientId}/editor`);
-  const openClientTab = (tab?: string) =>
-    navigate(`/clients/${clientId}${tab ? `?tab=${tab}` : ''}`);
+  const openClientTab = (tab?: string) => {
+    const params = new URLSearchParams();
+    params.set('from', 'meal-plan-hub');
+    if (tab) params.set('tab', tab);
+    navigate(`/clients/${clientId}?${params.toString()}`);
+  };
 
   const actions: Array<{ icon: any; title: string; desc: string; onClick: () => void }> = [
     { icon: User, title: 'Dados do atleta', desc: 'Perfil, plano, contato', onClick: () => openClientTab() },
     { icon: ClipboardCheck, title: 'Anamnese', desc: 'Respostas do formulário', onClick: () => openClientTab('anamnese') },
     { icon: MessageCircle, title: 'Histórico de check-ins', desc: 'Respostas recebidas', onClick: () => openClientTab('history') },
     { icon: TrendingUp, title: 'Avaliações', desc: 'Evolução e gráficos', onClick: () => openClientTab('evolution') },
-    { icon: FlaskConical, title: 'Exames', desc: 'Análise nutricional da IA', onClick: () => navigate(`/clients/${clientId}/analysis`) },
+    { icon: FlaskConical, title: 'Exames', desc: 'Análise nutricional da IA', onClick: () => navigate(`/clients/${clientId}/analysis?from=meal-plan-hub`) },
   ];
 
   return (
