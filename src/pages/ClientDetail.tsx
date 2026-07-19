@@ -73,7 +73,7 @@ export default function ClientDetail() {
   const { user } = useAuth();
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fromPeriodization = searchParams.get('from') === 'periodization';
   const fromMealPlanHub = searchParams.get('from') === 'meal-plan-hub';
   const goBack = () => {
@@ -503,7 +503,15 @@ export default function ClientDetail() {
         <PlanHistorySection clientId={client.id} />
         
         {/* Tabs */}
-        <Tabs defaultValue={searchParams.get('tab') || 'timeline'} className="space-y-4">
+        <Tabs
+          value={searchParams.get('tab') || 'timeline'}
+          onValueChange={(v) => {
+            const params = new URLSearchParams(searchParams);
+            params.set('tab', v);
+            setSearchParams(params, { replace: true });
+          }}
+          className="space-y-4"
+        >
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="timeline" className="gap-2">
               <History className="h-4 w-4" />
