@@ -2,7 +2,7 @@
 // AST → meals[] canônico do sistema (mesmo formato usado pelo envio ao Zona
 // Nutri, PDF e visualização estruturada).
 
-import type { PlanAst, FoodToken, MealBlock } from './ast';
+import type { PlanAst, FoodToken, MealBlock, MealOption, GroupLine } from './ast';
 
 function fmtQty(q?: number | null): string {
   if (q == null || !isFinite(q)) return '';
@@ -14,25 +14,36 @@ export function tokenToText(t: FoodToken): string {
   const qty = [q, m].filter(Boolean).join(' ');
   return qty ? `${t.name} - ${qty}` : t.name;
 }
+
+function optionsOf(meal: MealBlock): MealOption[] {
+  if (meal.options && meal.options.length) return meal.options;
+  return [{ name: 'Opção 1', primary: true, groups: meal.groups }];
+}
+
 export function astToText(ast: PlanAst): string {
   const out: string[] = [];
   for (const meal of ast.meals) {
     const title = meal.time ? `${meal.time} — ${meal.name}` : meal.name;
     if (out.length) out.push('');
     out.push(title);
-    for (const g of meal.groups) {
-      out.push(g.tokens.map(tokenToText).join(' ou '));
-    }
+    const options = optionsOf(meal);
+    options.forEach((opt, i) => {
+      if (i > 0) {
+        const name = opt.name || `Opção ${i + 1}`;
+        out.push(`== ${name}${opt.primary ? ' *' : ''}`);
+      } else if (options.length > 1 && opt.primary) {
+        // Marca a Opção 1 como principal explicitamente quando há mais opções.
+        // (Se a principal for outra, o "*" aparece só na dela.)
+        // Sem emitir marcador para não poluir; parser assume Opção 1 default.
+      }
+      for (const g of opt.groups) out.push(g.tokens.map(tokenToText).join(' ou '));
+    });
     if (meal.notes) out.push(`> ${meal.notes}`);
   }
   return out.join('\n');
 }
 
 // ─────────── AST → formato canônico `meals[]` ───────────
-// Estrutura consumida por PlanReadOnlyView, envio ao Zona Nutri e PDF.
-// Cada linha (grupo) vira: `foods[]` com o principal + `substitutions` no
-// próprio food. Também popula `options` (uma única opção com o principal) e
-// `food_groups` textual para retrocompatibilidade.
 
 function tokenToFood(t: FoodToken) {
   return {
@@ -49,32 +60,53 @@ function tokenToFood(t: FoodToken) {
   };
 }
 
+function foodsOfGroups(groups: GroupLine[]): any[] {
+  return groups.map((g) => {
+    const [main, ...subs] = g.tokens;
+    if (!main) return null;
+    const f: any = tokenToFood(main);
+    f.substitutions = subs.map((s) => tokenToFood(s));
+    return f;
+  }).filter(Boolean) as any[];
+}
+
+function totalsOfFoods(foods: any[]) {
+  return foods.reduce(
+    (a, f) => ({
+      kcal: a.kcal + (Number(f.calories) || 0),
+      cho: a.cho + (Number(f.carbs_g) || 0),
+      ptn: a.ptn + (Number(f.protein_g) || 0),
+      lip: a.lip + (Number(f.fat_g) || 0),
+    }),
+    { kcal: 0, cho: 0, ptn: 0, lip: 0 },
+  );
+}
+
 export function astToMeals(ast: PlanAst) {
   return ast.meals.map((meal) => {
-    const foods = meal.groups.map((g) => {
-      const [main, ...subs] = g.tokens;
-      if (!main) return null;
-      const f: any = tokenToFood(main);
-      f.substitutions = subs.map((s) => tokenToFood(s));
-      return f;
-    }).filter(Boolean) as any[];
-
-    const totals = foods.reduce(
-      (a, f) => ({
-        kcal: a.kcal + (Number(f.calories) || 0),
-        cho: a.cho + (Number(f.carbs_g) || 0),
-        ptn: a.ptn + (Number(f.protein_g) || 0),
-        lip: a.lip + (Number(f.fat_g) || 0),
-      }),
-      { kcal: 0, cho: 0, ptn: 0, lip: 0 },
-    );
+    const opts = optionsOf(meal);
+    const serializedOptions = opts.map((o, i) => {
+      const foods = foodsOfGroups(o.groups);
+      const t = totalsOfFoods(foods);
+      return {
+        label: o.name || `Opção ${i + 1}`,
+        primary: !!o.primary,
+        foods,
+        meal_macros: t.kcal
+          ? `~${Math.round(t.kcal)} kcal, CHO ${Math.round(t.cho)}g, PTN ${Math.round(t.ptn)}g, LIP ${Math.round(t.lip)}g`
+          : '',
+      };
+    });
+    const primary = serializedOptions.find((o) => o.primary) || serializedOptions[0];
+    const foods = primary.foods;
+    const totals = totalsOfFoods(foods);
 
     return {
       meal_name: meal.name,
       horario: meal.time || '',
       timing_note: meal.notes || '',
       foods,
-      options: [{ foods }],
+      options: serializedOptions,
       food_groups: foods.map((f) => ({
         group: f.name,
         options: `${f.name}${f.grams ? ` ${f.grams}g` : (f.measure ? ` ${f.quantity ?? ''} ${f.measure}`.trim() : '')}${(f.substitutions || []).length ? ` ou ${(f.substitutions || []).map((s: any) => `${s.name}${s.grams ? ` ${s.grams}g` : ''}`).join('; ')}` : ''}`.trim(),
