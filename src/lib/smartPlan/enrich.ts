@@ -116,9 +116,14 @@ async function enrichToken(t: FoodToken, cache: EnrichCache): Promise<boolean> {
 
 export async function enrichAst(ast: PlanAst, cache = makeEnrichCache()): Promise<PlanAst> {
   for (const meal of ast.meals) {
-    for (const g of meal.groups) {
-      for (const t of g.tokens) {
-        try { await enrichToken(t, cache); } catch { /* ignore */ }
+    const groupsList = meal.options && meal.options.length
+      ? meal.options.map((o) => o.groups)
+      : [meal.groups];
+    for (const groups of groupsList) {
+      for (const g of groups) {
+        for (const t of g.tokens) {
+          try { await enrichToken(t, cache); } catch { /* ignore */ }
+        }
       }
     }
   }
