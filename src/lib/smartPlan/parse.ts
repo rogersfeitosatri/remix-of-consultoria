@@ -102,43 +102,66 @@ export function parseText(text: string): PlanAst {
   const lines = text.split(/\r?\n/);
   const meals: MealBlock[] = [];
   let current: MealBlock | null = null;
+  let currentOptions: import('./ast').MealOption[] = [];
+  let currentOption: import('./ast').MealOption | null = null;
+
+  const finalize = () => {
+    if (!current) return;
+    if (currentOptions.length === 0) return;
+    if (!currentOptions.some((o) => o.primary)) currentOptions[0].primary = true;
+    const primary = currentOptions.find((o) => o.primary) || currentOptions[0];
+    current.groups = primary.groups;
+    current.options = currentOptions.length > 1 ? currentOptions : undefined;
+  };
+
+  const startMeal = (mb: MealBlock) => {
+    finalize();
+    current = mb;
+    meals.push(current);
+    currentOption = { name: 'Opção 1', primary: true, groups: [] };
+    currentOptions = [currentOption];
+    current.groups = currentOption.groups;
+  };
 
   for (const raw of lines) {
     const line = raw.replace(/\s+$/g, '');
     const trimmed = line.trim();
     if (!trimmed) continue;
 
+    // Marcador explícito de nova OPÇÃO dentro da refeição corrente: "== Opção X" (opcional " *" = principal).
+    if (/^==\s*/.test(trimmed) && current) {
+      const body = trimmed.replace(/^==\s*/, '');
+      const primary = /\*\s*$/.test(body);
+      const name = body.replace(/\*\s*$/, '').trim() || `Opção ${currentOptions.length + 1}`;
+      currentOption = { name, primary, groups: [] };
+      currentOptions.push(currentOption);
+      continue;
+    }
+
     // Marcador explícito de título de refeição: linha iniciada por "@".
     if (trimmed.startsWith('@')) {
       const body = trimmed.replace(/^@\s*/, '');
       const { time, rest } = extractTime(body);
-      current = { name: rest || 'Refeição', time, groups: [] };
-      meals.push(current);
+      startMeal({ name: rest || 'Refeição', time, groups: [] });
       continue;
     }
     // Observação livre: linhas iniciadas por "#" ou "> " NUNCA são alimento.
     if (trimmed.startsWith('#') || trimmed.startsWith('>')) {
       const note = trimmed.replace(/^[#>]\s*/, '');
-      if (!current) {
-        current = { name: 'Refeição', time: null, groups: [] };
-        meals.push(current);
-      }
-      current.notes = current.notes ? `${current.notes}\n${note}` : note;
+      if (!current) startMeal({ name: 'Refeição', time: null, groups: [] });
+      current!.notes = current!.notes ? `${current!.notes}\n${note}` : note;
       continue;
     }
 
     if (looksLikeMealTitle(trimmed)) {
       const { time, rest } = extractTime(trimmed);
-      current = { name: rest || 'Refeição', time, groups: [] };
-      meals.push(current);
+      startMeal({ name: rest || 'Refeição', time, groups: [] });
       continue;
     }
     // Sem refeição corrente ainda? Cria uma "solta".
-    if (!current) {
-      current = { name: 'Refeição', time: null, groups: [] };
-      meals.push(current);
-    }
-    current.groups.push(parseGroupLine(trimmed));
+    if (!current) startMeal({ name: 'Refeição', time: null, groups: [] });
+    currentOption!.groups.push(parseGroupLine(trimmed));
   }
+  finalize();
   return { meals };
 }

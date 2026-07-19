@@ -26,6 +26,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SmartPlanEditor } from '@/components/mealplan-v3/SmartPlanEditor';
+import { MealOptionsBar } from '@/components/mealplan-v3/MealOptionsBar';
 import { TotalsPanel } from '@/components/mealplan-v3/TotalsPanel';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { mealsToText } from '@/lib/smartPlan/fromMeals';
@@ -791,7 +792,9 @@ export default function MealPlanEditor() {
                   </Button>
                 ))}
               </div>
+              <MealOptionsBar text={text} onChange={setText} />
               <SmartPlanEditor value={text} onChange={setText} />
+
             </CardContent>
           </Card>
 
