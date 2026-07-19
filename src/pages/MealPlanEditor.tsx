@@ -58,7 +58,7 @@ const EMPTY_TEXTS: PlanTexts = {
   all: '', seg: '', ter: '', qua: '', qui: '', sex: '', sab: '', dom: '',
 };
 
-// Botão de barra de ferramentas: apenas ícone (32x32), com tooltip no hover.
+// Botão de barra de ferramentas: ícone com tooltip. Mobile 32×32; desktop 64×64.
 function ToolIconButton({
   label, children, onClick, disabled, loading, variant = 'outline',
 }: {
@@ -78,9 +78,9 @@ function ToolIconButton({
           onClick={onClick}
           disabled={disabled}
           aria-label={label}
-          className="h-8 w-8 shrink-0"
+          className="h-8 w-8 shrink-0 lg:h-16 lg:w-16 [&_svg]:h-4 [&_svg]:w-4 lg:[&_svg]:h-6 lg:[&_svg]:w-6"
         >
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin lg:h-6 lg:w-6" /> : children}
         </Button>
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
