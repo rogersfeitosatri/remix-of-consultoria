@@ -453,7 +453,7 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
       return list;
     }
     return [];
-  }, [mode, foodResults.data, measures.data, pendingFood, manualQuery, applyFood, applyMeasure, searchWithAi]);
+  }, [mode, foodResults.data, measures.data, pendingFood, manualQuery, applyFood, applyMeasure, searchWithAi, learnedSubs.data]);
 
   const stripMarkerOnEnter = (): boolean => {
     // Ao apertar Enter numa linha iniciada por @ (título) ou # (observação),
