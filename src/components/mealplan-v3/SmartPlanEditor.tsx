@@ -224,8 +224,7 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
           const mainKcal = mainTok?.calories || 0;
           if (mainKcal > 0) {
             const grams = Math.max(1, Math.round((mainKcal / food.calories_per_100g) * 100));
-            const per = grams;
-            const insert = `${food.name} - 1 porção (${per}g cada · ${grams}g)`;
+            const insert = `${food.name} - 1 porção (${grams}g)`;
             setPendingFood(null);
             setMode('idle');
             insertAtCaret(beforeSeg, insert, afterCaret);
@@ -261,10 +260,7 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     const nameStart = c.segStart;
     const beforeSeg = value.slice(0, nameStart);
     const afterCaret = value.slice(c.segStart + c.segCaret);
-    const isGramUnit = per === 1 || /^\s*(g|gramas?)\s*$/i.test(cleanLabel);
-    const newSeg = isGramUnit
-      ? `${q.query} - ${qtyPrefix}${cleanLabel} (${fmt(total)}g)`
-      : `${q.query} - ${qtyPrefix}${cleanLabel} (${fmt(per)}g cada · ${fmt(total)}g)`;
+    const newSeg = `${q.query} - ${qtyPrefix}${cleanLabel} (${fmt(total)}g)`;
     insertAtCaret(beforeSeg, newSeg, afterCaret);
     if (food) {
       const nutrients = calcNutrients(food, grams * qty);
@@ -277,38 +273,58 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     setMode('idle');
   }, [value, caret, insertAtCaret]);
 
-  /** Recalcula o sufixo em gramas com base na quantidade digitada.
-   *  Suporta dois formatos:
-   *   - "(Xg cada · Yg)" → medidas caseiras (Y = qty × X)
-   *   - "(Yg)" quando a medida é grama/g → Y = qty */
-  const recomputeTotals = useCallback((text: string): string => {
+  /** Recalcula o sufixo em gramas (Yg) com base na variação da quantidade
+   *  entre o texto anterior e o atual. Para medidas caseiras usamos o
+   *  ratio oldY/oldQty * newQty; se o token vier no formato legado
+   *  "(Xg cada · Yg)", colapsamos para "(Yg)" usando X * newQty. */
+  const recomputeTotals = useCallback((prev: string, next: string): string => {
     const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toString().replace('.', ','));
-    // 1) formato completo com "cada"
-    let out = text.replace(
-      /(\d+(?:[.,]\d+)?)(\s+)([^\n()]+?)\s*\((\d+(?:[.,]\d+)?)\s*g\s*cada\s*·\s*(\d+(?:[.,]\d+)?)\s*g\)/g,
-      (_m, qtyStr: string, sp: string, label: string, perStr: string) => {
-        const qty = Number(qtyStr.replace(',', '.'));
-        const per = Number(perStr.replace(',', '.'));
-        if (!Number.isFinite(qty) || !Number.isFinite(per)) return _m;
-        const total = Math.round(qty * per * 10) / 10;
-        // Se a medida é em gramas, colapsa para "(Yg)" simples.
-        if (per === 1 || /^\s*(g|gramas?)\s*$/i.test(label.trim())) {
-          return `${qtyStr}${sp}${label.trimEnd()} (${fmt(total)}g)`;
+    const tokenRx = /(\d+(?:[.,]\d+)?)(\s+)([^\n()]+?)\s*\((?:(\d+(?:[.,]\d+)?)\s*g\s*cada\s*·\s*)?(\d+(?:[.,]\d+)?)\s*g\)/g;
+    type Tok = { start: number; end: number; qty: number; label: string; per?: number; total: number; raw: string };
+    const extract = (line: string): Tok[] => {
+      const out: Tok[] = [];
+      let m: RegExpExecArray | null;
+      tokenRx.lastIndex = 0;
+      while ((m = tokenRx.exec(line))) {
+        out.push({
+          start: m.index, end: m.index + m[0].length,
+          qty: Number(m[1].replace(',', '.')),
+          label: m[3],
+          per: m[4] ? Number(m[4].replace(',', '.')) : undefined,
+          total: Number(m[5].replace(',', '.')),
+          raw: m[0],
+        });
+      }
+      return out;
+    };
+
+    const prevLines = prev.split('\n');
+    const nextLines = next.split('\n');
+    const outLines = nextLines.map((line, i) => {
+      const prevLine = prevLines[i] ?? '';
+      const oldToks = extract(prevLine);
+      const newToks = extract(line);
+      if (newToks.length === 0) return line;
+      // Aplica de trás pra frente para preservar índices.
+      let out = line;
+      for (let k = newToks.length - 1; k >= 0; k--) {
+        const t = newToks[k];
+        const old = oldToks[k];
+        let newTotal = t.total;
+        if (t.per && Number.isFinite(t.per)) {
+          newTotal = Math.round(t.per * t.qty * 10) / 10;
+        } else if (old && Number.isFinite(old.qty) && old.qty > 0 && Number.isFinite(old.total)) {
+          if (old.qty !== t.qty) newTotal = Math.round((old.total / old.qty) * t.qty * 10) / 10;
         }
-        return `${qtyStr}${sp}${label.trimEnd()} (${fmt(per)}g cada · ${fmt(total)}g)`;
-      },
-    );
-    // 2) formato simples "(Yg)" quando a medida é grama — total = qty
-    out = out.replace(
-      /(\d+(?:[.,]\d+)?)(\s+)(g|gramas?)\s*\((\d+(?:[.,]\d+)?)\s*g\)/gi,
-      (_m, qtyStr: string, sp: string, label: string) => {
-        const qty = Number(qtyStr.replace(',', '.'));
-        if (!Number.isFinite(qty)) return _m;
-        return `${qtyStr}${sp}${label} (${fmt(qty)}g)`;
-      },
-    );
-    return out;
+        if (!Number.isFinite(newTotal)) continue;
+        const replacement = `${fmt(t.qty)}${t.raw.match(/^\d+(?:[.,]\d+)?(\s+)/)?.[1] ?? ' '}${t.label.trimEnd()} (${fmt(newTotal)}g)`;
+        out = out.slice(0, t.start) + replacement + out.slice(t.end);
+      }
+      return out;
+    });
+    return outLines.join('\n');
   }, []);
+
 
   const searchWithAi = useCallback(async () => {
     if (!manualQuery) return;
@@ -407,7 +423,7 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
         ref={taRef}
         value={value}
         onChange={(e) => {
-          const next = recomputeTotals(e.target.value);
+          const next = recomputeTotals(value, e.target.value);
           onChange(next);
           setCaret(e.target.selectionStart);
         }}
