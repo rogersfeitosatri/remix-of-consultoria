@@ -645,7 +645,7 @@ export default function MealPlanEditor() {
                     </Button>
                   )}
                   <a
-                    href={`/meal-plans/${clientId}`}
+                    href={`/meal-plans/${clientId}/classic`}
                     className="inline-flex items-center gap-1 text-primary hover:underline"
                   >
                     Editor clássico <ExternalLink className="h-3 w-3" />

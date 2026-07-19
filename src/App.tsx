@@ -52,6 +52,7 @@ const AthleteAnalysis = lazy(() => import("./pages/AthleteAnalysis"));
 const MealPlans = lazy(() => import("./pages/MealPlans"));
 const MealPlanDetail = lazy(() => import("./pages/MealPlanDetail"));
 const MealPlanEditor = lazy(() => import("./pages/MealPlanEditor"));
+const MealPlanHub = lazy(() => import("./pages/MealPlanHub"));
 const PublicBooking = lazy(() => import("./pages/PublicBooking"));
 const PublicBookingConsult = lazy(() => import("./pages/PublicBookingConsult"));
 const QuestionBank = lazy(() => import("./pages/QuestionBank"));
@@ -167,8 +168,9 @@ function AppRoutes() {
         <Route path="/adjustments" element={<ProtectedRoute adminOnly><Adjustments /></ProtectedRoute>} />
         <Route path="/clients" element={<ProtectedRoute adminOnly><Clients /></ProtectedRoute>} />
         <Route path="/meal-plans" element={<ProtectedRoute adminOnly><MealPlans /></ProtectedRoute>} />
-        <Route path="/meal-plans/:clientId" element={<ProtectedRoute adminOnly><MealPlanDetail /></ProtectedRoute>} />
-        <Route path="/meal-plans/:clientId/editor" element={<ProtectedRoute adminOnly><MealPlanEditor /></ProtectedRoute>} />
+       <Route path="/meal-plans/:clientId" element={<ProtectedRoute adminOnly><MealPlanHub /></ProtectedRoute>} />
+       <Route path="/meal-plans/:clientId/classic" element={<ProtectedRoute adminOnly><MealPlanDetail /></ProtectedRoute>} />
+       <Route path="/meal-plans/:clientId/editor" element={<ProtectedRoute adminOnly><MealPlanEditor /></ProtectedRoute>} />
         <Route path="/periodization" element={<ProtectedRoute adminOnly><NutritionalPeriodization /></ProtectedRoute>} />
         <Route path="/metabolic-web" element={<ProtectedRoute adminOnly><MetabolicWeb /></ProtectedRoute>} />
         <Route path="/clients/:clientId" element={<ProtectedRoute adminOnly><ClientDetail /></ProtectedRoute>} />

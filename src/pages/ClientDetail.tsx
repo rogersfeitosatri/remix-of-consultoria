@@ -501,7 +501,7 @@ export default function ClientDetail() {
         <PlanHistorySection clientId={client.id} />
         
         {/* Tabs */}
-        <Tabs defaultValue="timeline" className="space-y-4">
+        <Tabs defaultValue={searchParams.get('tab') || 'timeline'} className="space-y-4">
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="timeline" className="gap-2">
               <History className="h-4 w-4" />
