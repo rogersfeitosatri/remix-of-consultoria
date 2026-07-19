@@ -349,7 +349,11 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
       <Textarea
         ref={taRef}
         value={value}
-        onChange={(e) => { onChange(e.target.value); setCaret(e.target.selectionStart); }}
+        onChange={(e) => {
+          const next = recomputeTotals(e.target.value);
+          onChange(next);
+          setCaret(e.target.selectionStart);
+        }}
         onKeyUp={handleSelect}
         onClick={handleSelect}
         onKeyDown={handleKey}
