@@ -152,21 +152,27 @@ export default function MealPlanEditor() {
   const fileRef = useRef<HTMLInputElement>(null);
   const enrichCache = useRef(makeEnrichCache());
   const [enrichedTotalsText, setEnrichedTotalsText] = useState<string>('');
+  const [enrichedMeals, setEnrichedMeals] = useState<any[] | undefined>(undefined);
+  const [enrichedTotals, setEnrichedTotals] = useState<{ kcal: number; cho: number; ptn: number; lip: number } | undefined>(undefined);
 
   const backupKey = `smart-plan-backup:${clientId}`;
   useEffect(() => {
     try { setHasBackup(!!localStorage.getItem(backupKey)); } catch { /* noop */ }
   }, [backupKey]);
 
-  // Enriquecimento para o painel de totais do dia ativo.
+  // Enriquecimento para o painel de totais do dia ativo — recalcula g e macros
+  // toda vez que o texto muda (inclusive edições de quantidade).
   useEffect(() => {
     const t = setTimeout(async () => {
       try {
         const ast = parseText(text);
         await enrichAst(ast, enrichCache.current);
+        const { astToMeals, planTotals } = await import('@/lib/smartPlan/serialize');
+        setEnrichedMeals(astToMeals(ast));
+        setEnrichedTotals(planTotals(ast));
         setEnrichedTotalsText(astToText(ast));
       } catch { /* silencioso */ }
-    }, 700);
+    }, 500);
     return () => clearTimeout(t);
   }, [text]);
 
