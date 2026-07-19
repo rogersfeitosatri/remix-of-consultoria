@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import {
   ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat, ClipboardCheck, Plus, Scale, CalendarDays, FileText,
 } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { SmartPlanEditor } from '@/components/mealplan-v3/SmartPlanEditor';
