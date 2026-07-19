@@ -14,6 +14,7 @@ function fmt(n: number, digits = 0) {
 
 export function TotalsPanel({
   text, weightKg, saveState, onSave, onSendZonaNutri, sending,
+  enrichedMeals, enrichedTotals,
 }: {
   text: string;
   weightKg: number | null;
@@ -21,11 +22,17 @@ export function TotalsPanel({
   onSave?: () => void;
   onSendZonaNutri?: () => void;
   sending?: boolean;
+  /** Meals já enriquecidos (com calories/grams). Preferidos sobre `text`. */
+  enrichedMeals?: any[];
+  enrichedTotals?: { kcal: number; cho: number; ptn: number; lip: number };
 }) {
   const { meals, totals } = useMemo(() => {
+    if (enrichedMeals && enrichedTotals) {
+      return { meals: enrichedMeals, totals: enrichedTotals };
+    }
     const ast = parseText(text);
     return { meals: astToMeals(ast), totals: planTotals(ast) };
-  }, [text]);
+  }, [text, enrichedMeals, enrichedTotals]);
 
   const kg = weightKg && weightKg > 0 ? weightKg : null;
   const gkg = (v: number) => kg ? Math.round((v / kg) * 100) / 100 : null;
@@ -45,7 +52,7 @@ export function TotalsPanel({
           <Stat label="Carboidratos" value={`${fmt(totals.cho)} g`} sub={gkg(totals.cho) != null ? `${fmt(gkg(totals.cho)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.cho), 5, 7)} />
           <Stat label="Proteínas" value={`${fmt(totals.ptn)} g`} sub={gkg(totals.ptn) != null ? `${fmt(gkg(totals.ptn)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.ptn), 1.6, 2.0)} />
           <Stat label="Gorduras" value={`${fmt(totals.lip)} g`} sub={gkg(totals.lip) != null ? `${fmt(gkg(totals.lip)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.lip), 0.8, 1.2)} />
-          <Stat label="Refeições" value={String(meals.length)} sub={`${meals.reduce((a, m: any) => a + (m.foods?.length || 0), 0)} itens`} />
+          <Stat label="Refeições" value={String(meals.length)} sub={`${(meals as any[]).reduce<number>((a, m) => a + (m.foods?.length || 0), 0)} itens`} />
         </div>
         {kg && (
           <p className="text-[10px] text-muted-foreground -mt-1">
