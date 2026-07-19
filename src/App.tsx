@@ -52,6 +52,7 @@ const AthleteAnalysis = lazy(() => import("./pages/AthleteAnalysis"));
 const MealPlans = lazy(() => import("./pages/MealPlans"));
 const MealPlanDetail = lazy(() => import("./pages/MealPlanDetail"));
 const MealPlanEditor = lazy(() => import("./pages/MealPlanEditor"));
+const MealPlanHub = lazy(() => import("./pages/MealPlanHub"));
 const PublicBooking = lazy(() => import("./pages/PublicBooking"));
 const PublicBookingConsult = lazy(() => import("./pages/PublicBookingConsult"));
 const QuestionBank = lazy(() => import("./pages/QuestionBank"));
