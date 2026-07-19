@@ -183,6 +183,8 @@ export default function MealPlanEditor() {
       .filter(k => texts[k].trim().length > 0);
   }, [texts]);
 
+  const recordSubs = useRecordSubstitutions();
+
   const savePlan = async () => {
     if (!clientId) return;
     try {
