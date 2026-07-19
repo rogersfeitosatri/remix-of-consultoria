@@ -29,6 +29,7 @@ import {
   type FoodMeasure,
 } from '@/hooks/useFoodSearch';
 import { supabase } from '@/integrations/supabase/client';
+import { useLearnedSubstitutions } from '@/hooks/useSubstitutionHistory';
 import { parseText } from '@/lib/smartPlan/parse';
 import type { PlanAst, FoodToken } from '@/lib/smartPlan/ast';
 import { SuggestionPopover, type SuggestionItem } from './SuggestionPopover';
