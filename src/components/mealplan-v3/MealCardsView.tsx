@@ -1,22 +1,22 @@
-// Visualização em cards do plano montado no editor.
-// Cada refeição vira uma linha separada por um divisor bem fino/claro.
-// As OPÇÕES da refeição ficam lado a lado (lateralizadas). Ao lado do título
-// há um botão "+" para adicionar mais uma opção àquela refeição. Cada card
-// mostra, no rodapé, o resumo abreviado (kcal/CHO/PTN/LIP) da opção.
+// Visualização + edição inline do plano no formato de cards.
+// Cada refeição é uma linha (separada por divisor fino) contendo suas OPÇÕES
+// lateralizadas. Ao lado do nome de cada opção há um lápis: clicar troca
+// a opção para o modo de edição (SmartPlanEditor) com autocomplete de
+// alimentos/medidas. Um botão verde (✓) salva e volta ao modo de visualização;
+// um "X" cancela sem gravar.
 //
-// A fonte de verdade continua sendo o texto do editor (SmartPlanEditor). Este
-// componente apenas parseia o texto, enriquece com os macros e oferece
-// atalhos visuais (adicionar opção, marcar principal, remover). Toda edição
-// de alimentos continua acontecendo dentro do textarea abaixo.
+// A fonte de verdade continua sendo o texto plano (mesma sintaxe do editor
+// clássico). Este componente parseia o texto, oferece as ações e reserializa
+// o AST completo ao gravar cada edição pontual.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Star, Trash2 } from 'lucide-react';
-import { parseText } from '@/lib/smartPlan/parse';
-import { astToText } from '@/lib/smartPlan/serialize';
+import { Plus, Star, Trash2, Pencil, Check, X } from 'lucide-react';
+import { parseText, parseGroupLine } from '@/lib/smartPlan/parse';
+import { astToText, tokenToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 import type { MealOption, MealBlock, PlanAst } from '@/lib/smartPlan/ast';
-import { tokenToText } from '@/lib/smartPlan/serialize';
+import { SmartPlanEditor } from './SmartPlanEditor';
 
 interface Props {
   text: string;
@@ -46,12 +46,22 @@ function fmt(n: number): string {
   return n >= 10 ? String(Math.round(n)) : n.toFixed(1).replace('.', ',');
 }
 
+/** Texto plano das linhas de alimentos de UMA opção (sem o título da refeição). */
+function optionToLines(opt: MealOption): string {
+  return opt.groups.map((g) => g.tokens.map(tokenToText).join(' ou ')).join('\n');
+}
+
 export function MealCardsView({ text, onChange }: Props) {
   const [ast, setAst] = useState<PlanAst>(() => parseText(text || ''));
   const enrichCache = useRef(makeEnrichCache());
+  // Estado "qual opção está em edição": null = nenhuma.
+  const [editing, setEditing] = useState<{ mi: number; oi: number } | null>(null);
+  const [editText, setEditText] = useState<string>('');
 
-  // Enriquece com macros (debounce curto).
+  // Enriquece com macros (debounce curto). Pausa enquanto edita para não
+  // sobrescrever o texto do editor inline.
   useEffect(() => {
+    if (editing) return;
     const t = setTimeout(async () => {
       try {
         const next = parseText(text || '');
@@ -60,7 +70,7 @@ export function MealCardsView({ text, onChange }: Props) {
       } catch { /* silencioso */ }
     }, 350);
     return () => clearTimeout(t);
-  }, [text]);
+  }, [text, editing]);
 
   const mutate = (fn: (a: PlanAst) => void) => {
     const next = parseText(text || '');
@@ -99,8 +109,46 @@ export function MealCardsView({ text, onChange }: Props) {
       meal.groups = primary.groups;
     });
 
+  const startEdit = (mi: number, oi: number) => {
+    const meal = ast.meals[mi];
+    if (!meal) return;
+    const opt = optionsOf(meal)[oi];
+    setEditText(optionToLines(opt));
+    setEditing({ mi, oi });
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setEditText('');
+  };
+
+  const saveEdit = () => {
+    if (!editing) return;
+    const { mi, oi } = editing;
+    // Parseia cada linha do editor como um GroupLine.
+    const lines = editText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const groups = lines.map(parseGroupLine);
+    mutate((a) => {
+      const meal = a.meals[mi];
+      if (!meal) return;
+      const opts = optionsOf(meal).map((o) => ({ ...o, groups: [...o.groups] }));
+      opts[oi] = { ...opts[oi], groups };
+      meal.options = opts.length > 1 ? opts : undefined;
+      const primary = opts.find((o) => o.primary) || opts[0];
+      meal.groups = primary.groups;
+    });
+    setEditing(null);
+    setEditText('');
+  };
+
   const meals = useMemo(() => ast.meals, [ast]);
-  if (!meals.length) return null;
+  if (!meals.length) {
+    return (
+      <div className="mb-3 rounded-md border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+        Nenhuma refeição ainda. Use os atalhos "Adicionar refeição" acima para começar.
+      </div>
+    );
+  }
 
   return (
     <div className="mb-3 rounded-md border bg-card">
@@ -125,6 +173,7 @@ export function MealCardsView({ text, onChange }: Props) {
                 onClick={() => addOption(mi)}
                 aria-label="Adicionar opção nesta refeição"
                 title="Adicionar opção nesta refeição"
+                disabled={!!editing}
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -133,62 +182,114 @@ export function MealCardsView({ text, onChange }: Props) {
             {/* Opções lado a lado */}
             <div className="flex flex-nowrap overflow-x-auto gap-0">
               {opts.map((o, oi) => {
+                const isEditing = editing?.mi === mi && editing?.oi === oi;
                 const t = totalsOfOption(o);
                 return (
                   <div
                     key={oi}
-                    className={`min-w-[240px] max-w-[320px] flex-1 px-3 py-2 ${
-                      oi < opts.length - 1 ? 'border-r border-border/40' : ''
+                    className={`${isEditing ? 'min-w-full' : 'min-w-[240px] max-w-[320px]'} flex-1 px-3 py-2 ${
+                      oi < opts.length - 1 && !isEditing ? 'border-r border-border/40' : ''
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1 mb-1">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 min-w-0">
                         <button
                           type="button"
                           onClick={() => setPrimary(mi, oi)}
                           title={o.primary ? 'Opção principal (entra nos cálculos)' : 'Definir como principal'}
                           className={`inline-flex items-center ${o.primary ? 'text-amber-500' : 'text-muted-foreground hover:text-amber-500'}`}
+                          disabled={!!editing}
                         >
                           <Star className={`h-3.5 w-3.5 ${o.primary ? 'fill-current' : ''}`} />
                         </button>
-                        <span className="text-xs font-medium">
+                        <span className="text-xs font-medium truncate">
                           {o.name || `Opção ${oi + 1}`}
                         </span>
                       </div>
-                      {opts.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeOption(mi, oi)}
-                          className="text-muted-foreground hover:text-destructive"
-                          title="Remover opção"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {isEditing ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={saveEdit}
+                              className="inline-flex items-center justify-center h-6 w-6 rounded text-emerald-600 hover:bg-emerald-50"
+                              title="Salvar e voltar"
+                              aria-label="Salvar edição da opção"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEdit}
+                              className="inline-flex items-center justify-center h-6 w-6 rounded text-muted-foreground hover:bg-muted"
+                              title="Cancelar"
+                              aria-label="Cancelar edição"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => startEdit(mi, oi)}
+                              className="inline-flex items-center justify-center h-6 w-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted"
+                              title="Editar esta opção"
+                              aria-label="Editar opção"
+                              disabled={!!editing}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            {opts.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeOption(mi, oi)}
+                                className="inline-flex items-center justify-center h-6 w-6 rounded text-muted-foreground hover:text-destructive"
+                                title="Remover opção"
+                                aria-label="Remover opção"
+                                disabled={!!editing}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Prévia compacta dos alimentos */}
-                    <ul className="text-[11px] leading-snug text-muted-foreground space-y-0.5 mb-2">
-                      {o.groups.length === 0 && (
-                        <li className="italic opacity-70">Sem alimentos ainda</li>
-                      )}
-                      {o.groups.slice(0, 6).map((g, gi) => (
-                        <li key={gi} className="truncate">
-                          {g.tokens.map(tokenToText).join(' ou ')}
-                        </li>
-                      ))}
-                      {o.groups.length > 6 && (
-                        <li className="opacity-70">+ {o.groups.length - 6} …</li>
-                      )}
-                    </ul>
+                    {isEditing ? (
+                      <div className="mt-2">
+                        <SmartPlanEditor value={editText} onChange={setEditText} />
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          Cada linha = um alimento. Use "ou" para substituições. Clique no ✓ verde para salvar.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Prévia compacta dos alimentos */}
+                        <ul className="text-[11px] leading-snug text-muted-foreground space-y-0.5 mb-2">
+                          {o.groups.length === 0 && (
+                            <li className="italic opacity-70">Sem alimentos ainda</li>
+                          )}
+                          {o.groups.slice(0, 6).map((g, gi) => (
+                            <li key={gi} className="truncate">
+                              {g.tokens.map(tokenToText).join(' ou ')}
+                            </li>
+                          ))}
+                          {o.groups.length > 6 && (
+                            <li className="opacity-70">+ {o.groups.length - 6} …</li>
+                          )}
+                        </ul>
 
-                    {/* Rodapé com macros abreviados */}
-                    <div className="text-[11px] font-medium flex flex-wrap gap-x-2 gap-y-0.5 pt-1 border-t border-border/40">
-                      <span className="text-amber-600">CHO: {fmt(t.cho)}g</span>
-                      <span className="text-red-500">PTN: {fmt(t.ptn)}g</span>
-                      <span className="text-blue-500">LIP: {fmt(t.lip)}g</span>
-                      <span className="text-purple-600 ml-auto">{Math.round(t.kcal)} kcal</span>
-                    </div>
+                        {/* Rodapé com macros abreviados */}
+                        <div className="text-[11px] font-medium flex flex-wrap gap-x-2 gap-y-0.5 pt-1 border-t border-border/40">
+                          <span className="text-amber-600">CHO: {fmt(t.cho)}g</span>
+                          <span className="text-red-500">PTN: {fmt(t.ptn)}g</span>
+                          <span className="text-blue-500">LIP: {fmt(t.lip)}g</span>
+                          <span className="text-purple-600 ml-auto">{Math.round(t.kcal)} kcal</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}
