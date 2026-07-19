@@ -85,6 +85,10 @@ function parseJsonField<T>(field: Json | null | undefined, defaultValue: T): T {
 export default function AthleteAnalysis() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const backTarget = searchParams.get('from') === 'meal-plan-hub' && clientId
+    ? `/meal-plans/${clientId}`
+    : '/clients';
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
