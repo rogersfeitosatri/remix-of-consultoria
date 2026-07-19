@@ -716,6 +716,58 @@ export default function MealPlanEditor() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajustar g/kg da aba atual</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Escala <b>proporcionalmente</b> todas as quantidades dos alimentos principais para atingir o
+              alvo do macro escolhido. Os outros macros mudam junto — a proporção do plano é preservada.
+              Peso do atleta: <b>{weightKg ?? '—'} kg</b>.
+            </p>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm w-16">Macro</Label>
+              <select
+                value={adjustMacro}
+                onChange={(e) => { setAdjustMacro(e.target.value as any); setAdjustPreview(null); }}
+                className="flex h-9 rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="cho">CHO (carboidrato)</option>
+                <option value="ptn">PTN (proteína)</option>
+                <option value="lip">LIP (gordura)</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm w-16">Alvo</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={adjustTargetGkg}
+                onChange={(e) => { setAdjustTargetGkg(e.target.value); setAdjustPreview(null); }}
+                className="w-28"
+              />
+              <span className="text-xs text-muted-foreground">g/kg</span>
+              <Button size="sm" variant="secondary" onClick={computeAdjustPreview}>Calcular</Button>
+            </div>
+            {adjustPreview && (
+              <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-1">
+                <div>Atual: <b>{adjustPreview.current.toFixed(2)} g/kg</b></div>
+                <div>Fator de escala: <b>{adjustPreview.factor.toFixed(2)}×</b></div>
+                {adjustPreview.factor > 2 && (
+                  <div className="text-amber-600">Atenção: escala &gt; 2× pode gerar porções irrealistas.</div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancelar</Button>
+            <Button onClick={applyAdjust} disabled={!adjustPreview}>Aplicar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
