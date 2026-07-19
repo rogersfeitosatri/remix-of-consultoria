@@ -180,9 +180,9 @@ export function MealCardsView({ text, onChange }: Props) {
             key={mi}
             className={`px-3 py-2 ${!isLast ? 'border-b border-border/50' : ''}`}
           >
-            {/* Título + botão de adicionar opção */}
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-medium truncate">
+            {/* Título + botões da refeição */}
+            <div className="flex items-center gap-1 mb-2">
+              <span className="text-sm font-medium truncate flex-1">
                 {meal.time ? `${meal.time} · ` : ''}{meal.name}
               </span>
               <Button
@@ -197,7 +197,20 @@ export function MealCardsView({ text, onChange }: Props) {
               >
                 <Plus className="h-4 w-4" />
               </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                onClick={() => removeMeal(mi)}
+                aria-label="Excluir esta refeição"
+                title="Excluir esta refeição"
+                disabled={!!editing}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
+
 
             {/* Opções lado a lado */}
             <div className="flex flex-nowrap overflow-x-auto gap-0">
