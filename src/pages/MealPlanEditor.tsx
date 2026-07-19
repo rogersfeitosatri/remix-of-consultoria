@@ -18,8 +18,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
-  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat, ClipboardCheck, Plus,
+  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat, ClipboardCheck, Plus, Scale, CalendarDays,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -375,6 +376,100 @@ export default function MealPlanEditor() {
     }
   };
 
+  // Item 2 — Exportar semana inteira em um único PDF. Para cada dia usa a
+  // variação, se existir; caso contrário, cai no plano base. Prefixa o nome de
+  // cada refeição com o dia da semana para manter tudo em um documento único.
+  const exportWeekPdf = async () => {
+    if (!clientId) return;
+    try {
+      const days = DAY_TABS.filter(d => d.key !== 'all');
+      const allMeals: any[] = [];
+      for (const d of days) {
+        const src = texts[d.key].trim() ? texts[d.key] : texts.all;
+        if (!src.trim()) continue;
+        const ast = parseText(src);
+        await enrichAst(ast, enrichCache.current);
+        const meals = astToMeals(ast);
+        for (const m of meals) {
+          allMeals.push({ ...m, meal_name: `${d.long} • ${m.meal_name}` });
+        }
+      }
+      if (!allMeals.length) { toast.error('Nada para exportar na semana.'); return; }
+      const input = structuredAnalysisToPdfInput(
+        { meal_plan: { meals: allMeals } },
+        `${client?.name || 'Atleta'} — Semana completa`,
+      );
+      const safe = `${(client?.name || 'atleta').toLowerCase().replace(/[^a-z0-9]+/g, '_')}_semana`;
+      await downloadMealPlanPdf(input, safe);
+      toast.success('PDF da semana gerado.');
+    } catch (e: any) {
+      toast.error(`Falha ao exportar semana: ${e.message || e}`);
+    }
+  };
+
+  // Item 6 — Ajuste automático por g/kg alvo. Escala as quantidades dos
+  // alimentos da aba ativa para atingir o alvo do macro escolhido. Como a
+  // escala é proporcional a TODOS os tokens, os outros macros mudam junto —
+  // isso é intencional: mantém a proporção do plano montado pelo nutri.
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustMacro, setAdjustMacro] = useState<'cho' | 'ptn' | 'lip'>('cho');
+  const [adjustTargetGkg, setAdjustTargetGkg] = useState<string>('6');
+  const [adjustPreview, setAdjustPreview] = useState<{ current: number; factor: number } | null>(null);
+
+  const openAdjust = async () => {
+    if (!weightKg) { toast.error('Peso do atleta não disponível para calcular g/kg.'); return; }
+    if (!text.trim()) { toast.error('Aba atual está vazia.'); return; }
+    setAdjustPreview(null);
+    setAdjustOpen(true);
+  };
+
+  const computeAdjustPreview = async () => {
+    try {
+      if (!weightKg) return;
+      const target = Number(String(adjustTargetGkg).replace(',', '.'));
+      if (!isFinite(target) || target <= 0) { toast.error('Informe um alvo válido.'); return; }
+      const ast = parseText(text);
+      await enrichAst(ast, enrichCache.current);
+      let sum = 0;
+      for (const m of ast.meals) for (const g of m.groups) for (const t of g.tokens) {
+        // Só o alimento principal (primeiro token) conta — substituições são opcionais.
+        if (g.tokens[0] === t) {
+          const macro = adjustMacro === 'cho' ? (t.carbs_g || 0) : adjustMacro === 'ptn' ? (t.protein_g || 0) : (t.fat_g || 0);
+          sum += macro;
+        }
+      }
+      const currentGkg = sum / weightKg;
+      const factor = currentGkg > 0 ? target / currentGkg : 0;
+      setAdjustPreview({ current: currentGkg, factor });
+    } catch (e: any) {
+      toast.error(`Falha ao calcular: ${e.message || e}`);
+    }
+  };
+
+  const applyAdjust = async () => {
+    try {
+      if (!adjustPreview || !isFinite(adjustPreview.factor) || adjustPreview.factor <= 0) {
+        toast.error('Calcule a prévia antes de aplicar.');
+        return;
+      }
+      const factor = adjustPreview.factor;
+      const ast = parseText(text);
+      for (const m of ast.meals) for (const g of m.groups) for (const t of g.tokens) {
+        if (t.quantity != null && isFinite(t.quantity)) {
+          const scaled = t.quantity * factor;
+          t.quantity = Math.round(scaled * 100) / 100;
+        }
+      }
+      const next = astToText(ast);
+      setText(next);
+      toast.success(`Quantidades escaladas por ${factor.toFixed(2)}× para atingir o alvo.`);
+      setAdjustOpen(false);
+    } catch (e: any) {
+      toast.error(`Falha ao aplicar ajuste: ${e.message || e}`);
+    }
+  };
+
+
   const copyFromAll = () => {
     if (activeDay === 'all') return;
     if (!texts.all.trim()) { toast.error('A aba "Todos os dias" está vazia.'); return; }
@@ -514,6 +609,12 @@ export default function MealPlanEditor() {
                   <Button size="sm" variant="outline" onClick={exportPdf}>
                     <FileDown className="h-3 w-3 mr-1" /> Exportar PDF
                   </Button>
+                  <Button size="sm" variant="outline" onClick={exportWeekPdf}>
+                    <CalendarDays className="h-3 w-3 mr-1" /> Exportar semana
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={openAdjust} disabled={!text.trim() || !weightKg}>
+                    <Scale className="h-3 w-3 mr-1" /> Ajustar g/kg
+                  </Button>
                   <Button size="sm" variant="outline" onClick={saveAsProposal} disabled={saving}>
                     <ClipboardCheck className="h-3 w-3 mr-1" /> Salvar como proposta
                   </Button>
@@ -612,6 +713,58 @@ export default function MealPlanEditor() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setReplicateOpen(false)}>Cancelar</Button>
             <Button onClick={applyReplicate}>Replicar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajustar g/kg da aba atual</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Escala <b>proporcionalmente</b> todas as quantidades dos alimentos principais para atingir o
+              alvo do macro escolhido. Os outros macros mudam junto — a proporção do plano é preservada.
+              Peso do atleta: <b>{weightKg ?? '—'} kg</b>.
+            </p>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm w-16">Macro</Label>
+              <select
+                value={adjustMacro}
+                onChange={(e) => { setAdjustMacro(e.target.value as any); setAdjustPreview(null); }}
+                className="flex h-9 rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="cho">CHO (carboidrato)</option>
+                <option value="ptn">PTN (proteína)</option>
+                <option value="lip">LIP (gordura)</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm w-16">Alvo</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={adjustTargetGkg}
+                onChange={(e) => { setAdjustTargetGkg(e.target.value); setAdjustPreview(null); }}
+                className="w-28"
+              />
+              <span className="text-xs text-muted-foreground">g/kg</span>
+              <Button size="sm" variant="secondary" onClick={computeAdjustPreview}>Calcular</Button>
+            </div>
+            {adjustPreview && (
+              <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-1">
+                <div>Atual: <b>{adjustPreview.current.toFixed(2)} g/kg</b></div>
+                <div>Fator de escala: <b>{adjustPreview.factor.toFixed(2)}×</b></div>
+                {adjustPreview.factor > 2 && (
+                  <div className="text-amber-600">Atenção: escala &gt; 2× pode gerar porções irrealistas.</div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdjustOpen(false)}>Cancelar</Button>
+            <Button onClick={applyAdjust} disabled={!adjustPreview}>Aplicar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
