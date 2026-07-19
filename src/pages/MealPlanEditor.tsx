@@ -624,53 +624,77 @@ export default function MealPlanEditor() {
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
           <Card className="min-w-0 overflow-hidden">
             <CardContent className="p-3 md:p-4">
-              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="flex-1 min-w-0">
+              {/* Descrição do dia ativo */}
+              <div className="mb-3">
+                <p className="text-xs md:text-sm text-muted-foreground">
                   {activeDay === 'all'
                     ? 'Plano base — aplicado nos dias sem variação específica.'
                     : `Variação de ${DAY_TABS.find(d => d.key === activeDay)?.long}. Se vazio, usa o plano base.`}
-                </span>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="application/pdf,.md,.txt"
-                  className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) importPdf(f); }}
-                />
-                {/* Toolbar compacta, ícones + tooltip. Rola no mobile. */}
-                <div className="w-full -mx-1 overflow-x-auto">
-                  <div className="flex items-center gap-1 px-1 py-0.5">
+                </p>
+              </div>
+
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/pdf,.md,.txt"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) importPdf(f); }}
+              />
+
+              {/* Toolbar agrupada: ícones + tooltip. Mobile 32×32; desktop 64×64. */}
+              <div className="mb-3 flex flex-wrap items-center gap-2 lg:gap-3">
+                <div className="flex flex-wrap items-center gap-1.5 lg:gap-2">
+                  {/* Criar / Importar */}
+                  <div className="flex items-center gap-1.5 lg:gap-2">
                     <ToolIconButton label="Gerar com IA" onClick={generateWithAI} disabled={generating} loading={generating} variant="secondary">
-                      <Sparkles className="h-4 w-4" />
+                      <Sparkles />
                     </ToolIconButton>
                     {activeDay !== 'all' && (
                       <ToolIconButton label="Copiar do plano base" onClick={copyFromAll}>
-                        <Copy className="h-4 w-4" />
+                        <Copy />
                       </ToolIconButton>
                     )}
                     <ToolIconButton label="Importar PDF/MD" onClick={() => fileRef.current?.click()} disabled={importing} loading={importing}>
-                      <Upload className="h-4 w-4" />
+                      <Upload />
                     </ToolIconButton>
+                  </div>
+
+                  <Separator orientation="vertical" className="hidden sm:block h-6 lg:h-10" />
+
+                  {/* Exportar */}
+                  <div className="flex items-center gap-1.5 lg:gap-2">
                     <ToolIconButton label="Exportar PDF" onClick={exportPdf}>
-                      <FileDown className="h-4 w-4" />
+                      <FileDown />
                     </ToolIconButton>
                     <ToolIconButton label="Exportar semana" onClick={exportWeekPdf}>
-                      <CalendarDays className="h-4 w-4" />
+                      <CalendarDays />
                     </ToolIconButton>
+                  </div>
+
+                  <Separator orientation="vertical" className="hidden sm:block h-6 lg:h-10" />
+
+                  {/* Ações do plano */}
+                  <div className="flex items-center gap-1.5 lg:gap-2">
                     <ToolIconButton label="Ajustar g/kg" onClick={openAdjust} disabled={!text.trim() || !weightKg}>
-                      <Scale className="h-4 w-4" />
+                      <Scale />
                     </ToolIconButton>
                     <ToolIconButton label="Salvar como proposta" onClick={saveAsProposal} disabled={saving}>
-                      <ClipboardCheck className="h-4 w-4" />
+                      <ClipboardCheck />
                     </ToolIconButton>
                     <ToolIconButton label="Replicar para outros dias" onClick={openReplicate} disabled={!text.trim()}>
-                      <Repeat className="h-4 w-4" />
+                      <Repeat />
                     </ToolIconButton>
+                  </div>
+
+                  <Separator orientation="vertical" className="hidden sm:block h-6 lg:h-10" />
+
+                  {/* Consulta / Navegação */}
+                  <div className="flex items-center gap-1.5 lg:gap-2">
                     <Sheet>
                       <SheetTrigger asChild>
                         <span>
                           <ToolIconButton label="Ver anamnese do atleta">
-                            <FileText className="h-4 w-4" />
+                            <FileText />
                           </ToolIconButton>
                         </span>
                       </SheetTrigger>
@@ -683,36 +707,46 @@ export default function MealPlanEditor() {
                         </div>
                       </SheetContent>
                     </Sheet>
-                    {text.trim() && (
-                      <ToolIconButton label="Limpar aba" onClick={clearDay} variant="ghost">
-                        <Trash2 className="h-4 w-4" />
-                      </ToolIconButton>
-                    )}
-                    {hasBackup && (
-                      <ToolIconButton label="Desfazer salvamento" onClick={undoSave} variant="ghost">
-                        <Undo2 className="h-4 w-4" />
-                      </ToolIconButton>
-                    )}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <a
                           href={`/meal-plans/${clientId}/classic`}
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-md border text-muted-foreground hover:bg-muted"
+                          className="inline-flex items-center justify-center h-8 w-8 shrink-0 rounded-md border text-muted-foreground hover:bg-muted lg:h-16 lg:w-16"
                           aria-label="Editor clássico"
                         >
-                          <ExternalLink className="h-4 w-4" />
+                          <ExternalLink className="h-4 w-4 lg:h-6 lg:w-6" />
                         </a>
                       </TooltipTrigger>
                       <TooltipContent>Editor clássico</TooltipContent>
                     </Tooltip>
                   </div>
+
+                  <Separator orientation="vertical" className="hidden sm:block h-6 lg:h-10" />
+
+                  {/* Perigos */}
+                  <div className="flex items-center gap-1.5 lg:gap-2">
+                    {text.trim() && (
+                      <ToolIconButton label="Limpar aba" onClick={clearDay} variant="ghost">
+                        <Trash2 />
+                      </ToolIconButton>
+                    )}
+                    {hasBackup && (
+                      <ToolIconButton label="Desfazer salvamento" onClick={undoSave} variant="ghost">
+                        <Undo2 />
+                      </ToolIconButton>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="mb-2 rounded-md border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground leading-relaxed">
+
+              {/* Dicas de edição */}
+              <div className="mb-3 rounded-md border bg-muted/40 px-3 py-2 text-[11px] md:text-xs text-muted-foreground leading-relaxed">
                 <b>Dicas:</b> comece a linha com <code className="px-1 rounded bg-background border">@</code> para nomear uma refeição (ex.: <code className="px-1 rounded bg-background border">@ 07:00 Café da manhã</code>) e com <code className="px-1 rounded bg-background border">#</code> para uma observação. Ao pressionar Enter, o marcador some. Use <b>"ou"</b> na mesma linha para substituições.
               </div>
-              <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] text-muted-foreground mr-1">Adicionar refeição:</span>
+
+              {/* Atalhos de refeição */}
+              <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] md:text-xs text-muted-foreground mr-1">Adicionar refeição:</span>
                 {QUICK_MEALS.map((m) => (
                   <Button
                     key={m.label}
