@@ -79,11 +79,17 @@ function macroStr(t: Nutrients): string {
 
 // Reconstrói meal_plan.meals no formato compatível (options[] + foods espelhado + meal_macros).
 function toMealPlan(meals: Meal[], base: any): any {
+  const foodText = (f: Food) => `${f.name}${f.grams ? ` — ${Math.round(Number(f.grams))} g` : f.measure ? ` — ${f.measure}` : ''}`;
   const out = meals.map((m) => {
     const options = m.options.map((o) => ({ label: o.label, foods: o.foods, meal_macros: macroStr(sumFoods(o.foods.map(foodNutrients))) }));
+    // food_groups (texto legado) — mantém compatível com envio ao Zona Nutri / PDF / telas antigas.
+    const food_groups = (options[0]?.foods ?? []).map((f: Food) => ({
+      group: f.name,
+      options: [foodText(f), ...((f.substitutions || []))].filter(Boolean).join(' ou '),
+    }));
     return {
       meal_name: m.meal_name, horario: m.horario, timing_note: m.timing_note,
-      options, foods: options[0]?.foods ?? [], meal_macros: options[0]?.meal_macros ?? '',
+      options, foods: options[0]?.foods ?? [], food_groups, meal_macros: options[0]?.meal_macros ?? '',
     };
   });
   const primary = out.reduce((acc, m) => sumFoods([acc, sumFoods((m.foods as Food[]).map(foodNutrients))]), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 } as Nutrients);
