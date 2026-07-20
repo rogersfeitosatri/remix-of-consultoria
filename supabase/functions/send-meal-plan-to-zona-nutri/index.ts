@@ -172,7 +172,10 @@ Deno.serve(async (req) => {
     const { data: analysis } = await supabase
       .from("ai_analyses").select("*").eq("client_id", clientId).maybeSingle();
     let plan: any = null;
-    try { plan = analysis?.raw_response ? JSON.parse(analysis.raw_response) : null; } catch { /* */ }
+    try {
+      const raw = analysis?.raw_response;
+      plan = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch { /* */ }
     if (!plan?.meal_plan?.meals) throw new Error("Não há plano alimentar para enviar.");
 
     // O endpoint do Zona Nutri resolve primeiro por external_id
