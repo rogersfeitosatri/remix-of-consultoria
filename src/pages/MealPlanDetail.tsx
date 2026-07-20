@@ -355,7 +355,12 @@ export default function MealPlanDetail() {
       const { data, error } = await supabase.functions.invoke('send-meal-plan-to-zona-nutri', {
         body: { clientId },
       });
-      if (error) throw error;
+      if (error) {
+        // Lê o motivo real retornado pela edge function (body do erro), quando houver.
+        let detail = '';
+        try { const body = await (error as any).context?.json?.(); detail = body?.error || body?.message || ''; } catch { /* ignore */ }
+        throw new Error(detail || error.message || 'Falha no envio.');
+      }
       if (data?.error) throw new Error(data.error);
       return data;
     },

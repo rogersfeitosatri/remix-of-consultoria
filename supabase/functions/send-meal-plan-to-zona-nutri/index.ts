@@ -48,9 +48,25 @@ async function readResponse(res: Response) {
   return { text, body };
 }
 
+// Texto "Nome — 100 g" de um alimento estruturado.
+function foodToText(f: any): string {
+  const name = f?.name ?? f?.food_name ?? "";
+  const qty = f?.grams ? `${Math.round(Number(f.grams))} g` : (f?.measure || (f?.quantity != null && f?.quantity !== "" ? `${f.quantity}${f.unit ? " " + f.unit : ""}` : ""));
+  return `${name}${qty ? ` — ${qty}` : ""}`.trim();
+}
+
 // Converte uma refeição do formato da consultoria para o formato do Zona Nutri.
+// Aceita food_groups (texto legado) OU options[].foods (estruturado, novo editor).
 function mapMeal(meal: any, order: number) {
-  const groupsSrc = (meal.options?.[0]?.food_groups) || meal.food_groups || [];
+  let groupsSrc = (meal.options?.[0]?.food_groups) || meal.food_groups || [];
+  // Fallback: sem food_groups → monta a partir dos alimentos estruturados.
+  if (!Array.isArray(groupsSrc) || groupsSrc.length === 0) {
+    const foods = (meal.options?.[0]?.foods) || meal.foods || [];
+    groupsSrc = (foods || []).map((f: any) => ({
+      group: f?.name ?? f?.food_name ?? "",
+      options: [foodToText(f), ...(Array.isArray(f?.substitutions) ? f.substitutions.filter(Boolean) : [])].filter(Boolean).join(" ou "),
+    }));
+  }
   const groups = (groupsSrc || []).map((g: any) => ({
     group: g.group ?? "",
     // "pão (100g) ou tapioca (80g)" → opções intercambiáveis
