@@ -34,12 +34,17 @@ export function looksLikeMealTitle(line: string): boolean {
   // Sem hora: heurística de palavras conhecidas.
   const lower = t.toLowerCase();
   const meals = [
-    'café', 'cafe', 'lanche', 'almoço', 'almoco', 'jantar', 'ceia', 'brunch',
+    'café da manhã', 'cafe da manha', 'lanche', 'almoço', 'almoco', 'jantar', 'ceia', 'brunch',
     'pré-treino', 'pre-treino', 'pré treino', 'pre treino',
     'pós-treino', 'pos-treino', 'pós treino', 'pos treino',
     'refeição', 'refeicao',
   ];
-  return meals.some((m) => lower.startsWith(m));
+  if (!meals.some((m) => lower.startsWith(m))) return false;
+  // Rejeita se a linha parece um alimento: contém dígitos (quantidade/gramas/ml)
+  // ou medida caseira após um divisor. Ex.: "Café — 1 xícara (150 ml)".
+  if (/\d/.test(t)) return false;
+  if (/\b(g|ml|kg|unidade|fatia|colher|x[íi]cara|concha|copo|pote|punhado)\b/i.test(t)) return false;
+  return true;
 }
 
 const QTY_RE = /(\d+(?:[.,]\d+)?)/;
