@@ -20,8 +20,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import {
-  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat, ClipboardCheck, Plus, Scale, CalendarDays, FileText,
+  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat, ClipboardCheck, Plus, Scale, CalendarDays, FileText, NotebookPen,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { importMealPlanFromMarkdown, type DayKey as MdDayKey } from '@/lib/smartPlan/mdImport';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
