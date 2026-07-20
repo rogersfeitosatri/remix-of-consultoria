@@ -13,6 +13,7 @@
 // "lookup-custom-food" para que o enriquecimento local calcule kcal/macros.
 
 import { supabase } from '@/integrations/supabase/client';
+import { sortMealsByTimeInText } from './sortMeals';
 
 export type DayKey = 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom';
 
