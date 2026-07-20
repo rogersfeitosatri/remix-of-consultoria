@@ -927,6 +927,7 @@ export default function MealPlanEditor() {
                     <Plus className="h-3 w-3 mr-1" /> {m.label}
                   </Button>
                 ))}
+                <CustomMealAdder onAdd={insertMealSkeleton} />
               </div>
 
               <MealCardsView text={text} onChange={setText} />
