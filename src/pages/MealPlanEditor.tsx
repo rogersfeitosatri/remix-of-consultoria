@@ -148,11 +148,15 @@ export default function MealPlanEditor() {
   });
   const [activeDay, setActiveDay] = useState<DayKey>('all');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Só grava rascunho depois que o usuário edita algo — evita que o autosave
+  // escreva EMPTY_TEXTS antes da hidratação vinda do banco (o que apagava
+  // rascunhos após refresh, atualização do sistema ou abrir noutra aba).
+  const dirtyRef = useRef(false);
 
-  // Hidrata do banco quando não há rascunho local.
+  // Hidrata do banco quando não há rascunho local (e usuário ainda não editou).
   useEffect(() => {
     if (!analysisRow || !draftKey) return;
+    if (dirtyRef.current) return;
     try {
       if (!localStorage.getItem(draftKey)) {
         setTexts(initialTexts);
@@ -160,20 +164,34 @@ export default function MealPlanEditor() {
     } catch { /* noop */ }
   }, [analysisRow, initialTexts, draftKey]);
 
-  // Autosave em localStorage.
+  // Autosave em localStorage — síncrono, sem debounce, e só após edição real.
+  // localStorage é rápido; escrever a cada tecla é seguro e garante que nada
+  // se perca em refresh, navegação ou atualização do sistema.
+  useEffect(() => {
+    if (!draftKey || !dirtyRef.current) return;
+    try { localStorage.setItem(draftKey, JSON.stringify(texts)); setSaveState('saved'); }
+    catch { setSaveState('error'); }
+  }, [texts, draftKey]);
+
+  // Flush ao sair da página (fecha aba, navega para fora) — proteção extra.
   useEffect(() => {
     if (!draftKey) return;
-    setSaveState('saving');
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      try { localStorage.setItem(draftKey, JSON.stringify(texts)); setSaveState('saved'); }
-      catch { setSaveState('error'); }
-    }, 500);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+    const flush = () => {
+      if (!dirtyRef.current) return;
+      try { localStorage.setItem(draftKey, JSON.stringify(texts)); } catch { /* noop */ }
+    };
+    window.addEventListener('beforeunload', flush);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      window.removeEventListener('pagehide', flush);
+    };
   }, [texts, draftKey]);
 
   const text = texts[activeDay];
   const setText = (v: string | ((prev: string) => string)) => {
+    dirtyRef.current = true;
+    setSaveState('saving');
     setTexts(prev => ({
       ...prev,
       [activeDay]: typeof v === 'function' ? (v as (p: string) => string)(prev[activeDay]) : v,
@@ -909,6 +927,7 @@ export default function MealPlanEditor() {
                     <Plus className="h-3 w-3 mr-1" /> {m.label}
                   </Button>
                 ))}
+                <CustomMealAdder onAdd={insertMealSkeleton} />
               </div>
 
               <MealCardsView text={text} onChange={setText} />
@@ -1030,5 +1049,53 @@ export default function MealPlanEditor() {
         </DialogContent>
       </Dialog>
     </Layout>
+  );
+}
+
+// Adiciona uma refeição personalizada (horário + nome). Ao confirmar, chama
+// `insertMealSkeleton`, que já reordena o dia cronologicamente pelo horário.
+function CustomMealAdder({ onAdd }: { onAdd: (name: string, time: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [time, setTime] = useState('');
+  const [name, setName] = useState('');
+  const submit = () => {
+    const t = time.trim();
+    const n = name.trim();
+    if (!/^\d{1,2}:\d{2}$/.test(t)) { toast.error('Informe o horário no formato HH:MM.'); return; }
+    if (!n) { toast.error('Informe o nome da refeição.'); return; }
+    onAdd(n, t);
+    setTime(''); setName(''); setOpen(false);
+  };
+  if (!open) {
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 px-2 text-xs border border-dashed"
+        onClick={() => setOpen(true)}
+      >
+        <Plus className="h-3 w-3 mr-1" /> Refeição personalizada
+      </Button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1.5 rounded-md border bg-muted/30 px-2 py-1">
+      <Input
+        type="time"
+        value={time}
+        onChange={(e) => setTime(e.target.value)}
+        className="h-7 w-24 text-xs"
+        autoFocus
+      />
+      <Input
+        placeholder="Nome da refeição"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') setOpen(false); }}
+        className="h-7 w-40 text-xs"
+      />
+      <Button size="sm" className="h-7 px-2 text-xs" onClick={submit}>Adicionar</Button>
+      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setOpen(false); setTime(''); setName(''); }}>Cancelar</Button>
+    </div>
   );
 }
