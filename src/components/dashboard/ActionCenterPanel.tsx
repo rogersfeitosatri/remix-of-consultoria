@@ -92,11 +92,11 @@ export function ActionCenterPanel() {
   const { data: pendingPlans = [], isLoading: loadingPlans } = usePendingMealPlans();
   const { data: unlinkedAnamnese = [], isLoading: loadingUnlinked } = useUnlinkedAnamneseForMealPlan();
 
-  const [mealPlansOpen, setMealPlansOpen] = useState(true);
-  const [anamnesesOpen, setAnamnesesOpen] = useState(true);
-  const [checkinsOpen, setCheckinsOpen] = useState(true);
-  const [expiringOpen, setExpiringOpen] = useState(true);
-  const [pendingRegOpen, setPendingRegOpen] = useState(true);
+  const [mealPlansOpen, setMealPlansOpen] = useState(false);
+  const [anamnesesOpen, setAnamnesesOpen] = useState(false);
+  const [checkinsOpen, setCheckinsOpen] = useState(false);
+  const [expiringOpen, setExpiringOpen] = useState(false);
+  const [pendingRegOpen, setPendingRegOpen] = useState(false);
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || '';
 
