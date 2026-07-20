@@ -470,6 +470,41 @@ export default function MealPlanEditor() {
   };
 
   const importPdf = async (file: File) => {
+    // Markdown/txt são processados 100% no cliente — extraem múltiplos planos,
+    // distribuem por dia da semana e alimentam a área de orientações.
+    const isMarkdown = /\.(md|txt|markdown)$/i.test(file.name) || file.type === 'text/markdown';
+    if (isMarkdown) {
+      try {
+        setImporting(true);
+        const md = await file.text();
+        const result = await importMealPlanFromMarkdown(md);
+        setTexts((prev) => {
+          const next = { ...prev };
+          if (result.base && !next.all.trim()) next.all = result.base;
+          for (const k of Object.keys(result.perDay) as MdDayKey[]) {
+            const v = result.perDay[k];
+            if (v) next[k as DayKey] = v;
+          }
+          return next;
+        });
+        if (result.orientations) {
+          setOrientationsText((prev) => prev.trim() ? `${prev}\n\n${result.orientations}` : result.orientations);
+        }
+        const dayCount = Object.keys(result.perDay).length;
+        const foodMsg = result.createdFoods.length ? ` ${result.createdFoods.length} alimento(s) novo(s) criado(s) no banco.` : '';
+        const skipMsg = result.skippedPlans.length ? ` Planos anexados às orientações: ${result.skippedPlans.join('; ')}.` : '';
+        toast.success(`MD importado: ${dayCount} dia(s) preenchido(s).${foodMsg}${skipMsg}`);
+        if (result.orientations) {
+          toast.message('Orientações extraídas — abra "Criar orientação" para revisar e salvar.');
+        }
+      } catch (e: any) {
+        toast.error(`Falha ao importar MD: ${e.message || e}`);
+      } finally {
+        setImporting(false);
+        if (fileRef.current) fileRef.current.value = '';
+      }
+      return;
+    }
     try {
       setImporting(true);
       const fd = new FormData();
