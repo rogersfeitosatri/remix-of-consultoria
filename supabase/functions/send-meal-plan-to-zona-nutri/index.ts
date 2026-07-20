@@ -228,7 +228,18 @@ Deno.serve(async (req) => {
         objective: plan.athlete_summary ?? "",
         weekly_structure: hasVariations ? "per_day" : "single",
         days,
-        strategic_orientations: plan.strategic_orientations ?? {},
+        strategic_orientations: {
+          ...(plan.strategic_orientations ?? {}),
+          // Texto livre editado pelo nutricionista no botão "Criar orientação".
+          custom_notes:
+            plan.strategic_orientations?.custom_notes ??
+            plan.orientations_text ??
+            "",
+        },
+        orientations_text:
+          plan.strategic_orientations?.custom_notes ??
+          plan.orientations_text ??
+          "",
         athlete_message: plan.adjustment_message ?? "",
       },
     };
