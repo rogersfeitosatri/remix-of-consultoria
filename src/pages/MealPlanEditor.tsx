@@ -825,6 +825,37 @@ export default function MealPlanEditor() {
                         </div>
                       </SheetContent>
                     </Sheet>
+                    <Sheet open={orientationsOpen} onOpenChange={setOrientationsOpen}>
+                      <SheetTrigger asChild>
+                        <span>
+                          <ToolIconButton label="Criar orientação">
+                            <NotebookPen />
+                          </ToolIconButton>
+                        </span>
+                      </SheetTrigger>
+                      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto flex flex-col">
+                        <SheetHeader>
+                          <SheetTitle>Orientações do plano</SheetTitle>
+                        </SheetHeader>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Escreva as orientações específicas do atleta (rotina, treino, carbloading, hidratação, suplementação).
+                          O conteúdo é enviado ao Zona Nutri junto com o plano.
+                        </p>
+                        <Textarea
+                          value={orientationsText}
+                          onChange={(e) => setOrientationsText(e.target.value)}
+                          placeholder="Ex.: Nos dias de longão, siga a estratégia pré-treino do app..."
+                          className="mt-3 flex-1 min-h-[300px] font-mono text-sm"
+                        />
+                        <div className="mt-3 flex justify-end gap-2">
+                          <Button variant="outline" onClick={() => setOrientationsOpen(false)}>Cancelar</Button>
+                          <Button onClick={saveOrientations} disabled={orientationsSaving}>
+                            {orientationsSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Salvar orientações
+                          </Button>
+                        </div>
+                      </SheetContent>
+                    </Sheet>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <a
