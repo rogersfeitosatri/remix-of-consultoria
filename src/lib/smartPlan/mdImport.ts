@@ -242,17 +242,18 @@ export async function importMealPlanFromMarkdown(md: string): Promise<MdImportRe
       continue;
     }
 
+    // Planos "especiais" (carbloading / anterior à prova) SOBRESCREVEM os
+    // dias declarados; planos regulares só preenchem dias ainda vazios.
     const assigned: DayKey[] = [];
     const conflicts: DayKey[] = [];
     for (const d of p.weekdays) {
-      if (perDay[d]) conflicts.push(d);
+      if (perDay[d] && !p.special) conflicts.push(d);
       else { perDay[d] = text; assigned.push(d); }
     }
     if (!assigned.length) {
       skippedPlans.push(p.title);
       orientationParts.push(`\n\n${p.title}\nDias: ${p.daysText}\n\n${p.bodyText}`);
     } else if (conflicts.length) {
-      // Menciona nos avisos para o nutricionista
       skippedPlans.push(`${p.title} (conflito em ${conflicts.join(', ')})`);
     }
   }
