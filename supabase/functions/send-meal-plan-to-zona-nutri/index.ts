@@ -172,7 +172,10 @@ Deno.serve(async (req) => {
     const { data: analysis } = await supabase
       .from("ai_analyses").select("*").eq("client_id", clientId).maybeSingle();
     let plan: any = null;
-    try { plan = analysis?.raw_response ? JSON.parse(analysis.raw_response) : null; } catch { /* */ }
+    try {
+      const raw = analysis?.raw_response;
+      plan = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch { /* */ }
     if (!plan?.meal_plan?.meals) throw new Error("Não há plano alimentar para enviar.");
 
     // O endpoint do Zona Nutri resolve primeiro por external_id
@@ -225,7 +228,18 @@ Deno.serve(async (req) => {
         objective: plan.athlete_summary ?? "",
         weekly_structure: hasVariations ? "per_day" : "single",
         days,
-        strategic_orientations: plan.strategic_orientations ?? {},
+        strategic_orientations: {
+          ...(plan.strategic_orientations ?? {}),
+          // Texto livre editado pelo nutricionista no botão "Criar orientação".
+          custom_notes:
+            plan.strategic_orientations?.custom_notes ??
+            plan.orientations_text ??
+            "",
+        },
+        orientations_text:
+          plan.strategic_orientations?.custom_notes ??
+          plan.orientations_text ??
+          "",
         athlete_message: plan.adjustment_message ?? "",
       },
     };

@@ -20,8 +20,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import {
-  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat, ClipboardCheck, Plus, Scale, CalendarDays, FileText,
+  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat, ClipboardCheck, Plus, Scale, CalendarDays, FileText, NotebookPen,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { importMealPlanFromMarkdown, type DayKey as MdDayKey } from '@/lib/smartPlan/mdImport';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -191,6 +193,54 @@ export default function MealPlanEditor() {
   const [enrichedMeals, setEnrichedMeals] = useState<any[] | undefined>(undefined);
   const [enrichedTotals, setEnrichedTotals] = useState<{ kcal: number; cho: number; ptn: number; lip: number } | undefined>(undefined);
   const [enrichedTotalsByDay, setEnrichedTotalsByDay] = useState<Partial<Record<DayKey, { kcal: number; cho: number; ptn: number; lip: number }>>>({});
+
+  // Orientações escritas pelo nutricionista (vão junto no envio ao Zona Nutri).
+  const [orientationsText, setOrientationsText] = useState<string>('');
+  const [orientationsOpen, setOrientationsOpen] = useState(false);
+  const [orientationsSaving, setOrientationsSaving] = useState(false);
+
+  // Hidrata orientações do banco.
+  useEffect(() => {
+    try {
+      const raw = analysisRow?.raw_response as any;
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      const text =
+        parsed?.strategic_orientations?.custom_notes ??
+        parsed?.orientations_text ??
+        '';
+      if (typeof text === 'string') setOrientationsText(text);
+    } catch { /* noop */ }
+  }, [analysisRow]);
+
+  const saveOrientations = async () => {
+    if (!clientId) return;
+    try {
+      setOrientationsSaving(true);
+      const raw = analysisRow?.raw_response as any;
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+      const nextRaw = {
+        ...parsed,
+        strategic_orientations: {
+          ...(parsed?.strategic_orientations || {}),
+          custom_notes: orientationsText,
+        },
+      };
+      if (analysisRow?.id) {
+        const { error } = await supabase.from('ai_analyses').update({ raw_response: nextRaw as any }).eq('id', analysisRow.id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: nextRaw });
+        if (error) throw error;
+      }
+      toast.success('Orientações salvas. Serão enviadas ao Zona Nutri no próximo envio.');
+      qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
+      setOrientationsOpen(false);
+    } catch (e: any) {
+      toast.error(`Falha ao salvar orientações: ${e.message || e}`);
+    } finally {
+      setOrientationsSaving(false);
+    }
+  };
 
   const backupKey = `smart-plan-backup:${clientId}`;
   useEffect(() => {
@@ -420,6 +470,41 @@ export default function MealPlanEditor() {
   };
 
   const importPdf = async (file: File) => {
+    // Markdown/txt são processados 100% no cliente — extraem múltiplos planos,
+    // distribuem por dia da semana e alimentam a área de orientações.
+    const isMarkdown = /\.(md|txt|markdown)$/i.test(file.name) || file.type === 'text/markdown';
+    if (isMarkdown) {
+      try {
+        setImporting(true);
+        const md = await file.text();
+        const result = await importMealPlanFromMarkdown(md);
+        setTexts((prev) => {
+          const next = { ...prev };
+          if (result.base && !next.all.trim()) next.all = result.base;
+          for (const k of Object.keys(result.perDay) as MdDayKey[]) {
+            const v = result.perDay[k];
+            if (v) next[k as DayKey] = v;
+          }
+          return next;
+        });
+        if (result.orientations) {
+          setOrientationsText((prev) => prev.trim() ? `${prev}\n\n${result.orientations}` : result.orientations);
+        }
+        const dayCount = Object.keys(result.perDay).length;
+        const foodMsg = result.createdFoods.length ? ` ${result.createdFoods.length} alimento(s) novo(s) criado(s) no banco.` : '';
+        const skipMsg = result.skippedPlans.length ? ` Planos anexados às orientações: ${result.skippedPlans.join('; ')}.` : '';
+        toast.success(`MD importado: ${dayCount} dia(s) preenchido(s).${foodMsg}${skipMsg}`);
+        if (result.orientations) {
+          toast.message('Orientações extraídas — abra "Criar orientação" para revisar e salvar.');
+        }
+      } catch (e: any) {
+        toast.error(`Falha ao importar MD: ${e.message || e}`);
+      } finally {
+        setImporting(false);
+        if (fileRef.current) fileRef.current.value = '';
+      }
+      return;
+    }
     try {
       setImporting(true);
       const fd = new FormData();
@@ -737,6 +822,37 @@ export default function MealPlanEditor() {
                         </SheetHeader>
                         <div className="mt-4">
                           {clientId && <AnamneseResponseSection clientId={clientId} clientName={client?.name || ''} />}
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                    <Sheet open={orientationsOpen} onOpenChange={setOrientationsOpen}>
+                      <SheetTrigger asChild>
+                        <span>
+                          <ToolIconButton label="Criar orientação">
+                            <NotebookPen />
+                          </ToolIconButton>
+                        </span>
+                      </SheetTrigger>
+                      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto flex flex-col">
+                        <SheetHeader>
+                          <SheetTitle>Orientações do plano</SheetTitle>
+                        </SheetHeader>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Escreva as orientações específicas do atleta (rotina, treino, carbloading, hidratação, suplementação).
+                          O conteúdo é enviado ao Zona Nutri junto com o plano.
+                        </p>
+                        <Textarea
+                          value={orientationsText}
+                          onChange={(e) => setOrientationsText(e.target.value)}
+                          placeholder="Ex.: Nos dias de longão, siga a estratégia pré-treino do app..."
+                          className="mt-3 flex-1 min-h-[300px] font-mono text-sm"
+                        />
+                        <div className="mt-3 flex justify-end gap-2">
+                          <Button variant="outline" onClick={() => setOrientationsOpen(false)}>Cancelar</Button>
+                          <Button onClick={saveOrientations} disabled={orientationsSaving}>
+                            {orientationsSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Salvar orientações
+                          </Button>
                         </div>
                       </SheetContent>
                     </Sheet>
