@@ -395,12 +395,22 @@ export default function MealPlanEditor() {
     }
   };
 
-  // Insere um esqueleto de refeição no final do texto da aba atual.
+  // Insere um esqueleto de refeição respeitando a ordem cronológica pelo
+  // horário — ex.: "Almoço 12:30" cai entre "Lanche 10:00" e "Pós-treino 15:00".
   const insertMealSkeleton = (name: string, time: string) => {
     const skeleton = `@ ${time} ${name}\n`;
     setText(prev => {
       const sep = prev.length === 0 ? '' : (prev.endsWith('\n\n') ? '' : prev.endsWith('\n') ? '\n' : '\n\n');
-      return prev + sep + skeleton;
+      const appended = prev + sep + skeleton;
+      try {
+        // Reordena após inserir para posicionar a nova refeição pelo horário.
+        // Import dinâmico para não criar dependência circular no bundle inicial.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { sortMealsByTimeInText } = require('@/lib/smartPlan/sortMeals');
+        return sortMealsByTimeInText(appended);
+      } catch {
+        return appended;
+      }
     });
   };
   const QUICK_MEALS: { label: string; time: string }[] = [
