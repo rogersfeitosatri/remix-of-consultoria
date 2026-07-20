@@ -136,6 +136,7 @@ export function formatAnyAnswer(v: any): string {
     return s === '' ? '(não respondeu)' : s;
   }
   if (Array.isArray(v)) {
+    if (isSimpleMealArray(v)) return formatSimpleMealArray(v);
     const parts = v
       .map((x) => (x && typeof x === 'object' ? formatAnyAnswer(x) : String(x ?? '').trim()))
       .filter((s) => s && s !== '(não respondeu)');
