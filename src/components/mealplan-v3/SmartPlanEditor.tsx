@@ -167,9 +167,38 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
   // Cache para enriquecer o alimento principal em contexto de substituição.
   const subEnrichCache = useRef(makeEnrichCache());
 
+  // Nome do alimento no segmento atual (parte antes do " - "). Usado para
+  // re-resolver o pendingFood quando o nutri edita manualmente uma linha
+  // (ex.: apagou a medida da substituição e voltou a digitar a quantidade).
+  const segFoodName = useMemo(() => {
+    if (mode !== 'measure') return '';
+    const q = foodQueryOfSegment(ctx.segText.slice(0, ctx.segCaret));
+    return q.hasDivider ? q.query : '';
+  }, [mode, ctx]);
+
   // Consultas de sugestão
   const foodResults = useFoodSearch(mode === 'food' ? manualQuery : '');
+  // Em 'measure', se ainda não temos pendingFood (edição manual), busca pelo
+  // nome do segmento para conseguir carregar as medidas caseiras.
+  const measureFoodLookup = useFoodSearch(mode === 'measure' && !pendingFood && segFoodName.length >= 2 ? segFoodName : '');
+  useEffect(() => {
+    if (mode !== 'measure') return;
+    // Se o nome atual do segmento diverge do pendingFood, invalida para
+    // permitir nova resolução (nutri trocou o alimento manualmente).
+    if (pendingFood && segFoodName && pendingFood.name.toLowerCase() !== segFoodName.toLowerCase()) {
+      setPendingFood(null);
+      return;
+    }
+    if (pendingFood) return;
+    const rows = measureFoodLookup.data || [];
+    if (rows.length === 0) return;
+    const target = segFoodName.trim().toLowerCase();
+    const exact = rows.find((r) => r.name.toLowerCase() === target);
+    setPendingFood(exact || rows[0]);
+  }, [mode, pendingFood, measureFoodLookup.data, segFoodName]);
+
   const measures = useFoodMeasures(mode === 'measure' ? pendingFood?.id ?? null : null);
+
 
   // Identifica o alimento principal do grupo atual (quando estamos digitando
   // uma substituição) para sugerir substitutos aprendidos pelo nutricionista.
