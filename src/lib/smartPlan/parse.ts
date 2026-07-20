@@ -133,8 +133,23 @@ export function parseText(text: string): PlanAst {
       const body = trimmed.replace(/^==\s*/, '');
       const primary = /\*\s*$/.test(body);
       const name = body.replace(/\*\s*$/, '').trim() || `Opção ${currentOptions.length + 1}`;
-      currentOption = { name, primary, groups: [] };
-      currentOptions.push(currentOption);
+      // Se a única opção existente foi criada automaticamente por startMeal
+      // e ainda está vazia, substitui — evita "Opção 1" fantasma que rouba
+      // o papel de principal e zera o cálculo do dia.
+      if (
+        currentOptions.length === 1 &&
+        currentOptions[0].groups.length === 0 &&
+        currentOption === currentOptions[0]
+      ) {
+        currentOption = { name, primary, groups: [] };
+        currentOptions[0] = currentOption;
+        current.groups = currentOption.groups;
+      } else {
+        // Se a nova opção é marcada principal, remove o flag das anteriores.
+        if (primary) for (const o of currentOptions) o.primary = false;
+        currentOption = { name, primary, groups: [] };
+        currentOptions.push(currentOption);
+      }
       continue;
     }
 
