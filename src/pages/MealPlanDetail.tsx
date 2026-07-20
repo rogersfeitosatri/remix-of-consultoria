@@ -18,6 +18,7 @@ import { PlanReadOnlyView } from '@/components/admin/PlanReadOnlyView';
 import { PlanFinalizationPanel } from '@/components/admin/PlanFinalizationPanel';
 import { PlanInlineEditor } from '@/components/admin/PlanInlineEditor';
 import { EditableStrategicOrientations } from '@/components/admin/EditableStrategicOrientations';
+import { AttachedPlanPanel } from '@/components/admin/AttachedPlanPanel';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send, Layers, MoreVertical, CircleCheck, CircleDashed } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -1013,6 +1014,9 @@ export default function MealPlanDetail() {
             <EditableStrategicOrientations key={`so-${structured.updated_at}`} analysis={structured} clientId={clientId!} onUpdated={refresh} />
           </>
         )}
+
+        {/* Anexar plano (texto livre + orientações) — histórico, comparação e envio ao ZN */}
+        {!isLoading && <AttachedPlanPanel clientId={clientId!} analysisRow={analysisRow} />}
 
         {/* Diálogo: importar dieta atual */}
         <Dialog open={importOpen} onOpenChange={setImportOpen}>
