@@ -15,6 +15,7 @@ export function useAthleteWeight(clientId?: string | null) {
     queryKey: ['athlete-weight', clientId],
     enabled: !!clientId,
     staleTime: 60_000,
+    retry: false, // consultas de peso não devem re-tentar em loop se uma coluna faltar
     queryFn: async (): Promise<{ weightKg: number | null; source: WeightSource; date?: string }> => {
       if (!clientId) return { weightKg: null, source: null };
 
