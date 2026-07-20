@@ -194,6 +194,54 @@ export default function MealPlanEditor() {
   const [enrichedTotals, setEnrichedTotals] = useState<{ kcal: number; cho: number; ptn: number; lip: number } | undefined>(undefined);
   const [enrichedTotalsByDay, setEnrichedTotalsByDay] = useState<Partial<Record<DayKey, { kcal: number; cho: number; ptn: number; lip: number }>>>({});
 
+  // Orientações escritas pelo nutricionista (vão junto no envio ao Zona Nutri).
+  const [orientationsText, setOrientationsText] = useState<string>('');
+  const [orientationsOpen, setOrientationsOpen] = useState(false);
+  const [orientationsSaving, setOrientationsSaving] = useState(false);
+
+  // Hidrata orientações do banco.
+  useEffect(() => {
+    try {
+      const raw = analysisRow?.raw_response as any;
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      const text =
+        parsed?.strategic_orientations?.custom_notes ??
+        parsed?.orientations_text ??
+        '';
+      if (typeof text === 'string') setOrientationsText(text);
+    } catch { /* noop */ }
+  }, [analysisRow]);
+
+  const saveOrientations = async () => {
+    if (!clientId) return;
+    try {
+      setOrientationsSaving(true);
+      const raw = analysisRow?.raw_response as any;
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+      const nextRaw = {
+        ...parsed,
+        strategic_orientations: {
+          ...(parsed?.strategic_orientations || {}),
+          custom_notes: orientationsText,
+        },
+      };
+      if (analysisRow?.id) {
+        const { error } = await supabase.from('ai_analyses').update({ raw_response: nextRaw as any }).eq('id', analysisRow.id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: nextRaw });
+        if (error) throw error;
+      }
+      toast.success('Orientações salvas. Serão enviadas ao Zona Nutri no próximo envio.');
+      qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
+      setOrientationsOpen(false);
+    } catch (e: any) {
+      toast.error(`Falha ao salvar orientações: ${e.message || e}`);
+    } finally {
+      setOrientationsSaving(false);
+    }
+  };
+
   const backupKey = `smart-plan-backup:${clientId}`;
   useEffect(() => {
     try { setHasBackup(!!localStorage.getItem(backupKey)); } catch { /* noop */ }
