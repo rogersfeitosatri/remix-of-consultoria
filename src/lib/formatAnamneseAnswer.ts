@@ -5,6 +5,55 @@ export function isMealObject(v: any): boolean {
   return v && typeof v === 'object' && !Array.isArray(v) && ('itens' in v || 'bebidas' in v || 'horario' in v);
 }
 
+// SimpleMeal (Alimentação Habitual v2)
+export function isSimpleMealObject(v: any): boolean {
+  return v && typeof v === 'object' && !Array.isArray(v) &&
+    ('meal_name' in v) && (('options' in v) || ('foods' in v) || ('enabled' in v) || ('skipped' in v));
+}
+export function isSimpleMealArray(v: any): boolean {
+  return Array.isArray(v) && v.length > 0 && v.every(isSimpleMealObject);
+}
+
+function foodToString(f: any): string {
+  if (!f || typeof f !== 'object') return String(f ?? '').trim();
+  const name = String(f.food_name ?? '').trim();
+  if (!name) return '';
+  const qty = String(f.quantity ?? '').trim();
+  const unit = String(f.unit ?? '').trim();
+  const qtyUnit = [qty, unit].filter(Boolean).join(' ');
+  const base = qtyUnit ? `${name} — ${qtyUnit}` : name;
+  const subs = Array.isArray(f.substitutions)
+    ? f.substitutions.map((s: any) => String(s ?? '').trim()).filter(Boolean)
+    : [];
+  return subs.length ? `${base} (ou ${subs.join(' / ')})` : base;
+}
+
+export function formatSimpleMeal(v: any): string {
+  const name = String(v.meal_name ?? '').trim();
+  const time = String(v.time ?? '').trim();
+  const header = [name, time].filter(Boolean).join(' — ');
+  if (v.skipped || v.enabled === false) {
+    return `${header}\n  (não faz essa refeição)`;
+  }
+  const options: any[] = Array.isArray(v.options) && v.options.length
+    ? v.options
+    : (Array.isArray(v.foods) ? [{ foods: v.foods }] : []);
+  const optLines: string[] = [];
+  options.forEach((op, i) => {
+    const foods = Array.isArray(op?.foods) ? op.foods : [];
+    const items = foods.map(foodToString).filter(Boolean);
+    if (!items.length) return;
+    if (options.length > 1) optLines.push(`  Opção ${i + 1}:`);
+    for (const it of items) optLines.push(options.length > 1 ? `    • ${it}` : `  • ${it}`);
+  });
+  if (!optLines.length) return `${header}\n  (não respondeu)`;
+  return [header, ...optLines].join('\n');
+}
+
+export function formatSimpleMealArray(v: any[]): string {
+  return v.map(formatSimpleMeal).join('\n\n');
+}
+
 export function isTrainingWeekObject(v: any): boolean {
   return v && typeof v === 'object' && !Array.isArray(v) && ('Segunda' in v || 'Terça' in v || 'Domingo' in v);
 }
@@ -69,6 +118,8 @@ export function formatSymptomScale(v: Record<string, number>): string {
 
 // Retorna a string formatada para respostas estruturadas, ou null se não for um tipo estruturado.
 export function formatStructuredAnswer(v: any): string | null {
+  if (isSimpleMealArray(v)) return formatSimpleMealArray(v);
+  if (isSimpleMealObject(v)) return formatSimpleMeal(v);
   if (isMealObject(v)) return formatMeal(v);
   if (isTrainingWeekObject(v)) return formatTrainingWeek(v);
   if (isSymptomScaleObject(v)) return formatSymptomScale(v);
@@ -85,6 +136,7 @@ export function formatAnyAnswer(v: any): string {
     return s === '' ? '(não respondeu)' : s;
   }
   if (Array.isArray(v)) {
+    if (isSimpleMealArray(v)) return formatSimpleMealArray(v);
     const parts = v
       .map((x) => (x && typeof x === 'object' ? formatAnyAnswer(x) : String(x ?? '').trim()))
       .filter((s) => s && s !== '(não respondeu)');
