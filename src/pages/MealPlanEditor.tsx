@@ -404,10 +404,6 @@ export default function MealPlanEditor() {
       const sep = prev.length === 0 ? '' : (prev.endsWith('\n\n') ? '' : prev.endsWith('\n') ? '\n' : '\n\n');
       const appended = prev + sep + skeleton;
       try {
-        // Reordena após inserir para posicionar a nova refeição pelo horário.
-        // Import dinâmico para não criar dependência circular no bundle inicial.
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { sortMealsByTimeInText } = require('@/lib/smartPlan/sortMeals');
         return sortMealsByTimeInText(appended);
       } catch {
         return appended;
