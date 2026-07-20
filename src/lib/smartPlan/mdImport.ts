@@ -13,6 +13,7 @@
 // "lookup-custom-food" para que o enriquecimento local calcule kcal/macros.
 
 import { supabase } from '@/integrations/supabase/client';
+import { sortMealsByTimeInText } from './sortMeals';
 
 export type DayKey = 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom';
 
@@ -260,6 +261,17 @@ export async function importMealPlanFromMarkdown(md: string): Promise<MdImportRe
 
   const orientationsFinal = [orientations, ...orientationParts].filter(Boolean).join('\n').trim();
   const createdFoods = await ensureFoodsExist(allFoodNames);
+
+  // Reordena cada texto por horário (garante Café → Lanche → Almoço → Jantar → Ceia
+  // mesmo se o MD original vier fora de ordem). Também evita que opções caiam
+  // sob a refeição errada quando o ChatGPT emite blocos desordenados.
+  try {
+    for (const k of Object.keys(perDay) as DayKey[]) {
+      const t = perDay[k];
+      if (t) perDay[k] = sortMealsByTimeInText(t);
+    }
+    if (base) base = sortMealsByTimeInText(base);
+  } catch { /* silencioso */ }
 
   return { perDay, base, orientations: orientationsFinal, skippedPlans, createdFoods };
 }

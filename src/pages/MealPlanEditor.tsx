@@ -33,6 +33,7 @@ import { TotalsPanel } from '@/components/mealplan-v3/TotalsPanel';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { mealsToText } from '@/lib/smartPlan/fromMeals';
 import { parseText } from '@/lib/smartPlan/parse';
+import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
@@ -395,12 +396,18 @@ export default function MealPlanEditor() {
     }
   };
 
-  // Insere um esqueleto de refeição no final do texto da aba atual.
+  // Insere um esqueleto de refeição respeitando a ordem cronológica pelo
+  // horário — ex.: "Almoço 12:30" cai entre "Lanche 10:00" e "Pós-treino 15:00".
   const insertMealSkeleton = (name: string, time: string) => {
     const skeleton = `@ ${time} ${name}\n`;
     setText(prev => {
       const sep = prev.length === 0 ? '' : (prev.endsWith('\n\n') ? '' : prev.endsWith('\n') ? '\n' : '\n\n');
-      return prev + sep + skeleton;
+      const appended = prev + sep + skeleton;
+      try {
+        return sortMealsByTimeInText(appended);
+      } catch {
+        return appended;
+      }
     });
   };
   const QUICK_MEALS: { label: string; time: string }[] = [
