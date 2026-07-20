@@ -357,17 +357,26 @@ export default function MealPlanEditor() {
         },
         editor: 'smart-plan-v3',
       };
+      const nowIso = new Date().toISOString();
       if (analysisRow?.id) {
-        const { error } = await supabase.from('ai_analyses').update({ raw_response: nextRaw }).eq('id', analysisRow.id);
+        const { error } = await supabase.from('ai_analyses').update({ raw_response: nextRaw, updated_at: nowIso } as any).eq('id', analysisRow.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: nextRaw });
+        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: nextRaw, updated_at: nowIso });
         if (error) throw error;
       }
+      // Plano persistido no banco — banco passa a ser a fonte da verdade.
+      // Limpa o rascunho local para que abrir aqui ou em outro dispositivo
+      // hidrate do banco (evita divergência entre dispositivos).
+      try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* noop */ }
+      // Mantém dirtyRef=false para que a hidratação do refetch atualize a UI
+      // com o que foi realmente salvo.
+      dirtyRef.current = false;
+      setSaveState('saved');
       toast.success(overrideDays.length
         ? `Plano salvo (base + ${overrideDays.length} variação(ões) de dia).`
         : 'Plano salvo.');
-      qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
+      await qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
       qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
     } catch (e: any) {
       toast.error(`Não foi possível salvar: ${e.message || e}`);
