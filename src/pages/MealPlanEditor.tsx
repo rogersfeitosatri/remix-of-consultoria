@@ -1051,3 +1051,51 @@ export default function MealPlanEditor() {
     </Layout>
   );
 }
+
+// Adiciona uma refeição personalizada (horário + nome). Ao confirmar, chama
+// `insertMealSkeleton`, que já reordena o dia cronologicamente pelo horário.
+function CustomMealAdder({ onAdd }: { onAdd: (name: string, time: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [time, setTime] = useState('');
+  const [name, setName] = useState('');
+  const submit = () => {
+    const t = time.trim();
+    const n = name.trim();
+    if (!/^\d{1,2}:\d{2}$/.test(t)) { toast.error('Informe o horário no formato HH:MM.'); return; }
+    if (!n) { toast.error('Informe o nome da refeição.'); return; }
+    onAdd(n, t);
+    setTime(''); setName(''); setOpen(false);
+  };
+  if (!open) {
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 px-2 text-xs border border-dashed"
+        onClick={() => setOpen(true)}
+      >
+        <Plus className="h-3 w-3 mr-1" /> Refeição personalizada
+      </Button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1.5 rounded-md border bg-muted/30 px-2 py-1">
+      <Input
+        type="time"
+        value={time}
+        onChange={(e) => setTime(e.target.value)}
+        className="h-7 w-24 text-xs"
+        autoFocus
+      />
+      <Input
+        placeholder="Nome da refeição"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') setOpen(false); }}
+        className="h-7 w-40 text-xs"
+      />
+      <Button size="sm" className="h-7 px-2 text-xs" onClick={submit}>Adicionar</Button>
+      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setOpen(false); setTime(''); setName(''); }}>Cancelar</Button>
+    </div>
+  );
+}
