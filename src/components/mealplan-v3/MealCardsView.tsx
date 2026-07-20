@@ -16,7 +16,22 @@ import { parseText, parseGroupLine } from '@/lib/smartPlan/parse';
 import { astToText, tokenToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 import type { MealOption, MealBlock, PlanAst } from '@/lib/smartPlan/ast';
+import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
 import { SmartPlanEditor } from './SmartPlanEditor';
+
+// "08:00 Café da manhã" | "08:00 - Café" | "08:00 — Café" | "Café da manhã"
+function parseMealTitleInput(raw: string): { time: string | null; name: string } {
+  const s = (raw || '').trim();
+  const m = /^(\d{1,2}):(\d{2})\s*[-–—:]?\s*(.*)$/.exec(s);
+  if (m) {
+    const h = Math.min(23, parseInt(m[1], 10));
+    const mm = Math.min(59, parseInt(m[2], 10));
+    const time = `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    const name = m[3].trim() || 'Refeição';
+    return { time, name };
+  }
+  return { time: null, name: s || 'Refeição' };
+}
 
 interface Props {
   text: string;
