@@ -148,11 +148,15 @@ export default function MealPlanEditor() {
   });
   const [activeDay, setActiveDay] = useState<DayKey>('all');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Só grava rascunho depois que o usuário edita algo — evita que o autosave
+  // escreva EMPTY_TEXTS antes da hidratação vinda do banco (o que apagava
+  // rascunhos após refresh, atualização do sistema ou abrir noutra aba).
+  const dirtyRef = useRef(false);
 
-  // Hidrata do banco quando não há rascunho local.
+  // Hidrata do banco quando não há rascunho local (e usuário ainda não editou).
   useEffect(() => {
     if (!analysisRow || !draftKey) return;
+    if (dirtyRef.current) return;
     try {
       if (!localStorage.getItem(draftKey)) {
         setTexts(initialTexts);
@@ -160,20 +164,34 @@ export default function MealPlanEditor() {
     } catch { /* noop */ }
   }, [analysisRow, initialTexts, draftKey]);
 
-  // Autosave em localStorage.
+  // Autosave em localStorage — síncrono, sem debounce, e só após edição real.
+  // localStorage é rápido; escrever a cada tecla é seguro e garante que nada
+  // se perca em refresh, navegação ou atualização do sistema.
+  useEffect(() => {
+    if (!draftKey || !dirtyRef.current) return;
+    try { localStorage.setItem(draftKey, JSON.stringify(texts)); setSaveState('saved'); }
+    catch { setSaveState('error'); }
+  }, [texts, draftKey]);
+
+  // Flush ao sair da página (fecha aba, navega para fora) — proteção extra.
   useEffect(() => {
     if (!draftKey) return;
-    setSaveState('saving');
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      try { localStorage.setItem(draftKey, JSON.stringify(texts)); setSaveState('saved'); }
-      catch { setSaveState('error'); }
-    }, 500);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+    const flush = () => {
+      if (!dirtyRef.current) return;
+      try { localStorage.setItem(draftKey, JSON.stringify(texts)); } catch { /* noop */ }
+    };
+    window.addEventListener('beforeunload', flush);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      window.removeEventListener('pagehide', flush);
+    };
   }, [texts, draftKey]);
 
   const text = texts[activeDay];
   const setText = (v: string | ((prev: string) => string)) => {
+    dirtyRef.current = true;
+    setSaveState('saving');
     setTexts(prev => ({
       ...prev,
       [activeDay]: typeof v === 'function' ? (v as (p: string) => string)(prev[activeDay]) : v,
