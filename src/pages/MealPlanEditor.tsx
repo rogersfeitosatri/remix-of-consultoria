@@ -729,7 +729,7 @@ export default function MealPlanEditor() {
     try {
       setSending(true);
       await savePlan();
-      const { data, error } = await supabase.functions.invoke('send-meal-plan-to-zona-nutri', { body: { client_id: clientId } });
+      const { data, error } = await supabase.functions.invoke('send-meal-plan-to-zona-nutri', { body: { clientId } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success('Plano enviado ao Zona Nutri.');
