@@ -214,11 +214,14 @@ Deno.serve(async (req) => {
     const days = hasVariations
       ? WEEKDAYS.map((wd) => {
           const v = variations[wd.key];
+          // V3 editor grava array de refeições direto; legado grava { meals, daily_totals }.
+          const vMeals = Array.isArray(v) ? v : v?.meals;
+          const vTotals = Array.isArray(v) ? null : (v?.daily_totals ?? null);
           return {
             weekday: wd.weekday,
             label: wd.label,
-            meals: mapMeals(v?.meals ?? base.meals),
-            daily_totals: v?.daily_totals ?? base.daily_totals ?? null,
+            meals: mapMeals(vMeals ?? base.meals),
+            daily_totals: vTotals ?? base.daily_totals ?? null,
           };
         })
       : [{ weekday: "all", label: "Todos os dias", meals: mapMeals(base.meals), daily_totals: base.daily_totals ?? null }];
