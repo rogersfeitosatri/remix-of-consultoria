@@ -16,7 +16,22 @@ import { parseText, parseGroupLine } from '@/lib/smartPlan/parse';
 import { astToText, tokenToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 import type { MealOption, MealBlock, PlanAst } from '@/lib/smartPlan/ast';
+import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
 import { SmartPlanEditor } from './SmartPlanEditor';
+
+// "08:00 Café da manhã" | "08:00 - Café" | "08:00 — Café" | "Café da manhã"
+function parseMealTitleInput(raw: string): { time: string | null; name: string } {
+  const s = (raw || '').trim();
+  const m = /^(\d{1,2}):(\d{2})\s*[-–—:]?\s*(.*)$/.exec(s);
+  if (m) {
+    const h = Math.min(23, parseInt(m[1], 10));
+    const mm = Math.min(59, parseInt(m[2], 10));
+    const time = `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    const name = m[3].trim() || 'Refeição';
+    return { time, name };
+  }
+  return { time: null, name: s || 'Refeição' };
+}
 
 interface Props {
   text: string;
@@ -72,12 +87,44 @@ export function MealCardsView({ text, onChange }: Props) {
     return () => clearTimeout(t);
   }, [text, editing]);
 
+  // Edição inline do título (horário + nome) de uma refeição.
+  const [titleEditIdx, setTitleEditIdx] = useState<number | null>(null);
+  const [titleDraft, setTitleDraft] = useState<string>('');
+
   const mutate = (fn: (a: PlanAst) => void) => {
     const next = parseText(text || '');
     fn(next);
     setAst(next); // atualização síncrona — evita "trava" enquanto o efeito debounced não roda
     onChange(astToText(next));
   };
+
+  const startTitleEdit = (mi: number) => {
+    const meal = ast.meals[mi];
+    if (!meal) return;
+    setTitleDraft(meal.time ? `${meal.time} ${meal.name}` : meal.name);
+    setTitleEditIdx(mi);
+  };
+  const cancelTitleEdit = () => {
+    setTitleEditIdx(null);
+    setTitleDraft('');
+  };
+  const saveTitleEdit = () => {
+    if (titleEditIdx == null) return;
+    const { time, name } = parseMealTitleInput(titleDraft);
+    const next = parseText(text || '');
+    const meal = next.meals[titleEditIdx];
+    if (meal) {
+      meal.name = name;
+      meal.time = time;
+    }
+    // Reordena cronologicamente (se o novo horário mudou a posição).
+    const sorted = sortMealsByTimeInText(astToText(next));
+    setAst(parseText(sorted));
+    onChange(sorted);
+    setTitleEditIdx(null);
+    setTitleDraft('');
+  };
+
 
   const addOption = (mealIdx: number) => {
     // Cria a nova opção e já entra no modo edição dela, com autocomplete pronto.
@@ -185,34 +232,84 @@ export function MealCardsView({ text, onChange }: Props) {
           >
             {/* Título + botões da refeição */}
             <div className="flex items-center gap-1 mb-2">
-              <span className="text-sm font-medium truncate flex-1">
-                {meal.time ? `${meal.time} · ` : ''}{meal.name}
-              </span>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                onClick={() => addOption(mi)}
-                aria-label="Adicionar opção nesta refeição"
-                title="Adicionar opção nesta refeição"
-                disabled={!!editing}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                onClick={() => removeMeal(mi)}
-                aria-label="Excluir esta refeição"
-                title="Excluir esta refeição"
-                disabled={!!editing}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {titleEditIdx === mi ? (
+                <>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); saveTitleEdit(); }
+                      else if (e.key === 'Escape') { e.preventDefault(); cancelTitleEdit(); }
+                    }}
+                    placeholder="08:00 Café da manhã"
+                    className="flex-1 text-sm font-medium bg-background border border-input rounded px-2 py-1 h-7 focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={saveTitleEdit}
+                    className="inline-flex items-center justify-center h-6 w-6 rounded text-emerald-600 hover:bg-emerald-50"
+                    title="Salvar horário e nome"
+                    aria-label="Salvar título da refeição"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelTitleEdit}
+                    className="inline-flex items-center justify-center h-6 w-6 rounded text-muted-foreground hover:bg-muted"
+                    title="Cancelar"
+                    aria-label="Cancelar edição do título"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm font-medium truncate flex-1">
+                    {meal.time ? `${meal.time} · ` : ''}{meal.name}
+                  </span>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    onClick={() => startTitleEdit(mi)}
+                    aria-label="Editar horário e nome da refeição"
+                    title="Editar horário e nome"
+                    disabled={!!editing}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                    onClick={() => addOption(mi)}
+                    aria-label="Adicionar opção nesta refeição"
+                    title="Adicionar opção nesta refeição"
+                    disabled={!!editing}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => removeMeal(mi)}
+                    aria-label="Excluir esta refeição"
+                    title="Excluir esta refeição"
+                    disabled={!!editing}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
             </div>
+
 
 
             {/* Opções lado a lado */}
