@@ -118,6 +118,8 @@ export function formatSymptomScale(v: Record<string, number>): string {
 
 // Retorna a string formatada para respostas estruturadas, ou null se não for um tipo estruturado.
 export function formatStructuredAnswer(v: any): string | null {
+  if (isSimpleMealArray(v)) return formatSimpleMealArray(v);
+  if (isSimpleMealObject(v)) return formatSimpleMeal(v);
   if (isMealObject(v)) return formatMeal(v);
   if (isTrainingWeekObject(v)) return formatTrainingWeek(v);
   if (isSymptomScaleObject(v)) return formatSymptomScale(v);
