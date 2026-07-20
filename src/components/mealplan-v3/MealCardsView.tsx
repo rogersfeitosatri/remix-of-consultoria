@@ -87,12 +87,44 @@ export function MealCardsView({ text, onChange }: Props) {
     return () => clearTimeout(t);
   }, [text, editing]);
 
+  // Edição inline do título (horário + nome) de uma refeição.
+  const [titleEditIdx, setTitleEditIdx] = useState<number | null>(null);
+  const [titleDraft, setTitleDraft] = useState<string>('');
+
   const mutate = (fn: (a: PlanAst) => void) => {
     const next = parseText(text || '');
     fn(next);
     setAst(next); // atualização síncrona — evita "trava" enquanto o efeito debounced não roda
     onChange(astToText(next));
   };
+
+  const startTitleEdit = (mi: number) => {
+    const meal = ast.meals[mi];
+    if (!meal) return;
+    setTitleDraft(meal.time ? `${meal.time} ${meal.name}` : meal.name);
+    setTitleEditIdx(mi);
+  };
+  const cancelTitleEdit = () => {
+    setTitleEditIdx(null);
+    setTitleDraft('');
+  };
+  const saveTitleEdit = () => {
+    if (titleEditIdx == null) return;
+    const { time, name } = parseMealTitleInput(titleDraft);
+    const next = parseText(text || '');
+    const meal = next.meals[titleEditIdx];
+    if (meal) {
+      meal.name = name;
+      meal.time = time;
+    }
+    // Reordena cronologicamente (se o novo horário mudou a posição).
+    const sorted = sortMealsByTimeInText(astToText(next));
+    setAst(parseText(sorted));
+    onChange(sorted);
+    setTitleEditIdx(null);
+    setTitleDraft('');
+  };
+
 
   const addOption = (mealIdx: number) => {
     // Cria a nova opção e já entra no modo edição dela, com autocomplete pronto.
