@@ -182,13 +182,21 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
   // nome do segmento para conseguir carregar as medidas caseiras.
   const measureFoodLookup = useFoodSearch(mode === 'measure' && !pendingFood && segFoodName.length >= 2 ? segFoodName : '');
   useEffect(() => {
-    if (mode !== 'measure' || pendingFood) return;
+    if (mode !== 'measure') return;
+    // Se o nome atual do segmento diverge do pendingFood, invalida para
+    // permitir nova resolução (nutri trocou o alimento manualmente).
+    if (pendingFood && segFoodName && pendingFood.name.toLowerCase() !== segFoodName.toLowerCase()) {
+      setPendingFood(null);
+      return;
+    }
+    if (pendingFood) return;
     const rows = measureFoodLookup.data || [];
     if (rows.length === 0) return;
     const target = segFoodName.trim().toLowerCase();
     const exact = rows.find((r) => r.name.toLowerCase() === target);
     setPendingFood(exact || rows[0]);
   }, [mode, pendingFood, measureFoodLookup.data, segFoodName]);
+
   const measures = useFoodMeasures(mode === 'measure' ? pendingFood?.id ?? null : null);
 
 
