@@ -36,6 +36,7 @@ import { parseText } from '@/lib/smartPlan/parse';
 import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
+import { parseRaw, upsertActivePlan } from '@/lib/planHistory';
 import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
 import { WeekOverview } from '@/components/mealplan-v3/WeekOverview';
 import { useRecordSubstitutions } from '@/hooks/useSubstitutionHistory';
@@ -123,7 +124,7 @@ export default function MealPlanEditor() {
   const initialTexts = useMemo<PlanTexts>(() => {
     const out: PlanTexts = { ...EMPTY_TEXTS };
     try {
-      const raw = analysisRow?.raw_response as any;
+      const raw = parseRaw(analysisRow?.raw_response);
       const meals = raw?.meal_plan?.meals || raw?.meals || [];
       if (Array.isArray(meals) && meals.length) out.all = mealsToText(meals);
       const variations = raw?.meal_plan?.day_variations || {};
@@ -235,8 +236,7 @@ export default function MealPlanEditor() {
     if (!clientId) return;
     try {
       setOrientationsSaving(true);
-      const raw = analysisRow?.raw_response as any;
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+      const parsed = parseRaw(analysisRow?.raw_response);
       const nextRaw = {
         ...parsed,
         strategic_orientations: {
@@ -244,11 +244,12 @@ export default function MealPlanEditor() {
           custom_notes: orientationsText,
         },
       };
+      const rawStr = JSON.stringify(nextRaw);
       if (analysisRow?.id) {
-        const { error } = await supabase.from('ai_analyses').update({ raw_response: nextRaw as any }).eq('id', analysisRow.id);
+        const { error } = await supabase.from('ai_analyses').update({ raw_response: rawStr as any }).eq('id', analysisRow.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: nextRaw });
+        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: rawStr });
         if (error) throw error;
       }
       toast.success('Orientações salvas. Serão enviadas ao Zona Nutri no próximo envio.');
@@ -340,7 +341,7 @@ export default function MealPlanEditor() {
       }
       // Registra as substituições usadas — a IA aprende com o histórico.
       void recordSubs(dayAsts);
-      const currentRaw = (analysisRow?.raw_response as any) || {};
+      const currentRaw = parseRaw(analysisRow?.raw_response);
       try {
         localStorage.setItem(backupKey, JSON.stringify({
           raw_response: currentRaw,
@@ -348,21 +349,22 @@ export default function MealPlanEditor() {
         }));
         setHasBackup(true);
       } catch { /* noop */ }
-      const nextRaw = {
-        ...currentRaw,
-        meal_plan: {
-          ...(currentRaw.meal_plan || {}),
-          meals: baseMeals,
-          day_variations: dayVariations,
-        },
-        editor: 'smart-plan-v3',
+      const mealPlan = {
+        ...(currentRaw.meal_plan || {}),
+        meals: baseMeals,
+        day_variations: dayVariations,
       };
+      // Atualiza a entrada ATIVA no histórico (aparece no hub em "Planos salvos").
+      const { raw: withHistory } = upsertActivePlan(currentRaw, mealPlan);
+      const nextRaw = { ...withHistory, editor: 'smart-plan-v3' };
       const nowIso = new Date().toISOString();
+      // Coluna raw_response é TEXT → grava JSON string (convenção do sistema).
+      const rawStr = JSON.stringify(nextRaw);
       if (analysisRow?.id) {
-        const { error } = await supabase.from('ai_analyses').update({ raw_response: nextRaw, updated_at: nowIso } as any).eq('id', analysisRow.id);
+        const { error } = await supabase.from('ai_analyses').update({ raw_response: rawStr, updated_at: nowIso } as any).eq('id', analysisRow.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: nextRaw, updated_at: nowIso });
+        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: rawStr, updated_at: nowIso });
         if (error) throw error;
       }
       // Plano persistido no banco — banco passa a ser a fonte da verdade.
@@ -400,7 +402,7 @@ export default function MealPlanEditor() {
         await enrichAst(ast, enrichCache.current);
         dayVariations[k] = astToMeals(ast);
       }
-      const currentRaw = (analysisRow?.raw_response as any) || {};
+      const currentRaw = parseRaw(analysisRow?.raw_response);
       const pending_update = {
         source: 'smart-plan-v3',
         created_at: new Date().toISOString(),
@@ -411,7 +413,7 @@ export default function MealPlanEditor() {
         },
       };
       const nextRaw = { ...currentRaw, pending_update };
-      const { error } = await supabase.from('ai_analyses').update({ raw_response: nextRaw }).eq('id', analysisRow.id);
+      const { error } = await supabase.from('ai_analyses').update({ raw_response: JSON.stringify(nextRaw) }).eq('id', analysisRow.id);
       if (error) throw error;
       toast.success('Proposta salva. Abra o plano do atleta e clique em "Aplicar ajustes".');
       qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
@@ -454,7 +456,7 @@ export default function MealPlanEditor() {
       const raw = localStorage.getItem(backupKey);
       if (!raw) { toast.error('Sem backup para desfazer.'); return; }
       const { raw_response } = JSON.parse(raw);
-      const { error } = await supabase.from('ai_analyses').update({ raw_response }).eq('id', analysisRow.id);
+      const { error } = await supabase.from('ai_analyses').update({ raw_response: JSON.stringify(raw_response) }).eq('id', analysisRow.id);
       if (error) throw error;
       // Reconstrói textos a partir do estado anterior.
       const meals = raw_response?.meal_plan?.meals || raw_response?.meals || [];
@@ -489,7 +491,8 @@ export default function MealPlanEditor() {
       const { data: fresh } = await supabase
         .from('ai_analyses').select('raw_response').eq('client_id', clientId)
         .order('updated_at', { ascending: false }).limit(1).maybeSingle();
-      const meals = (fresh?.raw_response as any)?.meal_plan?.meals || (fresh?.raw_response as any)?.meals || [];
+      const freshRaw = parseRaw(fresh?.raw_response);
+      const meals = freshRaw?.meal_plan?.meals || freshRaw?.meals || [];
       if (Array.isArray(meals) && meals.length) {
         setText(mealsToText(meals));
         toast.success('Plano gerado pela IA carregado na aba atual.');
