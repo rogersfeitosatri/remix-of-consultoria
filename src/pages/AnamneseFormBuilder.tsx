@@ -205,6 +205,7 @@ export default function AnamneseFormBuilder() {
         question_text: question.question_text,
         question_type: question.question_type,
         section: question.section,
+        subsection: question.subsection || '',
         is_required: question.is_required,
         has_comment_field: question.has_comment_field,
         comment_field_required: question.comment_field_required || false,
