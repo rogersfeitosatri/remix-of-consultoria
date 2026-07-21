@@ -65,7 +65,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { SortableQuestionCard } from '@/components/forms/SortableQuestionCard';
-import { EditableSectionHeader } from '@/components/forms/SortableSectionHeader';
+import { SortableSectionHeader } from '@/components/forms/SortableSectionHeader';
 
 const questionTypes = [
   { value: 'info', label: '💡 Bloco informativo (sem resposta)' },
@@ -132,6 +132,8 @@ export default function AnamneseFormBuilder() {
     is_required: true,
   });
   const [localQuestions, setLocalQuestions] = useState<AnamneseQuestion[]>([]);
+  // Sections list persisted locally (includes empty sections not yet backed by questions)
+  const [sectionOrder, setSectionOrder] = useState<string[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -158,6 +160,20 @@ export default function AnamneseFormBuilder() {
   useEffect(() => {
     if (formData?.questions) {
       setLocalQuestions(formData.questions);
+      const sorted = [...formData.questions].sort((a, b) => a.order_index - b.order_index);
+      const derived = Array.from(new Set(sorted.map(q => q.section)));
+      setSectionOrder(prev => {
+        // Keep any locally-created empty sections + all derived sections, in previous known order
+        const kept = prev.filter(s => derived.includes(s) || !derived.length ? true : !derived.includes(s) ? true : true);
+        const missing = derived.filter(s => !prev.includes(s));
+        // Merge preserving previous relative order, appending new derived sections at the end
+        const merged: string[] = [];
+        for (const s of prev) if (derived.includes(s) || kept.includes(s)) merged.push(s);
+        for (const s of missing) if (!merged.includes(s)) merged.push(s);
+        // Ensure all derived sections are present
+        for (const s of derived) if (!merged.includes(s)) merged.push(s);
+        return merged;
+      });
     }
   }, [formData?.questions]);
 
@@ -413,37 +429,65 @@ export default function AnamneseFormBuilder() {
 
     if (!over || active.id === over.id) return;
 
-    // Find items in the flat list ordered by order_index
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    // ---- Section reorder ----
+    if (activeId.startsWith('section:') && overId.startsWith('section:')) {
+      const oldName = activeId.slice('section:'.length);
+      const newName = overId.slice('section:'.length);
+      const oldIdx = sectionOrder.indexOf(oldName);
+      const newIdx = sectionOrder.indexOf(newName);
+      if (oldIdx === -1 || newIdx === -1) return;
+      const reordered = arrayMove(sectionOrder, oldIdx, newIdx);
+      setSectionOrder(reordered);
+
+      // Rewrite order_index for all questions grouped by new section order
+      const sorted = [...localQuestions].sort((a, b) => a.order_index - b.order_index);
+      let idx = 0;
+      const updates: { id: string; order_index: number }[] = [];
+      const rebuilt: AnamneseQuestion[] = [];
+      for (const sec of reordered) {
+        for (const q of sorted.filter(q => q.section === sec)) {
+          updates.push({ id: q.id, order_index: idx });
+          rebuilt.push({ ...q, order_index: idx });
+          idx++;
+        }
+      }
+      setLocalQuestions(rebuilt);
+      try {
+        if (updates.length) {
+          await reorderQuestions.mutateAsync({ form_id: formId!, updates });
+        }
+        toast({ title: 'Seções reordenadas!' });
+      } catch (error) {
+        setLocalQuestions(formData?.questions || []);
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível reordenar as seções.',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    // ---- Question reorder ----
     const sortedQuestions = [...localQuestions].sort((a, b) => a.order_index - b.order_index);
-    const oldIndex = sortedQuestions.findIndex(q => q.id === active.id);
-    const newIndex = sortedQuestions.findIndex(q => q.id === over.id);
+    const oldIndex = sortedQuestions.findIndex(q => q.id === activeId);
+    const newIndex = sortedQuestions.findIndex(q => q.id === overId);
 
     if (oldIndex === -1 || newIndex === -1) return;
 
     const newQuestions = arrayMove(sortedQuestions, oldIndex, newIndex);
-    
-    // Update order_index for all questions
-    const updatedQuestions = newQuestions.map((q, index) => ({
-      ...q,
-      order_index: index,
-    }));
-    
+    const updatedQuestions = newQuestions.map((q, index) => ({ ...q, order_index: index }));
     setLocalQuestions(updatedQuestions);
 
-    // Update order_index for all affected questions
-    const updates = updatedQuestions.map((q) => ({
-      id: q.id,
-      order_index: q.order_index,
-    }));
+    const updates = updatedQuestions.map((q) => ({ id: q.id, order_index: q.order_index }));
 
     try {
-      await reorderQuestions.mutateAsync({
-        form_id: formId!,
-        updates,
-      });
+      await reorderQuestions.mutateAsync({ form_id: formId!, updates });
       toast({ title: 'Ordem atualizada!' });
     } catch (error) {
-      // Revert on error
       setLocalQuestions(formData?.questions || []);
       toast({
         title: 'Erro',
@@ -454,6 +498,8 @@ export default function AnamneseFormBuilder() {
   };
 
   const handleRenameSection = async (oldSection: string, newSection: string) => {
+    // Update local section order immediately (preserves position)
+    setSectionOrder(prev => prev.map(s => (s === oldSection ? newSection : s)));
     try {
       await renameSection.mutateAsync({
         form_id: formId!,
@@ -462,6 +508,8 @@ export default function AnamneseFormBuilder() {
       });
       toast({ title: 'Seção renomeada!' });
     } catch (error) {
+      // Revert
+      setSectionOrder(prev => prev.map(s => (s === newSection ? oldSection : s)));
       toast({
         title: 'Erro',
         description: 'Não foi possível renomear a seção.',
@@ -469,6 +517,94 @@ export default function AnamneseFormBuilder() {
       });
     }
   };
+
+  const uniqueSectionName = (base: string) => {
+    if (!sectionOrder.includes(base)) return base;
+    let i = 2;
+    while (sectionOrder.includes(`${base} ${i}`)) i++;
+    return `${base} ${i}`;
+  };
+
+  const handleAddSection = () => {
+    const name = uniqueSectionName('Nova Seção');
+    setSectionOrder(prev => [...prev, name]);
+    toast({ title: 'Seção criada!', description: 'Adicione perguntas ou renomeie a seção.' });
+  };
+
+  const handleDuplicateSection = async (section: string) => {
+    const newName = uniqueSectionName(`${section} (cópia)`);
+    const sectionQs = [...localQuestions]
+      .filter(q => q.section === section)
+      .sort((a, b) => a.order_index - b.order_index);
+
+    // Insert empty section right after the source in local order
+    setSectionOrder(prev => {
+      const idx = prev.indexOf(section);
+      const next = [...prev];
+      next.splice(idx + 1, 0, newName);
+      return next;
+    });
+
+    if (sectionQs.length === 0) {
+      toast({ title: 'Seção duplicada (vazia).' });
+      return;
+    }
+
+    try {
+      const baseIndex = (formData?.questions?.length || 0);
+      for (let i = 0; i < sectionQs.length; i++) {
+        const q = sectionQs[i];
+        await addQuestion.mutateAsync({
+          form_id: formId!,
+          section: newName,
+          question_text: q.question_text,
+          question_type: q.question_type,
+          options: q.options ?? undefined,
+          scale_min: q.scale_min,
+          scale_max: q.scale_max,
+          is_required: q.is_required,
+          has_comment_field: q.has_comment_field,
+          comment_field_label: q.comment_field_label,
+          comment_field_required: q.comment_field_required,
+          order_index: baseIndex + i,
+          config: q.config ?? null,
+        });
+      }
+      toast({ title: 'Seção duplicada!' });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível duplicar a seção.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteSection = async (section: string) => {
+    const sectionQs = localQuestions.filter(q => q.section === section);
+
+    // Empty section — just remove from local state
+    if (sectionQs.length === 0) {
+      setSectionOrder(prev => prev.filter(s => s !== section));
+      toast({ title: 'Seção removida.' });
+      return;
+    }
+
+    try {
+      for (const q of sectionQs) {
+        await deleteQuestion.mutateAsync({ id: q.id, form_id: formId! });
+      }
+      setSectionOrder(prev => prev.filter(s => s !== section));
+      toast({ title: 'Seção excluída!' });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir a seção.',
+        variant: 'destructive',
+      });
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -494,7 +630,12 @@ export default function AnamneseFormBuilder() {
   }
 
   const sortedQuestions = [...localQuestions].sort((a, b) => a.order_index - b.order_index);
-  const sections = [...new Set(sortedQuestions.map(q => q.section))];
+  const derivedSections = [...new Set(sortedQuestions.map(q => q.section))];
+  // Union: preserve local order; append any derived sections missing from local order
+  const sections = [
+    ...sectionOrder.filter(s => derivedSections.includes(s) || !derivedSections.length ? true : !derivedSections.includes(s) ? true : true),
+    ...derivedSections.filter(s => !sectionOrder.includes(s)),
+  ];
 
   return (
     <Layout>
@@ -533,6 +674,10 @@ export default function AnamneseFormBuilder() {
               <Library className="h-4 w-4" />
               Importar do Banco
             </Button>
+            <Button variant="outline" size="sm" onClick={handleAddSection} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nova Seção
+            </Button>
             <Button size="sm" onClick={() => handleOpenQuestionDialog()} className="gap-2">
               <Plus className="h-4 w-4" />
               Nova Pergunta
@@ -541,14 +686,20 @@ export default function AnamneseFormBuilder() {
         </div>
 
         {/* Questions */}
-        {sortedQuestions.length === 0 ? (
+        {sortedQuestions.length === 0 && sections.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <p className="text-muted-foreground mb-4">Nenhuma pergunta adicionada ainda.</p>
-              <Button onClick={() => handleOpenQuestionDialog()} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Adicionar Primeira Pergunta
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleAddSection} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Criar Seção
+                </Button>
+                <Button onClick={() => handleOpenQuestionDialog()} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Adicionar Primeira Pergunta
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -558,33 +709,64 @@ export default function AnamneseFormBuilder() {
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={sortedQuestions.map(q => q.id)}
+              items={sections.map(s => `section:${s}`)}
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-6">
-                {sections.map(section => {
+                {sections.map((section, sIdx) => {
                   const sectionQuestions = sortedQuestions.filter(q => q.section === section);
 
                   return (
-                    <div key={section} className="group">
-                      <EditableSectionHeader
+                    <div key={section}>
+                      <SortableSectionHeader
+                        id={`section:${section}`}
                         section={section}
+                        order={sIdx + 1}
+                        questionCount={sectionQuestions.length}
                         onRename={handleRenameSection}
+                        onDuplicate={() => handleDuplicateSection(section)}
+                        onDelete={() => handleDeleteSection(section)}
                       />
-                      <div className="space-y-3">
-                        {sectionQuestions.map((question, index) => (
-                          <SortableQuestionCard
-                            key={question.id}
-                            id={question.id}
-                            question={question}
-                            index={index}
-                            typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
-                            onEdit={() => handleOpenQuestionDialog(question)}
-                            onDelete={() => handleDeleteQuestion(question.id)}
-                            onDuplicate={() => handleDuplicateQuestion(question)}
-                          />
-                        ))}
-                      </div>
+                      <SortableContext
+                        items={sectionQuestions.map(q => q.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-3">
+                          {sectionQuestions.length === 0 ? (
+                            <div className="rounded-md border border-dashed border-muted-foreground/30 p-4 text-center">
+                              <p className="text-sm text-muted-foreground mb-2">
+                                Seção vazia — adicione perguntas selecionando "{section}" ao criar uma nova pergunta.
+                              </p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  resetQuestionData();
+                                  setQuestionData(prev => ({ ...prev, section }));
+                                  setShowQuestionDialog(true);
+                                }}
+                                className="gap-2"
+                              >
+                                <Plus className="h-4 w-4" />
+                                Adicionar pergunta aqui
+                              </Button>
+                            </div>
+                          ) : (
+                            sectionQuestions.map((question, index) => (
+                              <SortableQuestionCard
+                                key={question.id}
+                                id={question.id}
+                                question={question}
+                                index={index}
+                                typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
+                                onEdit={() => handleOpenQuestionDialog(question)}
+                                onDelete={() => handleDeleteQuestion(question.id)}
+                                onDuplicate={() => handleDuplicateQuestion(question)}
+                              />
+                            ))
+                          )}
+                        </div>
+                      </SortableContext>
                     </div>
                   );
                 })}
