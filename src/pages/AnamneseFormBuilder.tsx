@@ -980,6 +980,24 @@ export default function AnamneseFormBuilder() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label>Subseção (opcional)</Label>
+              <Input
+                value={questionData.subsection}
+                onChange={(e) => setQuestionData({ ...questionData, subsection: e.target.value })}
+                placeholder="Ex: Peso, Suplementação, Rotina de sono..."
+                list="subsection-suggestions"
+              />
+              <datalist id="subsection-suggestions">
+                {(subsectionOrder[questionData.section] || []).map(s => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+              <p className="text-xs text-muted-foreground">
+                Se preenchida, a pergunta ficará agrupada como {(sectionOrder.indexOf(questionData.section) + 1) || '?'}.{'X'} dentro da seção.
+              </p>
+            </div>
+
             {/* Options for select/multiselect */}
             {['select', 'multiselect'].includes(questionData.question_type) && (
               <div className="space-y-2">
