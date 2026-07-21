@@ -194,6 +194,8 @@ export default function AnamneseFormBuilder() {
         options: question.options || [],
         scale_min: question.scale_min || 1,
         scale_max: question.scale_max || 10,
+        info_body: question.config?.body || '',
+        info_button_label: question.config?.buttonLabel || 'Vamos lá',
       });
     } else {
       resetQuestionData();
