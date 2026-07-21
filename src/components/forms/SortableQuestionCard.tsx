@@ -32,6 +32,7 @@ interface SortableQuestionCardProps {
   typeLabel: string;
   onEdit: () => void;
   onDelete: () => void;
+  onDuplicate?: () => void;
   showIndex?: boolean;
 }
 
