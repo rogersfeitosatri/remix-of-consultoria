@@ -3,7 +3,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { GripVertical, Settings, Trash2, Edit } from 'lucide-react';
+import { GripVertical, Settings, Trash2, Edit, Copy } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
