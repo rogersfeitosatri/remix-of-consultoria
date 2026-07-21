@@ -160,6 +160,15 @@ export default function AnamneseFormBuilder() {
   useEffect(() => {
     if (formData?.questions) {
       setLocalQuestions(formData.questions);
+      // Seed section order from questions if we don't have one yet or new sections appeared
+      const sorted = [...formData.questions].sort((a, b) => a.order_index - b.order_index);
+      const derived = Array.from(new Set(sorted.map(q => q.section)));
+      setSectionOrder(prev => {
+        // Keep previous order, append any new sections at the end
+        const merged = [...prev.filter(s => derived.includes(s) || !formData.questions.some(q => q.section === s) ? true : true)];
+        const missing = derived.filter(s => !merged.includes(s));
+        return [...merged, ...missing];
+      });
     }
   }, [formData?.questions]);
 
