@@ -611,6 +611,14 @@ export default function PublicAnamneseForm() {
     }
     const qType = resolveQuestionType(question);
     switch (qType) {
+      case 'info': {
+        const body = (question as any).config?.body || '';
+        return (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+            {body || 'Leia as orientações e clique em Vamos lá para continuar.'}
+          </div>
+        );
+      }
       case 'short_text':
       case 'text':
         return (
