@@ -25,7 +25,8 @@ import {
   History,
   Target,
   Calendar,
-  Phone
+  Phone,
+  Download
 
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -34,6 +35,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { EvolutionAnalysisTab } from '@/components/checkin/EvolutionAnalysisTab';
+import { CheckinExportDialog } from '@/components/checkin/CheckinExportDialog';
 import { CheckinReviewPdfButton } from '@/components/checkin/CheckinReviewPdfButton';
 
 interface CheckinResponse {
@@ -93,6 +95,7 @@ export default function CheckinReview() {
   const [editedFeedback, setEditedFeedback] = useState('');
   const [feedbackInitialized, setFeedbackInitialized] = useState(false);
   const [activeTab, setActiveTab] = useState('responses');
+  const [exportOpen, setExportOpen] = useState(false);
   const [showTargetRaceForm, setShowTargetRaceForm] = useState(false);
   const [newTargetRace, setNewTargetRace] = useState('');
   const [newTargetDeadline, setNewTargetDeadline] = useState('');
@@ -693,7 +696,19 @@ export default function CheckinReview() {
             <h1 className="text-xl font-bold">Revisão de Check-in</h1>
             {checkinResponse && (
               <p className="text-sm text-muted-foreground">
-                {checkinResponse.clients?.name} - {format(parseISO(checkinResponse.submitted_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                {checkinResponse.client_id ? (
+                  <button
+                    type="button"
+                    onClick={() => setExportOpen(true)}
+                    className="font-medium text-primary underline decoration-dotted underline-offset-2 hover:opacity-80"
+                    title="Baixar check-ins e gráficos de evolução em PDF"
+                  >
+                    {checkinResponse.clients?.name}
+                  </button>
+                ) : (
+                  checkinResponse.clients?.name
+                )}
+                {' - '}{format(parseISO(checkinResponse.submitted_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
               </p>
             )}
           </div>
@@ -720,6 +735,18 @@ export default function CheckinReview() {
               >
                 <Brain className="h-4 w-4" />
                 <span className="hidden sm:inline">Ajustar plano com IA</span>
+              </Button>
+            )}
+            {checkinResponse?.client_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setExportOpen(true)}
+                className="gap-2"
+                title="Baixar check-ins selecionados e gráficos de evolução em PDF"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Baixar histórico</span>
               </Button>
             )}
             <CheckinReviewPdfButton
@@ -1437,6 +1464,15 @@ export default function CheckinReview() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {checkinResponse?.client_id && (
+        <CheckinExportDialog
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          clientId={checkinResponse.client_id}
+          clientName={checkinResponse.clients?.name || 'Atleta'}
+        />
+      )}
     </Layout>
   );
 }
