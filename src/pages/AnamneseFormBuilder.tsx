@@ -68,6 +68,7 @@ import { SortableQuestionCard } from '@/components/forms/SortableQuestionCard';
 import { EditableSectionHeader } from '@/components/forms/SortableSectionHeader';
 
 const questionTypes = [
+  { value: 'info', label: '💡 Bloco informativo (sem resposta)' },
   { value: 'text', label: 'Texto Curto' },
   { value: 'textarea', label: 'Texto Longo' },
   { value: 'number', label: 'Número' },
