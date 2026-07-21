@@ -183,6 +183,7 @@ export default function AnamneseFormBuilder() {
       question_text: '',
       question_type: 'text',
       section: 'Geral',
+      subsection: '',
       is_required: false,
       has_comment_field: false,
       comment_field_required: false,
