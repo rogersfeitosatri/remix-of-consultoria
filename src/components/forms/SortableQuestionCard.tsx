@@ -43,6 +43,7 @@ export function SortableQuestionCard({
   typeLabel,
   onEdit,
   onDelete,
+  onDuplicate,
   showIndex = false,
 }: SortableQuestionCardProps) {
   const {
