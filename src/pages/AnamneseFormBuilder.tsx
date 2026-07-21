@@ -66,6 +66,7 @@ import {
 } from '@dnd-kit/sortable';
 import { SortableQuestionCard } from '@/components/forms/SortableQuestionCard';
 import { SortableSectionHeader } from '@/components/forms/SortableSectionHeader';
+import { SubsectionHeader } from '@/components/forms/SubsectionHeader';
 
 const questionTypes = [
   { value: 'info', label: '💡 Bloco informativo (sem resposta)' },
