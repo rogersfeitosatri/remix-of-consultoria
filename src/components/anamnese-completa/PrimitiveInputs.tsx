@@ -14,6 +14,8 @@ import type { SubField } from '@/lib/anamneseCompletaQuestions';
 import type { SubFieldProps } from './types';
 import { StructuredListField } from './StructuredListField';
 import { FileUploadField } from './FileUploadField';
+import { PhoneDddInput } from '@/components/ui/phone-ddd-input';
+import { isPhoneLike } from '@/lib/anamneseValidation';
 
 // ─────────── Chips / tags ───────────
 export function ChipsInput({ value, onChange, disabled, placeholder }: {
@@ -82,6 +84,10 @@ export function SubFieldInput({ field, value, onChange, selfScope, answersByKey,
   if (!isSubFieldVisible(field, selfScope, answersByKey)) return null;
 
   const control = (() => {
+    // WhatsApp/telefone: DDI + DDD + número.
+    if ((field.type as string) === 'phone' || isPhoneLike(field.label, field.type as string, field.key)) {
+      return <PhoneDddInput value={typeof value === 'string' ? value : ''} onChange={onChange} disabled={disabled} />;
+    }
     switch (field.type) {
       case 'textarea':
         return <Textarea rows={3} value={value ?? ''} disabled={disabled} placeholder={field.placeholder} onChange={(e) => onChange(e.target.value)} />;

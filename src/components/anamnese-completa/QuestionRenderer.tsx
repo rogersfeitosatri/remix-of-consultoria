@@ -15,10 +15,14 @@ import { SymptomGridField } from './SymptomGridField';
 import { FrequencyGridField } from './FrequencyGridField';
 import { TrainingWeekDetailedField } from './TrainingWeekDetailedField';
 import { FileUploadField } from './FileUploadField';
+import { PhoneDddInput } from '@/components/ui/phone-ddd-input';
+import { isPhoneLike } from '@/lib/anamneseValidation';
 import type { FieldProps } from './types';
 
 export interface QuestionLike {
   question_type: string;
+  question_text?: string;
+  question_key?: string | null;
   options?: string[] | null;
   scale_min?: number | null;
   scale_max?: number | null;
@@ -40,6 +44,11 @@ export function QuestionRenderer({
     scaleMin: question.scale_min ?? undefined, scaleMax: question.scale_max ?? undefined,
     answersByKey, disabled, clientId,
   };
+
+  // WhatsApp/telefone: DDI + DDD + número (detecta por tipo ou pelo texto/chave).
+  if (question.question_type === 'phone' || isPhoneLike(question.question_text, question.question_type, question.question_key)) {
+    return <PhoneDddInput value={typeof value === 'string' ? value : ''} onChange={onChange} disabled={disabled} />;
+  }
 
   switch (question.question_type) {
     case 'field_group': return <FieldGroupField {...fp} />;
