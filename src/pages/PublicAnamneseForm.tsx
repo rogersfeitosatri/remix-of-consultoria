@@ -1036,7 +1036,11 @@ export default function PublicAnamneseForm() {
               <Button type="button" variant="outline" onClick={handleWizPrevious} className="flex-1">Anterior</Button>
             )}
             {!isLastWizStep ? (
-              <Button type="button" onClick={handleWizNext} className="flex-1">Próximo</Button>
+              <Button type="button" onClick={handleWizNext} className="flex-1">
+                {currentWizStep?.kind === 'question' && currentWizStep.question.question_type === 'info'
+                  ? ((currentWizStep.question as any).config?.buttonLabel || 'Vamos lá')
+                  : 'Próximo'}
+              </Button>
             ) : (
               <Button type="button" onClick={(e) => handleSubmit(e as any)} disabled={submitting || !termsAccepted} className="flex-1 gap-2">
                 {submitting ? (
