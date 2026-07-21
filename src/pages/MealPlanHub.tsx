@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { AttachedPlanPanel } from '@/components/admin/AttachedPlanPanel';
 
 type DraftPreview = { hasDraft: boolean; days: number; chars: number } | null;
 
@@ -233,6 +234,12 @@ export default function MealPlanHub() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Anexar plano (texto livre) — histórico, comparação e envio ao Zona Nutri */}
+        <div>
+          <h2 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Anexar plano</h2>
+          {clientId && <AttachedPlanPanel clientId={clientId} />}
         </div>
       </div>
     </Layout>
