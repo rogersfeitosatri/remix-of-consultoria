@@ -1,0 +1,1 @@
+ALTER TABLE public.anamnese_questions ADD COLUMN IF NOT EXISTS subsection text;
