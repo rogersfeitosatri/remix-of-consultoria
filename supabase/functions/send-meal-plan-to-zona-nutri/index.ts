@@ -228,17 +228,36 @@ Deno.serve(async (req) => {
     const variations = base.day_variations || {};
     const hasVariations = Object.keys(variations).length > 0;
 
+    // Uma refeição está "vazia" quando não tem food_groups nem options.foods.
+    // Isso ocorre quando o dia foi salvo só com os nomes das refeições (ex.:
+    // "CAFÉ DA MANHÃ") sem alimentos por baixo — nesse caso o dia deve herdar
+    // do plano base ao invés de ir vazio ao Zona Nutri.
+    const isMealEmpty = (m: any) => {
+      if (!m || typeof m !== "object") return true;
+      if (Array.isArray(m.food_groups) && m.food_groups.length) return false;
+      const foods = m.options?.[0]?.foods || m.foods;
+      if (Array.isArray(foods) && foods.length) return false;
+      const optGroups = m.options?.[0]?.food_groups;
+      if (Array.isArray(optGroups) && optGroups.length) return false;
+      return true;
+    };
+    const isDayEffectivelyEmpty = (meals: any) => {
+      if (!Array.isArray(meals) || meals.length === 0) return true;
+      return meals.every((m: any) => typeof m === "string" || isMealEmpty(m));
+    };
+
     const days = hasVariations
       ? WEEKDAYS.map((wd) => {
           const v = variations[wd.key];
-          // V3 editor grava array de refeições direto; legado grava { meals, daily_totals }.
-          const vMeals = Array.isArray(v) ? v : v?.meals;
+          const vMealsRaw = Array.isArray(v) ? v : v?.meals;
           const vTotals = Array.isArray(v) ? null : (v?.daily_totals ?? null);
+          const useBase = isDayEffectivelyEmpty(vMealsRaw);
+          const finalMeals = useBase ? base.meals : vMealsRaw;
           return {
             weekday: wd.weekday,
             label: wd.label,
-            meals: mapMeals(vMeals ?? base.meals),
-            daily_totals: vTotals ?? base.daily_totals ?? null,
+            meals: mapMeals(finalMeals),
+            daily_totals: (useBase ? null : vTotals) ?? base.daily_totals ?? null,
           };
         })
       : [{ weekday: "all", label: "Todos os dias", meals: mapMeals(base.meals), daily_totals: base.daily_totals ?? null }];
