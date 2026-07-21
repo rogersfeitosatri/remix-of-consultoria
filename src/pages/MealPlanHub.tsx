@@ -94,6 +94,16 @@ export default function MealPlanHub() {
     return [];
   }, [rawObj, analysisRow]);
 
+  // Planos salvos pela área "Anexar plano" (texto livre) — histórico separado.
+  const attachedPlans = useMemo(() => {
+    const list = Array.isArray(rawObj?.attached_plans) ? rawObj.attached_plans : [];
+    return [...list].sort((a: any, b: any) => String(b?.date || '').localeCompare(String(a?.date || '')));
+  }, [rawObj]);
+
+  // Pedido para abrir um plano anexado no painel "Anexar plano".
+  const [openAttached, setOpenAttached] = useState<{ id: string; nonce: number } | undefined>(undefined);
+  const openAttachedPlan = (id: string) => setOpenAttached({ id, nonce: Date.now() });
+
   const draft = useMemo(() => readDraft(clientId), [clientId, analysisRow]);
 
   // Persiste o rawObj (coluna TEXT → JSON string) e atualiza a UI.
@@ -249,11 +259,11 @@ export default function MealPlanHub() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <History className="h-4 w-4 text-muted-foreground" />
-                  Planos salvos ({savedPlans.length})
+                  Planos salvos ({savedPlans.length + attachedPlans.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                {savedPlans.length === 0 ? (
+              <CardContent className="space-y-4">
+                {savedPlans.length === 0 && attachedPlans.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <Utensils className="h-10 w-10 mx-auto mb-2 opacity-40" />
                     <p className="text-sm">Nenhum plano salvo ainda.</p>
@@ -261,8 +271,14 @@ export default function MealPlanHub() {
                       <PlusCircle className="h-4 w-4 mr-2" /> Criar primeiro plano
                     </Button>
                   </div>
-                ) : (
+                )}
+
+                {/* Grupo 1 — planos do Editor inteligente */}
+                {savedPlans.length > 0 && (
                   <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                      <Utensils className="h-3 w-3" /> Do editor inteligente
+                    </p>
                     {savedPlans.map((p) => {
                       const meals = countMeals(p.meal_plan);
                       const vars = variationCount(p.meal_plan);
@@ -299,7 +315,7 @@ export default function MealPlanHub() {
                           </div>
                           <div className="flex items-center gap-2 mt-2 pl-12">
                             <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" disabled={busyId === p.id} onClick={() => editPlan(p)}>
-                              {busyId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pencil className="h-3 w-3" />} Abrir / editar
+                              {busyId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pencil className="h-3 w-3" />} Abrir no editor
                             </Button>
                             <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" disabled={busyId === p.id} onClick={() => duplicate(p)}>
                               <Copy className="h-3 w-3" /> Duplicar para ajustar
@@ -310,6 +326,45 @@ export default function MealPlanHub() {
                     })}
                   </div>
                 )}
+
+                {/* Grupo 2 — planos da área "Anexar plano" (texto livre / MD) */}
+                {attachedPlans.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                      <FileEdit className="h-3 w-3" /> Do anexar plano (texto livre)
+                    </p>
+                    {attachedPlans.map((p: any) => (
+                      <div key={p.id} className="rounded-lg border p-3 hover:bg-accent/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                            <FileEdit className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-sm truncate">{p.label || 'Plano anexado'}</p>
+                              <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600">Texto livre</Badge>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground flex-wrap">
+                              {p.date && (
+                                <span className="flex items-center gap-1">
+                                  <CalendarClock className="h-3 w-3" />
+                                  {format(parseISO(p.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                </span>
+                              )}
+                              {p.totals?.meals > 0 && <span>· {p.totals.meals} refeição{p.totals.meals > 1 ? 'ões' : ''}</span>}
+                              {p.totals?.kcal > 0 && <span>· ~{p.totals.kcal} kcal</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2 pl-12">
+                          <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => openAttachedPlan(p.id)}>
+                            <Pencil className="h-3 w-3" /> Abrir no anexar plano
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -318,7 +373,7 @@ export default function MealPlanHub() {
         {/* Anexar plano (texto livre) — histórico, comparação e envio ao Zona Nutri */}
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Anexar plano</h2>
-          {clientId && <AttachedPlanPanel clientId={clientId} />}
+          {clientId && <AttachedPlanPanel clientId={clientId} openRequest={openAttached} />}
         </div>
       </div>
     </Layout>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -59,11 +59,15 @@ function Delta({ curr, prev, unit }: { curr: number; prev?: number; unit?: strin
 
 export function AttachedPlanPanel({
   clientId,
+  openRequest,
 }: {
   clientId: string;
   analysisRow?: any;
+  // Pedido externo (do hub) para abrir um plano anexado específico para edição.
+  openRequest?: { id: string; nonce: number };
 }) {
   const queryClient = useQueryClient();
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Histórico dos planos anexados vive em ai_analyses.raw_response.attached_plans[].
   const { data: history = [], refetch } = useQuery({
@@ -91,6 +95,24 @@ export function AttachedPlanPanel({
 
   const latest = history[0];
   const previous = history[1];
+
+  // Carrega um plano anexado nos campos para edição (reusa texto + orientações).
+  const loadPlan = (p: AttachedPlan, opts?: { scroll?: boolean; silent?: boolean }) => {
+    setText(p.text || '');
+    setOrientations(p.orientations || '');
+    setLabel(p.label || '');
+    setAnalysis({ summary: p.summary, totals: p.totals, per_day: p.per_day, meal_names: p.meal_names, orientations: p.orientations });
+    if (opts?.scroll) cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!opts?.silent) toast.info('Plano carregado para edição. "Salvar como novo" cria uma nova versão.');
+  };
+
+  // Atende o pedido do hub de abrir um plano anexado específico.
+  useEffect(() => {
+    if (!openRequest?.id) return;
+    const p = history.find((h) => h.id === openRequest.id);
+    if (p) loadPlan(p, { scroll: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest?.nonce, openRequest?.id, history]);
 
   const analyze = async () => {
     if (text.trim().length < 10) { toast.error('Cole o plano antes de analisar.'); return; }
@@ -174,6 +196,7 @@ export function AttachedPlanPanel({
       await persistAttached([entry, ...history]);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['meal-plan-hub-analysis', clientId] });
       toast.success(`Plano salvo (v${version}). Histórico atualizado.`);
       // Limpa o editor para o próximo — cada save é um novo plano.
       setText(''); setOrientations(''); setLabel(''); setAnalysis(null);
@@ -206,6 +229,7 @@ export function AttachedPlanPanel({
       }
       if (data?.error) throw new Error(data.error);
       queryClient.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['meal-plan-hub-analysis', clientId] });
       toast.success('Plano estruturado e enviado ao Zona Nutri! Ele distribuiu por dia da semana.');
     } catch (e: any) {
       toast.error(e.message || 'Falha ao enviar ao Zona Nutri.');
@@ -236,7 +260,7 @@ export function AttachedPlanPanel({
   const baseline = analysis ? latest : previous;
 
   return (
-    <Card className="border-primary/30">
+    <Card ref={cardRef} id="anexar-plano" className="border-primary/30 scroll-mt-4">
       <CardHeader className="py-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <Paperclip className="h-4 w-4 text-primary" /> Anexar plano (texto livre + orientações)
@@ -454,9 +478,9 @@ export function AttachedPlanPanel({
                     </div>
                     <Button
                       variant="link" size="sm" className="h-6 px-0 text-xs"
-                      onClick={() => { setText(p.text); setOrientations(p.orientations); setAnalysis({ summary: p.summary, totals: p.totals, per_day: p.per_day, meal_names: p.meal_names, orientations: p.orientations }); toast.info('Plano carregado no editor. Salve para criar uma nova versão.'); }}
+                      onClick={() => loadPlan(p, { scroll: true })}
                     >
-                      Carregar no editor
+                      Carregar para edição
                     </Button>
                   </div>
                 );
