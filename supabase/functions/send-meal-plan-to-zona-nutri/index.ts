@@ -30,6 +30,23 @@ function normalizeEmail(email: unknown) {
   return String(email ?? "").trim().toLowerCase();
 }
 
+// Marca a entrada ativa de saved_plans[] como enviada ao ZN e limpa o destaque
+// das demais (apenas UMA fica destacada por vez). Espelha o lib planHistory.
+function markSentToZonaNutri(plan: any): any {
+  const obj = { ...(plan || {}) };
+  const plans = Array.isArray(obj.saved_plans) ? obj.saved_plans : [];
+  const now = new Date().toISOString();
+  obj.zona_nutri_sent_at = now;
+  if (plans.length) {
+    const targetId = obj.active_plan_id || plans[plans.length - 1]?.id;
+    obj.saved_plans = plans.map((p: any) => p.id === targetId
+      ? { ...p, sent_to_zona_nutri: true, sent_at: now }
+      : { ...p, sent_to_zona_nutri: false });
+    obj.zona_nutri_sent_plan_id = targetId;
+  }
+  return obj;
+}
+
 function onlyDigits(value: unknown) {
   const digits = String(value ?? "").replace(/\D/g, "");
   return digits || null;
@@ -294,7 +311,7 @@ Deno.serve(async (req) => {
           ({ text, body: responseBody } = await readResponse(res));
           if (res.ok) {
             try {
-              const updated = { ...plan, zona_nutri_sent_at: new Date().toISOString() };
+              const updated = markSentToZonaNutri(plan);
               await supabase.from("ai_analyses").update({ raw_response: JSON.stringify(updated) }).eq("id", analysis.id);
             } catch { /* não bloqueia */ }
             return json({ success: true, sent: true, linked: true, response: responseBody });
@@ -310,9 +327,9 @@ Deno.serve(async (req) => {
       return json({ error: `Zona Nutri respondeu ${res.status}: ${text.slice(0, 500)}`, fallback: res.status >= 500 }, res.status >= 500 ? 200 : 502);
     }
 
-    // Marca envio no plano (para o admin ver que foi enviado)
+    // Marca envio no plano (destaque do plano enviado no hub do atleta).
     try {
-      const updated = { ...plan, zona_nutri_sent_at: new Date().toISOString() };
+      const updated = markSentToZonaNutri(plan);
       await supabase.from("ai_analyses").update({ raw_response: JSON.stringify(updated) }).eq("id", analysis.id);
     } catch { /* não bloqueia */ }
 

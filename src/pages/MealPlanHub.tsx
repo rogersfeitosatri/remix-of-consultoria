@@ -5,21 +5,27 @@
 // - Histórico do plano alimentar: rascunho local (não salvo) e planos salvos
 //   com data. O botão "Voltar" nas telas filhas retorna aqui.
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import {
   ArrowLeft, User, ClipboardCheck, MessageCircle, TrendingUp, FlaskConical,
   FileEdit, Utensils, Pencil, CalendarClock, ChevronRight, PlusCircle, History,
+  Copy, Send, Loader2,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AttachedPlanPanel } from '@/components/admin/AttachedPlanPanel';
+import {
+  parseRaw, readSavedPlans, countMeals, variationCount, planTotals,
+  duplicatePlan, setActivePlan, genPlanId, type SavedPlan,
+} from '@/lib/planHistory';
 
 type DraftPreview = { hasDraft: boolean; days: number; chars: number } | null;
 
@@ -50,40 +56,103 @@ export default function MealPlanHub() {
     },
   });
 
-  const { data: analyses = [] } = useQuery({
-    queryKey: ['meal-plan-hub-analyses', clientId],
+  const qc = useQueryClient();
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const { data: analysisRow } = useQuery({
+    queryKey: ['meal-plan-hub-analysis', clientId],
     enabled: !!clientId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ai_analyses')
         .select('id, updated_at, created_at, raw_response')
         .eq('client_id', clientId!)
-        .order('updated_at', { ascending: false });
+        .maybeSingle();
       if (error) throw error;
-      return data ?? [];
+      return data;
     },
   });
 
-  const savedPlans = useMemo(() => {
-    return (analyses as any[])
-      .map((r) => {
-        const meals = r?.raw_response?.meal_plan?.meals || r?.raw_response?.meals || [];
-        const dayVars = r?.raw_response?.meal_plan?.day_variations || {};
-        return {
-          id: r.id,
-          updated_at: r.updated_at,
-          created_at: r.created_at,
-          mealCount: Array.isArray(meals) ? meals.length : 0,
-          variationCount: Object.keys(dayVars).length,
-          hasPending: !!r?.raw_response?.pending_update,
-        };
-      })
-      .filter((r) => r.mealCount > 0);
-  }, [analyses]);
+  const rawObj = useMemo(() => parseRaw(analysisRow?.raw_response), [analysisRow]);
 
-  const draft = useMemo(() => readDraft(clientId), [clientId, analyses]);
+  // Histórico de planos salvos (fallback: sintetiza uma entrada do meal_plan
+  // canônico quando ainda não há histórico — planos salvos antes desta versão).
+  const savedPlans: SavedPlan[] = useMemo(() => {
+    const list = readSavedPlans(rawObj);
+    if (list.length) return list;
+    const mp = rawObj?.meal_plan;
+    if (mp && countMeals(mp) > 0) {
+      return [{
+        id: rawObj.active_plan_id || 'legacy',
+        label: 'Plano atual',
+        savedAt: analysisRow?.updated_at || new Date().toISOString(),
+        meal_plan: mp,
+        sent_to_zona_nutri: !!rawObj?.zona_nutri_sent_at,
+        sent_at: rawObj?.zona_nutri_sent_at || null,
+      }];
+    }
+    return [];
+  }, [rawObj, analysisRow]);
+
+  const draft = useMemo(() => readDraft(clientId), [clientId, analysisRow]);
+
+  // Persiste o rawObj (coluna TEXT → JSON string) e atualiza a UI.
+  const persistRaw = async (nextRaw: any) => {
+    if (analysisRow?.id) {
+      const { error } = await supabase.from('ai_analyses')
+        .update({ raw_response: JSON.stringify(nextRaw), updated_at: new Date().toISOString() })
+        .eq('id', analysisRow.id);
+      if (error) throw error;
+    } else {
+      const { error } = await (supabase as any).from('ai_analyses')
+        .insert({ client_id: clientId, raw_response: JSON.stringify(nextRaw) });
+      if (error) throw error;
+    }
+    await qc.invalidateQueries({ queryKey: ['meal-plan-hub-analysis', clientId] });
+    qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
+    qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
+  };
 
   const openEditor = () => navigate(`/meal-plans/${clientId}/editor`);
+
+  // Garante que saved_plans exista (materializa o histórico legado) e retorna
+  // { raw, id } com o id real da entrada equivalente a `sp`.
+  const ensureMaterialized = (sp: SavedPlan): { raw: any; id: string } => {
+    if (Array.isArray(rawObj?.saved_plans) && rawObj.saved_plans.length) {
+      return { raw: rawObj, id: sp.id };
+    }
+    const id = sp.id && sp.id !== 'legacy' ? sp.id : genPlanId();
+    const raw = { ...rawObj, saved_plans: [{ ...sp, id }], active_plan_id: id };
+    return { raw, id };
+  };
+
+  // Abre um plano salvo para edição (torna-o o plano ativo do editor).
+  const editPlan = async (sp: SavedPlan) => {
+    setBusyId(sp.id);
+    try {
+      const { raw, id } = ensureMaterialized(sp);
+      const next = setActivePlan(raw, id) ?? raw;
+      await persistRaw(next);
+      navigate(`/meal-plans/${clientId}/editor`);
+    } catch (e: any) {
+      toast.error(e.message || 'Não foi possível abrir o plano.');
+    } finally { setBusyId(null); }
+  };
+
+  // Duplica um plano salvo (nova cópia editável, sem envio) e abre no editor.
+  const duplicate = async (sp: SavedPlan) => {
+    setBusyId(sp.id);
+    try {
+      const { raw, id } = ensureMaterialized(sp);
+      const dup = duplicatePlan(raw, id);
+      if (!dup) { toast.error('Não foi possível duplicar.'); return; }
+      await persistRaw(dup.raw);
+      toast.success('Plano duplicado. Abrindo cópia para edição.');
+      navigate(`/meal-plans/${clientId}/editor`);
+    } catch (e: any) {
+      toast.error(e.message || 'Não foi possível duplicar o plano.');
+    } finally { setBusyId(null); }
+  };
   const openClientTab = (tab?: string) => {
     const params = new URLSearchParams();
     params.set('from', 'meal-plan-hub');
@@ -194,41 +263,51 @@ export default function MealPlanHub() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {savedPlans.map((p, i) => (
-                      <button
-                        key={p.id}
-                        onClick={openEditor}
-                        className="w-full flex items-center gap-3 rounded-lg border p-3 text-left hover:bg-accent/50 transition-colors"
-                      >
-                        <div className="h-9 w-9 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-                          <Utensils className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium text-sm">
-                              {i === 0 ? 'Plano atual' : `Plano ${savedPlans.length - i}`}
-                            </p>
-                            {i === 0 && <Badge variant="secondary" className="text-[10px]">Ativo</Badge>}
-                            {p.hasPending && (
-                              <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600">
-                                Proposta pendente
-                              </Badge>
-                            )}
+                    {savedPlans.map((p) => {
+                      const meals = countMeals(p.meal_plan);
+                      const vars = variationCount(p.meal_plan);
+                      const t = planTotals(p.meal_plan);
+                      const sent = !!p.sent_to_zona_nutri;
+                      return (
+                        <div
+                          key={p.id}
+                          className={`rounded-lg border p-3 transition-colors ${sent ? 'border-emerald-500/60 bg-emerald-500/5 ring-1 ring-emerald-500/30' : 'hover:bg-accent/50'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${sent ? 'bg-emerald-500/20 text-emerald-600' : 'bg-muted text-muted-foreground'}`}>
+                              {sent ? <Send className="h-4 w-4" /> : <Utensils className="h-4 w-4" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium text-sm truncate">{p.label}</p>
+                                {sent && (
+                                  <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">
+                                    Enviado ao Zona Nutri
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground flex-wrap">
+                                <span className="flex items-center gap-1">
+                                  <CalendarClock className="h-3 w-3" />
+                                  {format(parseISO(p.savedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                </span>
+                                {meals > 0 && <span>· {meals} refeição{meals > 1 ? 'ões' : ''}</span>}
+                                {vars > 0 && <span>· {vars} variação{vars > 1 ? 'ões' : ''} de dia</span>}
+                                {t.kcal > 0 && <span>· ~{t.kcal} kcal</span>}
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground flex-wrap">
-                            <span className="flex items-center gap-1">
-                              <CalendarClock className="h-3 w-3" />
-                              Salvo em {format(parseISO(p.updated_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                            </span>
-                            <span>· {p.mealCount} refeição{p.mealCount > 1 ? 'ões' : ''}</span>
-                            {p.variationCount > 0 && (
-                              <span>· {p.variationCount} variação{p.variationCount > 1 ? 'ões' : ''} de dia</span>
-                            )}
+                          <div className="flex items-center gap-2 mt-2 pl-12">
+                            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" disabled={busyId === p.id} onClick={() => editPlan(p)}>
+                              {busyId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pencil className="h-3 w-3" />} Abrir / editar
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" disabled={busyId === p.id} onClick={() => duplicate(p)}>
+                              <Copy className="h-3 w-3" /> Duplicar para ajustar
+                            </Button>
                           </div>
                         </div>
-                        <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
-                      </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
