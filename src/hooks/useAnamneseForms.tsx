@@ -16,6 +16,7 @@ export interface AnamneseQuestion {
   id: string;
   form_id: string;
   section: string;
+  subsection?: string | null;
   question_text: string;
   question_type: string;
   question_key?: string | null;
