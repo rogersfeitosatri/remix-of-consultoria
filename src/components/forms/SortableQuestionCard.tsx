@@ -109,9 +109,14 @@ export function SortableQuestionCard({
                 )}
               </div>
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" onClick={onEdit}>
+                <Button variant="ghost" size="icon" onClick={onEdit} title="Editar">
                   <Edit className="h-4 w-4" />
                 </Button>
+                {onDuplicate && (
+                  <Button variant="ghost" size="icon" onClick={onDuplicate} title="Duplicar">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                )}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="icon" className="text-destructive">
