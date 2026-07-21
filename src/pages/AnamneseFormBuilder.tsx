@@ -322,6 +322,7 @@ export default function AnamneseFormBuilder() {
       await addQuestion.mutateAsync({
         form_id: formId!,
         section: question.section,
+        subsection: question.subsection ?? null,
         question_text: `${question.question_text} (cópia)`,
         question_type: question.question_type,
         options: question.options ?? undefined,
