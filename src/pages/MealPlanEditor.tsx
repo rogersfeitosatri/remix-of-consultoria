@@ -35,7 +35,7 @@ import { mealsToText } from '@/lib/smartPlan/fromMeals';
 import { parseText } from '@/lib/smartPlan/parse';
 import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
-import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
+import { enrichAst, makeEnrichCache, seedCacheFromMeals } from '@/lib/smartPlan/enrich';
 import { parseRaw, upsertActivePlan } from '@/lib/planHistory';
 import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
 import { WeekOverview } from '@/components/mealplan-v3/WeekOverview';
@@ -209,6 +209,24 @@ export default function MealPlanEditor() {
   const [hasBackup, setHasBackup] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const enrichCache = useRef(makeEnrichCache());
+
+  // Semeia o cache com os macros JÁ SALVOS do plano — ao reabrir, os valores
+  // são reutilizados EXATAMENTE como estavam (sem re-chamar a IA): corrige a
+  // variação de kcal/porções e elimina a lentidão no carregamento.
+  useEffect(() => {
+    try {
+      const raw = parseRaw(analysisRow?.raw_response);
+      const base = raw?.meal_plan?.meals || raw?.meals || [];
+      if (Array.isArray(base) && base.length) seedCacheFromMeals(enrichCache.current, base);
+      const variations = raw?.meal_plan?.day_variations || {};
+      for (const k of Object.keys(variations)) {
+        const dm = variations[k];
+        const meals = Array.isArray(dm) ? dm : dm?.meals;
+        if (Array.isArray(meals) && meals.length) seedCacheFromMeals(enrichCache.current, meals);
+      }
+    } catch { /* noop */ }
+  }, [analysisRow]);
+
   const [enrichedTotalsText, setEnrichedTotalsText] = useState<string>('');
   const [enrichedMeals, setEnrichedMeals] = useState<any[] | undefined>(undefined);
   const [enrichedTotals, setEnrichedTotals] = useState<{ kcal: number; cho: number; ptn: number; lip: number } | undefined>(undefined);
