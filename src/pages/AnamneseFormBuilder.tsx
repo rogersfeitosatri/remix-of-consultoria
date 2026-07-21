@@ -843,28 +843,64 @@ export default function AnamneseFormBuilder() {
               <div className="space-y-6">
                 {sections.map((section, sIdx) => {
                   const sectionQuestions = sortedQuestions.filter(q => q.section === section);
+                  const directQuestions = sectionQuestions.filter(q => !q.subsection);
+                  const subsections = subsectionOrder[section] || [];
 
                   return (
                     <div key={section}>
-                      <SortableSectionHeader
-                        id={`section:${section}`}
-                        section={section}
-                        order={sIdx + 1}
-                        questionCount={sectionQuestions.length}
-                        onRename={handleRenameSection}
-                        onDuplicate={() => handleDuplicateSection(section)}
-                        onDelete={() => handleDeleteSection(section)}
-                      />
+                      <div className="flex items-center gap-1">
+                        <div className="flex-1">
+                          <SortableSectionHeader
+                            id={`section:${section}`}
+                            section={section}
+                            order={sIdx + 1}
+                            questionCount={sectionQuestions.length}
+                            onRename={handleRenameSection}
+                            onDuplicate={() => handleDuplicateSection(section)}
+                            onDelete={() => handleDeleteSection(section)}
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleAddSubsection(section)}
+                          className="gap-1 h-8 text-xs"
+                          title="Adicionar subseção"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Subseção
+                        </Button>
+                      </div>
+
                       <SortableContext
                         items={sectionQuestions.map(q => q.id)}
                         strategy={verticalListSortingStrategy}
                       >
-                        <div className="space-y-3">
-                          {sectionQuestions.length === 0 ? (
-                            <div className="rounded-md border border-dashed border-muted-foreground/30 p-4 text-center">
-                              <p className="text-sm text-muted-foreground mb-2">
-                                Seção vazia — adicione perguntas selecionando "{section}" ao criar uma nova pergunta.
-                              </p>
+                        {/* Direct questions (no subsection) — good spot for info blocks */}
+                        {directQuestions.length > 0 && (
+                          <div className="space-y-3 mb-4">
+                            {directQuestions.map((question, index) => (
+                              <SortableQuestionCard
+                                key={question.id}
+                                id={question.id}
+                                question={question}
+                                index={index}
+                                typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
+                                onEdit={() => handleOpenQuestionDialog(question)}
+                                onDelete={() => handleDeleteQuestion(question.id)}
+                                onDuplicate={() => handleDuplicateQuestion(question)}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Empty section placeholder */}
+                        {sectionQuestions.length === 0 && subsections.length === 0 && (
+                          <div className="rounded-md border border-dashed border-muted-foreground/30 p-4 text-center mb-3">
+                            <p className="text-sm text-muted-foreground mb-2">
+                              Seção vazia — adicione um bloco informativo, perguntas ou uma subseção.
+                            </p>
+                            <div className="flex justify-center gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -876,23 +912,71 @@ export default function AnamneseFormBuilder() {
                                 className="gap-2"
                               >
                                 <Plus className="h-4 w-4" />
-                                Adicionar pergunta aqui
+                                Pergunta
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleAddSubsection(section)}
+                                className="gap-2"
+                              >
+                                <Plus className="h-4 w-4" />
+                                Subseção
                               </Button>
                             </div>
-                          ) : (
-                            sectionQuestions.map((question, index) => (
-                              <SortableQuestionCard
-                                key={question.id}
-                                id={question.id}
-                                question={question}
-                                index={index}
-                                typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
-                                onEdit={() => handleOpenQuestionDialog(question)}
-                                onDelete={() => handleDeleteQuestion(question.id)}
-                                onDuplicate={() => handleDuplicateQuestion(question)}
-                              />
-                            ))
-                          )}
+                          </div>
+                        )}
+
+                        {/* Subsections */}
+                        <div className="space-y-4 pl-4 border-l border-muted">
+                          {subsections.map((subName, subIdx) => {
+                            const subQuestions = sectionQuestions.filter(q => q.subsection === subName);
+                            const subLabel = `${sIdx + 1}.${subIdx + 1}`;
+                            return (
+                              <div key={subName} className="group/subsection">
+                                <SubsectionHeader
+                                  label={subLabel}
+                                  name={subName}
+                                  questionCount={subQuestions.length}
+                                  onRename={(newName) => handleRenameSubsection(section, subName, newName)}
+                                  onDuplicate={() => handleDuplicateSubsection(section, subName)}
+                                  onDelete={() => handleDeleteSubsection(section, subName)}
+                                />
+                                {subQuestions.length === 0 ? (
+                                  <div className="rounded-md border border-dashed border-muted-foreground/30 p-3 text-center">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        resetQuestionData();
+                                        setQuestionData(prev => ({ ...prev, section, subsection: subName }));
+                                        setShowQuestionDialog(true);
+                                      }}
+                                      className="gap-2"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                      Adicionar pergunta em {subLabel}
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {subQuestions.map((question, index) => (
+                                      <SortableQuestionCard
+                                        key={question.id}
+                                        id={question.id}
+                                        question={question}
+                                        index={index}
+                                        typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
+                                        onEdit={() => handleOpenQuestionDialog(question)}
+                                        onDelete={() => handleDeleteQuestion(question.id)}
+                                        onDuplicate={() => handleDuplicateQuestion(question)}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </SortableContext>
                     </div>
