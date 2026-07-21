@@ -13,7 +13,10 @@ export const WEEKDAY_LABEL: Record<string, string> = {
 interface AiProvider { name: string; endpoint: string; apiKey?: string; model: string; }
 
 function providers(): AiProvider[] {
+  // OpenAI é a IA OFICIAL da geração de plano (botão "Gerar com IA"); gemini/
+  // lovable ficam como fallback automático caso a chave da OpenAI falte/à falhar.
   const list: AiProvider[] = [
+    { name: "openai", endpoint: "https://api.openai.com/v1/chat/completions", apiKey: Deno.env.get("OPENAI_API_KEY"), model: "gpt-4o" },
     { name: "gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", apiKey: Deno.env.get("GEMINI_API_KEY"), model: "gemini-2.5-flash" },
     { name: "lovable", endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions", apiKey: Deno.env.get("LOVABLE_API_KEY"), model: "google/gemini-2.5-flash" },
   ];
