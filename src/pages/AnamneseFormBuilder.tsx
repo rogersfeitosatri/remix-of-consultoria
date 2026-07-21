@@ -65,7 +65,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { SortableQuestionCard } from '@/components/forms/SortableQuestionCard';
-import { EditableSectionHeader } from '@/components/forms/SortableSectionHeader';
+import { SortableSectionHeader } from '@/components/forms/SortableSectionHeader';
 
 const questionTypes = [
   { value: 'info', label: '💡 Bloco informativo (sem resposta)' },
