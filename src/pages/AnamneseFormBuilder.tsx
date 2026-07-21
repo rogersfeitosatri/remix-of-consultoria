@@ -696,26 +696,28 @@ export default function AnamneseFormBuilder() {
               </div>
             )}
 
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="is_required"
-                  checked={questionData.is_required}
-                  onCheckedChange={(checked) => setQuestionData({ ...questionData, is_required: checked })}
-                />
-                <Label htmlFor="is_required">Obrigatória</Label>
+            {questionData.question_type !== 'info' && (
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="is_required"
+                    checked={questionData.is_required}
+                    onCheckedChange={(checked) => setQuestionData({ ...questionData, is_required: checked })}
+                  />
+                  <Label htmlFor="is_required">Obrigatória</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="has_comment"
+                    checked={questionData.has_comment_field}
+                    onCheckedChange={(checked) => setQuestionData({ ...questionData, has_comment_field: checked })}
+                  />
+                  <Label htmlFor="has_comment">Campo de comentário</Label>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="has_comment"
-                  checked={questionData.has_comment_field}
-                  onCheckedChange={(checked) => setQuestionData({ ...questionData, has_comment_field: checked })}
-                />
-                <Label htmlFor="has_comment">Campo de comentário</Label>
-              </div>
-            </div>
+            )}
 
-            {questionData.has_comment_field && (
+            {questionData.question_type !== 'info' && questionData.has_comment_field && (
               <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
                 <div className="space-y-2">
                   <Label>Label do comentário</Label>
