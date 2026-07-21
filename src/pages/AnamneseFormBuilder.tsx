@@ -67,6 +67,7 @@ import {
 import { SortableQuestionCard } from '@/components/forms/SortableQuestionCard';
 import { SortableSectionHeader } from '@/components/forms/SortableSectionHeader';
 import { SubsectionHeader } from '@/components/forms/SubsectionHeader';
+import { QuestionDropZone } from '@/components/forms/QuestionDropZone';
 
 const questionTypes = [
   { value: 'info', label: '💡 Bloco informativo (sem resposta)' },
