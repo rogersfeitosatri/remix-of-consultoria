@@ -297,6 +297,33 @@ export default function AnamneseFormBuilder() {
     }
   };
 
+  const handleDuplicateQuestion = async (question: AnamneseQuestion) => {
+    try {
+      await addQuestion.mutateAsync({
+        form_id: formId!,
+        section: question.section,
+        question_text: `${question.question_text} (cópia)`,
+        question_type: question.question_type,
+        options: question.options ?? undefined,
+        scale_min: question.scale_min,
+        scale_max: question.scale_max,
+        is_required: question.is_required,
+        has_comment_field: question.has_comment_field,
+        comment_field_label: question.comment_field_label,
+        comment_field_required: question.comment_field_required,
+        order_index: (formData?.questions?.length || 0),
+        config: question.config ?? null,
+      });
+      toast({ title: 'Pergunta duplicada!' });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível duplicar a pergunta.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleSaveSettings = async () => {
     try {
       await updateForm.mutateAsync({
@@ -554,6 +581,7 @@ export default function AnamneseFormBuilder() {
                             typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
                             onEdit={() => handleOpenQuestionDialog(question)}
                             onDelete={() => handleDeleteQuestion(question.id)}
+                            onDuplicate={() => handleDuplicateQuestion(question)}
                           />
                         ))}
                       </div>

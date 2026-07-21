@@ -3,7 +3,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { GripVertical, Settings, Trash2, Edit } from 'lucide-react';
+import { GripVertical, Settings, Trash2, Edit, Copy } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +32,7 @@ interface SortableQuestionCardProps {
   typeLabel: string;
   onEdit: () => void;
   onDelete: () => void;
+  onDuplicate?: () => void;
   showIndex?: boolean;
 }
 
@@ -42,6 +43,7 @@ export function SortableQuestionCard({
   typeLabel,
   onEdit,
   onDelete,
+  onDuplicate,
   showIndex = false,
 }: SortableQuestionCardProps) {
   const {
@@ -107,9 +109,14 @@ export function SortableQuestionCard({
                 )}
               </div>
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon" onClick={onEdit}>
+                <Button variant="ghost" size="icon" onClick={onEdit} title="Editar">
                   <Edit className="h-4 w-4" />
                 </Button>
+                {onDuplicate && (
+                  <Button variant="ghost" size="icon" onClick={onDuplicate} title="Duplicar">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                )}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="icon" className="text-destructive">
