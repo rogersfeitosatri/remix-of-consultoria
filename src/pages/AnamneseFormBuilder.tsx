@@ -429,37 +429,65 @@ export default function AnamneseFormBuilder() {
 
     if (!over || active.id === over.id) return;
 
-    // Find items in the flat list ordered by order_index
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    // ---- Section reorder ----
+    if (activeId.startsWith('section:') && overId.startsWith('section:')) {
+      const oldName = activeId.slice('section:'.length);
+      const newName = overId.slice('section:'.length);
+      const oldIdx = sectionOrder.indexOf(oldName);
+      const newIdx = sectionOrder.indexOf(newName);
+      if (oldIdx === -1 || newIdx === -1) return;
+      const reordered = arrayMove(sectionOrder, oldIdx, newIdx);
+      setSectionOrder(reordered);
+
+      // Rewrite order_index for all questions grouped by new section order
+      const sorted = [...localQuestions].sort((a, b) => a.order_index - b.order_index);
+      let idx = 0;
+      const updates: { id: string; order_index: number }[] = [];
+      const rebuilt: AnamneseQuestion[] = [];
+      for (const sec of reordered) {
+        for (const q of sorted.filter(q => q.section === sec)) {
+          updates.push({ id: q.id, order_index: idx });
+          rebuilt.push({ ...q, order_index: idx });
+          idx++;
+        }
+      }
+      setLocalQuestions(rebuilt);
+      try {
+        if (updates.length) {
+          await reorderQuestions.mutateAsync({ form_id: formId!, updates });
+        }
+        toast({ title: 'Seções reordenadas!' });
+      } catch (error) {
+        setLocalQuestions(formData?.questions || []);
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível reordenar as seções.',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    // ---- Question reorder ----
     const sortedQuestions = [...localQuestions].sort((a, b) => a.order_index - b.order_index);
-    const oldIndex = sortedQuestions.findIndex(q => q.id === active.id);
-    const newIndex = sortedQuestions.findIndex(q => q.id === over.id);
+    const oldIndex = sortedQuestions.findIndex(q => q.id === activeId);
+    const newIndex = sortedQuestions.findIndex(q => q.id === overId);
 
     if (oldIndex === -1 || newIndex === -1) return;
 
     const newQuestions = arrayMove(sortedQuestions, oldIndex, newIndex);
-    
-    // Update order_index for all questions
-    const updatedQuestions = newQuestions.map((q, index) => ({
-      ...q,
-      order_index: index,
-    }));
-    
+    const updatedQuestions = newQuestions.map((q, index) => ({ ...q, order_index: index }));
     setLocalQuestions(updatedQuestions);
 
-    // Update order_index for all affected questions
-    const updates = updatedQuestions.map((q) => ({
-      id: q.id,
-      order_index: q.order_index,
-    }));
+    const updates = updatedQuestions.map((q) => ({ id: q.id, order_index: q.order_index }));
 
     try {
-      await reorderQuestions.mutateAsync({
-        form_id: formId!,
-        updates,
-      });
+      await reorderQuestions.mutateAsync({ form_id: formId!, updates });
       toast({ title: 'Ordem atualizada!' });
     } catch (error) {
-      // Revert on error
       setLocalQuestions(formData?.questions || []);
       toast({
         title: 'Erro',
@@ -470,6 +498,8 @@ export default function AnamneseFormBuilder() {
   };
 
   const handleRenameSection = async (oldSection: string, newSection: string) => {
+    // Update local section order immediately (preserves position)
+    setSectionOrder(prev => prev.map(s => (s === oldSection ? newSection : s)));
     try {
       await renameSection.mutateAsync({
         form_id: formId!,
@@ -478,6 +508,8 @@ export default function AnamneseFormBuilder() {
       });
       toast({ title: 'Seção renomeada!' });
     } catch (error) {
+      // Revert
+      setSectionOrder(prev => prev.map(s => (s === newSection ? oldSection : s)));
       toast({
         title: 'Erro',
         description: 'Não foi possível renomear a seção.',
@@ -485,6 +517,94 @@ export default function AnamneseFormBuilder() {
       });
     }
   };
+
+  const uniqueSectionName = (base: string) => {
+    if (!sectionOrder.includes(base)) return base;
+    let i = 2;
+    while (sectionOrder.includes(`${base} ${i}`)) i++;
+    return `${base} ${i}`;
+  };
+
+  const handleAddSection = () => {
+    const name = uniqueSectionName('Nova Seção');
+    setSectionOrder(prev => [...prev, name]);
+    toast({ title: 'Seção criada!', description: 'Adicione perguntas ou renomeie a seção.' });
+  };
+
+  const handleDuplicateSection = async (section: string) => {
+    const newName = uniqueSectionName(`${section} (cópia)`);
+    const sectionQs = [...localQuestions]
+      .filter(q => q.section === section)
+      .sort((a, b) => a.order_index - b.order_index);
+
+    // Insert empty section right after the source in local order
+    setSectionOrder(prev => {
+      const idx = prev.indexOf(section);
+      const next = [...prev];
+      next.splice(idx + 1, 0, newName);
+      return next;
+    });
+
+    if (sectionQs.length === 0) {
+      toast({ title: 'Seção duplicada (vazia).' });
+      return;
+    }
+
+    try {
+      const baseIndex = (formData?.questions?.length || 0);
+      for (let i = 0; i < sectionQs.length; i++) {
+        const q = sectionQs[i];
+        await addQuestion.mutateAsync({
+          form_id: formId!,
+          section: newName,
+          question_text: q.question_text,
+          question_type: q.question_type,
+          options: q.options ?? undefined,
+          scale_min: q.scale_min,
+          scale_max: q.scale_max,
+          is_required: q.is_required,
+          has_comment_field: q.has_comment_field,
+          comment_field_label: q.comment_field_label,
+          comment_field_required: q.comment_field_required,
+          order_index: baseIndex + i,
+          config: q.config ?? null,
+        });
+      }
+      toast({ title: 'Seção duplicada!' });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível duplicar a seção.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteSection = async (section: string) => {
+    const sectionQs = localQuestions.filter(q => q.section === section);
+
+    // Empty section — just remove from local state
+    if (sectionQs.length === 0) {
+      setSectionOrder(prev => prev.filter(s => s !== section));
+      toast({ title: 'Seção removida.' });
+      return;
+    }
+
+    try {
+      for (const q of sectionQs) {
+        await deleteQuestion.mutateAsync({ id: q.id, form_id: formId! });
+      }
+      setSectionOrder(prev => prev.filter(s => s !== section));
+      toast({ title: 'Seção excluída!' });
+    } catch (error) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir a seção.',
+        variant: 'destructive',
+      });
+    }
+  };
+
 
   if (isLoading) {
     return (
