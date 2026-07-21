@@ -17,6 +17,7 @@ import { ArrowLeft, ArrowRight, Save, Send, Loader2, CheckCircle2, ListChecks } 
 import { QuestionRenderer } from '@/components/anamnese-completa/QuestionRenderer';
 import { validateSimpleMeal } from '@/components/anamnese-completa/SimpleMealField';
 import { isQuestionVisible } from '@/lib/anamneseConditions';
+import { firstMissing } from '@/lib/anamneseValidation';
 import { formatAnyAnswer } from '@/lib/formatAnamneseAnswer';
 import type { AnamneseForm, AnamneseQuestion } from '@/hooks/useAnamneseForms';
 
@@ -147,7 +148,8 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
     const pend: { q: AnamneseQuestion; label: string }[] = [];
     for (const q of sorted) {
       if (!isQuestionVisible(q, answersByKey)) continue;
-      if (q.is_required && isBlank(answers[q.id])) pend.push({ q, label: q.question_text });
+      const miss = firstMissing(q as any, answers[q.id], answersByKey);
+      if (miss) pend.push({ q, label: miss });
     }
     return pend;
   }, [sorted, answersByKey, answers]);
@@ -285,19 +287,21 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
               <Button onClick={() => {
                 // Bloqueia avanço quando a etapa atual tem campos obrigatórios pendentes.
                 const q = currentQuestion;
-                if (q && q.is_required) {
+                if (q) {
                   const cfg: any = q.config || {};
                   const ans = answers[q.id];
-                  if (q.question_type === 'meal_plan_editor' && cfg.simpleMode) {
+                  if (q.is_required && q.question_type === 'meal_plan_editor' && cfg.simpleMode) {
                     const defaults: string[] = Array.isArray(cfg.defaultMeals) ? cfg.defaultMeals : [];
                     const arr = Array.isArray(ans) ? ans : [];
                     for (let i = 0; i < defaults.length; i++) {
                       const err = validateSimpleMeal(arr[i], defaults[i]);
                       if (err) { toast.error(err); return; }
                     }
-                  } else if (isBlank(ans)) {
-                    toast.error(`Responda: “${q.question_text}”.`);
-                    return;
+                  } else {
+                    // Valida a pergunta E os sub-campos obrigatórios (field_group)
+                    // e a completude do telefone/WhatsApp (DDI+DDD+número).
+                    const miss = firstMissing(q as any, ans, answersByKey);
+                    if (miss) { toast.error(`Responda: “${miss}”.`); return; }
                   }
                 }
                 setStep((s) => s + 1); window.scrollTo({ top: 0 });

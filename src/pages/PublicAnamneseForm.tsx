@@ -21,6 +21,8 @@ import { isQuestionVisible } from '@/lib/anamneseConditions';
 import { QuestionRenderer } from '@/components/anamnese-completa/QuestionRenderer';
 import { validateSimpleMeal } from '@/components/anamnese-completa/SimpleMealField';
 import { usePublicZnPlans } from '@/hooks/usePublicZnPlans';
+import { firstMissing, isPhoneLike } from '@/lib/anamneseValidation';
+import { PhoneDddInput } from '@/components/ui/phone-ddd-input';
 
 interface Question {
   id: string;
@@ -353,18 +355,14 @@ export default function PublicAnamneseForm() {
     const missing = new Set<string>();
     const missingLabels: string[] = [];
     for (const question of visibleQuestions) {
-      let isMissing = false;
-      if (question.is_required) {
-        const answer = answers[question.id];
-        if (isBlankAnswer(answer)) isMissing = true;
-      }
-      if (!isMissing && question.has_comment_field && question.comment_field_required) {
+      let missLabel: string | null = firstMissing(question as any, answers[question.id], answersByKey);
+      if (!missLabel && question.has_comment_field && question.comment_field_required) {
         const comment = comments[question.id];
-        if (!comment || !comment.trim()) isMissing = true;
+        if (!comment || !comment.trim()) missLabel = question.comment_field_label || question.question_text;
       }
-      if (isMissing) {
+      if (missLabel) {
         missing.add(question.id);
-        missingLabels.push(question.question_text.replace(/[:?.\s]+$/, ''));
+        missingLabels.push(String(missLabel).replace(/[:?.\s]+$/, ''));
       }
     }
 
@@ -607,6 +605,10 @@ export default function PublicAnamneseForm() {
       );
     }
 
+    // WhatsApp/telefone: DDI + DDD + número.
+    if (isPhoneLike(question.question_text, question.question_type, (question as any).question_key)) {
+      return <PhoneDddInput value={typeof answers[question.id] === 'string' ? answers[question.id] : ''} onChange={(v) => handleAnswerChange(question.id, v)} />;
+    }
     const qType = resolveQuestionType(question);
     switch (qType) {
       case 'short_text':
@@ -693,12 +695,10 @@ export default function PublicAnamneseForm() {
   };
 
   const validateWizQuestion = (question: Question): boolean => {
-    if (question.is_required) {
-      const answer = answers[question.id];
-      if (isBlankAnswer(answer)) {
-        toast.error(`Responda: ${question.question_text.replace(/[:?.\s]+$/, '')}`);
-        return false;
-      }
+    const miss = firstMissing(question as any, answers[question.id], answersByKey);
+    if (miss) {
+      toast.error(`Responda: ${String(miss).replace(/[:?.\s]+$/, '')}`);
+      return false;
     }
     if (question.has_comment_field && question.comment_field_required) {
       const comment = comments[question.id];
@@ -1138,7 +1138,12 @@ export default function PublicAnamneseForm() {
                       </div>
                     </div>
 
-                    {(qType === 'short_text' || qType === 'text') && (
+                    {isPhoneLike(question.question_text, question.question_type, question.question_key) ? (
+                      <PhoneDddInput
+                        value={typeof answers[question.id] === 'string' ? answers[question.id] : ''}
+                        onChange={(v) => handleAnswerChange(question.id, v)}
+                      />
+                    ) : (qType === 'short_text' || qType === 'text') && (
                       <Input
                         value={answers[question.id] || ''}
                         onChange={(e) => handleAnswerChange(question.id, e.target.value)}
