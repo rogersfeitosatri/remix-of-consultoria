@@ -14,6 +14,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { calcNutrients, type FoodItem, type FoodMeasure } from '@/hooks/useFoodSearch';
 import type { PlanAst, FoodToken } from './ast';
+import { mealsToAst } from './fromMeals';
+import { tokenToText } from './serialize';
 
 const STOP = new Set([
   'de', 'da', 'do', 'com', 'sem', 'e', 'ou', 'a', 'o', 'as', 'os', 'em',
@@ -189,6 +191,38 @@ function applyResolved(t: FoodToken, r: ResolvedMacro) {
   t.protein_g = r.protein_g;
   t.carbs_g = r.carbs_g;
   t.fat_g = r.fat_g;
+}
+
+// Semeia o cache com os macros JÁ SALVOS do plano, para que ao reabrir um
+// plano salvo os valores sejam reutilizados EXATAMENTE como estavam (nada de
+// re-chamar a IA, que não é determinística) — corrige a variação de kcal/porções
+// ao reabrir e elimina a lentidão (sem chamadas de IA no carregamento).
+// A chave usa o MESMO texto que o editor gera (mealsToText → tokenToText), então
+// bate com keyOf() dos tokens re-parseados a partir do texto.
+export function seedCacheFromMeals(cache: EnrichCache, meals: any[]): void {
+  if (!Array.isArray(meals) || !meals.length) return;
+  const ast = mealsToAst(meals);
+  for (const meal of ast.meals) {
+    const groupsList = meal.options && meal.options.length
+      ? meal.options.map((o) => o.groups)
+      : [meal.groups];
+    for (const groups of groupsList) {
+      for (const g of groups) {
+        for (const t of g.tokens) {
+          if (!t.name) continue;
+          const key = normalize(tokenToText(t));
+          // Plano salvo é FIXO: registra os valores como estão (mesmo 0).
+          cache.aiByKey.set(key, {
+            grams: Number(t.grams) || 0,
+            kcal: Number(t.calories) || 0,
+            protein_g: Number(t.protein_g) || 0,
+            carbs_g: Number(t.carbs_g) || 0,
+            fat_g: Number(t.fat_g) || 0,
+          });
+        }
+      }
+    }
+  }
 }
 
 export async function enrichAst(ast: PlanAst, cache = makeEnrichCache()): Promise<PlanAst> {
