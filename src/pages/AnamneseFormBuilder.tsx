@@ -580,14 +580,37 @@ export default function AnamneseFormBuilder() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Pergunta *</Label>
+              <Label>{questionData.question_type === 'info' ? 'Título do bloco *' : 'Pergunta *'}</Label>
               <Textarea
                 value={questionData.question_text}
                 onChange={(e) => setQuestionData({ ...questionData, question_text: e.target.value })}
-                placeholder="Digite a pergunta..."
+                placeholder={questionData.question_type === 'info' ? 'Ex: Sobre suas refeições habituais' : 'Digite a pergunta...'}
                 rows={2}
               />
             </div>
+
+            {questionData.question_type === 'info' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Texto explicativo *</Label>
+                  <Textarea
+                    value={questionData.info_body}
+                    onChange={(e) => setQuestionData({ ...questionData, info_body: e.target.value })}
+                    placeholder="Explique como o próximo bloco deve ser respondido. Este texto aparece antes das próximas perguntas e o paciente clica em 'Vamos lá' para prosseguir."
+                    rows={6}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Texto do botão</Label>
+                  <Input
+                    value={questionData.info_button_label}
+                    onChange={(e) => setQuestionData({ ...questionData, info_button_label: e.target.value })}
+                    placeholder="Vamos lá"
+                  />
+                </div>
+              </>
+            )}
+
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
