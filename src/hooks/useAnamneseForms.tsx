@@ -222,9 +222,10 @@ export function useAddAnamneseQuestion() {
     mutationFn: async (data: {
       form_id: string;
       section: string;
+      subsection?: string | null;
       question_text: string;
       question_type: string;
-      options?: string[];
+      options?: string[] | null;
       scale_min?: number;
       scale_max?: number;
       is_required?: boolean;
