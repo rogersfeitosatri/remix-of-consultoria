@@ -626,6 +626,113 @@ export default function AnamneseFormBuilder() {
     }
   };
 
+  // ---- Sub-sections ----
+  const uniqueSubsectionName = (section: string, base: string) => {
+    const list = subsectionOrder[section] || [];
+    if (!list.includes(base)) return base;
+    let i = 2;
+    while (list.includes(`${base} ${i}`)) i++;
+    return `${base} ${i}`;
+  };
+
+  const handleAddSubsection = (section: string) => {
+    const name = uniqueSubsectionName(section, 'Nova Subseção');
+    setSubsectionOrder(prev => ({
+      ...prev,
+      [section]: [...(prev[section] || []), name],
+    }));
+    toast({ title: 'Subseção criada!', description: 'Adicione perguntas escolhendo esta subseção.' });
+  };
+
+  const handleRenameSubsection = async (section: string, oldName: string, newName: string) => {
+    if (!newName.trim() || newName === oldName) return;
+    setSubsectionOrder(prev => ({
+      ...prev,
+      [section]: (prev[section] || []).map(s => (s === oldName ? newName : s)),
+    }));
+    setLocalQuestions(prev => prev.map(q => (q.section === section && q.subsection === oldName ? { ...q, subsection: newName } : q)));
+    try {
+      const affected = localQuestions.filter(q => q.section === section && q.subsection === oldName);
+      await Promise.all(
+        affected.map(q =>
+          updateQuestion.mutateAsync({ id: q.id, form_id: formId!, subsection: newName })
+        )
+      );
+      toast({ title: 'Subseção renomeada!' });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível renomear a subseção.', variant: 'destructive' });
+    }
+  };
+
+  const handleDuplicateSubsection = async (section: string, name: string) => {
+    const newName = uniqueSubsectionName(section, `${name} (cópia)`);
+    const subQs = [...localQuestions]
+      .filter(q => q.section === section && q.subsection === name)
+      .sort((a, b) => a.order_index - b.order_index);
+
+    setSubsectionOrder(prev => {
+      const list = [...(prev[section] || [])];
+      const idx = list.indexOf(name);
+      list.splice(idx + 1, 0, newName);
+      return { ...prev, [section]: list };
+    });
+
+    if (subQs.length === 0) {
+      toast({ title: 'Subseção duplicada (vazia).' });
+      return;
+    }
+
+    try {
+      const baseIndex = (formData?.questions?.length || 0);
+      for (let i = 0; i < subQs.length; i++) {
+        const q = subQs[i];
+        await addQuestion.mutateAsync({
+          form_id: formId!,
+          section,
+          subsection: newName,
+          question_text: q.question_text,
+          question_type: q.question_type,
+          options: q.options ?? undefined,
+          scale_min: q.scale_min,
+          scale_max: q.scale_max,
+          is_required: q.is_required,
+          has_comment_field: q.has_comment_field,
+          comment_field_label: q.comment_field_label,
+          comment_field_required: q.comment_field_required,
+          order_index: baseIndex + i,
+          config: q.config ?? null,
+        });
+      }
+      toast({ title: 'Subseção duplicada!' });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível duplicar a subseção.', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteSubsection = async (section: string, name: string) => {
+    const subQs = localQuestions.filter(q => q.section === section && q.subsection === name);
+    if (subQs.length === 0) {
+      setSubsectionOrder(prev => ({
+        ...prev,
+        [section]: (prev[section] || []).filter(s => s !== name),
+      }));
+      toast({ title: 'Subseção removida.' });
+      return;
+    }
+    try {
+      for (const q of subQs) {
+        await deleteQuestion.mutateAsync({ id: q.id, form_id: formId! });
+      }
+      setSubsectionOrder(prev => ({
+        ...prev,
+        [section]: (prev[section] || []).filter(s => s !== name),
+      }));
+      toast({ title: 'Subseção excluída!' });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível excluir a subseção.', variant: 'destructive' });
+    }
+  };
+
 
   if (isLoading) {
     return (
