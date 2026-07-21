@@ -68,6 +68,7 @@ import { SortableQuestionCard } from '@/components/forms/SortableQuestionCard';
 import { EditableSectionHeader } from '@/components/forms/SortableSectionHeader';
 
 const questionTypes = [
+  { value: 'info', label: '💡 Bloco informativo (sem resposta)' },
   { value: 'text', label: 'Texto Curto' },
   { value: 'textarea', label: 'Texto Longo' },
   { value: 'number', label: 'Número' },
@@ -120,6 +121,8 @@ export default function AnamneseFormBuilder() {
     options: [] as string[],
     scale_min: 1,
     scale_max: 10,
+    info_body: '',
+    info_button_label: 'Vamos lá',
   });
   const [newOption, setNewOption] = useState('');
   const [formSettings, setFormSettings] = useState({
@@ -170,6 +173,8 @@ export default function AnamneseFormBuilder() {
       options: [],
       scale_min: 1,
       scale_max: 10,
+      info_body: '',
+      info_button_label: 'Vamos lá',
     });
     setEditingQuestion(null);
     setNewOption('');
@@ -189,6 +194,8 @@ export default function AnamneseFormBuilder() {
         options: question.options || [],
         scale_min: question.scale_min || 1,
         scale_max: question.scale_max || 10,
+        info_body: question.config?.body || '',
+        info_button_label: question.config?.buttonLabel || 'Vamos lá',
       });
     } else {
       resetQuestionData();
@@ -233,17 +240,21 @@ export default function AnamneseFormBuilder() {
     }
 
     try {
+      const isInfo = questionData.question_type === 'info';
       const payload = {
         question_text: questionData.question_text,
         question_type: questionData.question_type,
         section: questionData.section,
-        is_required: questionData.is_required,
-        has_comment_field: questionData.has_comment_field,
-        comment_field_required: questionData.comment_field_required,
+        is_required: isInfo ? false : questionData.is_required,
+        has_comment_field: isInfo ? false : questionData.has_comment_field,
+        comment_field_required: isInfo ? false : questionData.comment_field_required,
         comment_field_label: questionData.comment_field_label,
         options: ['select', 'multiselect'].includes(questionData.question_type) ? questionData.options : null,
         scale_min: questionData.question_type === 'scale' ? questionData.scale_min : null,
         scale_max: questionData.question_type === 'scale' ? questionData.scale_max : null,
+        config: isInfo
+          ? { body: questionData.info_body, buttonLabel: questionData.info_button_label || 'Vamos lá' }
+          : (editingQuestion?.config ?? null),
       };
 
       if (editingQuestion) {
@@ -569,14 +580,37 @@ export default function AnamneseFormBuilder() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Pergunta *</Label>
+              <Label>{questionData.question_type === 'info' ? 'Título do bloco *' : 'Pergunta *'}</Label>
               <Textarea
                 value={questionData.question_text}
                 onChange={(e) => setQuestionData({ ...questionData, question_text: e.target.value })}
-                placeholder="Digite a pergunta..."
+                placeholder={questionData.question_type === 'info' ? 'Ex: Sobre suas refeições habituais' : 'Digite a pergunta...'}
                 rows={2}
               />
             </div>
+
+            {questionData.question_type === 'info' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Texto explicativo *</Label>
+                  <Textarea
+                    value={questionData.info_body}
+                    onChange={(e) => setQuestionData({ ...questionData, info_body: e.target.value })}
+                    placeholder="Explique como o próximo bloco deve ser respondido. Este texto aparece antes das próximas perguntas e o paciente clica em 'Vamos lá' para prosseguir."
+                    rows={6}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Texto do botão</Label>
+                  <Input
+                    value={questionData.info_button_label}
+                    onChange={(e) => setQuestionData({ ...questionData, info_button_label: e.target.value })}
+                    placeholder="Vamos lá"
+                  />
+                </div>
+              </>
+            )}
+
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -662,26 +696,28 @@ export default function AnamneseFormBuilder() {
               </div>
             )}
 
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="is_required"
-                  checked={questionData.is_required}
-                  onCheckedChange={(checked) => setQuestionData({ ...questionData, is_required: checked })}
-                />
-                <Label htmlFor="is_required">Obrigatória</Label>
+            {questionData.question_type !== 'info' && (
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="is_required"
+                    checked={questionData.is_required}
+                    onCheckedChange={(checked) => setQuestionData({ ...questionData, is_required: checked })}
+                  />
+                  <Label htmlFor="is_required">Obrigatória</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="has_comment"
+                    checked={questionData.has_comment_field}
+                    onCheckedChange={(checked) => setQuestionData({ ...questionData, has_comment_field: checked })}
+                  />
+                  <Label htmlFor="has_comment">Campo de comentário</Label>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="has_comment"
-                  checked={questionData.has_comment_field}
-                  onCheckedChange={(checked) => setQuestionData({ ...questionData, has_comment_field: checked })}
-                />
-                <Label htmlFor="has_comment">Campo de comentário</Label>
-              </div>
-            </div>
+            )}
 
-            {questionData.has_comment_field && (
+            {questionData.question_type !== 'info' && questionData.has_comment_field && (
               <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
                 <div className="space-y-2">
                   <Label>Label do comentário</Label>

@@ -611,6 +611,14 @@ export default function PublicAnamneseForm() {
     }
     const qType = resolveQuestionType(question);
     switch (qType) {
+      case 'info': {
+        const body = (question as any).config?.body || '';
+        return (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+            {body || 'Leia as orientações e clique em Vamos lá para continuar.'}
+          </div>
+        );
+      }
       case 'short_text':
       case 'text':
         return (
@@ -1028,7 +1036,11 @@ export default function PublicAnamneseForm() {
               <Button type="button" variant="outline" onClick={handleWizPrevious} className="flex-1">Anterior</Button>
             )}
             {!isLastWizStep ? (
-              <Button type="button" onClick={handleWizNext} className="flex-1">Próximo</Button>
+              <Button type="button" onClick={handleWizNext} className="flex-1">
+                {currentWizStep?.kind === 'question' && currentWizStep.question.question_type === 'info'
+                  ? ((currentWizStep.question as any).config?.buttonLabel || 'Vamos lá')
+                  : 'Próximo'}
+              </Button>
             ) : (
               <Button type="button" onClick={(e) => handleSubmit(e as any)} disabled={submitting || !termsAccepted} className="flex-1 gap-2">
                 {submitting ? (

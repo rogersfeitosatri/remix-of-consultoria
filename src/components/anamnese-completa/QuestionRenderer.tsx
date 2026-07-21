@@ -51,6 +51,14 @@ export function QuestionRenderer({
   }
 
   switch (question.question_type) {
+    case 'info': {
+      const body = question.config?.body || '';
+      return (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+          {body || 'Leia as orientações e clique em Vamos lá para continuar.'}
+        </div>
+      );
+    }
     case 'field_group': return <FieldGroupField {...fp} />;
     case 'structured_list': return <StructuredListField field={{ key: 'items', label: '', type: 'structured_list', fields: question.config?.fields || [], addLabel: question.config?.addLabel }} value={value} onChange={onChange} selfScope={{}} answersByKey={answersByKey} disabled={disabled} clientId={clientId} />;
     case 'meal_plan_editor':
