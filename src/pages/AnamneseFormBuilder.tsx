@@ -132,6 +132,8 @@ export default function AnamneseFormBuilder() {
     is_required: true,
   });
   const [localQuestions, setLocalQuestions] = useState<AnamneseQuestion[]>([]);
+  // Sections list persisted locally (includes empty sections not yet backed by questions)
+  const [sectionOrder, setSectionOrder] = useState<string[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
