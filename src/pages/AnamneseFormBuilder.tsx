@@ -630,7 +630,12 @@ export default function AnamneseFormBuilder() {
   }
 
   const sortedQuestions = [...localQuestions].sort((a, b) => a.order_index - b.order_index);
-  const sections = [...new Set(sortedQuestions.map(q => q.section))];
+  const derivedSections = [...new Set(sortedQuestions.map(q => q.section))];
+  // Union: preserve local order; append any derived sections missing from local order
+  const sections = [
+    ...sectionOrder.filter(s => derivedSections.includes(s) || !derivedSections.length ? true : !derivedSections.includes(s) ? true : true),
+    ...derivedSections.filter(s => !sectionOrder.includes(s)),
+  ];
 
   return (
     <Layout>
