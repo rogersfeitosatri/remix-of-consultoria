@@ -969,24 +969,31 @@ export default function AnamneseFormBuilder() {
                         strategy={verticalListSortingStrategy}
                       >
                         {/* Direct questions (no subsection) — good spot for info blocks */}
-                        {directQuestions.length > 0 && (
-                          <div className="space-y-3 mb-4">
-                            {directQuestions.map((question, index) => (
-                              <SortableQuestionCard
-                                key={question.id}
-                                id={question.id}
-                                question={question}
-                                index={index}
-                                typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
-                                onEdit={() => handleOpenQuestionDialog(question)}
-                                onDelete={() => handleDeleteQuestion(question.id)}
-                                onDuplicate={() => handleDuplicateQuestion(question)}
-                              />
-                            ))}
-                          </div>
-                        )}
+                        <div className="space-y-3 mb-4">
+                          {directQuestions.map((question, index) => (
+                            <SortableQuestionCard
+                              key={question.id}
+                              id={question.id}
+                              question={question}
+                              index={index}
+                              typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
+                              onEdit={() => handleOpenQuestionDialog(question)}
+                              onDelete={() => handleDeleteQuestion(question.id)}
+                              onDuplicate={() => handleDuplicateQuestion(question)}
+                            />
+                          ))}
+                          {/* Always show a slim dropzone so items can be moved into the section root */}
+                          <QuestionDropZone
+                            id={`dropzone:section:${section}`}
+                            label={
+                              directQuestions.length === 0
+                                ? `Solte aqui para mover para ${sIdx + 1}. ${section}`
+                                : 'Solte aqui para colocar no final desta seção'
+                            }
+                          />
+                        </div>
 
-                        {/* Empty section placeholder */}
+                        {/* Empty section placeholder (no questions and no subsections) */}
                         {sectionQuestions.length === 0 && subsections.length === 0 && (
                           <div className="rounded-md border border-dashed border-muted-foreground/30 p-4 text-center mb-3">
                             <p className="text-sm text-muted-foreground mb-2">
@@ -1034,38 +1041,45 @@ export default function AnamneseFormBuilder() {
                                   onDuplicate={() => handleDuplicateSubsection(section, subName)}
                                   onDelete={() => handleDeleteSubsection(section, subName)}
                                 />
-                                {subQuestions.length === 0 ? (
-                                  <div className="rounded-md border border-dashed border-muted-foreground/30 p-3 text-center">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        resetQuestionData();
-                                        setQuestionData(prev => ({ ...prev, section, subsection: subName }));
-                                        setShowQuestionDialog(true);
-                                      }}
-                                      className="gap-2"
-                                    >
-                                      <Plus className="h-4 w-4" />
-                                      Adicionar pergunta em {subLabel}
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <div className="space-y-3">
-                                    {subQuestions.map((question, index) => (
-                                      <SortableQuestionCard
-                                        key={question.id}
-                                        id={question.id}
-                                        question={question}
-                                        index={index}
-                                        typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
-                                        onEdit={() => handleOpenQuestionDialog(question)}
-                                        onDelete={() => handleDeleteQuestion(question.id)}
-                                        onDuplicate={() => handleDuplicateQuestion(question)}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
+                                <div className="space-y-3">
+                                  {subQuestions.map((question, index) => (
+                                    <SortableQuestionCard
+                                      key={question.id}
+                                      id={question.id}
+                                      question={question}
+                                      index={index}
+                                      typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
+                                      onEdit={() => handleOpenQuestionDialog(question)}
+                                      onDelete={() => handleDeleteQuestion(question.id)}
+                                      onDuplicate={() => handleDuplicateQuestion(question)}
+                                    />
+                                  ))}
+                                  <QuestionDropZone
+                                    id={`dropzone:sub:${section}::${subName}`}
+                                    label={
+                                      subQuestions.length === 0
+                                        ? `Solte aqui para mover para ${subLabel} ${subName}`
+                                        : `Solte aqui para colocar no final de ${subLabel}`
+                                    }
+                                  />
+                                  {subQuestions.length === 0 && (
+                                    <div className="rounded-md border border-dashed border-muted-foreground/30 p-3 text-center">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          resetQuestionData();
+                                          setQuestionData(prev => ({ ...prev, section, subsection: subName }));
+                                          setShowQuestionDialog(true);
+                                        }}
+                                        className="gap-2"
+                                      >
+                                        <Plus className="h-4 w-4" />
+                                        Adicionar pergunta em {subLabel}
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
