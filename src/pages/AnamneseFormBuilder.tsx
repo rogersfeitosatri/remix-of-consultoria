@@ -264,6 +264,7 @@ export default function AnamneseFormBuilder() {
         question_text: questionData.question_text,
         question_type: questionData.question_type,
         section: questionData.section,
+        subsection: questionData.subsection?.trim() ? questionData.subsection.trim() : null,
         is_required: isInfo ? false : questionData.is_required,
         has_comment_field: isInfo ? false : questionData.has_comment_field,
         comment_field_required: isInfo ? false : questionData.comment_field_required,
