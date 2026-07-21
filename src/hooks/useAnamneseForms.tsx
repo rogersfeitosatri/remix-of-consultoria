@@ -231,6 +231,7 @@ export function useAddAnamneseQuestion() {
       comment_field_label?: string;
       comment_field_required?: boolean;
       order_index?: number;
+      config?: any;
     }) => {
       const { data: question, error } = await supabase
         .from('anamnese_questions' as any)
