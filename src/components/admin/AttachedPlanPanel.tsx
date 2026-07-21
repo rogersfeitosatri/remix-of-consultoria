@@ -59,10 +59,9 @@ function Delta({ curr, prev, unit }: { curr: number; prev?: number; unit?: strin
 
 export function AttachedPlanPanel({
   clientId,
-  analysisRow,
 }: {
   clientId: string;
-  analysisRow: any;
+  analysisRow?: any;
 }) {
   const queryClient = useQueryClient();
 
