@@ -581,6 +581,7 @@ export default function AnamneseFormBuilder() {
                             typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
                             onEdit={() => handleOpenQuestionDialog(question)}
                             onDelete={() => handleDeleteQuestion(question.id)}
+                            onDuplicate={() => handleDuplicateQuestion(question)}
                           />
                         ))}
                       </div>
