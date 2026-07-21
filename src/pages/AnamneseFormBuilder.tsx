@@ -686,14 +686,20 @@ export default function AnamneseFormBuilder() {
         </div>
 
         {/* Questions */}
-        {sortedQuestions.length === 0 ? (
+        {sortedQuestions.length === 0 && sections.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <p className="text-muted-foreground mb-4">Nenhuma pergunta adicionada ainda.</p>
-              <Button onClick={() => handleOpenQuestionDialog()} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Adicionar Primeira Pergunta
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleAddSection} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Criar Seção
+                </Button>
+                <Button onClick={() => handleOpenQuestionDialog()} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Adicionar Primeira Pergunta
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -703,33 +709,64 @@ export default function AnamneseFormBuilder() {
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={sortedQuestions.map(q => q.id)}
+              items={sections.map(s => `section:${s}`)}
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-6">
-                {sections.map(section => {
+                {sections.map((section, sIdx) => {
                   const sectionQuestions = sortedQuestions.filter(q => q.section === section);
 
                   return (
-                    <div key={section} className="group">
-                      <EditableSectionHeader
+                    <div key={section}>
+                      <SortableSectionHeader
+                        id={`section:${section}`}
                         section={section}
+                        order={sIdx + 1}
+                        questionCount={sectionQuestions.length}
                         onRename={handleRenameSection}
+                        onDuplicate={() => handleDuplicateSection(section)}
+                        onDelete={() => handleDeleteSection(section)}
                       />
-                      <div className="space-y-3">
-                        {sectionQuestions.map((question, index) => (
-                          <SortableQuestionCard
-                            key={question.id}
-                            id={question.id}
-                            question={question}
-                            index={index}
-                            typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
-                            onEdit={() => handleOpenQuestionDialog(question)}
-                            onDelete={() => handleDeleteQuestion(question.id)}
-                            onDuplicate={() => handleDuplicateQuestion(question)}
-                          />
-                        ))}
-                      </div>
+                      <SortableContext
+                        items={sectionQuestions.map(q => q.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-3">
+                          {sectionQuestions.length === 0 ? (
+                            <div className="rounded-md border border-dashed border-muted-foreground/30 p-4 text-center">
+                              <p className="text-sm text-muted-foreground mb-2">
+                                Seção vazia — adicione perguntas selecionando "{section}" ao criar uma nova pergunta.
+                              </p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  resetQuestionData();
+                                  setQuestionData(prev => ({ ...prev, section }));
+                                  setShowQuestionDialog(true);
+                                }}
+                                className="gap-2"
+                              >
+                                <Plus className="h-4 w-4" />
+                                Adicionar pergunta aqui
+                              </Button>
+                            </div>
+                          ) : (
+                            sectionQuestions.map((question, index) => (
+                              <SortableQuestionCard
+                                key={question.id}
+                                id={question.id}
+                                question={question}
+                                index={index}
+                                typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
+                                onEdit={() => handleOpenQuestionDialog(question)}
+                                onDelete={() => handleDeleteQuestion(question.id)}
+                                onDuplicate={() => handleDuplicateQuestion(question)}
+                              />
+                            ))
+                          )}
+                        </div>
+                      </SortableContext>
                     </div>
                   );
                 })}
