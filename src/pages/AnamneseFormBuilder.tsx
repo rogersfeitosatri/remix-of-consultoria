@@ -173,6 +173,8 @@ export default function AnamneseFormBuilder() {
       options: [],
       scale_min: 1,
       scale_max: 10,
+      info_body: '',
+      info_button_label: 'Vamos lá',
     });
     setEditingQuestion(null);
     setNewOption('');
