@@ -539,6 +539,7 @@ export type Database = {
           scale_max: number | null
           scale_min: number | null
           section: string
+          subsection: string | null
         }
         Insert: {
           comment_field_label?: string | null
@@ -558,6 +559,7 @@ export type Database = {
           scale_max?: number | null
           scale_min?: number | null
           section?: string
+          subsection?: string | null
         }
         Update: {
           comment_field_label?: string | null
@@ -577,6 +579,7 @@ export type Database = {
           scale_max?: number | null
           scale_min?: number | null
           section?: string
+          subsection?: string | null
         }
         Relationships: [
           {

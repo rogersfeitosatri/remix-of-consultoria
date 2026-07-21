@@ -16,6 +16,7 @@ export interface AnamneseQuestion {
   id: string;
   form_id: string;
   section: string;
+  subsection?: string | null;
   question_text: string;
   question_type: string;
   question_key?: string | null;
@@ -221,9 +222,10 @@ export function useAddAnamneseQuestion() {
     mutationFn: async (data: {
       form_id: string;
       section: string;
+      subsection?: string | null;
       question_text: string;
       question_type: string;
-      options?: string[];
+      options?: string[] | null;
       scale_min?: number;
       scale_max?: number;
       is_required?: boolean;
@@ -295,14 +297,17 @@ export function useReorderAnamneseQuestions() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ form_id, updates }: { form_id: string; updates: { id: string; order_index: number; section?: string }[] }) => {
+    mutationFn: async ({ form_id, updates }: { form_id: string; updates: { id: string; order_index: number; section?: string; subsection?: string | null }[] }) => {
       // Execute all updates in sequence to avoid race conditions
       // Using Promise.all with individual updates
       await Promise.all(
         updates.map(async (update) => {
+          const patch: any = { order_index: update.order_index };
+          if (update.section !== undefined) patch.section = update.section;
+          if (update.subsection !== undefined) patch.subsection = update.subsection;
           const { error } = await supabase
             .from('anamnese_questions' as any)
-            .update({ order_index: update.order_index, ...(update.section && { section: update.section }) })
+            .update(patch)
             .eq('id', update.id);
 
           if (error) throw error;

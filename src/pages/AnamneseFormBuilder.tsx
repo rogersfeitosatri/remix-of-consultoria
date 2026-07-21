@@ -66,6 +66,7 @@ import {
 } from '@dnd-kit/sortable';
 import { SortableQuestionCard } from '@/components/forms/SortableQuestionCard';
 import { SortableSectionHeader } from '@/components/forms/SortableSectionHeader';
+import { SubsectionHeader } from '@/components/forms/SubsectionHeader';
 
 const questionTypes = [
   { value: 'info', label: '💡 Bloco informativo (sem resposta)' },
@@ -114,6 +115,7 @@ export default function AnamneseFormBuilder() {
     question_text: '',
     question_type: 'text',
     section: 'Geral',
+    subsection: '' as string,
     is_required: false,
     has_comment_field: false,
     comment_field_required: false,
@@ -134,6 +136,8 @@ export default function AnamneseFormBuilder() {
   const [localQuestions, setLocalQuestions] = useState<AnamneseQuestion[]>([]);
   // Sections list persisted locally (includes empty sections not yet backed by questions)
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
+  // Subsection order per section: { [section]: string[] } — includes empty subsections not yet backed by questions
+  const [subsectionOrder, setSubsectionOrder] = useState<Record<string, string[]>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -163,16 +167,30 @@ export default function AnamneseFormBuilder() {
       const sorted = [...formData.questions].sort((a, b) => a.order_index - b.order_index);
       const derived = Array.from(new Set(sorted.map(q => q.section)));
       setSectionOrder(prev => {
-        // Keep any locally-created empty sections + all derived sections, in previous known order
-        const kept = prev.filter(s => derived.includes(s) || !derived.length ? true : !derived.includes(s) ? true : true);
-        const missing = derived.filter(s => !prev.includes(s));
-        // Merge preserving previous relative order, appending new derived sections at the end
         const merged: string[] = [];
-        for (const s of prev) if (derived.includes(s) || kept.includes(s)) merged.push(s);
-        for (const s of missing) if (!merged.includes(s)) merged.push(s);
-        // Ensure all derived sections are present
+        for (const s of prev) if (derived.includes(s)) merged.push(s);
+        for (const s of prev) if (!derived.includes(s) && !merged.includes(s)) merged.push(s);
         for (const s of derived) if (!merged.includes(s)) merged.push(s);
         return merged;
+      });
+
+      // Sync subsections per section
+      setSubsectionOrder(prev => {
+        const next: Record<string, string[]> = {};
+        for (const sec of new Set([...Object.keys(prev), ...derived])) {
+          const derivedSubs: string[] = [];
+          for (const q of sorted.filter(q => q.section === sec)) {
+            const sub = q.subsection?.trim();
+            if (sub && !derivedSubs.includes(sub)) derivedSubs.push(sub);
+          }
+          const prevSubs = prev[sec] || [];
+          const merged: string[] = [];
+          for (const s of prevSubs) if (derivedSubs.includes(s)) merged.push(s);
+          for (const s of prevSubs) if (!derivedSubs.includes(s) && !merged.includes(s)) merged.push(s);
+          for (const s of derivedSubs) if (!merged.includes(s)) merged.push(s);
+          if (merged.length) next[sec] = merged;
+        }
+        return next;
       });
     }
   }, [formData?.questions]);
@@ -182,6 +200,7 @@ export default function AnamneseFormBuilder() {
       question_text: '',
       question_type: 'text',
       section: 'Geral',
+      subsection: '',
       is_required: false,
       has_comment_field: false,
       comment_field_required: false,
@@ -203,6 +222,7 @@ export default function AnamneseFormBuilder() {
         question_text: question.question_text,
         question_type: question.question_type,
         section: question.section,
+        subsection: question.subsection || '',
         is_required: question.is_required,
         has_comment_field: question.has_comment_field,
         comment_field_required: question.comment_field_required || false,
@@ -261,6 +281,7 @@ export default function AnamneseFormBuilder() {
         question_text: questionData.question_text,
         question_type: questionData.question_type,
         section: questionData.section,
+        subsection: questionData.subsection?.trim() ? questionData.subsection.trim() : null,
         is_required: isInfo ? false : questionData.is_required,
         has_comment_field: isInfo ? false : questionData.has_comment_field,
         comment_field_required: isInfo ? false : questionData.comment_field_required,
@@ -318,6 +339,7 @@ export default function AnamneseFormBuilder() {
       await addQuestion.mutateAsync({
         form_id: formId!,
         section: question.section,
+        subsection: question.subsection ?? null,
         question_text: `${question.question_text} (cópia)`,
         question_type: question.question_type,
         options: question.options ?? undefined,
@@ -605,6 +627,113 @@ export default function AnamneseFormBuilder() {
     }
   };
 
+  // ---- Sub-sections ----
+  const uniqueSubsectionName = (section: string, base: string) => {
+    const list = subsectionOrder[section] || [];
+    if (!list.includes(base)) return base;
+    let i = 2;
+    while (list.includes(`${base} ${i}`)) i++;
+    return `${base} ${i}`;
+  };
+
+  const handleAddSubsection = (section: string) => {
+    const name = uniqueSubsectionName(section, 'Nova Subseção');
+    setSubsectionOrder(prev => ({
+      ...prev,
+      [section]: [...(prev[section] || []), name],
+    }));
+    toast({ title: 'Subseção criada!', description: 'Adicione perguntas escolhendo esta subseção.' });
+  };
+
+  const handleRenameSubsection = async (section: string, oldName: string, newName: string) => {
+    if (!newName.trim() || newName === oldName) return;
+    setSubsectionOrder(prev => ({
+      ...prev,
+      [section]: (prev[section] || []).map(s => (s === oldName ? newName : s)),
+    }));
+    setLocalQuestions(prev => prev.map(q => (q.section === section && q.subsection === oldName ? { ...q, subsection: newName } : q)));
+    try {
+      const affected = localQuestions.filter(q => q.section === section && q.subsection === oldName);
+      await Promise.all(
+        affected.map(q =>
+          updateQuestion.mutateAsync({ id: q.id, form_id: formId!, subsection: newName })
+        )
+      );
+      toast({ title: 'Subseção renomeada!' });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível renomear a subseção.', variant: 'destructive' });
+    }
+  };
+
+  const handleDuplicateSubsection = async (section: string, name: string) => {
+    const newName = uniqueSubsectionName(section, `${name} (cópia)`);
+    const subQs = [...localQuestions]
+      .filter(q => q.section === section && q.subsection === name)
+      .sort((a, b) => a.order_index - b.order_index);
+
+    setSubsectionOrder(prev => {
+      const list = [...(prev[section] || [])];
+      const idx = list.indexOf(name);
+      list.splice(idx + 1, 0, newName);
+      return { ...prev, [section]: list };
+    });
+
+    if (subQs.length === 0) {
+      toast({ title: 'Subseção duplicada (vazia).' });
+      return;
+    }
+
+    try {
+      const baseIndex = (formData?.questions?.length || 0);
+      for (let i = 0; i < subQs.length; i++) {
+        const q = subQs[i];
+        await addQuestion.mutateAsync({
+          form_id: formId!,
+          section,
+          subsection: newName,
+          question_text: q.question_text,
+          question_type: q.question_type,
+          options: q.options ?? undefined,
+          scale_min: q.scale_min,
+          scale_max: q.scale_max,
+          is_required: q.is_required,
+          has_comment_field: q.has_comment_field,
+          comment_field_label: q.comment_field_label,
+          comment_field_required: q.comment_field_required,
+          order_index: baseIndex + i,
+          config: q.config ?? null,
+        });
+      }
+      toast({ title: 'Subseção duplicada!' });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível duplicar a subseção.', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteSubsection = async (section: string, name: string) => {
+    const subQs = localQuestions.filter(q => q.section === section && q.subsection === name);
+    if (subQs.length === 0) {
+      setSubsectionOrder(prev => ({
+        ...prev,
+        [section]: (prev[section] || []).filter(s => s !== name),
+      }));
+      toast({ title: 'Subseção removida.' });
+      return;
+    }
+    try {
+      for (const q of subQs) {
+        await deleteQuestion.mutateAsync({ id: q.id, form_id: formId! });
+      }
+      setSubsectionOrder(prev => ({
+        ...prev,
+        [section]: (prev[section] || []).filter(s => s !== name),
+      }));
+      toast({ title: 'Subseção excluída!' });
+    } catch {
+      toast({ title: 'Erro', description: 'Não foi possível excluir a subseção.', variant: 'destructive' });
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -715,28 +844,64 @@ export default function AnamneseFormBuilder() {
               <div className="space-y-6">
                 {sections.map((section, sIdx) => {
                   const sectionQuestions = sortedQuestions.filter(q => q.section === section);
+                  const directQuestions = sectionQuestions.filter(q => !q.subsection);
+                  const subsections = subsectionOrder[section] || [];
 
                   return (
                     <div key={section}>
-                      <SortableSectionHeader
-                        id={`section:${section}`}
-                        section={section}
-                        order={sIdx + 1}
-                        questionCount={sectionQuestions.length}
-                        onRename={handleRenameSection}
-                        onDuplicate={() => handleDuplicateSection(section)}
-                        onDelete={() => handleDeleteSection(section)}
-                      />
+                      <div className="flex items-center gap-1">
+                        <div className="flex-1">
+                          <SortableSectionHeader
+                            id={`section:${section}`}
+                            section={section}
+                            order={sIdx + 1}
+                            questionCount={sectionQuestions.length}
+                            onRename={handleRenameSection}
+                            onDuplicate={() => handleDuplicateSection(section)}
+                            onDelete={() => handleDeleteSection(section)}
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleAddSubsection(section)}
+                          className="gap-1 h-8 text-xs"
+                          title="Adicionar subseção"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Subseção
+                        </Button>
+                      </div>
+
                       <SortableContext
                         items={sectionQuestions.map(q => q.id)}
                         strategy={verticalListSortingStrategy}
                       >
-                        <div className="space-y-3">
-                          {sectionQuestions.length === 0 ? (
-                            <div className="rounded-md border border-dashed border-muted-foreground/30 p-4 text-center">
-                              <p className="text-sm text-muted-foreground mb-2">
-                                Seção vazia — adicione perguntas selecionando "{section}" ao criar uma nova pergunta.
-                              </p>
+                        {/* Direct questions (no subsection) — good spot for info blocks */}
+                        {directQuestions.length > 0 && (
+                          <div className="space-y-3 mb-4">
+                            {directQuestions.map((question, index) => (
+                              <SortableQuestionCard
+                                key={question.id}
+                                id={question.id}
+                                question={question}
+                                index={index}
+                                typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
+                                onEdit={() => handleOpenQuestionDialog(question)}
+                                onDelete={() => handleDeleteQuestion(question.id)}
+                                onDuplicate={() => handleDuplicateQuestion(question)}
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Empty section placeholder */}
+                        {sectionQuestions.length === 0 && subsections.length === 0 && (
+                          <div className="rounded-md border border-dashed border-muted-foreground/30 p-4 text-center mb-3">
+                            <p className="text-sm text-muted-foreground mb-2">
+                              Seção vazia — adicione um bloco informativo, perguntas ou uma subseção.
+                            </p>
+                            <div className="flex justify-center gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -748,23 +913,71 @@ export default function AnamneseFormBuilder() {
                                 className="gap-2"
                               >
                                 <Plus className="h-4 w-4" />
-                                Adicionar pergunta aqui
+                                Pergunta
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleAddSubsection(section)}
+                                className="gap-2"
+                              >
+                                <Plus className="h-4 w-4" />
+                                Subseção
                               </Button>
                             </div>
-                          ) : (
-                            sectionQuestions.map((question, index) => (
-                              <SortableQuestionCard
-                                key={question.id}
-                                id={question.id}
-                                question={question}
-                                index={index}
-                                typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
-                                onEdit={() => handleOpenQuestionDialog(question)}
-                                onDelete={() => handleDeleteQuestion(question.id)}
-                                onDuplicate={() => handleDuplicateQuestion(question)}
-                              />
-                            ))
-                          )}
+                          </div>
+                        )}
+
+                        {/* Subsections */}
+                        <div className="space-y-4 pl-4 border-l border-muted">
+                          {subsections.map((subName, subIdx) => {
+                            const subQuestions = sectionQuestions.filter(q => q.subsection === subName);
+                            const subLabel = `${sIdx + 1}.${subIdx + 1}`;
+                            return (
+                              <div key={subName} className="group/subsection">
+                                <SubsectionHeader
+                                  label={subLabel}
+                                  name={subName}
+                                  questionCount={subQuestions.length}
+                                  onRename={(newName) => handleRenameSubsection(section, subName, newName)}
+                                  onDuplicate={() => handleDuplicateSubsection(section, subName)}
+                                  onDelete={() => handleDeleteSubsection(section, subName)}
+                                />
+                                {subQuestions.length === 0 ? (
+                                  <div className="rounded-md border border-dashed border-muted-foreground/30 p-3 text-center">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        resetQuestionData();
+                                        setQuestionData(prev => ({ ...prev, section, subsection: subName }));
+                                        setShowQuestionDialog(true);
+                                      }}
+                                      className="gap-2"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                      Adicionar pergunta em {subLabel}
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {subQuestions.map((question, index) => (
+                                      <SortableQuestionCard
+                                        key={question.id}
+                                        id={question.id}
+                                        question={question}
+                                        index={index}
+                                        typeLabel={questionTypes.find(t => t.value === question.question_type)?.label || question.question_type}
+                                        onEdit={() => handleOpenQuestionDialog(question)}
+                                        onDelete={() => handleDeleteQuestion(question.id)}
+                                        onDuplicate={() => handleDuplicateQuestion(question)}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </SortableContext>
                     </div>
@@ -850,6 +1063,24 @@ export default function AnamneseFormBuilder() {
                   placeholder="Ex: Dados Pessoais, Histórico..."
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Subseção (opcional)</Label>
+              <Input
+                value={questionData.subsection}
+                onChange={(e) => setQuestionData({ ...questionData, subsection: e.target.value })}
+                placeholder="Ex: Peso, Suplementação, Rotina de sono..."
+                list="subsection-suggestions"
+              />
+              <datalist id="subsection-suggestions">
+                {(subsectionOrder[questionData.section] || []).map(s => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+              <p className="text-xs text-muted-foreground">
+                Se preenchida, a pergunta ficará agrupada como {(sectionOrder.indexOf(questionData.section) + 1) || '?'}.{'X'} dentro da seção.
+              </p>
             </div>
 
             {/* Options for select/multiselect */}
