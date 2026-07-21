@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
-import { Network, ClipboardList, BarChart3, Search, ChevronsUpDown, Check, Trash2, Link2, Copy } from 'lucide-react';
+import { Network, ClipboardList, BarChart3, Search, ChevronsUpDown, Check, Trash2, Link2, Copy, Download, Brain } from 'lucide-react';
+import { downloadScreeningResponsesPdf, downloadScreeningAnalysisPdf } from '@/lib/metabolicExport';
 import { toast } from 'sonner';
 import { useClients } from '@/hooks/useClients';
 import { useMetabolicScreening } from '@/hooks/useMetabolicScreening';
@@ -171,7 +172,25 @@ export default function MetabolicWeb() {
             <TabsContent value="web">
               {selectedScreening ? (
                 <div className="space-y-2">
-                  <div className="flex justify-end">
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 text-xs"
+                      onClick={() => downloadScreeningResponsesPdf(selectedScreening, selectedClient?.name)}
+                    >
+                      <Download className="h-3.5 w-3.5" /> Baixar respostas
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1 text-xs"
+                      disabled={!selectedScreening.ai_analysis}
+                      title={selectedScreening.ai_analysis ? 'Baixar a análise da IA' : 'Gere a análise da IA primeiro'}
+                      onClick={() => downloadScreeningAnalysisPdf(selectedScreening, selectedClient?.name)}
+                    >
+                      <Brain className="h-3.5 w-3.5" /> Baixar análise (IA)
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
