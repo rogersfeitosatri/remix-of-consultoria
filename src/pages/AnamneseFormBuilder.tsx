@@ -493,18 +493,108 @@ export default function AnamneseFormBuilder() {
       return;
     }
 
-    // ---- Question reorder ----
-    const sortedQuestions = [...localQuestions].sort((a, b) => a.order_index - b.order_index);
-    const oldIndex = sortedQuestions.findIndex(q => q.id === activeId);
-    const newIndex = sortedQuestions.findIndex(q => q.id === overId);
+    // ---- Question reorder / move across sections & subsections ----
+    const activeQ = localQuestions.find(q => q.id === activeId);
+    if (!activeQ) return;
 
-    if (oldIndex === -1 || newIndex === -1) return;
+    // Determine target (section, subsection) from drop target.
+    // Supports: another question id, or container ids:
+    //   dropzone:section:<section>
+    //   dropzone:sub:<section>::<subName>
+    let targetSection: string;
+    let targetSubsection: string | null;
+    let overQuestionId: string | null = null;
 
-    const newQuestions = arrayMove(sortedQuestions, oldIndex, newIndex);
-    const updatedQuestions = newQuestions.map((q, index) => ({ ...q, order_index: index }));
-    setLocalQuestions(updatedQuestions);
+    if (overId.startsWith('dropzone:sub:')) {
+      const rest = overId.slice('dropzone:sub:'.length);
+      const [sec, sub] = rest.split('::');
+      targetSection = sec;
+      targetSubsection = sub || null;
+    } else if (overId.startsWith('dropzone:section:')) {
+      targetSection = overId.slice('dropzone:section:'.length);
+      targetSubsection = null;
+    } else {
+      const overQ = localQuestions.find(q => q.id === overId);
+      if (!overQ) return;
+      overQuestionId = overQ.id;
+      targetSection = overQ.section;
+      targetSubsection = overQ.subsection || null;
+    }
 
-    const updates = updatedQuestions.map((q) => ({ id: q.id, order_index: q.order_index }));
+    // Rebuild global order respecting sectionOrder, and within each section
+    // respect subsectionOrder (with `null` subsection group appearing where its
+    // items naturally sit — we place direct questions BEFORE subsections).
+    const sorted = [...localQuestions].sort((a, b) => a.order_index - b.order_index);
+    const without = sorted.filter(q => q.id !== activeId);
+    const movedQ: AnamneseQuestion = {
+      ...activeQ,
+      section: targetSection,
+      subsection: targetSubsection,
+    };
+
+    let insertAt: number;
+    if (overQuestionId) {
+      insertAt = without.findIndex(q => q.id === overQuestionId);
+      if (insertAt === -1) insertAt = without.length;
+    } else {
+      // Drop into empty container: append at end of that (section, subsection) group
+      let lastIdx = -1;
+      without.forEach((q, i) => {
+        if (q.section === targetSection && (q.subsection || null) === targetSubsection) {
+          lastIdx = i;
+        }
+      });
+      insertAt = lastIdx === -1 ? without.length : lastIdx + 1;
+    }
+    without.splice(insertAt, 0, movedQ);
+
+    // Now rewrite order_index following sectionOrder → (direct → each subsection in order)
+    const reindexed: AnamneseQuestion[] = [];
+    let idx = 0;
+    for (const sec of sectionOrder) {
+      const inSec = without.filter(q => q.section === sec);
+      // direct (no subsection) first
+      for (const q of inSec.filter(q => !q.subsection)) {
+        reindexed.push({ ...q, order_index: idx++ });
+      }
+      const subs = subsectionOrder[sec] || [];
+      // known subsections in configured order
+      for (const sub of subs) {
+        for (const q of inSec.filter(q => q.subsection === sub)) {
+          reindexed.push({ ...q, order_index: idx++ });
+        }
+      }
+      // any leftover subsections not yet registered
+      const leftover = inSec.filter(
+        q => q.subsection && !subs.includes(q.subsection)
+      );
+      for (const q of leftover) {
+        reindexed.push({ ...q, order_index: idx++ });
+      }
+    }
+    // Sections not in sectionOrder (safety net)
+    const knownSecs = new Set(sectionOrder);
+    for (const q of without.filter(q => !knownSecs.has(q.section))) {
+      reindexed.push({ ...q, order_index: idx++ });
+    }
+
+    // Ensure target subsection is registered in subsectionOrder
+    if (targetSubsection) {
+      setSubsectionOrder(prev => {
+        const list = prev[targetSection] || [];
+        if (list.includes(targetSubsection!)) return prev;
+        return { ...prev, [targetSection]: [...list, targetSubsection!] };
+      });
+    }
+
+    setLocalQuestions(reindexed);
+
+    const updates = reindexed.map(q => ({
+      id: q.id,
+      order_index: q.order_index,
+      section: q.section,
+      subsection: q.subsection ?? null,
+    }));
 
     try {
       await reorderQuestions.mutateAsync({ form_id: formId!, updates });
