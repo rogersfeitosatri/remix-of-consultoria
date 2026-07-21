@@ -166,16 +166,30 @@ export default function AnamneseFormBuilder() {
       const sorted = [...formData.questions].sort((a, b) => a.order_index - b.order_index);
       const derived = Array.from(new Set(sorted.map(q => q.section)));
       setSectionOrder(prev => {
-        // Keep any locally-created empty sections + all derived sections, in previous known order
-        const kept = prev.filter(s => derived.includes(s) || !derived.length ? true : !derived.includes(s) ? true : true);
-        const missing = derived.filter(s => !prev.includes(s));
-        // Merge preserving previous relative order, appending new derived sections at the end
         const merged: string[] = [];
-        for (const s of prev) if (derived.includes(s) || kept.includes(s)) merged.push(s);
-        for (const s of missing) if (!merged.includes(s)) merged.push(s);
-        // Ensure all derived sections are present
+        for (const s of prev) if (derived.includes(s)) merged.push(s);
+        for (const s of prev) if (!derived.includes(s) && !merged.includes(s)) merged.push(s);
         for (const s of derived) if (!merged.includes(s)) merged.push(s);
         return merged;
+      });
+
+      // Sync subsections per section
+      setSubsectionOrder(prev => {
+        const next: Record<string, string[]> = {};
+        for (const sec of new Set([...Object.keys(prev), ...derived])) {
+          const derivedSubs: string[] = [];
+          for (const q of sorted.filter(q => q.section === sec)) {
+            const sub = q.subsection?.trim();
+            if (sub && !derivedSubs.includes(sub)) derivedSubs.push(sub);
+          }
+          const prevSubs = prev[sec] || [];
+          const merged: string[] = [];
+          for (const s of prevSubs) if (derivedSubs.includes(s)) merged.push(s);
+          for (const s of prevSubs) if (!derivedSubs.includes(s) && !merged.includes(s)) merged.push(s);
+          for (const s of derivedSubs) if (!merged.includes(s)) merged.push(s);
+          if (merged.length) next[sec] = merged;
+        }
+        return next;
       });
     }
   }, [formData?.questions]);
