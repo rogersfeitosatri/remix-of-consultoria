@@ -240,17 +240,21 @@ export default function AnamneseFormBuilder() {
     }
 
     try {
+      const isInfo = questionData.question_type === 'info';
       const payload = {
         question_text: questionData.question_text,
         question_type: questionData.question_type,
         section: questionData.section,
-        is_required: questionData.is_required,
-        has_comment_field: questionData.has_comment_field,
-        comment_field_required: questionData.comment_field_required,
+        is_required: isInfo ? false : questionData.is_required,
+        has_comment_field: isInfo ? false : questionData.has_comment_field,
+        comment_field_required: isInfo ? false : questionData.comment_field_required,
         comment_field_label: questionData.comment_field_label,
         options: ['select', 'multiselect'].includes(questionData.question_type) ? questionData.options : null,
         scale_min: questionData.question_type === 'scale' ? questionData.scale_min : null,
         scale_max: questionData.question_type === 'scale' ? questionData.scale_max : null,
+        config: isInfo
+          ? { body: questionData.info_body, buttonLabel: questionData.info_button_label || 'Vamos lá' }
+          : (editingQuestion?.config ?? null),
       };
 
       if (editingQuestion) {
