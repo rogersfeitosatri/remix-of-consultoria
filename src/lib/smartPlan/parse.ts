@@ -82,9 +82,14 @@ export function parseToken(raw: string): FoodToken {
 
   if (!qtyPart) return { name: namePart, raw };
 
-  const q = qtyPart.match(QTY_RE);
-  const qty = q ? Number(q[1].replace(',', '.')) : null;
-  const measure = qtyPart.replace(QTY_RE, '').trim() || null;
+  // A quantidade é o número no INÍCIO do trecho — NUNCA um número dentro do
+  // "(X g)" (que é a grama). Ex.: "meia medida (15 g)" NÃO tem número inicial →
+  // quantity null e a medida inteira fica "meia medida (15 g)" (o gramsFromToken
+  // lê os 15 g). Antes, o regex pegava o 15 da grama como quantidade e produzia
+  // "15 meia medida ( g)", inflando os macros.
+  const leading = qtyPart.match(/^(\d+(?:[.,]\d+)?)\s*/);
+  const qty = leading ? Number(leading[1].replace(',', '.')) : null;
+  const measure = (leading ? qtyPart.slice(leading[0].length) : qtyPart).trim() || null;
   return { name: namePart, quantity: qty, measure, raw };
 }
 
