@@ -602,7 +602,9 @@ export default function MealPlanEditor() {
           return next;
         });
         if (result.orientations) {
-          setOrientationsText((prev) => prev.trim() ? `${prev}\n\n${result.orientations}` : result.orientations);
+          // Import é determinístico: SUBSTITUI as orientações (reimportar o mesmo
+          // arquivo dá sempre o mesmo resultado, sem duplicar).
+          setOrientationsText(result.orientations);
         }
         const dayCount = Object.keys(result.perDay).length;
         const foodMsg = result.createdFoods.length ? ` ${result.createdFoods.length} alimento(s) novo(s) criado(s) no banco.` : '';
