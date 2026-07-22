@@ -165,6 +165,9 @@ export default function MealPlanEditor() {
   const [activeDay, setActiveDay] = useState<DayKey>('all');
   // Painel de anamnese DOCADO (não-modal) — dá pra ler enquanto digita no editor.
   const [anamneseOpen, setAnamneseOpen] = useState(false);
+  // Resumo do plano encolhe para a LATERAL (vira um trilho fino) para dar mais
+  // largura ao editor. Começa encolhido.
+  const [resumoOpen, setResumoOpen] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   // Só grava rascunho depois que o usuário edita algo — evita que o autosave
   // escreva EMPTY_TEXTS antes da hidratação vinda do banco (o que apagava
@@ -848,7 +851,11 @@ export default function MealPlanEditor() {
           </TabsList>
         </Tabs>
 
-        <div className={`grid grid-cols-1 gap-4 items-start ${anamneseOpen ? 'lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)_300px]' : 'lg:grid-cols-[minmax(0,1fr)_300px]'}`}>
+        <div className={`grid grid-cols-1 gap-4 items-start ${
+          anamneseOpen
+            ? (resumoOpen ? 'lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)_300px]' : 'lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)_52px]')
+            : (resumoOpen ? 'lg:grid-cols-[minmax(0,1fr)_300px]' : 'lg:grid-cols-[minmax(0,1fr)_52px]')
+        }`}>
           {/* Coluna 1: dias da semana (alinhados à largura do editor) + editor */}
           <div className="min-w-0 space-y-4">
             <WeekOverview texts={texts} active={activeDay} onSelect={(k) => setActiveDay(k)} weightKg={weightKg} enrichedTotalsByDay={enrichedTotalsByDay} />
@@ -1048,6 +1055,8 @@ export default function MealPlanEditor() {
               onSave={savePlan}
               onSendZonaNutri={sendToZonaNutri}
               sending={sending}
+              open={resumoOpen}
+              onToggle={() => setResumoOpen((v) => !v)}
             />
           </div>
         </div>

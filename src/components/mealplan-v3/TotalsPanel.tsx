@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronsLeft, ChevronsRight, Save, Send } from 'lucide-react';
 import { parseText } from '@/lib/smartPlan/parse';
 import { astToMeals, planTotals } from '@/lib/smartPlan/serialize';
 
@@ -14,7 +14,7 @@ function fmt(n: number, digits = 0) {
 
 export function TotalsPanel({
   text, weightKg, saveState, onSave, onSendZonaNutri, sending,
-  enrichedMeals, enrichedTotals,
+  enrichedMeals, enrichedTotals, open: openProp, onToggle,
 }: {
   text: string;
   weightKg: number | null;
@@ -25,6 +25,9 @@ export function TotalsPanel({
   /** Meals já enriquecidos (com calories/grams). Preferidos sobre `text`. */
   enrichedMeals?: any[];
   enrichedTotals?: { kcal: number; cho: number; ptn: number; lip: number };
+  /** Controle externo do estado aberto/encolhido (encolhe para a lateral). */
+  open?: boolean;
+  onToggle?: () => void;
 }) {
   const { meals, totals } = useMemo(() => {
     if (enrichedMeals && enrichedTotals) {
@@ -37,51 +40,90 @@ export function TotalsPanel({
   const kg = weightKg && weightKg > 0 ? weightKg : null;
   const gkg = (v: number) => kg ? Math.round((v / kg) * 100) / 100 : null;
 
-  // Painel encolhido por padrão — libera espaço (útil com a anamnese aberta).
-  const [open, setOpen] = useState(false);
+  // Encolhe para a LATERAL: começa encolhido (controlado externamente ou local).
+  const [openLocal, setOpenLocal] = useState(false);
+  const open = openProp ?? openLocal;
+  const toggle = onToggle ?? (() => setOpenLocal((v) => !v));
+
+  // ── Trilho lateral fino (encolhido): libera largura para o editor ──
+  if (!open) {
+    return (
+      <Card className="sticky top-4 flex flex-col items-center gap-3 py-3 px-1">
+        <button
+          type="button"
+          onClick={toggle}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground hover:bg-muted"
+          title="Expandir resumo do plano"
+          aria-label="Expandir resumo do plano"
+        >
+          <ChevronsLeft className="h-4 w-4" />
+        </button>
+        <div
+          className="text-[11px] font-semibold tracking-wide text-foreground [writing-mode:vertical-rl] rotate-180 whitespace-nowrap"
+          title={`${fmt(totals.kcal)} kcal`}
+        >
+          Resumo · {fmt(totals.kcal)} kcal
+        </div>
+        <div className="flex flex-col items-center gap-2 mt-1">
+          {onSave && (
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saveState === 'saving'}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+              title="Salvar plano" aria-label="Salvar plano"
+            >
+              <Save className="h-4 w-4" />
+            </button>
+          )}
+          {onSendZonaNutri && (
+            <button
+              type="button"
+              onClick={onSendZonaNutri}
+              disabled={!!sending}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border disabled:opacity-50"
+              title="Enviar ao Zona Nutri" aria-label="Enviar ao Zona Nutri"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="sticky top-4">
       <CardHeader className="pb-2">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-center justify-between gap-2 text-left"
-          aria-expanded={open}
-        >
-          <CardTitle className="text-sm flex items-center gap-1.5">
-            {open ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
-            Resumo do plano
-          </CardTitle>
-          <StatusBadge state={saveState} />
-        </button>
-        {/* Resumo compacto sempre visível (mesmo encolhido). */}
-        {!open && (
-          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
-            <span className="font-semibold text-sm">{fmt(totals.kcal)} kcal</span>
-            <span className="text-muted-foreground">CHO {fmt(totals.cho)}g · PTN {fmt(totals.ptn)}g · LIP {fmt(totals.lip)}g</span>
-            <span className="text-muted-foreground">· {meals.length} ref.</span>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm">Resumo do plano</CardTitle>
+          <div className="flex items-center gap-1.5">
+            <StatusBadge state={saveState} />
+            <button
+              type="button"
+              onClick={toggle}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+              title="Encolher para a lateral" aria-label="Encolher resumo"
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </button>
           </div>
-        )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <Collapsible open={open} onOpenChange={setOpen}>
-          <CollapsibleContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <Stat label="Calorias" value={`${fmt(totals.kcal)} kcal`} sub={kg ? `${fmt(totals.kcal / kg, 1)} kcal/kg` : ''} />
-              <Stat label="Peso ref." value={kg ? `${kg} kg` : '—'} sub={kg ? '' : 'Informe na aba do plano'} />
-              <Stat label="Carboidratos" value={`${fmt(totals.cho)} g`} sub={gkg(totals.cho) != null ? `${fmt(gkg(totals.cho)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.cho), 5, 7)} />
-              <Stat label="Proteínas" value={`${fmt(totals.ptn)} g`} sub={gkg(totals.ptn) != null ? `${fmt(gkg(totals.ptn)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.ptn), 1.6, 2.0)} />
-              <Stat label="Gorduras" value={`${fmt(totals.lip)} g`} sub={gkg(totals.lip) != null ? `${fmt(gkg(totals.lip)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.lip), 0.8, 1.2)} />
-              <Stat label="Refeições" value={String(meals.length)} sub={`${(meals as any[]).reduce<number>((a, m) => a + (m.foods?.length || 0), 0)} itens`} />
-            </div>
-            {kg && (
-              <p className="text-[10px] text-muted-foreground -mt-1">
-                Faixas de referência endurance (g/kg): CHO 5–7 · PTN 1,6–2,0 · LIP 0,8–1,2
-              </p>
-            )}
-          </CollapsibleContent>
-        </Collapsible>
+        <div className="grid grid-cols-2 gap-2">
+          <Stat label="Calorias" value={`${fmt(totals.kcal)} kcal`} sub={kg ? `${fmt(totals.kcal / kg, 1)} kcal/kg` : ''} />
+          <Stat label="Peso ref." value={kg ? `${kg} kg` : '—'} sub={kg ? '' : 'Informe na aba do plano'} />
+          <Stat label="Carboidratos" value={`${fmt(totals.cho)} g`} sub={gkg(totals.cho) != null ? `${fmt(gkg(totals.cho)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.cho), 5, 7)} />
+          <Stat label="Proteínas" value={`${fmt(totals.ptn)} g`} sub={gkg(totals.ptn) != null ? `${fmt(gkg(totals.ptn)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.ptn), 1.6, 2.0)} />
+          <Stat label="Gorduras" value={`${fmt(totals.lip)} g`} sub={gkg(totals.lip) != null ? `${fmt(gkg(totals.lip)!, 1)} g/kg` : ''} status={rangeStatus(gkg(totals.lip), 0.8, 1.2)} />
+          <Stat label="Refeições" value={String(meals.length)} sub={`${(meals as any[]).reduce<number>((a, m) => a + (m.foods?.length || 0), 0)} itens`} />
+        </div>
+        {kg && (
+          <p className="text-[10px] text-muted-foreground -mt-1">
+            Faixas de referência endurance (g/kg): CHO 5–7 · PTN 1,6–2,0 · LIP 0,8–1,2
+          </p>
+        )}
 
         <Collapsible>
           <CollapsibleTrigger asChild>
