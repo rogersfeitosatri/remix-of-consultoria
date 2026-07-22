@@ -123,7 +123,41 @@ async function ensureResolved(cache: EnrichCache, items: Array<{ key: string; te
   await Promise.all(waits);
 }
 
-// ─────────── Fallback: casamento local com o banco ───────────
+// ─────────── Casamento EXATO com o banco (preferencial) ───────────
+// Nome do alimento igual (normalizado) a um item do banco. É o caso quando o
+// nutri escolhe o alimento na lista (o editor insere o nome exato do banco) —
+// aí os macros devem ser os do BANCO, iguais à prévia da sugestão. Determinístico.
+async function findFoodExact(name: string, cache: EnrichCache): Promise<FoodItem | null> {
+  const target = normalize(name);
+  if (!target) return null;
+  const cacheKey = 'exact:' + target;
+  if (cache.foodByKey.has(cacheKey)) return cache.foodByKey.get(cacheKey) ?? null;
+  const rawWords = (name || '').trim().split(/\s+/).filter((w) => w.length > 1 && !STOP.has(normalize(w)));
+  const q = (rawWords[0] || name).replace(/[%_]/g, '');
+  const { data } = await (supabase as any)
+    .from('food_items').select('*').ilike('name', `%${q}%`).limit(30);
+  const found = ((data || []) as FoodItem[]).find((r) => normalize(r.name) === target) ?? null;
+  cache.foodByKey.set(cacheKey, found);
+  return found;
+}
+
+async function enrichTokenExact(t: FoodToken, cache: EnrichCache): Promise<boolean> {
+  if (!t.name) return false;
+  const food = await findFoodExact(t.name, cache);
+  if (!food) return false;
+  const measures = await measuresOf(food.id, cache);
+  const grams = gramsFromToken(t, measures);
+  const n = calcNutrients(food, grams);
+  (t as any).foodItemId = food.id;
+  t.grams = grams;
+  t.calories = n.calories;
+  t.protein_g = n.protein_g;
+  t.carbs_g = n.carbs_g;
+  t.fat_g = n.fat_g;
+  return true;
+}
+
+// ─────────── Fallback: casamento local (fuzzy) com o banco ───────────
 async function findFood(name: string, cache: EnrichCache): Promise<FoodItem | null> {
   const key = name.trim().toLowerCase();
   if (!key) return null;
@@ -239,13 +273,32 @@ export async function enrichAst(ast: PlanAst, cache = makeEnrichCache()): Promis
     }
   }
 
-  // 2) Resolve via IA (batch + cache).
-  const items = allTokens.map((t) => ({ key: keyOf(t), text: itemText(t), grams: explicitGrams(t) }));
+  // 2) Casamento EXATO com o banco primeiro (determinístico e igual à prévia da
+  //    sugestão). Só o que NÃO casar exato vai para a IA — assim "café sem açúcar"
+  //    (sem item idêntico) ainda é interpretado pela IA, mas "Pão francês"
+  //    escolhido da lista usa os valores do banco.
+  const needAI: Array<{ key: string; text: string; grams: number | null }> = [];
+  for (const t of allTokens) {
+    const key = keyOf(t);
+    if (cache.aiByKey.has(key)) continue; // já resolvido/semeado
+    try {
+      if (await enrichTokenExact(t, cache)) {
+        cache.aiByKey.set(key, {
+          grams: Number(t.grams) || 0, kcal: Number(t.calories) || 0,
+          protein_g: Number(t.protein_g) || 0, carbs_g: Number(t.carbs_g) || 0, fat_g: Number(t.fat_g) || 0,
+        });
+        continue;
+      }
+    } catch { /* segue para IA */ }
+    needAI.push({ key, text: itemText(t), grams: explicitGrams(t) });
+  }
+
+  // 3) Resolve via IA (batch + cache) o que sobrou.
   try {
-    await ensureResolved(cache, items);
+    await ensureResolved(cache, needAI);
   } catch { /* segue com fallback local */ }
 
-  // 3) Aplica: IA quando disponível; senão, casamento local com o banco.
+  // 4) Aplica: valor do banco/IA quando disponível; senão, fuzzy local.
   for (const t of allTokens) {
     const r = cache.aiByKey.get(keyOf(t));
     if (r) { applyResolved(t, r); continue; }
