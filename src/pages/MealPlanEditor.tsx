@@ -20,7 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import {
-  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat, ClipboardCheck, Plus, Scale, CalendarDays, FileText, NotebookPen,
+  ArrowLeft, ExternalLink, Upload, Loader2, Sparkles, Undo2, FileDown, Copy, Trash2, Repeat, ClipboardCheck, Plus, Scale, CalendarDays, FileText, NotebookPen, X,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { importMealPlanFromMarkdown, type DayKey as MdDayKey } from '@/lib/smartPlan/mdImport';
@@ -163,6 +163,8 @@ export default function MealPlanEditor() {
     return EMPTY_TEXTS;
   });
   const [activeDay, setActiveDay] = useState<DayKey>('all');
+  // Painel de anamnese DOCADO (não-modal) — dá pra ler enquanto digita no editor.
+  const [anamneseOpen, setAnamneseOpen] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   // Só grava rascunho depois que o usuário edita algo — evita que o autosave
   // escreva EMPTY_TEXTS antes da hidratação vinda do banco (o que apagava
@@ -848,7 +850,7 @@ export default function MealPlanEditor() {
 
         <WeekOverview texts={texts} active={activeDay} onSelect={(k) => setActiveDay(k)} weightKg={weightKg} enrichedTotalsByDay={enrichedTotalsByDay} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
+        <div className={`grid grid-cols-1 gap-4 items-start ${anamneseOpen ? 'lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)_300px]' : 'lg:grid-cols-[minmax(0,1fr)_300px]'}`}>
           <Card className="min-w-0 overflow-hidden">
             <CardContent className="p-3 md:p-4">
               {/* Descrição do dia ativo */}
@@ -917,23 +919,13 @@ export default function MealPlanEditor() {
 
                   {/* Consulta / Navegação */}
                   <div className="flex items-center gap-1.5 lg:gap-2">
-                    <Sheet>
-                      <SheetTrigger asChild>
-                        <span>
-                          <ToolIconButton label="Ver anamnese do atleta">
-                            <FileText />
-                          </ToolIconButton>
-                        </span>
-                      </SheetTrigger>
-                      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
-                        <SheetHeader>
-                          <SheetTitle>Anamnese — {client?.name || 'Atleta'}</SheetTitle>
-                        </SheetHeader>
-                        <div className="mt-4">
-                          {clientId && <AnamneseResponseSection clientId={clientId} clientName={client?.name || ''} />}
-                        </div>
-                      </SheetContent>
-                    </Sheet>
+                    <ToolIconButton
+                      label={anamneseOpen ? 'Ocultar anamnese' : 'Ver anamnese (lado a lado)'}
+                      onClick={() => setAnamneseOpen((v) => !v)}
+                      variant={anamneseOpen ? 'secondary' : 'outline'}
+                    >
+                      <FileText />
+                    </ToolIconButton>
                     <Sheet open={orientationsOpen} onOpenChange={setOrientationsOpen}>
                       <SheetTrigger asChild>
                         <span>
@@ -1020,6 +1012,29 @@ export default function MealPlanEditor() {
 
             </CardContent>
           </Card>
+
+          {/* Painel de anamnese DOCADO — não-modal, dá pra ler enquanto digita. */}
+          {anamneseOpen && (
+            <Card className="min-w-0 lg:sticky lg:top-4 max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden border-primary/30">
+              <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-3 py-2 shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm font-semibold truncate">Anamnese — {client?.name || 'Atleta'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAnamneseOpen(false)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted shrink-0"
+                  aria-label="Fechar anamnese"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="overflow-y-auto p-3">
+                {clientId && <AnamneseResponseSection clientId={clientId} clientName={client?.name || ''} />}
+              </div>
+            </Card>
+          )}
 
           <div className="min-w-0">
             <TotalsPanel
