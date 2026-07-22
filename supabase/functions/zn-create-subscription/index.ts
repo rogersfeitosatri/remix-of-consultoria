@@ -158,9 +158,10 @@ Deno.serve(async (req) => {
     }
 
     // 2) Assinatura Asaas — externalReference identifica origem ZN
-    // Para planos parcelados (semestral/anual), o período atual é cobrado como
-    // /payments com installmentCount (até Nx no cartão) e a subscription começa
-    // a renovar depois do período pago.
+    // Para planos parcelados (TRIMESTRAL, semestral e anual — todos com
+    // installments > 1), o período atual é cobrado como /payments com
+    // installmentCount (à vista ou até Nx no cartão) e a subscription começa a
+    // renovar depois do período pago. Mesmo comportamento para os três.
     const isInstallmentPlan = (plan.installments ?? 1) > 1;
     const durationMonths = pInfo.duration_months ?? (data.plan_choice === "quarterly" ? 3 : data.plan_choice === "semiannual" ? 6 : data.plan_choice === "annual" ? 12 : 1);
 
