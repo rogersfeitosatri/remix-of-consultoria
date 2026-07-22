@@ -102,7 +102,10 @@ function splitBlocks(md: string): { plans: PlanBlock[]; orientations: string } {
   return { plans, orientations: orientations.trim() };
 }
 
-const MEAL_HEADER_RE = /^\s*([A-ZÁÂÃÉÊÍÓÔÕÚÇ][A-ZÁÂÃÉÊÍÓÔÕÚÇ \-'/]{2,})\s*[—–-]\s*(\d{1,2})[:h](\d{2})\s*$/;
+// Nome — HH:MM, aceitando TEXTO APÓS o horário (ex.: "CAFÉ DA MANHÃ — 07:00 NA
+// TERÇA E APÓS O LONGO NO DOMINGO"). Sem o trailing opcional, essa refeição era
+// ignorada e o dia vinha sem café da manhã.
+const MEAL_HEADER_RE = /^\s*([A-ZÁÂÃÉÊÍÓÔÕÚÇ][A-ZÁÂÃÉÊÍÓÔÕÚÇ \-'/]{2,})\s*[—–-]\s*(\d{1,2})[:h](\d{2})(?:\b.*)?$/;
 const OPTION_RE = /^\s*OP[ÇC][ÃA]O\s+(\d+)\s*$/i;
 
 interface Meal {
