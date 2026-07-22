@@ -79,9 +79,12 @@ function splitBlocks(md: string): { plans: PlanBlock[]; orientations: string } {
 
   for (const raw of lines) {
     const line = raw.replace(/\s+$/g, '');
-    if (/^ORIENTA[ÇC][ÕO]ES\b/i.test(line.trim())) {
+    // "ORIENTAÇÕES…" e "TROCAS PERMITIDAS" encerram os planos e vão para as
+    // orientações (senão os itens de troca vazam para a última refeição).
+    if (/^ORIENTA[ÇC][ÕO]ES\b/i.test(line.trim()) || /^TROCAS?\s+PERMITID/i.test(line.trim())) {
       flush();
       inOrientations = true;
+      orientations += (orientations ? '\n' : '') + line; // mantém o título da seção
       continue;
     }
     if (inOrientations) {
@@ -199,17 +202,19 @@ async function ensureFoodsExist(names: string[]): Promise<string[]> {
   const created: string[] = [];
   for (const name of uniq) {
     try {
-      // Busca simples por nome (case-insensitive, primeira palavra "âncora").
+      // Busca pela primeira palavra "âncora" e exige correspondência EXATA de
+      // nome (normalizada). Só assim o cálculo do plano é DETERMINÍSTICO: o
+      // enriquecimento usa o item do banco de mesmo nome (nada de IA a cada
+      // importação). Se não houver item idêntico, cria um com ESSE nome exato.
       const anchor = name.split(/\s+/)[0].replace(/[%_]/g, '');
       if (!anchor) continue;
+      const target = normalize(name);
       const { data: existing } = await (supabase as any)
-        .from('food_items').select('id, name').ilike('name', `%${anchor}%`).limit(10);
-      const found = (existing || []).some((r: any) =>
-        normalize(r.name).includes(normalize(name)) || normalize(name).includes(normalize(r.name)),
-      );
+        .from('food_items').select('id, name').ilike('name', `%${anchor}%`).limit(30);
+      const found = (existing || []).some((r: any) => normalize(r.name) === target);
       if (found) continue;
-      // Cria via IA (edge function). Ignora falhas — o editor ainda usa (Xg).
-      await supabase.functions.invoke('lookup-custom-food', { body: { foodName: name } });
+      // Cria via IA com o NOME EXATO (storeName). Ignora falhas — usa (Xg).
+      await supabase.functions.invoke('lookup-custom-food', { body: { foodName: name, storeName: name } });
       created.push(name);
     } catch { /* silencioso */ }
   }

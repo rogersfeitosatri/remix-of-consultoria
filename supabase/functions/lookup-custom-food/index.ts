@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
     if (authError || !user) throw new Error('Unauthorized');
 
-    const { foodName, preview } = await req.json();
+    const { foodName, preview, storeName } = await req.json();
     if (!foodName?.trim()) throw new Error('foodName is required');
 
     const SCHEMA = {
@@ -75,7 +75,8 @@ Deno.serve(async (req) => {
     const { data: inserted, error: insertError } = await supabase
       .from('food_items')
       .insert({
-        name: foodData.name,
+        // storeName: guarda com o NOME EXATO usado no plano (import determinístico).
+        name: (typeof storeName === 'string' && storeName.trim()) ? storeName.trim() : foodData.name,
         category: foodData.category,
         calories_per_100g: foodData.calories_per_100g,
         protein_per_100g: foodData.protein_per_100g,
