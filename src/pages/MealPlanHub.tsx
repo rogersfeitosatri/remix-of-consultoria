@@ -17,14 +17,15 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, User, ClipboardCheck, MessageCircle, TrendingUp, FlaskConical,
   FileEdit, Utensils, Pencil, CalendarClock, ChevronRight, PlusCircle, History,
-  Copy, Send, Loader2,
+  Copy, Send, Loader2, Trash2,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AttachedPlanPanel } from '@/components/admin/AttachedPlanPanel';
 import {
   parseRaw, readSavedPlans, countMeals, variationCount, planTotals,
-  duplicatePlan, setActivePlan, genPlanId, type SavedPlan,
+  duplicatePlan, setActivePlan, genPlanId, removeSavedPlan, removeAttachedPlan,
+  type SavedPlan,
 } from '@/lib/planHistory';
 
 type DraftPreview = { hasDraft: boolean; days: number; chars: number } | null;
@@ -146,6 +147,35 @@ export default function MealPlanHub() {
       navigate(`/meal-plans/${clientId}/editor`);
     } catch (e: any) {
       toast.error(e.message || 'Não foi possível abrir o plano.');
+    } finally { setBusyId(null); }
+  };
+
+  // Exclui um plano do histórico do editor.
+  const deleteSaved = async (sp: SavedPlan) => {
+    if (!window.confirm(`Excluir "${sp.label}"? Esta ação não pode ser desfeita.`)) return;
+    setBusyId(sp.id);
+    try {
+      // Materializa o histórico legado antes de excluir (para persistir corretamente).
+      const base = (Array.isArray(rawObj?.saved_plans) && rawObj.saved_plans.length)
+        ? rawObj
+        : { ...rawObj, saved_plans: savedPlans.map((p) => ({ ...p, id: p.id === 'legacy' ? genPlanId() : p.id })) };
+      const realId = sp.id === 'legacy' ? base.saved_plans[0]?.id : sp.id;
+      await persistRaw(removeSavedPlan(base, realId));
+      toast.success('Plano excluído.');
+    } catch (e: any) {
+      toast.error(e.message || 'Não foi possível excluir o plano.');
+    } finally { setBusyId(null); }
+  };
+
+  // Exclui um plano anexado (texto livre) do histórico.
+  const deleteAttached = async (id: string, label?: string) => {
+    if (!window.confirm(`Excluir "${label || 'plano anexado'}"? Esta ação não pode ser desfeita.`)) return;
+    setBusyId(id);
+    try {
+      await persistRaw(removeAttachedPlan(rawObj, id));
+      toast.success('Plano excluído.');
+    } catch (e: any) {
+      toast.error(e.message || 'Não foi possível excluir o plano.');
     } finally { setBusyId(null); }
   };
 
@@ -320,6 +350,9 @@ export default function MealPlanHub() {
                             <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" disabled={busyId === p.id} onClick={() => duplicate(p)}>
                               <Copy className="h-3 w-3" /> Duplicar para ajustar
                             </Button>
+                            <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs text-destructive hover:text-destructive" disabled={busyId === p.id} onClick={() => deleteSaved(p)}>
+                              <Trash2 className="h-3 w-3" /> Excluir
+                            </Button>
                           </div>
                         </div>
                       );
@@ -359,6 +392,9 @@ export default function MealPlanHub() {
                         <div className="flex items-center gap-2 mt-2 pl-12">
                           <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => openAttachedPlan(p.id)}>
                             <Pencil className="h-3 w-3" /> Abrir no anexar plano
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs text-destructive hover:text-destructive" disabled={busyId === p.id} onClick={() => deleteAttached(p.id, p.label)}>
+                            <Trash2 className="h-3 w-3" /> Excluir
                           </Button>
                         </div>
                       </div>

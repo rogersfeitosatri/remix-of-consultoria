@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseRaw, readSavedPlans, countMeals, upsertActivePlan,
   duplicatePlan, markSentToZonaNutri, setActivePlan,
+  removeSavedPlan, removeAttachedPlan,
 } from './planHistory';
 
 const mp = (n: number) => ({ meals: Array.from({ length: n }, (_, i) => ({ meal_name: `M${i}`, foods: [] })) });
@@ -64,6 +65,26 @@ describe('markSentToZonaNutri', () => {
     const sent2 = raw.saved_plans.filter((p: any) => p.sent_to_zona_nutri);
     expect(sent2).toHaveLength(1);
     expect(sent2[0].id).toBe(raw.saved_plans[0].id);
+  });
+});
+
+describe('removeSavedPlan', () => {
+  it('remove a entrada e reaponta o ativo para a mais recente', () => {
+    let raw = upsertActivePlan({}, mp(2)).raw;         // p1 ativo
+    const dup = duplicatePlan(raw, raw.saved_plans[0].id)!; // p2 ativo
+    raw = dup.raw;
+    const p2 = dup.newId;
+    raw = removeSavedPlan(raw, p2);                     // remove o ativo
+    expect(raw.saved_plans).toHaveLength(1);
+    expect(raw.active_plan_id).toBe(raw.saved_plans[0].id);
+    expect(raw.meal_plan).toEqual(raw.saved_plans[0].meal_plan);
+  });
+});
+
+describe('removeAttachedPlan', () => {
+  it('remove pelo id', () => {
+    const raw = { attached_plans: [{ id: 'a' }, { id: 'b' }] };
+    expect(removeAttachedPlan(raw, 'a').attached_plans).toEqual([{ id: 'b' }]);
   });
 });
 

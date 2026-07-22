@@ -150,6 +150,29 @@ export function markSentToZonaNutri(rawObj: any, planId?: string): any {
   return obj;
 }
 
+// Remove uma entrada do histórico do editor. Se era a ativa, reaponta o ativo
+// para a entrada mais recente restante (e atualiza o meal_plan canônico).
+export function removeSavedPlan(rawObj: any, planId: string): any {
+  const obj = { ...(rawObj || {}) };
+  const plans: SavedPlan[] = Array.isArray(obj.saved_plans) ? obj.saved_plans : [];
+  const next = plans.filter((p) => p.id !== planId);
+  obj.saved_plans = next;
+  if (obj.active_plan_id === planId) {
+    const newest = [...next].sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')))[0];
+    obj.active_plan_id = newest?.id ?? null;
+    obj.meal_plan = newest?.meal_plan ?? undefined;
+  }
+  return obj;
+}
+
+// Remove um plano anexado (texto livre) do histórico.
+export function removeAttachedPlan(rawObj: any, planId: string): any {
+  const obj = { ...(rawObj || {}) };
+  const list = Array.isArray(obj.attached_plans) ? obj.attached_plans : [];
+  obj.attached_plans = list.filter((p: any) => p.id !== planId);
+  return obj;
+}
+
 // Define qual entrada o editor deve editar (carrega no canônico meal_plan).
 export function setActivePlan(rawObj: any, planId: string): any | null {
   const obj = { ...(rawObj || {}) };
