@@ -98,7 +98,15 @@ export default function MealPlanHub() {
   // Planos salvos pela área "Anexar plano" (texto livre) — histórico separado.
   const attachedPlans = useMemo(() => {
     const list = Array.isArray(rawObj?.attached_plans) ? rawObj.attached_plans : [];
-    return [...list].sort((a: any, b: any) => String(b?.date || '').localeCompare(String(a?.date || '')));
+    // Enviados ao Zona Nutri primeiro (envio mais recente no topo); depois o resto por data.
+    return [...list].sort((a: any, b: any) => {
+      const as = a?.sent_to_zona_nutri ? (a.sent_at || a.date || '') : '';
+      const bs = b?.sent_to_zona_nutri ? (b.sent_at || b.date || '') : '';
+      if (as && bs) return String(bs).localeCompare(String(as));
+      if (as) return -1;
+      if (bs) return 1;
+      return String(b?.date || '').localeCompare(String(a?.date || ''));
+    });
   }, [rawObj]);
 
   // Pedido para abrir um plano anexado no painel "Anexar plano".
@@ -367,15 +375,16 @@ export default function MealPlanHub() {
                       <FileEdit className="h-3 w-3" /> Do anexar plano (texto livre)
                     </p>
                     {attachedPlans.map((p: any) => (
-                      <div key={p.id} className="rounded-lg border p-3 hover:bg-accent/50 transition-colors">
+                      <div key={p.id} className={`rounded-lg border p-3 transition-colors ${p.sent_to_zona_nutri ? 'border-emerald-500/60 bg-emerald-500/5 ring-1 ring-emerald-500/30' : 'hover:bg-accent/50'}`}>
                         <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
-                            <FileEdit className="h-4 w-4" />
+                          <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${p.sent_to_zona_nutri ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
+                            {p.sent_to_zona_nutri ? <Send className="h-4 w-4" /> : <FileEdit className="h-4 w-4" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium text-sm truncate">{p.label || 'Plano anexado'}</p>
                               <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600">Texto livre</Badge>
+                              {p.sent_to_zona_nutri && <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">Enviado ao Zona Nutri</Badge>}
                             </div>
                             <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground flex-wrap">
                               {p.date && (

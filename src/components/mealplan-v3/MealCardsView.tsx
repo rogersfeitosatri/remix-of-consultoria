@@ -36,6 +36,10 @@ function parseMealTitleInput(raw: string): { time: string | null; name: string }
 interface Props {
   text: string;
   onChange: (next: string) => void;
+  /** Cache de enriquecimento COMPARTILHADO com a página (já semeado com os macros
+   *  salvos). Sem ele, os cards usariam um cache próprio vazio → IA a cada edição
+   *  e macros divergentes do total do dia. */
+  cacheRef?: React.MutableRefObject<ReturnType<typeof makeEnrichCache>>;
 }
 
 function optionsOf(meal: MealBlock): MealOption[] {
@@ -66,9 +70,10 @@ function optionToLines(opt: MealOption): string {
   return opt.groups.map((g) => g.tokens.map(tokenToText).join(' ou ')).join('\n');
 }
 
-export function MealCardsView({ text, onChange }: Props) {
+export function MealCardsView({ text, onChange, cacheRef }: Props) {
   const [ast, setAst] = useState<PlanAst>(() => parseText(text || ''));
-  const enrichCache = useRef(makeEnrichCache());
+  const localCache = useRef(makeEnrichCache());
+  const enrichCache = cacheRef ?? localCache;
   // Estado "qual opção está em edição": null = nenhuma.
   const [editing, setEditing] = useState<{ mi: number; oi: number } | null>(null);
   const [editText, setEditText] = useState<string>('');

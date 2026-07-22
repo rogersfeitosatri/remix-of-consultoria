@@ -34,6 +34,8 @@ interface AttachedPlan {
   per_day: DayMacro[];
   meal_names: string[];
   version: number;
+  sent_to_zona_nutri?: boolean;
+  sent_at?: string | null;
 }
 
 const EMPTY_TOTALS: Totals = { kcal: 0, cho_g: 0, protein_g: 0, fat_g: 0, meals: 0 };
@@ -78,7 +80,16 @@ export function AttachedPlanPanel({
       try {
         const raw = typeof data?.raw_response === 'string' ? JSON.parse(data.raw_response) : data?.raw_response;
         const list = raw?.attached_plans;
-        return Array.isArray(list) ? [...list].sort((a, b) => (b.date || '').localeCompare(a.date || '')) : [];
+        // Ordena por ENVIO ao Zona Nutri: enviados primeiro (envio mais recente
+        // no topo); os não enviados depois, por data de salvamento.
+        return Array.isArray(list) ? [...list].sort((a, b) => {
+          const as = a.sent_to_zona_nutri ? (a.sent_at || a.date || '') : '';
+          const bs = b.sent_to_zona_nutri ? (b.sent_at || b.date || '') : '';
+          if (as && bs) return bs.localeCompare(as);
+          if (as) return -1;
+          if (bs) return 1;
+          return (b.date || '').localeCompare(a.date || '');
+        }) : [];
       } catch { return []; }
     },
   });
@@ -208,7 +219,9 @@ export function AttachedPlanPanel({
     }
   };
 
-  // Envia ao Zona Nutri: estrutura o texto (import-meal-plan) e distribui por dia (send-...).
+  // Envia ao Zona Nutri: estrutura o texto (import-meal-plan) e distribui por dia
+  // (send-...). Registra o plano enviado no histórico e o DESTACA (apenas um por
+  // vez fica destacado); o anterior perde o destaque.
   const sendToZn = async () => {
     if (text.trim().length < 10) { toast.error('Cole o plano antes de enviar.'); return; }
     setSending(true);
@@ -228,9 +241,36 @@ export function AttachedPlanPanel({
         throw new Error(detail || error.message || 'Falha no envio.');
       }
       if (data?.error) throw new Error(data.error);
+
+      // Registra/atualiza o plano enviado no histórico de anexados e o destaca.
+      try {
+        const now = new Date().toISOString();
+        // Se o texto atual bate com um plano já salvo, marca esse; senão, cria um.
+        const existing = history.find((h) => (h.text || '').trim() === text.trim());
+        let list: AttachedPlan[];
+        if (existing) {
+          list = history.map((h) => h.id === existing.id
+            ? { ...h, sent_to_zona_nutri: true, sent_at: now }
+            : { ...h, sent_to_zona_nutri: false });
+        } else {
+          const version = (history[0]?.version ?? 0) + 1;
+          const entry: AttachedPlan = {
+            id: `${Date.now()}-${version}`, date: now,
+            label: label.trim() || `Plano v${version} — ${fmtDate(now)}`,
+            text, orientations: orientations.trim() || analysis?.orientations || '',
+            summary: analysis?.summary || '', totals: analysis?.totals || EMPTY_TOTALS,
+            per_day: analysis?.per_day || [], meal_names: analysis?.meal_names || [], version,
+            sent_to_zona_nutri: true, sent_at: now,
+          };
+          list = [entry, ...history.map((h) => ({ ...h, sent_to_zona_nutri: false }))];
+        }
+        await persistAttached(list);
+        await refetch();
+      } catch { /* não bloqueia o sucesso do envio */ }
+
       queryClient.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
       queryClient.invalidateQueries({ queryKey: ['meal-plan-hub-analysis', clientId] });
-      toast.success('Plano estruturado e enviado ao Zona Nutri! Ele distribuiu por dia da semana.');
+      toast.success('Plano enviado ao Zona Nutri e destacado no histórico!');
     } catch (e: any) {
       toast.error(e.message || 'Falha ao enviar ao Zona Nutri.');
     } finally {
@@ -464,11 +504,19 @@ export function AttachedPlanPanel({
               {history.map((p, i) => {
                 const prev = history[i + 1];
                 return (
-                  <div key={p.id} className="rounded-md border p-2.5 space-y-1">
+                  <div key={p.id} className={`rounded-md border p-2.5 space-y-1 ${p.sent_to_zona_nutri ? 'border-emerald-500/60 bg-emerald-500/5 ring-1 ring-emerald-500/30' : ''}`}>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium">{p.label}</span>
+                      <span className="text-sm font-medium flex items-center gap-1.5">
+                        {p.sent_to_zona_nutri && <Send className="h-3.5 w-3.5 text-emerald-600" />}
+                        {p.label}
+                      </span>
                       <Badge variant="outline" className="text-[11px]">{fmtDate(p.date)}</Badge>
                     </div>
+                    {p.sent_to_zona_nutri && (
+                      <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">
+                        Enviado ao Zona Nutri{p.sent_at ? ` · ${fmtDate(p.sent_at)}` : ''}
+                      </Badge>
+                    )}
                     {p.summary && <p className="text-xs text-muted-foreground">{p.summary}</p>}
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
                       <span>Cal: <Delta curr={p.totals?.kcal || 0} prev={prev?.totals?.kcal} unit=" kcal" /></span>

@@ -67,7 +67,14 @@ export function useFoodSearch(query: string) {
         .order('name')
         .limit(15);
       if (error) throw error;
-      return (data ?? []) as FoodItem[];
+      // Relevância: alimentos que COMEÇAM com o termo aparecem primeiro
+      // (ex.: "Banana" antes de "Sopa de banana") — busca mais prática.
+      const q = debouncedQuery.toLowerCase();
+      return ((data ?? []) as FoodItem[]).sort((a, b) => {
+        const ap = a.name?.toLowerCase().startsWith(q) ? 0 : 1;
+        const bp = b.name?.toLowerCase().startsWith(q) ? 0 : 1;
+        return ap - bp || (a.name || '').localeCompare(b.name || '');
+      });
     },
     enabled: debouncedQuery.length >= 2,
     staleTime: 60_000,
