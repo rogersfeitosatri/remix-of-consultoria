@@ -50,6 +50,19 @@ describe('parseToken', () => {
     expect(t.name).toBe('Manteiga');
     expect(t.quantity == null).toBe(true);
   });
+  it('NÃO confunde a grama do "(X g)" com a quantidade (medida textual)', () => {
+    // Bug: "meia medida (15 g)" virava quantidade=15 + "meia medida ( g)".
+    const t = parseToken('Whey DUX — meia medida (15 g)');
+    expect(t.name).toBe('Whey DUX');
+    expect(t.quantity == null).toBe(true);
+    expect(t.measure).toBe('meia medida (15 g)');
+  });
+  it('quantidade inicial + grama entre parênteses coexistem', () => {
+    const t = parseToken('Arroz branco cozido — 7 colheres de sopa (140 g)');
+    expect(t.name).toBe('Arroz branco cozido');
+    expect(t.quantity).toBe(7);
+    expect(t.measure).toBe('colheres de sopa (140 g)');
+  });
   it('aceita vírgula decimal', () => {
     const t = parseToken('Azeite - 1,5 colher de sopa');
     expect(t.name).toBe('Azeite');
