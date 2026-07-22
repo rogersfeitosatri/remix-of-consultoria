@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export type ZnPlanCode = 'monthly' | 'semiannual' | 'annual';
+export type ZnPlanCode = 'monthly' | 'quarterly' | 'semiannual' | 'annual';
 
 export interface PublicZnPlan {
   code: ZnPlanCode;
@@ -11,9 +11,10 @@ export interface PublicZnPlan {
   is_active: boolean;
 }
 
-const SUFFIX: Record<ZnPlanCode, string> = { monthly: '/mês', semiannual: '/semestre', annual: '/ano' };
+const SUFFIX: Record<ZnPlanCode, string> = { monthly: '/mês', quarterly: '/trimestre', semiannual: '/semestre', annual: '/ano' };
 const INSTALLMENTS: Record<ZnPlanCode, string> = {
   monthly: 'Cartão de crédito',
+  quarterly: 'Cartão de crédito · à vista ou 3x R$ 59,90',
   semiannual: 'Cartão de crédito · à vista ou até 6x',
   annual: 'Cartão de crédito · à vista ou até 12x',
 };
@@ -45,7 +46,7 @@ export function usePublicZnPlans() {
   const byCode: Partial<Record<ZnPlanCode, PublicZnPlan>> = {};
   for (const row of query.data ?? []) {
     const code = row.code as ZnPlanCode;
-    if (!['monthly', 'semiannual', 'annual'].includes(code)) continue;
+    if (!['monthly', 'quarterly', 'semiannual', 'annual'].includes(code)) continue;
     byCode[code] = {
       code,
       label: row.name || code,

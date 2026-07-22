@@ -1,5 +1,7 @@
 // Tipos compartilhados do módulo ZN Assessoria
-export type ZnPlanCode = "monthly" | "semiannual" | "annual";
+// "monthly" mantido apenas para compatibilidade com assinaturas LEGADAS; o
+// funil novo oferece "quarterly" (Trimestral) no lugar do mensal.
+export type ZnPlanCode = "monthly" | "quarterly" | "semiannual" | "annual";
 
 export type ZnSubscriptionStatus =
   | "pending"
@@ -65,6 +67,7 @@ export interface AsaasEventPayload {
 export function mapAsaasCycleToPlan(cycle?: string | null): ZnPlanCode | null {
   const c = (cycle ?? "").toUpperCase();
   if (c === "MONTHLY") return "monthly";
+  if (c === "QUARTERLY") return "quarterly";
   if (c === "SEMIANNUALLY") return "semiannual";
   if (c === "YEARLY" || c === "ANNUALLY") return "annual";
   return null;

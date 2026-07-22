@@ -15,10 +15,10 @@ const ASAAS_BASE =
     ? "https://api.asaas.com/v3"
     : "https://api-sandbox.asaas.com/v3";
 
-type PlanCode = "monthly" | "semiannual" | "annual";
+type PlanCode = "monthly" | "quarterly" | "semiannual" | "annual";
 
 const Schema = z.object({
-  plan_choice: z.enum(["monthly", "semiannual", "annual"]),
+  plan_choice: z.enum(["quarterly", "semiannual", "annual"]),
   name: z.string().trim().min(3).max(120),
   email: z.string().trim().email().max(200),
   phone: z.string().trim().min(8).max(20),
@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
     // /payments com installmentCount (até Nx no cartão) e a subscription começa
     // a renovar depois do período pago.
     const isInstallmentPlan = (plan.installments ?? 1) > 1;
-    const durationMonths = pInfo.duration_months ?? (data.plan_choice === "semiannual" ? 6 : data.plan_choice === "annual" ? 12 : 1);
+    const durationMonths = pInfo.duration_months ?? (data.plan_choice === "quarterly" ? 3 : data.plan_choice === "semiannual" ? 6 : data.plan_choice === "annual" ? 12 : 1);
 
     const subNextDue = new Date();
     if (isInstallmentPlan) {

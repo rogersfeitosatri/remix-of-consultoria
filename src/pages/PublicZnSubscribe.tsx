@@ -10,10 +10,10 @@ import { Loader2, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePublicZnPlans, fmtBRL as fmtBRLShort } from '@/hooks/usePublicZnPlans';
 
-type PlanCode = 'monthly' | 'semiannual' | 'annual';
+type PlanCode = 'quarterly' | 'semiannual' | 'annual';
 
 const PLANS_FALLBACK: Record<PlanCode, { label: string; price: string; installments: string }> = {
-  monthly: { label: 'Mensal', price: 'R$ 69,90', installments: 'Cartão de crédito' },
+  quarterly: { label: 'Trimestral', price: 'R$ 179,70', installments: 'Cartão de crédito · à vista ou 3x R$ 59,90' },
   semiannual: { label: 'Semestral', price: 'R$ 299,00', installments: 'Cartão de crédito · à vista ou até 6x' },
   annual: { label: 'Anual', price: 'R$ 419,90', installments: 'Cartão de crédito · à vista ou até 12x' },
 };
@@ -22,7 +22,7 @@ const parsePlan = (raw: string | null): PlanCode => {
   const norm = (raw ?? '').toLowerCase();
   if (norm === 'semestral' || norm === 'semiannual') return 'semiannual';
   if (norm === 'anual' || norm === 'annual') return 'annual';
-  return 'monthly';
+  return 'quarterly';
 };
 
 const onlyDigits = (s: string) => s.replace(/\D+/g, '');
@@ -62,7 +62,7 @@ export default function PublicZnSubscribe() {
   // Preços vêm da configuração (zn_plans); fallback local enquanto carrega.
   const { plans: znPlans } = usePublicZnPlans();
   const PLANS: Record<PlanCode, { label: string; price: string; installments: string }> = {
-    monthly: znPlans.monthly ? { label: znPlans.monthly.label, price: fmtBRLShort(znPlans.monthly.price), installments: PLANS_FALLBACK.monthly.installments } : PLANS_FALLBACK.monthly,
+    quarterly: znPlans.quarterly ? { label: znPlans.quarterly.label, price: fmtBRLShort(znPlans.quarterly.price), installments: PLANS_FALLBACK.quarterly.installments } : PLANS_FALLBACK.quarterly,
     semiannual: znPlans.semiannual ? { label: znPlans.semiannual.label, price: fmtBRLShort(znPlans.semiannual.price), installments: PLANS_FALLBACK.semiannual.installments } : PLANS_FALLBACK.semiannual,
     annual: znPlans.annual ? { label: znPlans.annual.label, price: fmtBRLShort(znPlans.annual.price), installments: PLANS_FALLBACK.annual.installments } : PLANS_FALLBACK.annual,
   };
@@ -86,7 +86,7 @@ export default function PublicZnSubscribe() {
 
   const setPlanChange = (v: PlanCode) => {
     setPlan(v);
-    setParams({ plano: v === 'semiannual' ? 'semestral' : v === 'annual' ? 'anual' : 'mensal' });
+    setParams({ plano: v === 'semiannual' ? 'semestral' : v === 'annual' ? 'anual' : 'trimestral' });
   };
 
   const canStep1 = useMemo(() => {

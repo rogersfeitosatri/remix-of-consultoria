@@ -3,7 +3,8 @@
 // caso a leitura falhe ou os preços ainda não tenham sido configurados.
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-export type PlanCode = "monthly" | "semiannual" | "annual";
+// "monthly" só para LEGADO; o funil novo usa "quarterly" (Trimestral).
+export type PlanCode = "monthly" | "quarterly" | "semiannual" | "annual";
 
 export interface PlanInfo {
   code: PlanCode;
@@ -17,13 +18,16 @@ export interface PlanInfo {
 
 const CYCLE: Record<PlanCode, string> = {
   monthly: "MONTHLY",
+  quarterly: "QUARTERLY",
   semiannual: "SEMIANNUALLY",
   annual: "YEARLY",
 };
 
 // Defaults (rede de segurança) — valores atuais em produção.
+// monthly: apenas legado (não ofertado no funil). quarterly é o novo mensal→trimestral.
 const DEFAULTS: Record<PlanCode, PlanInfo> = {
-  monthly: { code: "monthly", label: "Mensal", price: 69.9, duration_months: 1, cycle: "MONTHLY", installments: 1, is_active: true },
+  monthly: { code: "monthly", label: "Mensal", price: 69.9, duration_months: 1, cycle: "MONTHLY", installments: 1, is_active: false },
+  quarterly: { code: "quarterly", label: "Trimestral", price: 179.7, duration_months: 3, cycle: "QUARTERLY", installments: 3, is_active: true },
   semiannual: { code: "semiannual", label: "Semestral", price: 299.0, duration_months: 6, cycle: "SEMIANNUALLY", installments: 6, is_active: true },
   annual: { code: "annual", label: "Anual", price: 419.9, duration_months: 12, cycle: "YEARLY", installments: 12, is_active: true },
 };
@@ -35,6 +39,7 @@ export async function loadZnPlans(
 ): Promise<Record<PlanCode, PlanInfo>> {
   const result: Record<PlanCode, PlanInfo> = {
     monthly: { ...DEFAULTS.monthly },
+    quarterly: { ...DEFAULTS.quarterly },
     semiannual: { ...DEFAULTS.semiannual },
     annual: { ...DEFAULTS.annual },
   };
@@ -81,10 +86,11 @@ export async function znPlanByValue(
 export function planFromText(text: string | null | undefined): PlanCode | null {
   const t = (text ?? "").toLowerCase();
   if (!t) return null;
+  if (/trimestr|quarterly|3\s*meses/.test(t)) return "quarterly";
   if (/semestr|semiannual|semi-?anual/.test(t)) return "semiannual";
   if (/anual|annual|yearly|\bano\b/.test(t)) return "annual";
   if (/mensal|monthly|\bmês\b|\bmes\b/.test(t)) return "monthly";
-  if (t === "monthly" || t === "semiannual" || t === "annual") return t as PlanCode;
+  if (t === "monthly" || t === "quarterly" || t === "semiannual" || t === "annual") return t as PlanCode;
   return null;
 }
 

@@ -18,14 +18,14 @@ const ASAAS_BASE =
     ? "https://api.asaas.com/v3"
     : "https://api-sandbox.asaas.com/v3";
 
-type PlanCode = "monthly" | "semiannual" | "annual";
+type PlanCode = "monthly" | "quarterly" | "semiannual" | "annual";
 
 const Schema = z.object({
   form_id: z.string().uuid(),
   respondent_name: z.string().trim().min(3).max(200),
   respondent_email: z.string().trim().email().max(200),
   responses: z.record(z.any()),
-  plan_choice: z.enum(["monthly", "semiannual", "annual"]),
+  plan_choice: z.enum(["quarterly", "semiannual", "annual"]),
   cpf: z.string().trim().min(11).max(20),
   phone: z.string().trim().min(8).max(20).optional().nullable(),
   coupon_code: z.string().trim().max(40).optional().nullable(),

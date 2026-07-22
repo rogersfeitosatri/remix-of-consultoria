@@ -28,6 +28,7 @@ const ATH_LABELS: Record<ZnAthleteStatus, { label: string; variant: 'default' | 
 
 const PLAN_LABELS: Record<ZnPlanCode, string> = {
   monthly: 'Mensal',
+  quarterly: 'Trimestral',
   semiannual: 'Semestral',
   annual: 'Anual',
 };

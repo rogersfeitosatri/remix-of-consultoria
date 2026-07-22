@@ -42,6 +42,7 @@ export interface ZonaNutriPayload {
 // depender de interpretar o código em inglês.
 const PLAN_META: Record<string, { months: number; label: string }> = {
   monthly: { months: 1, label: "Mensal" },
+  quarterly: { months: 3, label: "Trimestral" },
   semiannual: { months: 6, label: "Semestral" },
   annual: { months: 12, label: "Anual" },
 };
