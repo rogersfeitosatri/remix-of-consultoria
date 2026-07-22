@@ -38,6 +38,22 @@ import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 
 type Mode = 'idle' | 'food' | 'measure';
 
+// Medidas caseiras genéricas (peso aproximado em g) — usadas quando o alimento
+// NÃO está no banco (sem food_measures). Assim, ao digitar um número, o nutri
+// sempre vê opções de medida; a IA/edição refina os macros depois.
+const GENERIC_MEASURES: { name: string; g: number }[] = [
+  { name: 'colher de sopa', g: 15 },
+  { name: 'colher de sobremesa', g: 10 },
+  { name: 'colher de chá', g: 5 },
+  { name: 'xícara', g: 200 },
+  { name: 'copo', g: 200 },
+  { name: 'unidade', g: 50 },
+  { name: 'fatia', g: 25 },
+  { name: 'concha', g: 80 },
+  { name: 'porção', g: 100 },
+  { name: 'punhado', g: 30 },
+];
+
 export interface SmartPlanEditorProps {
   value: string;
   onChange: (text: string) => void;
@@ -513,23 +529,36 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
       }
       return list;
     }
-    if (mode === 'measure' && pendingFood) {
-      const rows = measures.data || [];
+    if (mode === 'measure') {
       const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toString().replace('.', ','));
-      const list: SuggestionItem[] = rows.map((m) => {
+      const bankRows = pendingFood ? (measures.data || []) : [];
+      const list: SuggestionItem[] = bankRows.map((m) => {
         const totalG = m.measure_weight_g * typedQty;
         return {
           key: m.id,
           label: `${m.measure_name} · ${fmt(Math.round(m.measure_weight_g * 10) / 10)} g${typedQty !== 1 ? ` (×${fmt(typedQty)} = ${fmt(Math.round(totalG * 10) / 10)}g)` : ''}`,
-          hint: macroHint(pendingFood, totalG),
+          hint: macroHint(pendingFood!, totalG),
           onSelect: () => applyMeasure(m.measure_name, m.measure_weight_g, pendingFood),
         };
       });
-      // Gramas comuns
+      // Alimento sem medidas cadastradas (ou fora do banco): medidas caseiras
+      // genéricas para o nutri não ficar sem opção ao digitar o número.
+      if (bankRows.length === 0) {
+        GENERIC_MEASURES.forEach((gm) => {
+          const totalG = gm.g * typedQty;
+          list.push({
+            key: `gen-${gm.name}`,
+            label: `${gm.name} · ~${fmt(gm.g)} g${typedQty !== 1 ? ` (×${fmt(typedQty)} = ${fmt(Math.round(totalG * 10) / 10)}g)` : ''}`,
+            hint: pendingFood ? macroHint(pendingFood, totalG) : undefined,
+            onSelect: () => applyMeasure(gm.name, gm.g, pendingFood),
+          });
+        });
+      }
+      // Gramas comuns (sempre disponíveis)
       [50, 100, 150, 200].forEach((g) => list.push({
         key: `g${g}`,
         label: `${g} g`,
-        hint: macroHint(pendingFood, g * typedQty),
+        hint: pendingFood ? macroHint(pendingFood, g * typedQty) : undefined,
         onSelect: () => applyMeasure(`${g} g`, g, pendingFood),
       }));
       return list;
@@ -625,6 +654,8 @@ Salada crua à vontade`}
           </span>
         ) : mode === 'measure' && pendingFood ? (
           <span className="text-muted-foreground truncate block">Medidas de <b>{pendingFood.name}</b></span>
+        ) : mode === 'measure' ? (
+          <span className="text-muted-foreground truncate block">Medidas caseiras (aprox.) — a IA/edição ajusta os macros</span>
         ) : null}
       />
 
