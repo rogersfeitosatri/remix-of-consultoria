@@ -73,6 +73,28 @@ describe('importMealPlanFromMarkdown', () => {
     expect(r.perDay.sab).not.toContain('Se a lentilha');
   });
 
+  it('reconhece refeição com texto após o horário (Terça/Domingo com café da manhã)', async () => {
+    const md = `PLANO B
+
+Dias: terça e domingo
+
+CAFÉ DA MANHÃ — 07:00 NA TERÇA E APÓS O LONGO NO DOMINGO
+
+OPÇÃO 1
+
+- Mamão — 1 porção (200 g).
+
+LANCHE DA MANHÃ — 10:00
+
+OPÇÃO 1
+
+- Banana-nanica — 1 unidade média (100 g).`;
+    const r = await importMealPlanFromMarkdown(md);
+    expect(r.perDay.ter).toContain('Café Da Manhã');
+    expect(r.perDay.ter).toContain('Mamão');
+    expect(r.perDay.dom).toContain('Café Da Manhã');
+  });
+
   it('é determinístico: reimportar dá exatamente o mesmo resultado', async () => {
     const a = await importMealPlanFromMarkdown(MD);
     const b = await importMealPlanFromMarkdown(MD);
