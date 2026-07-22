@@ -848,9 +848,10 @@ export default function MealPlanEditor() {
           </TabsList>
         </Tabs>
 
-        <WeekOverview texts={texts} active={activeDay} onSelect={(k) => setActiveDay(k)} weightKg={weightKg} enrichedTotalsByDay={enrichedTotalsByDay} />
-
         <div className={`grid grid-cols-1 gap-4 items-start ${anamneseOpen ? 'lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)_300px]' : 'lg:grid-cols-[minmax(0,1fr)_300px]'}`}>
+          {/* Coluna 1: dias da semana (alinhados à largura do editor) + editor */}
+          <div className="min-w-0 space-y-4">
+            <WeekOverview texts={texts} active={activeDay} onSelect={(k) => setActiveDay(k)} weightKg={weightKg} enrichedTotalsByDay={enrichedTotalsByDay} />
           <Card className="min-w-0 overflow-hidden">
             <CardContent className="p-3 md:p-4">
               {/* Descrição do dia ativo */}
@@ -1012,6 +1013,7 @@ export default function MealPlanEditor() {
 
             </CardContent>
           </Card>
+          </div>
 
           {/* Painel de anamnese DOCADO — não-modal, dá pra ler enquanto digita. */}
           {anamneseOpen && (
