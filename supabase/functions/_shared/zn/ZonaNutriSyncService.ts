@@ -27,12 +27,29 @@ export interface ZonaNutriPayload {
   nome: string | null;
   email: string;
   telefone: string | null;
-  plano: string;
+  plano: string;               // código do plano (monthly | semiannual | annual)
+  planoCodigo: string;         // idem, explícito
+  planoLabel: string;          // rótulo PT: Mensal | Semestral | Anual
+  duracaoMeses: number | null; // duração do plano em MESES (1 | 6 | 12)
   status: string;
-  dataInicio: string | null;
-  dataExpiracao: string | null;
+  dataInicio: string | null;   // início do acesso (YYYY-MM-DD)
+  dataExpiracao: string | null; // fim do acesso (YYYY-MM-DD) — construir o prazo por AQUI
   // metadados extras (não obrigatórios para o Zona Nutri, mas ajudam auditoria)
   motivoCancelamento?: string | null;
+}
+
+// Duração e rótulo por código de plano — para o Zona Nutri montar o prazo sem
+// depender de interpretar o código em inglês.
+const PLAN_META: Record<string, { months: number; label: string }> = {
+  monthly: { months: 1, label: "Mensal" },
+  semiannual: { months: 6, label: "Semestral" },
+  annual: { months: 12, label: "Anual" },
+};
+
+function addMonthsIso(startIso: string, months: number): string {
+  const d = new Date(startIso + "T00:00:00Z");
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
 }
 
 export interface QueueInput {
@@ -70,16 +87,26 @@ export class ZonaNutriSyncService {
     const idempotencyKey =
       `${input.event}:${input.athlete.id}:${input.subscription.id}:${input.subscription.expires_at ?? "null"}:${input.subscription.status}`;
 
+    const planCode = input.subscription.plan_code;
+    const meta = PLAN_META[planCode] ?? null;
+    // Garante a data de expiração: se vier ausente mas houver início + duração,
+    // calcula aqui (defensivo) — o prazo de acesso NUNCA deve faltar.
+    const expira = input.subscription.expires_at
+      ?? (input.subscription.start_date && meta ? addMonthsIso(input.subscription.start_date, meta.months) : null);
+
     const payload: ZonaNutriPayload = {
       evento: input.event,
       athleteId: input.athlete.id,
       nome: input.athlete.name,
       email: input.athlete.email,
       telefone: input.athlete.phone,
-      plano: input.subscription.plan_code,
+      plano: planCode,
+      planoCodigo: planCode,
+      planoLabel: meta?.label ?? planCode,
+      duracaoMeses: meta?.months ?? null,
       status: input.subscription.status,
       dataInicio: input.subscription.start_date,
-      dataExpiracao: input.subscription.expires_at,
+      dataExpiracao: expira,
       motivoCancelamento: input.subscription.cancel_reason ?? null,
     };
 
