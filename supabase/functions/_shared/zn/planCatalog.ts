@@ -62,6 +62,32 @@ export async function loadZnPlans(
   return result;
 }
 
+// Deriva o código do plano pelo VALOR pago (fallback quando não há cycle na
+// subscription — ex.: cobrança parcelada avulsa). Só casa com o preço INTEGRAL.
+export async function znPlanByValue(
+  supabase: SupabaseClient,
+  ownerUserId: string | null,
+  value: number | null | undefined,
+): Promise<PlanCode | null> {
+  if (!value) return null;
+  const target = Math.round(Number(value) * 100) / 100;
+  const plans = await loadZnPlans(supabase, ownerUserId);
+  for (const p of Object.values(plans)) if (Math.round(p.price * 100) / 100 === target) return p.code;
+  for (const p of Object.values(DEFAULTS)) if (Math.round(p.price * 100) / 100 === target) return p.code;
+  return null;
+}
+
+// Normaliza um plan_choice/label textual para PlanCode.
+export function planFromText(text: string | null | undefined): PlanCode | null {
+  const t = (text ?? "").toLowerCase();
+  if (!t) return null;
+  if (/semestr|semiannual|semi-?anual/.test(t)) return "semiannual";
+  if (/anual|annual|yearly|\bano\b/.test(t)) return "annual";
+  if (/mensal|monthly|\bmês\b|\bmes\b/.test(t)) return "monthly";
+  if (t === "monthly" || t === "semiannual" || t === "annual") return t as PlanCode;
+  return null;
+}
+
 // Conjunto de valores válidos ZN (para o guard multi-tenant do webhook).
 export async function znActivePrices(
   supabase: SupabaseClient,
