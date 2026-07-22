@@ -382,21 +382,33 @@ export default function MealPlanEditor() {
     if (!clientId) return;
     try {
       setSaving(true);
-      // Base (Todos os dias)
-      const baseAst = parseText(texts.all);
-      await enrichAst(baseAst, enrichCache.current);
-      const baseMeals = astToMeals(baseAst);
+      // FAST SAVE: dias NÃO editados (texto == plano salvo) reusam as refeições
+      // já enriquecidas — sem parsear nem re-enriquecer. Só os dias editados
+      // passam pelo pipeline.
+      const dayAsts: any[] = [];
+      let baseMeals: any[];
+      if (storedByDay.all && texts.all === (initialTexts.all ?? '')) {
+        baseMeals = storedByDay.all;
+      } else {
+        const baseAst = parseText(texts.all);
+        await enrichAst(baseAst, enrichCache.current);
+        baseMeals = astToMeals(baseAst);
+        dayAsts.push(baseAst);
+      }
       // Overrides por dia
       const dayVariations: Record<string, any> = {};
-      const dayAsts = [baseAst];
       for (const k of overrideDays) {
+        if (storedByDay[k] && texts[k] === (initialTexts[k] ?? '')) {
+          dayVariations[k] = storedByDay[k];
+          continue;
+        }
         const ast = parseText(texts[k]);
         await enrichAst(ast, enrichCache.current);
         dayVariations[k] = astToMeals(ast);
         dayAsts.push(ast);
       }
       // Registra as substituições usadas — a IA aprende com o histórico.
-      void recordSubs(dayAsts);
+      if (dayAsts.length) void recordSubs(dayAsts);
       const currentRaw = parseRaw(analysisRow?.raw_response);
       try {
         localStorage.setItem(backupKey, JSON.stringify({
@@ -405,10 +417,14 @@ export default function MealPlanEditor() {
         }));
         setHasBackup(true);
       } catch { /* noop */ }
+      // Recalcula os totais do dia (opção principal) para não persistir um
+      // daily_totals antigo que divergia do que o painel de totais mostra.
+      const bt = storedPlanTotals({ meals: baseMeals });
       const mealPlan = {
         ...(currentRaw.meal_plan || {}),
         meals: baseMeals,
         day_variations: dayVariations,
+        daily_totals: { calories: bt.kcal, carbs_g: bt.cho, protein_g: bt.ptn, fat_g: bt.lip },
       };
       // Atualiza a entrada ATIVA no histórico (aparece no hub em "Planos salvos").
       const { raw: withHistory } = upsertActivePlan(currentRaw, mealPlan);
@@ -998,7 +1014,7 @@ export default function MealPlanEditor() {
                 <CustomMealAdder onAdd={insertMealSkeleton} />
               </div>
 
-              <MealCardsView text={text} onChange={setText} />
+              <MealCardsView text={text} onChange={setText} cacheRef={enrichCache} />
 
 
 
