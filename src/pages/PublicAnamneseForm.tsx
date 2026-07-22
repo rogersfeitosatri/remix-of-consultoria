@@ -63,17 +63,20 @@ function isHiddenQuestion(q: Question): boolean {
   );
 }
 
-const PLAN_PARAM_MAP: Record<string, 'monthly' | 'semiannual' | 'annual'> = {
-  mensal: 'monthly',
-  monthly: 'monthly',
+const PLAN_PARAM_MAP: Record<string, 'quarterly' | 'semiannual' | 'annual'> = {
+  // "mensal"/"monthly" antigos passam a apontar para o trimestral (novo plano de entrada).
+  mensal: 'quarterly',
+  monthly: 'quarterly',
+  trimestral: 'quarterly',
+  quarterly: 'quarterly',
   semestral: 'semiannual',
   semiannual: 'semiannual',
   anual: 'annual',
   annual: 'annual',
 };
 
-const PLAN_INFO_FALLBACK: Record<'monthly' | 'semiannual' | 'annual', { label: string; price: string; sub: string }> = {
-  monthly:    { label: 'Mensal',    price: 'R$ 69,90/mês',      sub: 'Cartão de crédito' },
+const PLAN_INFO_FALLBACK: Record<'quarterly' | 'semiannual' | 'annual', { label: string; price: string; sub: string }> = {
+  quarterly:  { label: 'Trimestral', price: 'R$ 179,70/trimestre', sub: 'Cartão de crédito · à vista ou 3x R$ 59,90' },
   semiannual: { label: 'Semestral', price: 'R$ 299,00/semestre', sub: 'Cartão de crédito · à vista ou até 6x' },
   annual:     { label: 'Anual',     price: 'R$ 419,90/ano',      sub: 'Cartão de crédito · à vista ou até 12x' },
 };
@@ -95,12 +98,12 @@ export default function PublicAnamneseForm() {
   // Preços vêm da configuração (zn_plans); fallback local enquanto carrega.
   const { info: znPlanInfo } = usePublicZnPlans();
   const PLAN_INFO = {
-    monthly: znPlanInfo('monthly', PLAN_INFO_FALLBACK.monthly),
+    quarterly: znPlanInfo('quarterly', PLAN_INFO_FALLBACK.quarterly),
     semiannual: znPlanInfo('semiannual', PLAN_INFO_FALLBACK.semiannual),
     annual: znPlanInfo('annual', PLAN_INFO_FALLBACK.annual),
-  } as Record<'monthly' | 'semiannual' | 'annual', { label: string; price: string; sub: string }>;
+  } as Record<'quarterly' | 'semiannual' | 'annual', { label: string; price: string; sub: string }>;
   const planFromUrl = PLAN_PARAM_MAP[(searchParams.get('plano') || '').toLowerCase()] || '';
-  const [znPlan, setZnPlan] = useState<'' | 'monthly' | 'semiannual' | 'annual'>(planFromUrl as any);
+  const [znPlan, setZnPlan] = useState<'' | 'quarterly' | 'semiannual' | 'annual'>(planFromUrl as any);
   const [znCpf, setZnCpf] = useState('');
   const [znCoupon, setZnCoupon] = useState((searchParams.get('cupom') || searchParams.get('ref') || '').trim());
   const [couponInfo, setCouponInfo] = useState<any>(null); // resultado da validação
@@ -900,7 +903,7 @@ export default function PublicAnamneseForm() {
                     onValueChange={(v) => setZnPlan(v as any)}
                     className="mt-2 grid gap-2"
                   >
-                    {(['monthly', 'semiannual', 'annual'] as const).map((code) => (
+                    {(['quarterly', 'semiannual', 'annual'] as const).map((code) => (
                       <label
                         key={code}
                         htmlFor={`zn-plan-${code}`}
@@ -970,7 +973,7 @@ export default function PublicAnamneseForm() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold truncate">
-                      Plano {PLAN_INFO[znPlan as 'monthly'].label} · {PLAN_INFO[znPlan as 'monthly'].price}
+                      Plano {PLAN_INFO[znPlan as 'quarterly'].label} · {PLAN_INFO[znPlan as 'quarterly'].price}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">CPF {znCpf || '—'}</div>
                   </div>

@@ -4,7 +4,7 @@ import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
 export type ZnAthleteStatus = 'pending' | 'active' | 'inactive';
-export type ZnPlanCode = 'monthly' | 'semiannual' | 'annual';
+export type ZnPlanCode = 'monthly' | 'quarterly' | 'semiannual' | 'annual';
 export type ZnSubscriptionStatus =
   | 'pending' | 'active' | 'overdue' | 'suspended' | 'cancelled' | 'expired';
 export type ZnPaymentStatus =

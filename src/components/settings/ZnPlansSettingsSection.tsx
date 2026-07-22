@@ -9,7 +9,7 @@ import { CreditCard, Loader2, Save } from 'lucide-react';
 import { useZnPlans, useUpdateZnPlan, type ZnPlan } from '@/hooks/useZnAssessoria';
 import { toast } from 'sonner';
 
-const ORDER = ['monthly', 'semiannual', 'annual'];
+const ORDER = ['monthly', 'quarterly', 'semiannual', 'annual'];
 
 export function ZnPlansSettingsSection() {
   const { data: plans = [], isLoading } = useZnPlans();

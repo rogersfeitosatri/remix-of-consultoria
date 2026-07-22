@@ -5,6 +5,7 @@ import type { ZnPlanCode, ZnSubscriptionStatus } from "./types.ts";
 
 const DURATION_MONTHS: Record<ZnPlanCode, number> = {
   monthly: 1,
+  quarterly: 3,
   semiannual: 6,
   annual: 12,
 };

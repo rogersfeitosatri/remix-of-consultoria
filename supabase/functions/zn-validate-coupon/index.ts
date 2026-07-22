@@ -5,8 +5,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { loadZnPlans } from "../_shared/zn/planCatalog.ts";
 
-type PlanCode = "monthly" | "semiannual" | "annual";
-const VALID_PLANS = new Set<PlanCode>(["monthly", "semiannual", "annual"]);
+type PlanCode = "monthly" | "quarterly" | "semiannual" | "annual";
+const VALID_PLANS = new Set<PlanCode>(["monthly", "quarterly", "semiannual", "annual"]);
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const code = String(body.code ?? "").trim();
-    const plan = String(body.plan_choice ?? "monthly") as PlanCode;
+    const plan = String(body.plan_choice ?? "quarterly") as PlanCode;
     if (!code) return json({ valid: false, message: "Informe um cupom." });
     if (!VALID_PLANS.has(plan)) return json({ valid: false, message: "Plano inválido." });
 
@@ -32,10 +32,10 @@ Deno.serve(async (req) => {
     // Preços/rótulos vêm da configuração (zn_plans).
     const catalog = await loadZnPlans(supabase, null);
     const PLAN_VALUE: Record<PlanCode, number> = {
-      monthly: catalog.monthly.price, semiannual: catalog.semiannual.price, annual: catalog.annual.price,
+      monthly: catalog.monthly.price, quarterly: catalog.quarterly.price, semiannual: catalog.semiannual.price, annual: catalog.annual.price,
     };
     const PLAN_LABEL: Record<PlanCode, string> = {
-      monthly: catalog.monthly.label, semiannual: catalog.semiannual.label, annual: catalog.annual.label,
+      monthly: catalog.monthly.label, quarterly: catalog.quarterly.label, semiannual: catalog.semiannual.label, annual: catalog.annual.label,
     };
 
     const { data: coupon } = await supabase
