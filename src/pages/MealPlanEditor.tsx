@@ -36,7 +36,7 @@ import { parseText } from '@/lib/smartPlan/parse';
 import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache, seedCacheFromMeals } from '@/lib/smartPlan/enrich';
-import { parseRaw, upsertActivePlan } from '@/lib/planHistory';
+import { parseRaw, upsertActivePlan, planTotals as storedPlanTotals } from '@/lib/planHistory';
 import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
 import { WeekOverview } from '@/components/mealplan-v3/WeekOverview';
 import { useRecordSubstitutions } from '@/hooks/useSubstitutionHistory';
@@ -135,6 +135,21 @@ export default function MealPlanEditor() {
         }
       }
     } catch { /* noop */ }
+    return out;
+  }, [analysisRow]);
+
+  // Refeições JÁ SALVAS por dia (base = 'all'). O plano salvo já traz gramas e
+  // macros por alimento — usamos direto para exibir na hora, sem re-enriquecer.
+  const storedByDay = useMemo<Partial<Record<DayKey, any[]>>>(() => {
+    const raw = parseRaw(analysisRow?.raw_response);
+    const mp = raw?.meal_plan || {};
+    const out: Partial<Record<DayKey, any[]>> = { all: Array.isArray(mp.meals) ? mp.meals : [] };
+    const vars = mp.day_variations || {};
+    for (const k of Object.keys(vars)) {
+      const v = vars[k];
+      const meals = Array.isArray(v) ? v : v?.meals;
+      if (Array.isArray(meals)) out[k as DayKey] = meals;
+    }
     return out;
   }, [analysisRow]);
 
@@ -288,6 +303,17 @@ export default function MealPlanEditor() {
   // Enriquecimento para o painel de totais do dia ativo — recalcula g e macros
   // toda vez que o texto muda (inclusive edições de quantidade).
   useEffect(() => {
+    // FAST PATH: se o texto do dia é exatamente o do plano salvo (não editado),
+    // exibe as refeições/macros JÁ salvos na hora — sem parsear/enriquecer.
+    const stored = storedByDay[activeDay];
+    if (stored && text === (initialTexts[activeDay] ?? '')) {
+      const totals = storedPlanTotals({ meals: stored });
+      setEnrichedMeals(stored);
+      setEnrichedTotals(totals);
+      setEnrichedTotalsText(text);
+      setEnrichedTotalsByDay((prev) => ({ ...prev, [activeDay]: totals }));
+      return;
+    }
     const t = setTimeout(async () => {
       try {
         const ast = parseText(text);
@@ -304,32 +330,44 @@ export default function MealPlanEditor() {
       } catch { /* silencioso */ }
     }, 400);
     return () => clearTimeout(t);
-  }, [text, activeDay]);
+  }, [text, activeDay, storedByDay, initialTexts]);
 
-  // Enriquecimento em segundo plano para TODOS os dias com override + base,
-  // permitindo que o WeekOverview mostre kcal/macros reais em tempo real.
+  // Totais por dia para o WeekOverview. Dias NÃO editados usam os macros já
+  // salvos (instantâneo); só os dias editados passam pelo enriquecimento.
   useEffect(() => {
+    // 1) Preenche imediatamente os totais dos dias com plano salvo (sync, sem IA).
+    const instant: Partial<Record<DayKey, { kcal: number; cho: number; ptn: number; lip: number }>> = {};
+    const daysToScan: DayKey[] = ['all', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
+    for (const k of daysToScan) {
+      const stored = storedByDay[k];
+      if (stored && (texts[k] ?? '') === (initialTexts[k] ?? '')) instant[k] = storedPlanTotals({ meals: stored });
+    }
+    if (Object.keys(instant).length) setEnrichedTotalsByDay((prev) => ({ ...prev, ...instant }));
+
+    // 2) Enriquecimento só para os dias EDITADOS (diferentes do plano salvo).
     const t = setTimeout(async () => {
       try {
         const { planTotals } = await import('@/lib/smartPlan/serialize');
         const entries: [DayKey, { kcal: number; cho: number; ptn: number; lip: number }][] = [];
-        const daysToScan: DayKey[] = ['all', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
         for (const k of daysToScan) {
           const txt = texts[k];
           if (!txt || !txt.trim()) continue;
+          if (storedByDay[k] && txt === (initialTexts[k] ?? '')) continue; // já resolvido acima
           const ast = parseText(txt);
           await enrichAst(ast, enrichCache.current);
           entries.push([k, planTotals(ast)]);
         }
-        setEnrichedTotalsByDay((prev) => {
-          const next = { ...prev };
-          for (const [k, v] of entries) next[k] = v;
-          return next;
-        });
+        if (entries.length) {
+          setEnrichedTotalsByDay((prev) => {
+            const next = { ...prev };
+            for (const [k, v] of entries) next[k] = v;
+            return next;
+          });
+        }
       } catch { /* silencioso */ }
     }, 700);
     return () => clearTimeout(t);
-  }, [texts]);
+  }, [texts, storedByDay, initialTexts]);
 
 
   // Conta quais dias têm override preenchido.
