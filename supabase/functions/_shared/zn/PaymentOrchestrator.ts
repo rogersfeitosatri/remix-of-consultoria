@@ -134,6 +134,9 @@ export class PaymentOrchestrator {
 
     let subscription: any = null;
     let isFirstPurchase = false;
+    // O atleta já estava com acesso ativo ANTES deste pagamento? Define se a
+    // mensagem é de ATIVAÇÃO (boas-vindas) ou de RENOVAÇÃO (confirmação).
+    let wasActiveBefore = false;
     if (plan && isPaid) {
       const existingSub = await this.subs.findByAsaasIds({
         asaas_subscription_id: p.subscription,
@@ -141,6 +144,12 @@ export class PaymentOrchestrator {
         athlete_id: athlete.id,
       });
       isFirstPurchase = !existingSub;
+      wasActiveBefore = !!(
+        existingSub &&
+        existingSub.status === "active" &&
+        existingSub.expires_at &&
+        new Date(existingSub.expires_at + "T23:59:59Z") >= reference_date
+      );
 
       subscription = await this.subs.upsertFromPayment({
         owner_user_id: ownerUserId,
@@ -254,39 +263,64 @@ export class PaymentOrchestrator {
       });
       this.log("[8/9] Sync Zona Nutri disparada", { event: syncEvent });
 
-      // WhatsApp de boas-vindas apenas na primeira compra bem-sucedida.
-      // ZN athletes NÃO existem em public.clients, então não podemos usar
-      // send-whatsapp (que exige clientId). Enviamos direto para o ZAPI e
-      // logamos em whatsapp_message_logs com client_id=null.
-      if (isFirstPurchase && isPaid && athlete.phone) {
+      // WhatsApp de confirmação em TODA compra/renovação paga (não só a primeira).
+      // Antes ficava restrito à primeira compra, então clientes que retornavam
+      // (ex.: já tinham conta no Zona Nutri) pagavam e não recebiam nada.
+      // Deduplica por pagamento (CONFIRMED + RECEIVED disparam para o mesmo id).
+      // ZN athletes NÃO existem em public.clients (por isso ZAPI direto).
+      if (isPaid && athlete.phone) {
         try {
-          // Buscar credenciais retornadas pelo Zona Nutri no sync anterior
-          const { data: outboxRow } = await this.supabase
-            .from("zn_integration_outbox")
-            .select("response_body, status")
-            .eq("athlete_id", athlete.id)
-            .eq("subscription_id", subscription.id)
-            .eq("event_type", "subscription_created")
-            .eq("status", "sent")
-            .order("sent_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          const paymentId = p.id ?? null;
+          let alreadySent = false;
+          if (paymentId) {
+            const { data: prior } = await this.supabase
+              .from("whatsapp_message_logs")
+              .select("id")
+              .eq("template_key", "zn_welcome")
+              .eq("status", "sent")
+              .contains("metadata", { asaas_payment_id: paymentId })
+              .limit(1)
+              .maybeSingle();
+            alreadySent = !!prior?.id;
+          }
 
-          const resp = (outboxRow?.response_body ?? {}) as Record<string, any>;
-          const login = typeof resp.login === "string" ? resp.login : null;
-          const senha = typeof resp.senha_temporaria === "string" ? resp.senha_temporaria : null;
+          if (alreadySent) {
+            this.log("[whatsapp] Já enviado para este pagamento — pulando", { paymentId });
+          } else {
+            // Credenciais retornadas pelo Zona Nutri no sync (quando é conta nova).
+            const { data: outboxRow } = await this.supabase
+              .from("zn_integration_outbox")
+              .select("response_body, status")
+              .eq("athlete_id", athlete.id)
+              .eq("subscription_id", subscription.id)
+              .eq("event_type", "subscription_created")
+              .eq("status", "sent")
+              .order("sent_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-          await this.sendZnWelcomeWhatsapp({
-            ownerUserId,
-            athlete,
-            planCode: subscription.plan_code,
-            expiresAt: subscription.expires_at,
-            login,
-            senhaTemporaria: senha,
-          });
-          this.log("[whatsapp] Mensagem de boas-vindas enviada", { hasCredentials: !!(login && senha) });
+            const resp = (outboxRow?.response_body ?? {}) as Record<string, any>;
+            const login = typeof resp.login === "string" ? resp.login : null;
+            const senha = typeof resp.senha_temporaria === "string" ? resp.senha_temporaria : null;
+
+            // Renovação = já estava ativo antes deste pagamento (não é 1ª compra
+            // nem reativação após lapso). Aí mandamos confirmação curta.
+            const isRenewal = !isFirstPurchase && wasActiveBefore;
+
+            await this.sendZnWelcomeWhatsapp({
+              ownerUserId,
+              athlete,
+              planCode: subscription.plan_code,
+              expiresAt: subscription.expires_at,
+              login,
+              senhaTemporaria: senha,
+              paymentId,
+              isRenewal,
+            });
+            this.log("[whatsapp] Confirmação enviada", { hasCredentials: !!(login && senha), isRenewal, paymentId });
+          }
         } catch (e) {
-          this.log("[whatsapp] Falha ao enviar boas-vindas (não bloqueia)", { error: (e as Error).message });
+          this.log("[whatsapp] Falha ao enviar confirmação (não bloqueia)", { error: (e as Error).message });
         }
       }
     } else {
@@ -340,6 +374,8 @@ export class PaymentOrchestrator {
     expiresAt: string | null;
     login: string | null;
     senhaTemporaria: string | null;
+    paymentId?: string | null;
+    isRenewal?: boolean;
   }): Promise<void> {
     const zapiInstanceId = Deno.env.get("ZAPI_INSTANCE_ID");
     const zapiToken = Deno.env.get("ZAPI_TOKEN");
@@ -357,7 +393,16 @@ export class PaymentOrchestrator {
 
     const firstName = (input.athlete.name ?? "").split(" ")[0] || "";
     const hasCreds = !!(input.login && input.senhaTemporaria);
-    const message = hasCreds
+    const message = input.isRenewal
+      ? `Olá ${firstName}! ✅ *Pagamento confirmado* — seu acesso à *ZN Assessoria* está ativo` +
+        `${input.expiresAt ? ` e válido até ${input.expiresAt}` : ""}.\n\n` +
+        `Plano: *${input.planCode}*\n\n` +
+        `👇 Acesse o app Zona Nutri:\n` +
+        `🔗 https://zonanutri.com/login\n` +
+        `📧 Login (e-mail): ${input.athlete.email}\n\n` +
+        `Se esqueceu a senha, use *"Esqueci minha senha"* na tela de login.\n\n` +
+        `Bons treinos! 🏃‍♂️💪`
+      : hasCreds
       ? `Olá ${firstName}! 🎉 Seu acesso à *ZN Assessoria* foi ativado.\n\n` +
         `Plano: *${input.planCode}*${input.expiresAt ? ` • válido até ${input.expiresAt}` : ""}\n\n` +
         `👇 *Acesse o app Zona Nutri com estes dados:*\n` +
@@ -396,6 +441,8 @@ export class PaymentOrchestrator {
         zn_athlete_id: input.athlete.id,
         zn_athlete_email: input.athlete.email,
         plan_code: input.planCode,
+        asaas_payment_id: input.paymentId ?? null,
+        is_renewal: !!input.isRenewal,
         zapi_response: zapiResult,
       },
     });
