@@ -15,7 +15,7 @@ import { SubscriptionService } from "./SubscriptionService.ts";
 import { PaymentService } from "./PaymentService.ts";
 import { ExternalSyncService } from "./ExternalSyncService.ts";
 import { mapAsaasCycleToPlan, type AsaasEventPayload, type ZnPlanCode } from "./types.ts";
-import { znActivePrices } from "./planCatalog.ts";
+import { znActivePrices, znPlanByValue, planFromText } from "./planCatalog.ts";
 
 const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY") ?? "";
 const ASAAS_BASE =
@@ -120,12 +120,28 @@ export class PaymentOrchestrator {
       this.log("[3/9] Cadastro criado", { athlete_id: athlete.id, email: athlete.email });
     }
 
-    // 4) Plano
-    const plan: ZnPlanCode | null = mapAsaasCycleToPlan(subscriptionData?.cycle);
+    // 4) Plano. Nos planos PARCELADOS (semestral/anual), a cobrança que confirma
+    // vem AVULSA (sem subscription/cycle) → antes o plano ficava null e todo o
+    // fluxo (assinatura + sync + WhatsApp) era pulado. Deriva por fallback:
+    // cycle → texto (plano do atleta / descrição) → valor integral.
+    let plan: ZnPlanCode | null = mapAsaasCycleToPlan(subscriptionData?.cycle);
+    let planSource = "cycle";
+    if (!plan) {
+      plan = planFromText((athlete as any).plan_choice) as ZnPlanCode | null;
+      if (plan) planSource = "athlete.plan_choice";
+    }
+    if (!plan) {
+      plan = planFromText((p as any).description) as ZnPlanCode | null;
+      if (plan) planSource = "payment.description";
+    }
+    if (!plan) {
+      plan = (await znPlanByValue(this.supabase, ownerUserId, value)) as ZnPlanCode | null;
+      if (plan) planSource = "value";
+    }
     if (plan) {
-      this.log("[4/9] Plano identificado", { plan, cycle: subscriptionData?.cycle });
+      this.log("[4/9] Plano identificado", { plan, source: planSource, cycle: subscriptionData?.cycle });
     } else {
-      this.log("[4/9] Plano NÃO identificado (subscription sem cycle)", { cycle: subscriptionData?.cycle });
+      this.log("[4/9] Plano NÃO identificado", { cycle: subscriptionData?.cycle, value });
     }
 
     // 5) Assinatura
