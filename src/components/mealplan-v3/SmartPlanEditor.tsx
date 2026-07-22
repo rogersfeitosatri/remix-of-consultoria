@@ -348,7 +348,11 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
                   const qty = Math.max(0.5, Math.round(rawQty * 2) / 2);
                   const total = Math.round(qty * unitMeasure.measure_weight_g * 10) / 10;
                   const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toString().replace('.', ','));
-                  const cleanLabel = unitMeasure.measure_name.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                  // Remove parênteses E número inicial da medida (evita "1 1 unidade").
+                  const cleanLabel = unitMeasure.measure_name
+                    .replace(/\s*\([^)]*\)\s*/g, ' ')
+                    .replace(/^\s*\d+(?:[.,]\d+)?(?:\/\d+)?\s*/, '')
+                    .trim();
                   const insert = `${food.name} - ${fmt(qty)} ${cleanLabel} (${fmt(total)}g)`;
                   setPendingFood(null);
                   setMode('idle');
@@ -390,19 +394,34 @@ export function SmartPlanEditor({ value, onChange, onAstChange, autoRecalcSubs =
     const typed = q.afterDivider.trim();
     const qtyMatch = typed.match(/^(\d+(?:[.,]\d+)?)/);
     const qty = qtyMatch ? Number(qtyMatch[1].replace(',', '.')) : 1;
-    const qtyPrefix = qtyMatch ? `${qtyMatch[1]} ` : '1 ';
-    const cleanLabel = measureLabel.replace(/\s*\([^)]*\)\s*/g, '').trim();
-    const per = Math.round(grams * 10) / 10;
-    const total = Math.round(grams * qty * 10) / 10;
     const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toString().replace('.', ','));
+    const total = Math.round(grams * qty * 10) / 10;
+    // Frase da medida: sem parênteses E sem um número inicial que a própria
+    // medida traga (ex.: "1 unidade média" → "unidade média"). Assim não
+    // duplicamos o número: quantidade digitada + "1 unidade" viravam "1 1 unidade".
+    const phrase = measureLabel
+      .replace(/\s*\([^)]*\)\s*/g, ' ')
+      .replace(/^\s*\d+(?:[.,]\d+)?(?:\/\d+)?\s*/, '')
+      .trim();
+    const gramUnit = phrase === '' || /^(g|ml|kg|gramas?|mls?)$/i.test(phrase);
+    // Padrão: "1 unidade média (Xg)" · "1 xícara (Xg)" · ou "50 g" para gramas.
+    let newSeg: string;
+    let shownMeasure: string;
+    if (gramUnit) {
+      const unit = /ml/i.test(measureLabel) ? 'ml' : (/kg/i.test(phrase) ? 'kg' : 'g');
+      shownMeasure = `${fmt(total)} ${unit}`;
+      newSeg = `${q.query} - ${shownMeasure}`;
+    } else {
+      shownMeasure = `${fmt(qty)} ${phrase} (${fmt(total)}g)`;
+      newSeg = `${q.query} - ${shownMeasure}`;
+    }
     const nameStart = c.segStart;
     const beforeSeg = value.slice(0, nameStart);
     const afterCaret = value.slice(c.segStart + c.segCaret);
-    const newSeg = `${q.query} - ${qtyPrefix}${cleanLabel} (${fmt(total)}g)`;
     insertAtCaret(beforeSeg, newSeg, afterCaret);
     if (food) {
-      const nutrients = calcNutrients(food, grams * qty);
-      toast.success(`${food.name} × ${qtyPrefix}${cleanLabel}`.trim(), {
+      const nutrients = calcNutrients(food, total);
+      toast.success(`${food.name} × ${shownMeasure}`.trim(), {
         description: `${Math.round(nutrients.calories)} kcal · CHO ${nutrients.carbs_g}g · PTN ${nutrients.protein_g}g · GORD ${nutrients.fat_g}g`,
         duration: 1800,
       });
