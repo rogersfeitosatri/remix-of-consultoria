@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useDashboardDismissals } from '@/hooks/useDashboardDismissals';
 import { usePendingMealPlans, useUnlinkedAnamneseForMealPlan } from '@/hooks/useMealPlanStatus';
 import { parseISO, addDays, isWeekend, differenceInCalendarDays, format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -100,24 +101,13 @@ export function ActionCenterPanel() {
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || '';
 
-  // Dismiss system: items stay dismissed permanently
-  const DISMISS_KEY = 'dashboard-dismissed-v3';
-  const [dismissed, setDismissed] = useState<Record<string, number>>(() => {
-    try {
-      const raw = localStorage.getItem(DISMISS_KEY);
-      if (!raw) return {};
-      return JSON.parse(raw) as Record<string, number>;
-    } catch { return {}; }
-  });
-  const isDismissed = (key: string) => key in dismissed;
+  // Dismiss persistente (banco + fallback localStorage) — some de vez, em
+  // qualquer dispositivo/acesso.
+  const { isDismissed, dismiss: dismissPersist } = useDashboardDismissals();
   const dismiss = useCallback((key: string) => {
-    setDismissed(prev => {
-      const next = { ...prev, [key]: Date.now() };
-      try { localStorage.setItem(DISMISS_KEY, JSON.stringify(next)); } catch {}
-      return next;
-    });
+    void dismissPersist(key);
     toast.success('Concluído!');
-  }, []);
+  }, [dismissPersist]);
 
   // All clients for registration progress
   const { data: allClients = [], isLoading: loadingClients } = useQuery({
