@@ -77,6 +77,7 @@ const Terms = lazy(() => import("./pages/Terms"));
 const PublicOnboarding = lazy(() => import("./pages/PublicOnboarding"));
 const ZnAssessoria = lazy(() => import("./pages/ZnAssessoria"));
 const PublicZnSubscribe = lazy(() => import("./pages/PublicZnSubscribe"));
+const PublicPromoterStats = lazy(() => import("./pages/PublicPromoterStats"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -163,6 +164,7 @@ function AppRoutes() {
         <Route path="/onboarding" element={<PublicOnboarding />} />
         <Route path="/zn/assinar" element={<Navigate to={`/anamnese-form/cdb87aff-804f-4c5f-9b90-61923317531a?zn=1${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('plano') ? `&plano=${new URLSearchParams(window.location.search).get('plano')}` : ''}${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('cupom') ? `&cupom=${new URLSearchParams(window.location.search).get('cupom')}` : ''}`} replace />} />
         <Route path="/zn/anamnese" element={<Navigate to={`/anamnese-form/cdb87aff-804f-4c5f-9b90-61923317531a?zn=1${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('plano') ? `&plano=${new URLSearchParams(window.location.search).get('plano')}` : ''}${typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('cupom') ? `&cupom=${new URLSearchParams(window.location.search).get('cupom')}` : ''}`} replace />} />
+        <Route path="/parceiro/:ref" element={<PublicPromoterStats />} />
         <Route path="/athlete" element={<AthleteRoute allowAdmin><AthleteDashboard /></AthleteRoute>} />
         <Route path="/athlete/anamnese" element={<AthleteRoute allowAdmin><AthleteDynamicAnamneseForm /></AthleteRoute>} />
         <Route path="/admin" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, Ticket, Megaphone, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, Ticket, Megaphone, Copy, BarChart3 } from 'lucide-react';
 import {
   useZnCoupons, useZnPromoters, useSaveZnCoupon, useDeleteZnCoupon,
   useSaveZnPromoter, useDeleteZnPromoter, useZnAthletes,
@@ -213,6 +213,14 @@ export function ZnPromotersSection() {
     toast.success('Link copiado (troque SEU_FORM_ID pelo ID do formulário ZN)');
   };
 
+  // Link do PAINEL do criador — ele vê só quantas pessoas usaram o cupom dele.
+  const copyPanelLink = (ref: string | null) => {
+    if (!ref) { toast.error('Defina um código de referência para gerar o painel.'); return; }
+    const link = `${PUBLIC_BASE}/parceiro/${ref}`;
+    navigator.clipboard.writeText(link);
+    toast.success('Link do painel do criador copiado! Envie para o influenciador.');
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -243,7 +251,8 @@ export function ZnPromotersSection() {
                 <TableCell className="font-mono text-xs">{p.ref_code ?? '—'}</TableCell>
                 <TableCell>{p.is_active ? <Badge>Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}</TableCell>
                 <TableCell className="text-right whitespace-nowrap">
-                  {p.ref_code && <Button variant="ghost" size="sm" title="Copiar link" onClick={() => copyLink(p.ref_code)}><Copy className="h-3.5 w-3.5" /></Button>}
+                  {p.ref_code && <Button variant="ghost" size="sm" title="Copiar link de divulgação (funil)" onClick={() => copyLink(p.ref_code)}><Copy className="h-3.5 w-3.5" /></Button>}
+                  {p.ref_code && <Button variant="ghost" size="sm" title="Copiar link do painel do criador (só a contagem)" onClick={() => copyPanelLink(p.ref_code)}><BarChart3 className="h-3.5 w-3.5" /></Button>}
                   <Button variant="ghost" size="sm" onClick={() => setEditing(p)}><Pencil className="h-3.5 w-3.5" /></Button>
                   <Button variant="ghost" size="sm" className="text-destructive" onClick={() => { if (confirm(`Remover ${p.name}?`)) del.mutate(p.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
                 </TableCell>
