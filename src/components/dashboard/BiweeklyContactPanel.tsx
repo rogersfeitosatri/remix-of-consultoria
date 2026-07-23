@@ -64,20 +64,33 @@ export function BiweeklyContactPanel() {
             {pending.map((r) => {
               const s = sinceLabel(r);
               return (
-                <div key={r.id} className="flex items-center gap-2 rounded-lg border p-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{r.name}</p>
-                    <span className={`text-[11px] ${s.overdue ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                      {s.text}
-                    </span>
+                <div key={r.id} className="rounded-lg border p-2.5 sm:p-2">
+                  <div className="flex items-start gap-2 sm:items-center">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{r.name}</p>
+                      <span className={`text-[11px] ${s.overdue ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                        {s.text}
+                      </span>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2">
+                      <Button size="sm" variant="outline" className="h-8 gap-1 text-xs text-green-600 border-green-600/30 hover:bg-green-600/10"
+                        onClick={() => openWa(r)}>
+                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                      </Button>
+                      <Button size="sm" className="h-8 gap-1 text-xs" onClick={() => { markContacted(r.id); toast.success(`Contato com ${r.name.split(' ')[0]} registrado.`); }}>
+                        <Check className="h-3.5 w-3.5" /> Falei
+                      </Button>
+                    </div>
                   </div>
-                  <Button size="sm" variant="outline" className="h-8 gap-1 text-xs text-green-600 border-green-600/30 hover:bg-green-600/10"
-                    onClick={() => openWa(r)}>
-                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                  </Button>
-                  <Button size="sm" className="h-8 gap-1 text-xs" onClick={() => { markContacted(r.id); toast.success(`Contato com ${r.name.split(' ')[0]} registrado.`); }}>
-                    <Check className="h-3.5 w-3.5" /> Falei
-                  </Button>
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:hidden">
+                    <Button size="sm" variant="outline" className="h-9 gap-1 text-xs text-green-600 border-green-600/30 hover:bg-green-600/10"
+                      onClick={() => openWa(r)}>
+                      <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                    </Button>
+                    <Button size="sm" className="h-9 gap-1 text-xs" onClick={() => { markContacted(r.id); toast.success(`Contato com ${r.name.split(' ')[0]} registrado.`); }}>
+                      <Check className="h-3.5 w-3.5" /> Falei
+                    </Button>
+                  </div>
                 </div>
               );
             })}
