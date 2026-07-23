@@ -30,12 +30,13 @@ export function useBiweeklyContacts() {
     enabled: !!user?.id,
     staleTime: 30_000,
     queryFn: async (): Promise<ContactRow[]> => {
-      // 1) Atletas ativos.
+      // 1) Atletas ativos (não congelados / inativados).
       const { data: clients, error: cErr } = await supabase
         .from('clients')
         .select('id, name, phone')
         .eq('user_id', user!.id)
         .eq('is_active', true)
+        .eq('is_frozen', false)
         .order('name');
       if (cErr) throw cErr;
 
