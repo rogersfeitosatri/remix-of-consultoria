@@ -28,6 +28,7 @@ function sinceLabel(r: ContactRow): { text: string; overdue: boolean } {
 export function BiweeklyContactPanel() {
   const { pending, done, total, isLoading, markContacted, undoContact } = useBiweeklyContacts();
   const [doneOpen, setDoneOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
 
   if (isLoading) return null;
   if (total === 0) return null; // sem atletas ativos → nada a mostrar
