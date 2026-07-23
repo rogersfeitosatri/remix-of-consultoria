@@ -2648,6 +2648,27 @@ export type Database = {
           },
         ]
       }
+      dashboard_dismissals: {
+        Row: {
+          dismissed_at: string
+          id: string
+          item_key: string
+          user_id: string
+        }
+        Insert: {
+          dismissed_at?: string
+          id?: string
+          item_key: string
+          user_id: string
+        }
+        Update: {
+          dismissed_at?: string
+          id?: string
+          item_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       diet_adjustment_alerts: {
         Row: {
           client_id: string
