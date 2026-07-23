@@ -81,6 +81,24 @@ export function firstMissing(
     return null;
   }
 
+  // training_week: exige ao menos uma sessão com conteúdo mínimo quando obrigatória.
+  if (question.question_type === 'training_week') {
+    if (!required) return null;
+    const week = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : {};
+    const hasAnySession = Object.values(week).some((sessions: any) =>
+      Array.isArray(sessions) && sessions.some((s: any) => {
+        if (!s || typeof s !== 'object') return false;
+        return !!(String(s.start_time || '').trim() ||
+                  String(s.modality || '').trim() ||
+                  String(s.session_type || '').trim() ||
+                  (s.duration_minutes !== '' && s.duration_minutes != null) ||
+                  (s.distance_km !== '' && s.distance_km != null));
+      }),
+    );
+    if (!hasAnySession) return question.question_text || 'Semana de treino';
+    return null;
+  }
+
   // Demais tipos: obrigatório e vazio → falta.
   if (required && isBlankValue(answer)) return question.question_text || 'Campo obrigatório';
   return null;
