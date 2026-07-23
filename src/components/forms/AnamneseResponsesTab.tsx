@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, FileText, Eye, User, Link2, AlertCircle, Trash2, UserPlus } from 'lucide-react';
+import { Search, FileText, Eye, User, Link2, AlertCircle, Trash2, UserPlus, Pencil } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -67,6 +67,8 @@ export function AnamneseResponsesTab() {
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [responseToDelete, setResponseToDelete] = useState<UnlinkedResponse | null>(null);
+  const [deleteLinkedOpen, setDeleteLinkedOpen] = useState(false);
+  const [linkedToDelete, setLinkedToDelete] = useState<AnamneseListItem | null>(null);
   const [linkMode, setLinkMode] = useState<'existing' | 'new'>('existing');
   const [newAthleteName, setNewAthleteName] = useState('');
   const [newAthleteEmail, setNewAthleteEmail] = useState('');
@@ -248,6 +250,29 @@ export function AnamneseResponsesTab() {
     },
     onError: (error) => {
       console.error('Error deleting response:', error);
+      toast.error('Erro ao excluir anamnese');
+    },
+  });
+
+  // Delete a linked (already attached to an athlete) anamnese response
+  const deleteLinkedMutation = useMutation({
+    mutationFn: async (responseId: string) => {
+      const { error } = await supabase
+        .from('anamnese_responses')
+        .delete()
+        .eq('id', responseId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all_anamnese_responses'] });
+      queryClient.invalidateQueries({ queryKey: ['pending_anamnese_for_list'] });
+      queryClient.invalidateQueries({ queryKey: ['pending_anamnese_clients'] });
+      toast.success('Anamnese excluída com sucesso!');
+      setDeleteLinkedOpen(false);
+      setLinkedToDelete(null);
+    },
+    onError: (err) => {
+      console.error('Error deleting linked response:', err);
       toast.error('Erro ao excluir anamnese');
     },
   });
@@ -594,7 +619,27 @@ export function AnamneseResponsesTab() {
                       onClick={() => navigate(`/anamnese-response/${response.id}`)}
                     >
                       <Eye className="h-4 w-4" />
-                      <span className="hidden sm:inline">Ver anamnese</span>
+                      <span className="hidden sm:inline">Ver</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => navigate(`/anamnese-response/${response.id}?edit=1`)}
+                      title="Editar anamnese"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      <span className="hidden sm:inline">Editar</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 text-destructive hover:text-destructive"
+                      onClick={() => { setLinkedToDelete(response); setDeleteLinkedOpen(true); }}
+                      title="Excluir anamnese"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Excluir</span>
                     </Button>
                   </div>
                 </div>
@@ -760,6 +805,30 @@ export function AnamneseResponsesTab() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleteResponseMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Linked Response Confirmation */}
+      <AlertDialog open={deleteLinkedOpen} onOpenChange={setDeleteLinkedOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir anamnese?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação excluirá permanentemente a anamnese respondida por{' '}
+              <span className="font-medium text-foreground">{linkedToDelete?.client_name}</span>.
+              O cadastro do atleta não será afetado. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setLinkedToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => linkedToDelete && deleteLinkedMutation.mutate(linkedToDelete.id)}
+              disabled={deleteLinkedMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteLinkedMutation.isPending ? 'Excluindo...' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
