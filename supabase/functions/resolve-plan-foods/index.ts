@@ -79,8 +79,8 @@ ${lines}`;
       toolName: "submit_resolved_foods",
       toolDescription: "Retorna gramas e macros por item",
       schema: SCHEMA,
-      primary: "lovable",
-      openaiModel: "openai/gpt-5.6-luna",
+      primary: "openai",
+      openaiModel: "gpt-5.6-luna",
       fallback: "openai-gpt4o-mini",
     });
 
