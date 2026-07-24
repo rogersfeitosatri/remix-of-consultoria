@@ -214,7 +214,11 @@ export default function AnamneseResponseDetail() {
     textToCopy += `Data: ${submittedAt}\n${'='.repeat(50)}\n\n`;
     Object.entries(groupedQuestions).forEach(([section, sqs], si) => {
       textToCopy += `--- ${section} ---\n\n`;
+      let lastSub = '';
       sqs.forEach((q, qi) => {
+        const sub = ((q as any).subsection || '').trim();
+        if (sub && sub !== lastSub) { textToCopy += `[${sub}]\n`; lastSub = sub; }
+        if (q.question_type === 'info') return;
         textToCopy += `Pergunta ${si + 1}.${qi + 1}: ${q.question_text}\nResposta: ${formatAnswer(q.id, q.question_type)}\n\n`;
       });
     });
