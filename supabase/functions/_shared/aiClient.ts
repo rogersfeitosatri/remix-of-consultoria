@@ -189,10 +189,10 @@ export interface AiResult {
 
 // Saída estruturada via function-calling (parseia tool_calls[0].function.arguments).
 export async function callAiStructured(opts: StructuredOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'gemini', opts.openaiModel);
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'lovable', opts.openaiModel);
 
   if (!providers.length) {
-    throw new Error('Nenhuma chave de IA configurada. Defina GEMINI_API_KEY nas secrets.');
+    throw new Error('Nenhuma chave de IA configurada. Defina LOVABLE_API_KEY (ou GEMINI_API_KEY) nas secrets.');
   }
   let lastErr: any;
   for (const p of providers) {
@@ -251,10 +251,10 @@ export interface JsonOpts {
 
 // Saída de texto livre (sem parsing) — usada pelo playground de teste de prompts.
 export async function callAiText(opts: JsonOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'gemini', opts.openaiModel);
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'lovable', opts.openaiModel);
 
   if (!providers.length) {
-    throw new Error('Nenhuma chave de IA configurada. Defina GEMINI_API_KEY nas secrets.');
+    throw new Error('Nenhuma chave de IA configurada. Defina LOVABLE_API_KEY (ou GEMINI_API_KEY) nas secrets.');
   }
   let lastErr: any;
   for (const p of providers) {
@@ -280,9 +280,9 @@ export async function callAiText(opts: JsonOpts): Promise<AiResult> {
 
 // Saída JSON simples no conteúdo da mensagem (tolerante a cercas markdown ```json).
 export async function callAiJson(opts: JsonOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'gemini', opts.openaiModel);
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'lovable', opts.openaiModel);
   if (!providers.length) {
-    throw new Error('Nenhuma chave de IA configurada. Defina GEMINI_API_KEY nas secrets.');
+    throw new Error('Nenhuma chave de IA configurada. Defina LOVABLE_API_KEY (ou GEMINI_API_KEY) nas secrets.');
   }
   let lastErr: any;
   for (const p of providers) {
