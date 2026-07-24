@@ -560,35 +560,53 @@ export default function AnamneseResponseDetail() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                {isAnamneseCompletaForm((responseData as any)?.anamnese_forms) ? (
+              <CardContent className="space-y-8">
+                {isAnamneseCompletaForm((responseData as any)?.anamnese_forms) && (
                   <AnamneseCompletaAdminView
                     response={responseData as any}
                     questions={questions as any}
                     onUpdated={() => queryClient.invalidateQueries({ queryKey: ['anamnese_response_detail', responseId] })}
                   />
-                ) : (
+                )}
                 <ScrollArea className="h-[600px] pr-4">
                   <div className="space-y-8">
-                    {Object.entries(groupedQuestions).map(([section, sectionQuestions]) => (
-                      <div key={section}>
-                        <h3 className="text-lg font-semibold mb-4 pb-2 border-b">{section}</h3>
-                        <div className="space-y-6">
-                          {sectionQuestions.map((question, index) => {
-                            const answer = formatAnswer(question.id, question.question_type);
-                            const isEmpty = answer === '(não respondeu)';
-                            return (
-                              <div key={question.id} className="space-y-2">
-                                <p className="font-medium text-foreground">{index + 1}. {question.question_text}</p>
-                                <div className={`p-3 rounded-lg ${isEmpty ? 'bg-muted/50' : 'bg-primary/5 border border-primary/10'}`}>
-                                  <p className={`${isEmpty ? 'text-muted-foreground italic' : 'text-foreground'} whitespace-pre-wrap`}>{answer}</p>
-                                </div>
+                    <h3 className="text-base font-semibold text-muted-foreground">Todas as respostas (fonte original)</h3>
+                    {Object.entries(groupedQuestions).map(([section, sectionQuestions]) => {
+                      // Agrupar por subseção dentro de cada seção
+                      const bySub: Record<string, AnamneseQuestion[]> = {};
+                      sectionQuestions.forEach((q) => {
+                        const key = (q.subsection || '').trim();
+                        if (!bySub[key]) bySub[key] = [];
+                        bySub[key].push(q);
+                      });
+                      return (
+                        <div key={section}>
+                          <h3 className="text-lg font-semibold mb-4 pb-2 border-b">{section}</h3>
+                          {Object.entries(bySub).map(([sub, subQs]) => (
+                            <div key={sub || 'no-sub'} className="mb-6">
+                              {sub && (
+                                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">{sub}</h4>
+                              )}
+                              <div className="space-y-4">
+                                {subQs.map((question, index) => {
+                                  if (question.question_type === 'info') return null;
+                                  const answer = formatAnswer(question.id, question.question_type);
+                                  const isEmpty = answer === '(não respondeu)';
+                                  return (
+                                    <div key={question.id} className="space-y-2">
+                                      <p className="font-medium text-foreground text-sm">{index + 1}. {question.question_text}</p>
+                                      <div className={`p-3 rounded-lg ${isEmpty ? 'bg-muted/50' : 'bg-primary/5 border border-primary/10'}`}>
+                                        <p className={`text-sm ${isEmpty ? 'text-muted-foreground italic' : 'text-foreground'} whitespace-pre-wrap break-words`}>{answer}</p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            );
-                          })}
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {Object.keys(groupedQuestions).length === 0 && (
                       <div className="text-center py-8 text-muted-foreground">
                         <p>Nenhuma pergunta encontrada para este formulário</p>
@@ -596,7 +614,6 @@ export default function AnamneseResponseDetail() {
                     )}
                   </div>
                 </ScrollArea>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
