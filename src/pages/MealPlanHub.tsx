@@ -22,6 +22,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AttachedPlanPanel } from '@/components/admin/AttachedPlanPanel';
+import { MealPlanLinksCard } from '@/components/admin/MealPlanLinksCard';
 import {
   parseRaw, readSavedPlans, countMeals, variationCount, planTotals,
   duplicatePlan, setActivePlan, genPlanId, removeSavedPlan, removeAttachedPlan,
@@ -251,6 +252,9 @@ export default function MealPlanHub() {
             ))}
           </div>
         </div>
+
+        {/* Links de acesso rápido */}
+        {clientId && <MealPlanLinksCard clientId={clientId} />}
 
         {/* Histórico de plano alimentar */}
         <div>
