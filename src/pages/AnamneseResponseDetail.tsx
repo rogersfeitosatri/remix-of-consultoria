@@ -369,9 +369,15 @@ export default function AnamneseResponseDetail() {
     addSeparator();
 
     Object.entries(groupedQuestions).forEach(([section, sqs]) => {
+      const bySub: Record<string, AnamneseQuestion[]> = {};
+      sqs.forEach((q) => {
+        const key = ((q as any).subsection || '').trim();
+        if (!bySub[key]) bySub[key] = [];
+        bySub[key].push(q);
+      });
       if (mode === 'meals') {
         const sectionIsMeal = isMealSection(section);
-        const mealQs = sqs.filter(q => sectionIsMeal || isMealQuestion(q.question_text));
+        const mealQs = sqs.filter(q => q.question_type !== 'info' && (sectionIsMeal || isMealQuestion(q.question_text)));
         if (mealQs.length === 0) return;
         addText(section, 13, true, [30, 80, 60]);
         addSpace(4);
@@ -385,11 +391,15 @@ export default function AnamneseResponseDetail() {
       } else {
         addText(section, 13, true, [30, 80, 60]);
         addSpace(4);
-        sqs.forEach(q => {
-          const answer = formatAnswer(q.id, q.question_type);
-          addText(q.question_text, 10, true);
-          addText(answer, 10, false, answer === '(não respondeu)' ? [160, 160, 160] : [33, 33, 33]);
-          addSpace(5);
+        Object.entries(bySub).forEach(([sub, subQs]) => {
+          if (sub) { addText(sub, 11, true, [90, 90, 90]); addSpace(2); }
+          subQs.forEach(q => {
+            if (q.question_type === 'info') return;
+            const answer = formatAnswer(q.id, q.question_type);
+            addText(q.question_text, 10, true);
+            addText(answer, 10, false, answer === '(não respondeu)' ? [160, 160, 160] : [33, 33, 33]);
+            addSpace(5);
+          });
         });
         addSpace(4);
       }
