@@ -43,24 +43,27 @@ async function notifyAdminViaZapi(supabase: any, clientName: string, excerpt: st
 }
 
 async function callLovableAI(model: string, systemPrompt: string, history: Array<{ role: string; content: string }>, userMessage: string) {
-  const apiKey = Deno.env.get("LOVABLE_API_KEY");
-  if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) throw new Error("OPENAI_API_KEY missing");
   const messages = [
     { role: "system", content: systemPrompt },
     ...history.slice(-10),
     { role: "user", content: userMessage },
   ];
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  // Modelo padrão do sistema: OpenAI direto → gpt-5.6-luna.
+  const finalModel = model && !model.includes('/') ? model : 'gpt-5.6-luna';
+  const body: any = { model: finalModel, messages, max_tokens: 600 };
+  if (/gpt-5\.6/i.test(finalModel)) body.reasoning_effort = 'none';
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "vercel-ai-sdk",
+      "Authorization": `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ model, messages, max_tokens: 600 }),
+    body: JSON.stringify(body),
   });
   const j = await res.json();
-  if (!res.ok) throw new Error(`AI gateway ${res.status}: ${JSON.stringify(j).slice(0, 400)}`);
+  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${JSON.stringify(j).slice(0, 400)}`);
   return {
     text: j?.choices?.[0]?.message?.content?.trim() || "Desculpe, não consegui responder agora.",
     tokensIn: j?.usage?.prompt_tokens,

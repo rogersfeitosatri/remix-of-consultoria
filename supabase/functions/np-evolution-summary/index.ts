@@ -12,8 +12,8 @@ Deno.serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurada");
 
     const authHeader = req.headers.get("Authorization") || "";
     const userClient = createClient(SUPABASE_URL, SERVICE_ROLE, {
@@ -96,11 +96,12 @@ ${logs.map((l: any) => `- ${l.checkin_date}: CHO ${l.current_cho_rate_g_h ?? "?"
 
 Gere ${audience === 'athlete' ? 'a mensagem motivacional para o atleta' : 'o resumo de evolução técnico'} agora.`;
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-5.6-luna", reasoning_effort: "none",
+        model: "gpt-5.6-luna",
+        reasoning_effort: "none",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -139,7 +140,7 @@ Gere ${audience === 'athlete' ? 'a mensagem motivacional para o atleta' : 'o res
         logs_analyzed: logs.length,
         summary_markdown: summary,
         recommendations: [],
-        model: "openai/gpt-5.6-luna", reasoning_effort: "none",
+        model: "gpt-5.6-luna", reasoning_effort: "none",
         audience,
       })
       .select("id, created_at, summary_markdown, phase, weeks_to_race, logs_analyzed, model, audience")

@@ -1,11 +1,11 @@
 // Cliente de IA compartilhado.
-// Provedor PRIMÁRIO (padrão do sistema): Lovable AI Gateway → openai/gpt-5.6-luna.
-// Fallbacks automáticos: Gemini direto e OpenAI direto (quando as chaves existem).
+// Provedor PRIMÁRIO (padrão do sistema): OpenAI direto → gpt-5.6-luna.
+// Fallbacks automáticos: Gemini direto e Lovable Gateway (se as chaves existirem).
 //
 // Secrets esperados (Supabase Edge Functions):
-//   - LOVABLE_API_KEY  (obrigatório — provedor primário: openai/gpt-5.6-luna)
+//   - OPENAI_API_KEY   (obrigatório — provedor primário: gpt-5.6-luna)
 //   - GEMINI_API_KEY   (opcional — fallback)
-//   - OPENAI_API_KEY   (opcional — fallback)
+//   - LOVABLE_API_KEY  (opcional — fallback)
 
 export type FallbackKind = 'openai-gpt4o' | 'openai-gpt4o-mini' | 'openai-gpt5' | 'openai-gpt5-mini' | 'lovable-gemini-pro' | 'none';
 export type PrimaryProvider = 'gemini' | 'openai' | 'lovable';
@@ -16,7 +16,6 @@ interface Provider {
   apiKey: string | undefined;
   model: string;
   sanitizeSchema: boolean;
-  // Cabeçalho de autenticação: Lovable usa "Lovable-API-Key"; outros usam Authorization Bearer.
   authHeader: 'bearer' | 'lovable';
 }
 
@@ -25,19 +24,8 @@ const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const LOVABLE_ENDPOINT = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 
-// Modelo padrão de todo o sistema.
-export const DEFAULT_MODEL = 'openai/gpt-5.6-luna';
-
-function lovableProvider(model = DEFAULT_MODEL): Provider {
-  return {
-    name: 'lovable',
-    endpoint: LOVABLE_ENDPOINT,
-    apiKey: Deno.env.get('LOVABLE_API_KEY'),
-    model,
-    sanitizeSchema: false,
-    authHeader: 'lovable',
-  };
-}
+// Modelo padrão de todo o sistema (OpenAI direto).
+export const DEFAULT_MODEL = 'gpt-5.6-luna';
 
 function geminiProvider(): Provider {
   return {
@@ -50,7 +38,7 @@ function geminiProvider(): Provider {
   };
 }
 
-function openaiProvider(model = 'gpt-4o-mini'): Provider {
+function openaiProvider(model = DEFAULT_MODEL): Provider {
   return {
     name: 'openai',
     endpoint: OPENAI_ENDPOINT,
@@ -68,7 +56,7 @@ function fallbackProvider(kind: FallbackKind): Provider | null {
   if (kind === 'openai-gpt5-mini') return openaiProvider('gpt-5-mini');
   if (kind === 'lovable-gemini-pro') {
     return {
-      name: 'lovable-gemini',
+      name: 'lovable',
       endpoint: LOVABLE_ENDPOINT,
       apiKey: Deno.env.get('LOVABLE_API_KEY'),
       model: 'google/gemini-2.5-flash',
@@ -79,16 +67,22 @@ function fallbackProvider(kind: FallbackKind): Provider | null {
   return null;
 }
 
-// Modelo padrão = Lovable Gateway → openai/gpt-5.6-luna.
-// Fallbacks: Gemini direto e OpenAI direto (se as chaves existirem).
-function providersFor(fallback: FallbackKind, primary: PrimaryProvider = 'lovable', openaiModel?: string): Provider[] {
+// Modelo padrão = OpenAI direto → gpt-5.6-luna. Fallbacks: Gemini direto + kind escolhido.
+function providersFor(fallback: FallbackKind, primary: PrimaryProvider = 'openai', openaiModel?: string): Provider[] {
   let primaryProv: Provider;
-  if (primary === 'openai') primaryProv = openaiProvider(openaiModel || DEFAULT_MODEL.replace(/^openai\//, ''));
-  else if (primary === 'gemini') primaryProv = geminiProvider();
-  else primaryProv = lovableProvider(openaiModel && openaiModel.includes('/') ? openaiModel : DEFAULT_MODEL);
+  if (primary === 'gemini') primaryProv = geminiProvider();
+  else if (primary === 'lovable') {
+    primaryProv = {
+      name: 'lovable',
+      endpoint: LOVABLE_ENDPOINT,
+      apiKey: Deno.env.get('LOVABLE_API_KEY'),
+      model: openaiModel && openaiModel.includes('/') ? openaiModel : 'openai/gpt-5.6-luna',
+      sanitizeSchema: false,
+      authHeader: 'lovable',
+    };
+  } else primaryProv = openaiProvider(openaiModel || DEFAULT_MODEL);
 
   const list = [primaryProv, geminiProvider(), fallbackProvider(fallback)];
-  // Remove duplicados por nome e sem apiKey.
   const seen = new Set<string>();
   return list.filter((p): p is Provider => {
     if (!p || !p.apiKey) return false;
@@ -189,10 +183,10 @@ export interface AiResult {
 
 // Saída estruturada via function-calling (parseia tool_calls[0].function.arguments).
 export async function callAiStructured(opts: StructuredOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'lovable', opts.openaiModel);
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'openai', opts.openaiModel);
 
   if (!providers.length) {
-    throw new Error('Nenhuma chave de IA configurada. Defina LOVABLE_API_KEY (ou GEMINI_API_KEY) nas secrets.');
+    throw new Error('Nenhuma chave de IA configurada. Defina OPENAI_API_KEY nas secrets.');
   }
   let lastErr: any;
   for (const p of providers) {
@@ -251,10 +245,10 @@ export interface JsonOpts {
 
 // Saída de texto livre (sem parsing) — usada pelo playground de teste de prompts.
 export async function callAiText(opts: JsonOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'lovable', opts.openaiModel);
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'openai', opts.openaiModel);
 
   if (!providers.length) {
-    throw new Error('Nenhuma chave de IA configurada. Defina LOVABLE_API_KEY (ou GEMINI_API_KEY) nas secrets.');
+    throw new Error('Nenhuma chave de IA configurada. Defina OPENAI_API_KEY nas secrets.');
   }
   let lastErr: any;
   for (const p of providers) {
@@ -280,9 +274,9 @@ export async function callAiText(opts: JsonOpts): Promise<AiResult> {
 
 // Saída JSON simples no conteúdo da mensagem (tolerante a cercas markdown ```json).
 export async function callAiJson(opts: JsonOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'lovable', opts.openaiModel);
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'openai', opts.openaiModel);
   if (!providers.length) {
-    throw new Error('Nenhuma chave de IA configurada. Defina LOVABLE_API_KEY (ou GEMINI_API_KEY) nas secrets.');
+    throw new Error('Nenhuma chave de IA configurada. Defina OPENAI_API_KEY nas secrets.');
   }
   let lastErr: any;
   for (const p of providers) {

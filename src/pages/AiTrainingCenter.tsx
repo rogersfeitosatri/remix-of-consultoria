@@ -97,7 +97,7 @@ export default function AiTrainingCenter() {
   const [playgroundOpen, setPlaygroundOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [testProvider, setTestProvider] = useState<'gemini' | 'openai'>('gemini');
-  const [openaiModel, setOpenaiModel] = useState<string>('openai/gpt-5.6-luna');
+  const [openaiModel, setOpenaiModel] = useState<string>('gpt-5.6-luna');
 
 
   // Importa o conteúdo de um arquivo (.md/.txt lido direto; .pdf transcrito via IA)
@@ -410,10 +410,11 @@ export default function AiTrainingCenter() {
                                 onChange={(e) => setOpenaiModel(e.target.value)}
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                               >
-                                <option value="gpt-4o-mini">gpt-4o-mini (rápido/barato)</option>
-                                <option value="gpt-4o">gpt-4o (completo)</option>
+                                <option value="gpt-5.6-luna">gpt-5.6-luna (padrão do sistema)</option>
+                                <option value="gpt-5.6-terra">gpt-5.6-terra</option>
                                 <option value="gpt-5-mini">gpt-5-mini</option>
-                                <option value="gpt-5">gpt-5 (mais capaz)</option>
+                                <option value="gpt-4o-mini">gpt-4o-mini (barato)</option>
+                                <option value="gpt-4o">gpt-4o</option>
                               </select>
                             </div>
                           )}
