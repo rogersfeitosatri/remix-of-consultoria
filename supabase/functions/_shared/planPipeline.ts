@@ -72,8 +72,8 @@ export async function callAiJson(opts: {
           }
           break; // erro definitivo — próximo provedor
         }
-        const body = await res.json();
-        const content = body?.choices?.[0]?.message?.content ?? "";
+        const respBody = await res.json();
+        const content = respBody?.choices?.[0]?.message?.content ?? "";
         const parsed = parseJson(content);
         if (parsed) return { data: parsed, provider: p.name, model: p.model };
         errs.push(`${p.name}:parse#${attempt}`);
