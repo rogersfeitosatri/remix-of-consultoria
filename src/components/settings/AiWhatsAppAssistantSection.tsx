@@ -14,10 +14,10 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const MODELS = [
-  { value: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna (padrão do sistema)' },
-  { value: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra (mais capacidade)' },
-  { value: 'openai/gpt-5-mini', label: 'GPT-5 mini' },
-  { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (rápido/barato)' },
+  { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna (padrão do sistema)' },
+  { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra (mais capacidade)' },
+  { value: 'gpt-5-mini', label: 'GPT-5 mini' },
+  { value: 'gpt-4o-mini', label: 'GPT-4o mini (barato)' },
 ];
 
 const PROJECT_ID = 'vhzxnatgwravidvbehwi';
