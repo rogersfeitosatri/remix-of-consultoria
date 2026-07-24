@@ -33,6 +33,7 @@ interface AnamneseQuestion {
   question_text: string;
   question_type: string;
   section: string;
+  subsection?: string | null;
   order_index: number;
   options?: string[] | null;
 }
@@ -213,7 +214,11 @@ export default function AnamneseResponseDetail() {
     textToCopy += `Data: ${submittedAt}\n${'='.repeat(50)}\n\n`;
     Object.entries(groupedQuestions).forEach(([section, sqs], si) => {
       textToCopy += `--- ${section} ---\n\n`;
+      let lastSub = '';
       sqs.forEach((q, qi) => {
+        const sub = ((q as any).subsection || '').trim();
+        if (sub && sub !== lastSub) { textToCopy += `[${sub}]\n`; lastSub = sub; }
+        if (q.question_type === 'info') return;
         textToCopy += `Pergunta ${si + 1}.${qi + 1}: ${q.question_text}\nResposta: ${formatAnswer(q.id, q.question_type)}\n\n`;
       });
     });
@@ -368,9 +373,15 @@ export default function AnamneseResponseDetail() {
     addSeparator();
 
     Object.entries(groupedQuestions).forEach(([section, sqs]) => {
+      const bySub: Record<string, AnamneseQuestion[]> = {};
+      sqs.forEach((q) => {
+        const key = ((q as any).subsection || '').trim();
+        if (!bySub[key]) bySub[key] = [];
+        bySub[key].push(q);
+      });
       if (mode === 'meals') {
         const sectionIsMeal = isMealSection(section);
-        const mealQs = sqs.filter(q => sectionIsMeal || isMealQuestion(q.question_text));
+        const mealQs = sqs.filter(q => q.question_type !== 'info' && (sectionIsMeal || isMealQuestion(q.question_text)));
         if (mealQs.length === 0) return;
         addText(section, 13, true, [30, 80, 60]);
         addSpace(4);
@@ -384,11 +395,15 @@ export default function AnamneseResponseDetail() {
       } else {
         addText(section, 13, true, [30, 80, 60]);
         addSpace(4);
-        sqs.forEach(q => {
-          const answer = formatAnswer(q.id, q.question_type);
-          addText(q.question_text, 10, true);
-          addText(answer, 10, false, answer === '(não respondeu)' ? [160, 160, 160] : [33, 33, 33]);
-          addSpace(5);
+        Object.entries(bySub).forEach(([sub, subQs]) => {
+          if (sub) { addText(sub, 11, true, [90, 90, 90]); addSpace(2); }
+          subQs.forEach(q => {
+            if (q.question_type === 'info') return;
+            const answer = formatAnswer(q.id, q.question_type);
+            addText(q.question_text, 10, true);
+            addText(answer, 10, false, answer === '(não respondeu)' ? [160, 160, 160] : [33, 33, 33]);
+            addSpace(5);
+          });
         });
         addSpace(4);
       }
@@ -559,35 +574,53 @@ export default function AnamneseResponseDetail() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                {isAnamneseCompletaForm((responseData as any)?.anamnese_forms) ? (
+              <CardContent className="space-y-8">
+                {isAnamneseCompletaForm((responseData as any)?.anamnese_forms) && (
                   <AnamneseCompletaAdminView
                     response={responseData as any}
                     questions={questions as any}
                     onUpdated={() => queryClient.invalidateQueries({ queryKey: ['anamnese_response_detail', responseId] })}
                   />
-                ) : (
+                )}
                 <ScrollArea className="h-[600px] pr-4">
                   <div className="space-y-8">
-                    {Object.entries(groupedQuestions).map(([section, sectionQuestions]) => (
-                      <div key={section}>
-                        <h3 className="text-lg font-semibold mb-4 pb-2 border-b">{section}</h3>
-                        <div className="space-y-6">
-                          {sectionQuestions.map((question, index) => {
-                            const answer = formatAnswer(question.id, question.question_type);
-                            const isEmpty = answer === '(não respondeu)';
-                            return (
-                              <div key={question.id} className="space-y-2">
-                                <p className="font-medium text-foreground">{index + 1}. {question.question_text}</p>
-                                <div className={`p-3 rounded-lg ${isEmpty ? 'bg-muted/50' : 'bg-primary/5 border border-primary/10'}`}>
-                                  <p className={`${isEmpty ? 'text-muted-foreground italic' : 'text-foreground'} whitespace-pre-wrap`}>{answer}</p>
-                                </div>
+                    <h3 className="text-base font-semibold text-muted-foreground">Todas as respostas (fonte original)</h3>
+                    {Object.entries(groupedQuestions).map(([section, sectionQuestions]) => {
+                      // Agrupar por subseção dentro de cada seção
+                      const bySub: Record<string, AnamneseQuestion[]> = {};
+                      sectionQuestions.forEach((q) => {
+                        const key = (q.subsection || '').trim();
+                        if (!bySub[key]) bySub[key] = [];
+                        bySub[key].push(q);
+                      });
+                      return (
+                        <div key={section}>
+                          <h3 className="text-lg font-semibold mb-4 pb-2 border-b">{section}</h3>
+                          {Object.entries(bySub).map(([sub, subQs]) => (
+                            <div key={sub || 'no-sub'} className="mb-6">
+                              {sub && (
+                                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">{sub}</h4>
+                              )}
+                              <div className="space-y-4">
+                                {subQs.map((question, index) => {
+                                  if (question.question_type === 'info') return null;
+                                  const answer = formatAnswer(question.id, question.question_type);
+                                  const isEmpty = answer === '(não respondeu)';
+                                  return (
+                                    <div key={question.id} className="space-y-2">
+                                      <p className="font-medium text-foreground text-sm">{index + 1}. {question.question_text}</p>
+                                      <div className={`p-3 rounded-lg ${isEmpty ? 'bg-muted/50' : 'bg-primary/5 border border-primary/10'}`}>
+                                        <p className={`text-sm ${isEmpty ? 'text-muted-foreground italic' : 'text-foreground'} whitespace-pre-wrap break-words`}>{answer}</p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            );
-                          })}
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {Object.keys(groupedQuestions).length === 0 && (
                       <div className="text-center py-8 text-muted-foreground">
                         <p>Nenhuma pergunta encontrada para este formulário</p>
@@ -595,7 +628,6 @@ export default function AnamneseResponseDetail() {
                     )}
                   </div>
                 </ScrollArea>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
