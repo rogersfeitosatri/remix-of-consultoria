@@ -100,7 +100,7 @@ Gere ${audience === 'athlete' ? 'a mensagem motivacional para o atleta' : 'o res
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-5",
+        model: "openai/gpt-5.6-luna", reasoning_effort: "none",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -139,7 +139,7 @@ Gere ${audience === 'athlete' ? 'a mensagem motivacional para o atleta' : 'o res
         logs_analyzed: logs.length,
         summary_markdown: summary,
         recommendations: [],
-        model: "openai/gpt-5",
+        model: "openai/gpt-5.6-luna", reasoning_effort: "none",
         audience,
       })
       .select("id, created_at, summary_markdown, phase, weeks_to_race, logs_analyzed, model, audience")

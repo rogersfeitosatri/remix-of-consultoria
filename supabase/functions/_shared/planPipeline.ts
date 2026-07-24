@@ -10,15 +10,16 @@ export const WEEKDAY_LABEL: Record<string, string> = {
   seg: "Segunda", ter: "Terça", qua: "Quarta", qui: "Quinta", sex: "Sexta", sab: "Sábado", dom: "Domingo",
 };
 
-interface AiProvider { name: string; endpoint: string; apiKey?: string; model: string; }
+interface AiProvider { name: string; endpoint: string; apiKey?: string; model: string; authHeader: 'bearer' | 'lovable'; }
 
 function providers(): AiProvider[] {
-  // OpenAI é a IA OFICIAL da geração de plano (botão "Gerar com IA"); gemini/
-  // lovable ficam como fallback automático caso a chave da OpenAI falte/à falhar.
+  // Provedor primário: Lovable AI Gateway → openai/gpt-5.6-luna (padrão do sistema).
+  // Fallbacks: OpenAI direto e Gemini direto.
   const list: AiProvider[] = [
-    { name: "openai", endpoint: "https://api.openai.com/v1/chat/completions", apiKey: Deno.env.get("OPENAI_API_KEY"), model: "gpt-4o" },
-    { name: "gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", apiKey: Deno.env.get("GEMINI_API_KEY"), model: "gemini-2.5-flash" },
-    { name: "lovable", endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions", apiKey: Deno.env.get("LOVABLE_API_KEY"), model: "google/gemini-2.5-flash" },
+    { name: "lovable", endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions", apiKey: Deno.env.get("LOVABLE_API_KEY"), model: "openai/gpt-5.6-luna", authHeader: 'lovable' },
+    { name: "openai", endpoint: "https://api.openai.com/v1/chat/completions", apiKey: Deno.env.get("OPENAI_API_KEY"), model: "gpt-4o", authHeader: 'bearer' },
+    { name: "gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", apiKey: Deno.env.get("GEMINI_API_KEY"), model: "gemini-2.5-flash", authHeader: 'bearer' },
+    { name: "lovable-fallback", endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions", apiKey: Deno.env.get("LOVABLE_API_KEY"), model: "google/gemini-2.5-flash", authHeader: 'lovable' },
   ];
   return list.filter((p) => !!p.apiKey);
 }
@@ -40,19 +41,28 @@ export async function callAiJson(opts: {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), perAttempt);
       try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (p.authHeader === 'lovable') {
+          headers['Lovable-API-Key'] = p.apiKey!;
+          headers['X-Lovable-AIG-SDK'] = 'edge-function';
+        } else {
+          headers['Authorization'] = `Bearer ${p.apiKey}`;
+        }
+        const body: any = {
+          model: p.model,
+          messages: [
+            { role: "system", content: opts.systemPrompt },
+            { role: "user", content: opts.userPrompt },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.4,
+        };
+        if (/gpt-5\.6/i.test(p.model)) body.reasoning_effort = 'none';
         const res = await fetch(p.endpoint, {
           method: "POST",
           signal: controller.signal,
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${p.apiKey}` },
-          body: JSON.stringify({
-            model: p.model,
-            messages: [
-              { role: "system", content: opts.systemPrompt },
-              { role: "user", content: opts.userPrompt },
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.4,
-          }),
+          headers,
+          body: JSON.stringify(body),
         });
         clearTimeout(timer);
         if (!res.ok) {

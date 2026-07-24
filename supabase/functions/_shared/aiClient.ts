@@ -1,14 +1,14 @@
 // Cliente de IA compartilhado.
-// Provedor primário: Gemini direto (endpoint compatível com OpenAI do Google).
-// Fallback automático opcional para o provedor legado (OpenAI gpt-4o ou Lovable gemini-pro).
+// Provedor PRIMÁRIO (padrão do sistema): Lovable AI Gateway → openai/gpt-5.6-luna.
+// Fallbacks automáticos: Gemini direto e OpenAI direto (quando as chaves existem).
 //
 // Secrets esperados (Supabase Edge Functions):
-//   - GEMINI_API_KEY   (obrigatório — provedor primário)
-//   - OPENAI_API_KEY   (opcional — fallback das análises de checkin/evolução/metabólica)
-//   - LOVABLE_API_KEY  (opcional — fallback da análise de anamnese)
+//   - LOVABLE_API_KEY  (obrigatório — provedor primário: openai/gpt-5.6-luna)
+//   - GEMINI_API_KEY   (opcional — fallback)
+//   - OPENAI_API_KEY   (opcional — fallback)
 
 export type FallbackKind = 'openai-gpt4o' | 'openai-gpt4o-mini' | 'openai-gpt5' | 'openai-gpt5-mini' | 'lovable-gemini-pro' | 'none';
-export type PrimaryProvider = 'gemini' | 'openai';
+export type PrimaryProvider = 'gemini' | 'openai' | 'lovable';
 
 interface Provider {
   name: string;
@@ -16,12 +16,28 @@ interface Provider {
   apiKey: string | undefined;
   model: string;
   sanitizeSchema: boolean;
+  // Cabeçalho de autenticação: Lovable usa "Lovable-API-Key"; outros usam Authorization Bearer.
+  authHeader: 'bearer' | 'lovable';
 }
 
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const LOVABLE_ENDPOINT = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const GEMINI_MODEL = 'gemini-2.5-flash';
+
+// Modelo padrão de todo o sistema.
+export const DEFAULT_MODEL = 'openai/gpt-5.6-luna';
+
+function lovableProvider(model = DEFAULT_MODEL): Provider {
+  return {
+    name: 'lovable',
+    endpoint: LOVABLE_ENDPOINT,
+    apiKey: Deno.env.get('LOVABLE_API_KEY'),
+    model,
+    sanitizeSchema: false,
+    authHeader: 'lovable',
+  };
+}
 
 function geminiProvider(): Provider {
   return {
@@ -30,6 +46,7 @@ function geminiProvider(): Provider {
     apiKey: Deno.env.get('GEMINI_API_KEY'),
     model: GEMINI_MODEL,
     sanitizeSchema: true,
+    authHeader: 'bearer',
   };
 }
 
@@ -40,6 +57,7 @@ function openaiProvider(model = 'gpt-4o-mini'): Provider {
     apiKey: Deno.env.get('OPENAI_API_KEY'),
     model,
     sanitizeSchema: false,
+    authHeader: 'bearer',
   };
 }
 
@@ -50,20 +68,35 @@ function fallbackProvider(kind: FallbackKind): Provider | null {
   if (kind === 'openai-gpt5-mini') return openaiProvider('gpt-5-mini');
   if (kind === 'lovable-gemini-pro') {
     return {
-      name: 'lovable',
+      name: 'lovable-gemini',
       endpoint: LOVABLE_ENDPOINT,
       apiKey: Deno.env.get('LOVABLE_API_KEY'),
       model: 'google/gemini-2.5-flash',
       sanitizeSchema: false,
+      authHeader: 'lovable',
     };
   }
   return null;
 }
 
-function providersFor(fallback: FallbackKind, primary: PrimaryProvider = 'gemini', openaiModel?: string): Provider[] {
-  const primaryProv = primary === 'openai' ? openaiProvider(openaiModel || 'gpt-4o-mini') : geminiProvider();
-  const list = [primaryProv, fallbackProvider(fallback)];
-  return list.filter((p): p is Provider => !!p && !!p.apiKey);
+// Modelo padrão = Lovable Gateway → openai/gpt-5.6-luna.
+// Fallbacks: Gemini direto e OpenAI direto (se as chaves existirem).
+function providersFor(fallback: FallbackKind, primary: PrimaryProvider = 'lovable', openaiModel?: string): Provider[] {
+  let primaryProv: Provider;
+  if (primary === 'openai') primaryProv = openaiProvider(openaiModel || DEFAULT_MODEL.replace(/^openai\//, ''));
+  else if (primary === 'gemini') primaryProv = geminiProvider();
+  else primaryProv = lovableProvider(openaiModel && openaiModel.includes('/') ? openaiModel : DEFAULT_MODEL);
+
+  const list = [primaryProv, geminiProvider(), fallbackProvider(fallback)];
+  // Remove duplicados por nome e sem apiKey.
+  const seen = new Set<string>();
+  return list.filter((p): p is Provider => {
+    if (!p || !p.apiKey) return false;
+    const key = `${p.name}:${p.model}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 
@@ -82,17 +115,30 @@ function stripUnsupported(schema: any): any {
   return schema;
 }
 
+// Modelos GPT-5.6 exigem `reasoning_effort: "none"` em chat-completions com tools.
+function needsReasoningNone(model: string): boolean {
+  return /gpt-5\.6/i.test(model);
+}
+
 async function postChat(p: Provider, body: any, timeoutMs = 70000): Promise<any> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  // Injeta reasoning_effort:none quando aplicável (GPT-5.6 via Lovable Gateway).
+  const finalBody = needsReasoningNone(p.model) && body?.reasoning_effort === undefined
+    ? { ...body, reasoning_effort: 'none' }
+    : body;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (p.authHeader === 'lovable') {
+    headers['Lovable-API-Key'] = p.apiKey!;
+    headers['X-Lovable-AIG-SDK'] = 'edge-function';
+  } else {
+    headers['Authorization'] = `Bearer ${p.apiKey}`;
+  }
   try {
     const res = await fetch(p.endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${p.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+      headers,
+      body: JSON.stringify(finalBody),
       signal: ctrl.signal,
     });
     if (!res.ok) {
@@ -143,10 +189,10 @@ export interface AiResult {
 
 // Saída estruturada via function-calling (parseia tool_calls[0].function.arguments).
 export async function callAiStructured(opts: StructuredOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'gemini', opts.openaiModel);
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'lovable', opts.openaiModel);
 
   if (!providers.length) {
-    throw new Error('Nenhuma chave de IA configurada. Defina GEMINI_API_KEY nas secrets.');
+    throw new Error('Nenhuma chave de IA configurada. Defina LOVABLE_API_KEY (ou GEMINI_API_KEY) nas secrets.');
   }
   let lastErr: any;
   for (const p of providers) {
@@ -205,10 +251,10 @@ export interface JsonOpts {
 
 // Saída de texto livre (sem parsing) — usada pelo playground de teste de prompts.
 export async function callAiText(opts: JsonOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'gemini', opts.openaiModel);
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'lovable', opts.openaiModel);
 
   if (!providers.length) {
-    throw new Error('Nenhuma chave de IA configurada. Defina GEMINI_API_KEY nas secrets.');
+    throw new Error('Nenhuma chave de IA configurada. Defina LOVABLE_API_KEY (ou GEMINI_API_KEY) nas secrets.');
   }
   let lastErr: any;
   for (const p of providers) {
@@ -234,9 +280,9 @@ export async function callAiText(opts: JsonOpts): Promise<AiResult> {
 
 // Saída JSON simples no conteúdo da mensagem (tolerante a cercas markdown ```json).
 export async function callAiJson(opts: JsonOpts): Promise<AiResult> {
-  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'gemini', opts.openaiModel);
+  const providers = providersFor(opts.fallback ?? 'none', opts.primary ?? 'lovable', opts.openaiModel);
   if (!providers.length) {
-    throw new Error('Nenhuma chave de IA configurada. Defina GEMINI_API_KEY nas secrets.');
+    throw new Error('Nenhuma chave de IA configurada. Defina LOVABLE_API_KEY (ou GEMINI_API_KEY) nas secrets.');
   }
   let lastErr: any;
   for (const p of providers) {

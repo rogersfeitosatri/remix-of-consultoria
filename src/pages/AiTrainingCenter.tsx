@@ -97,7 +97,7 @@ export default function AiTrainingCenter() {
   const [playgroundOpen, setPlaygroundOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [testProvider, setTestProvider] = useState<'gemini' | 'openai'>('gemini');
-  const [openaiModel, setOpenaiModel] = useState<string>('gpt-4o-mini');
+  const [openaiModel, setOpenaiModel] = useState<string>('openai/gpt-5.6-luna');
 
 
   // Importa o conteúdo de um arquivo (.md/.txt lido direto; .pdf transcrito via IA)

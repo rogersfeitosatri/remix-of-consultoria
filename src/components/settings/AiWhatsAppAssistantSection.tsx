@@ -14,8 +14,9 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const MODELS = [
-  { value: 'openai/gpt-5-mini', label: 'GPT-5 mini (recomendado)' },
-  { value: 'openai/gpt-5', label: 'GPT-5 (mais caro, mais nuance)' },
+  { value: 'openai/gpt-5.6-luna', label: 'GPT-5.6 Luna (padrão do sistema)' },
+  { value: 'openai/gpt-5.6-terra', label: 'GPT-5.6 Terra (mais capacidade)' },
+  { value: 'openai/gpt-5-mini', label: 'GPT-5 mini' },
   { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (rápido/barato)' },
 ];
 
@@ -30,7 +31,7 @@ export function AiWhatsAppAssistantSection() {
   const { data: messages = [] } = useAiChatMessages(openConv);
 
   const [enabled, setEnabled] = useState(false);
-  const [model, setModel] = useState('openai/gpt-5-mini');
+  const [model, setModel] = useState('openai/gpt-5.6-luna');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [keywordsText, setKeywordsText] = useState('');
 
