@@ -13,11 +13,10 @@ export const WEEKDAY_LABEL: Record<string, string> = {
 interface AiProvider { name: string; endpoint: string; apiKey?: string; model: string; authHeader: 'bearer' | 'lovable'; }
 
 function providers(): AiProvider[] {
-  // Provedor primário: Lovable AI Gateway → openai/gpt-5.6-luna (padrão do sistema).
-  // Fallbacks: OpenAI direto e Gemini direto.
+  // Provedor primário: OpenAI direto → gpt-5.6-luna (padrão do sistema).
+  // Fallbacks: Gemini direto e Lovable Gateway (Gemini).
   const list: AiProvider[] = [
-    { name: "lovable", endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions", apiKey: Deno.env.get("LOVABLE_API_KEY"), model: "openai/gpt-5.6-luna", authHeader: 'lovable' },
-    { name: "openai", endpoint: "https://api.openai.com/v1/chat/completions", apiKey: Deno.env.get("OPENAI_API_KEY"), model: "gpt-4o", authHeader: 'bearer' },
+    { name: "openai", endpoint: "https://api.openai.com/v1/chat/completions", apiKey: Deno.env.get("OPENAI_API_KEY"), model: "gpt-5.6-luna", authHeader: 'bearer' },
     { name: "gemini", endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", apiKey: Deno.env.get("GEMINI_API_KEY"), model: "gemini-2.5-flash", authHeader: 'bearer' },
     { name: "lovable-fallback", endpoint: "https://ai.gateway.lovable.dev/v1/chat/completions", apiKey: Deno.env.get("LOVABLE_API_KEY"), model: "google/gemini-2.5-flash", authHeader: 'lovable' },
   ];
