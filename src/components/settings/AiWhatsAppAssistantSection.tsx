@@ -31,7 +31,7 @@ export function AiWhatsAppAssistantSection() {
   const { data: messages = [] } = useAiChatMessages(openConv);
 
   const [enabled, setEnabled] = useState(false);
-  const [model, setModel] = useState('openai/gpt-5-mini');
+  const [model, setModel] = useState('openai/gpt-5.6-luna');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [keywordsText, setKeywordsText] = useState('');
 
