@@ -33,6 +33,7 @@ interface AnamneseQuestion {
   question_text: string;
   question_type: string;
   section: string;
+  subsection?: string | null;
   order_index: number;
   options?: string[] | null;
 }
