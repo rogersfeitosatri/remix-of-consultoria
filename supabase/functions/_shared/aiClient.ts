@@ -1,14 +1,14 @@
 // Cliente de IA compartilhado.
-// Provedor primário: Gemini direto (endpoint compatível com OpenAI do Google).
-// Fallback automático opcional para o provedor legado (OpenAI gpt-4o ou Lovable gemini-pro).
+// Provedor PRIMÁRIO (padrão do sistema): Lovable AI Gateway → openai/gpt-5.6-luna.
+// Fallbacks automáticos: Gemini direto e OpenAI direto (quando as chaves existem).
 //
 // Secrets esperados (Supabase Edge Functions):
-//   - GEMINI_API_KEY   (obrigatório — provedor primário)
-//   - OPENAI_API_KEY   (opcional — fallback das análises de checkin/evolução/metabólica)
-//   - LOVABLE_API_KEY  (opcional — fallback da análise de anamnese)
+//   - LOVABLE_API_KEY  (obrigatório — provedor primário: openai/gpt-5.6-luna)
+//   - GEMINI_API_KEY   (opcional — fallback)
+//   - OPENAI_API_KEY   (opcional — fallback)
 
 export type FallbackKind = 'openai-gpt4o' | 'openai-gpt4o-mini' | 'openai-gpt5' | 'openai-gpt5-mini' | 'lovable-gemini-pro' | 'none';
-export type PrimaryProvider = 'gemini' | 'openai';
+export type PrimaryProvider = 'gemini' | 'openai' | 'lovable';
 
 interface Provider {
   name: string;
@@ -16,12 +16,28 @@ interface Provider {
   apiKey: string | undefined;
   model: string;
   sanitizeSchema: boolean;
+  // Cabeçalho de autenticação: Lovable usa "Lovable-API-Key"; outros usam Authorization Bearer.
+  authHeader: 'bearer' | 'lovable';
 }
 
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const LOVABLE_ENDPOINT = 'https://ai.gateway.lovable.dev/v1/chat/completions';
 const GEMINI_MODEL = 'gemini-2.5-flash';
+
+// Modelo padrão de todo o sistema.
+export const DEFAULT_MODEL = 'openai/gpt-5.6-luna';
+
+function lovableProvider(model = DEFAULT_MODEL): Provider {
+  return {
+    name: 'lovable',
+    endpoint: LOVABLE_ENDPOINT,
+    apiKey: Deno.env.get('LOVABLE_API_KEY'),
+    model,
+    sanitizeSchema: false,
+    authHeader: 'lovable',
+  };
+}
 
 function geminiProvider(): Provider {
   return {
@@ -30,6 +46,7 @@ function geminiProvider(): Provider {
     apiKey: Deno.env.get('GEMINI_API_KEY'),
     model: GEMINI_MODEL,
     sanitizeSchema: true,
+    authHeader: 'bearer',
   };
 }
 
@@ -40,6 +57,7 @@ function openaiProvider(model = 'gpt-4o-mini'): Provider {
     apiKey: Deno.env.get('OPENAI_API_KEY'),
     model,
     sanitizeSchema: false,
+    authHeader: 'bearer',
   };
 }
 
@@ -50,20 +68,35 @@ function fallbackProvider(kind: FallbackKind): Provider | null {
   if (kind === 'openai-gpt5-mini') return openaiProvider('gpt-5-mini');
   if (kind === 'lovable-gemini-pro') {
     return {
-      name: 'lovable',
+      name: 'lovable-gemini',
       endpoint: LOVABLE_ENDPOINT,
       apiKey: Deno.env.get('LOVABLE_API_KEY'),
       model: 'google/gemini-2.5-flash',
       sanitizeSchema: false,
+      authHeader: 'lovable',
     };
   }
   return null;
 }
 
-function providersFor(fallback: FallbackKind, primary: PrimaryProvider = 'gemini', openaiModel?: string): Provider[] {
-  const primaryProv = primary === 'openai' ? openaiProvider(openaiModel || 'gpt-4o-mini') : geminiProvider();
-  const list = [primaryProv, fallbackProvider(fallback)];
-  return list.filter((p): p is Provider => !!p && !!p.apiKey);
+// Modelo padrão = Lovable Gateway → openai/gpt-5.6-luna.
+// Fallbacks: Gemini direto e OpenAI direto (se as chaves existirem).
+function providersFor(fallback: FallbackKind, primary: PrimaryProvider = 'lovable', openaiModel?: string): Provider[] {
+  let primaryProv: Provider;
+  if (primary === 'openai') primaryProv = openaiProvider(openaiModel || DEFAULT_MODEL.replace(/^openai\//, ''));
+  else if (primary === 'gemini') primaryProv = geminiProvider();
+  else primaryProv = lovableProvider(openaiModel && openaiModel.includes('/') ? openaiModel : DEFAULT_MODEL);
+
+  const list = [primaryProv, geminiProvider(), fallbackProvider(fallback)];
+  // Remove duplicados por nome e sem apiKey.
+  const seen = new Set<string>();
+  return list.filter((p): p is Provider => {
+    if (!p || !p.apiKey) return false;
+    const key = `${p.name}:${p.model}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 
