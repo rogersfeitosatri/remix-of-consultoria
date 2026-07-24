@@ -115,17 +115,30 @@ function stripUnsupported(schema: any): any {
   return schema;
 }
 
+// Modelos GPT-5.6 exigem `reasoning_effort: "none"` em chat-completions com tools.
+function needsReasoningNone(model: string): boolean {
+  return /gpt-5\.6/i.test(model);
+}
+
 async function postChat(p: Provider, body: any, timeoutMs = 70000): Promise<any> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  // Injeta reasoning_effort:none quando aplicável (GPT-5.6 via Lovable Gateway).
+  const finalBody = needsReasoningNone(p.model) && body?.reasoning_effort === undefined
+    ? { ...body, reasoning_effort: 'none' }
+    : body;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (p.authHeader === 'lovable') {
+    headers['Lovable-API-Key'] = p.apiKey!;
+    headers['X-Lovable-AIG-SDK'] = 'edge-function';
+  } else {
+    headers['Authorization'] = `Bearer ${p.apiKey}`;
+  }
   try {
     const res = await fetch(p.endpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${p.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+      headers,
+      body: JSON.stringify(finalBody),
       signal: ctrl.signal,
     });
     if (!res.ok) {
