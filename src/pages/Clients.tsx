@@ -175,8 +175,12 @@ export default function Clients() {
     // Processar em background (sem bloquear a UI)
     const processInBackground = async () => {
       try {
+        let targetClientId: string | null = null;
+        let targetPhone: string | null = data.phone || null;
+
         if (isEditing) {
           await updateClient.mutateAsync({ id: editingClient!.id, ...data });
+          targetClientId = editingClient!.id;
           toast({
             title: '✅ Atleta atualizado',
             description: 'Os dados foram salvos com sucesso.',
@@ -184,6 +188,7 @@ export default function Clients() {
         } else {
           // Criar o atleta primeiro
           const newClient = await addClient.mutateAsync(data);
+          targetClientId = newClient.id;
 
           // Marcar 1ª consulta como já realizada (caso a data inicial seja retroativa)
           if (options?.firstConsultAlreadyDone && data.has_consultations && data.start_date) {
@@ -250,12 +255,12 @@ export default function Clients() {
               } else {
                 // Invalidar cache para atualizar athlete_user_id na lista
                 queryClient.invalidateQueries({ queryKey: ['clients'] });
-                
+
                 if (options?.sendCredentials && data.phone) {
                   // Enviar credenciais via Z-API (WhatsApp direto)
                   const baseUrl = window.location.origin;
                   const message = `🏃 *Rogers Feitosa - Bem-vindo!*\n\nOlá ${data.name}!\n\nSua conta foi criada com sucesso.\n\n📧 *Login:* ${data.email}\n🔑 *Senha:* 123456\n\n🔗 Acesse: ${baseUrl}/auth\n\n⚠️ Recomendamos trocar sua senha no primeiro acesso.\n\nQualquer dúvida, estamos à disposição!`;
-                  
+
                   try {
                     const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
                       body: {
@@ -263,7 +268,7 @@ export default function Clients() {
                         message: message,
                       },
                     });
-                    
+
                     if (whatsappError) {
                       console.error('Erro ao enviar WhatsApp:', whatsappError);
                       toast({
@@ -287,36 +292,58 @@ export default function Clients() {
             }
           }
 
-          // Send booking link if requested (consultoria with consultation)
-          if (options?.sendBookingLink && data.phone) {
-            try {
-              const { error: bookingError } = await supabase.functions.invoke('send-booking-link', {
-                body: { clientId: newClient.id },
-              });
-              if (bookingError) {
-                console.error('Erro ao enviar link de agendamento:', bookingError);
-                toast({
-                  title: 'Aviso',
-                  description: 'Atleta cadastrado, mas houve erro ao enviar link de agendamento.',
-                  variant: 'destructive',
-                });
-              } else {
-                toast({
-                  title: '✅ Link enviado',
-                  description: 'Link de agendamento enviado via WhatsApp com sucesso!',
-                });
-              }
-            } catch (err) {
-              console.error('Erro ao enviar link de agendamento:', err);
-            }
-          }
-          
           if (!options?.sendCredentials && !options?.sendBookingLink) {
             toast({
               title: '✅ Atleta cadastrado',
               description: 'O novo atleta foi adicionado com sucesso.',
             });
           }
+        }
+
+        // Send booking link if requested (works for both new and edit)
+        if (options?.sendBookingLink && targetClientId && targetPhone) {
+          try {
+            const { data: bookingResult, error: bookingError } = await supabase.functions.invoke('send-booking-link', {
+              body: {
+                clientId: targetClientId,
+                messageType: 'booking_invite',
+                triggeredBy: 'manual_admin',
+              },
+            });
+            if (bookingError) {
+              console.error('Erro ao enviar link de agendamento:', bookingError);
+              toast({
+                title: 'Aviso',
+                description: `Erro ao enviar link de agendamento: ${bookingError.message || 'falha desconhecida'}`,
+                variant: 'destructive',
+              });
+            } else if (bookingResult && (bookingResult as any).success === false) {
+              const reason = (bookingResult as any).reason || 'desconhecido';
+              toast({
+                title: 'Link não enviado',
+                description: `Motivo: ${reason}`,
+                variant: 'destructive',
+              });
+            } else {
+              toast({
+                title: '✅ Link enviado',
+                description: 'Link de agendamento enviado via WhatsApp com sucesso!',
+              });
+            }
+          } catch (err: any) {
+            console.error('Erro ao enviar link de agendamento:', err);
+            toast({
+              title: 'Erro',
+              description: `Falha ao enviar link: ${err?.message || 'erro inesperado'}`,
+              variant: 'destructive',
+            });
+          }
+        } else if (options?.sendBookingLink && !targetPhone) {
+          toast({
+            title: 'Link não enviado',
+            description: 'Atleta sem telefone cadastrado.',
+            variant: 'destructive',
+          });
         }
       } catch (error) {
         console.error('Erro ao salvar atleta:', error);
@@ -331,6 +358,7 @@ export default function Clients() {
     // Executar em background sem await
     processInBackground();
   };
+
 
   const handleEdit = (client: Client) => {
     setEditingClient(client);
