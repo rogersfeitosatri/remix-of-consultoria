@@ -29,10 +29,15 @@ interface Session {
 }
 
 type PlanningMap = Record<string, string[]>; // modality -> day names
-interface Week {
-  [day: string]: Session[] | PlanningMap | undefined;
+// Week: runtime tem chaves de dia (Session[]) e __planning. Usamos any-index no
+// TypeScript para evitar união em cada acesso.
+type Week = {
+  [day: string]: any;
   __planning?: PlanningMap;
-}
+};
+
+const daySessions = (w: Week, day: string): Session[] =>
+  (Array.isArray(w[day]) ? (w[day] as Session[]) : []);
 
 const WEEKDAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] as const;
 // Ordem de exibição da grade (usuário pediu Dom→Sáb) e iniciais.
