@@ -29,7 +29,10 @@ interface Session {
 }
 
 type PlanningMap = Record<string, string[]>; // modality -> day names
-type Week = Record<string, Session[]> & { __planning?: PlanningMap };
+interface Week {
+  [day: string]: Session[] | PlanningMap | undefined;
+  __planning?: PlanningMap;
+}
 
 const WEEKDAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'] as const;
 // Ordem de exibição da grade (usuário pediu Dom→Sáb) e iniciais.
