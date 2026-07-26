@@ -143,16 +143,18 @@ export function TrainingWeekDetailedField({ value, onChange, config, disabled, a
   };
 
   const updateSession = (day: string, i: number, patch: Partial<Session>) => {
-    emit(day, week[day].map((s, j) => (j === i ? { ...s, ...patch } : s)));
+    emit(day, daySessions(week, day).map((s, j) => (j === i ? { ...s, ...patch } : s)));
   };
   const addSession = (day: string, modality = '') => {
     setOpenDays((s) => ({ ...s, [day]: true }));
-    emit(day, [...week[day], emptySession(modality)]);
+    emit(day, [...daySessions(week, day), emptySession(modality)]);
   };
-  const dupSession = (day: string, i: number) =>
-    emit(day, [...week[day].slice(0, i + 1), { ...week[day][i] }, ...week[day].slice(i + 1)]);
+  const dupSession = (day: string, i: number) => {
+    const arr = daySessions(week, day);
+    emit(day, [...arr.slice(0, i + 1), { ...arr[i] }, ...arr.slice(i + 1)]);
+  };
   const delSession = (day: string, i: number) =>
-    emit(day, week[day].filter((_, j) => j !== i));
+    emit(day, daySessions(week, day).filter((_, j) => j !== i));
 
   // Toggle célula (modalidade × dia). Auto-cria uma sessão vazia com a modalidade
   // no dia quando não houver nenhuma daquela modalidade; abre o dia.
@@ -166,7 +168,7 @@ export function TrainingWeekDetailedField({ value, onChange, config, disabled, a
       current.add(day);
     }
     next[modality] = Array.from(current);
-    const sessions = [...(week[day] || [])];
+    const sessions = [...daySessions(week, day)];
     const nowChecked = current.has(day);
     if (nowChecked && !sessions.some((s) => s.modality === modality)) {
       sessions.push(emptySession(modality));
@@ -194,9 +196,9 @@ export function TrainingWeekDetailedField({ value, onChange, config, disabled, a
   const missingByDay = useMemo(() => {
     const out: Record<string, string[]> = {};
     for (const [modality, days] of Object.entries(planning)) {
-      for (const day of days || []) {
-        const daySessions = week[day] || [];
-        const ok = daySessions.some((s) => s.modality === modality && sessionHasContent(s));
+      for (const day of (days as string[]) || []) {
+        const sessions = daySessions(week, day);
+        const ok = sessions.some((s) => s.modality === modality && sessionHasContent(s));
         if (!ok) (out[day] ||= []).push(modality);
       }
     }
