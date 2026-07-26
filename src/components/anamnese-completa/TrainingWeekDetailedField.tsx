@@ -268,7 +268,7 @@ export function TrainingWeekDetailedField({ value, onChange, config, disabled, a
       )}
 
       {WEEKDAYS.map((day) => {
-        const sessions = week[day];
+        const sessions = daySessions(week, day);
         const isOpen = !!openDays[day];
         const missing = missingByDay[day] || [];
         const hasMissing = missing.length > 0;
