@@ -81,11 +81,37 @@ export function firstMissing(
     return null;
   }
 
-  // training_week: exige ao menos uma sessão com conteúdo mínimo quando obrigatória.
+  // training_week: exige ao menos uma sessão com conteúdo mínimo quando obrigatória
+  // e, se houver planejamento (modalidade × dia), cada dia planejado precisa ter
+  // ao menos uma sessão daquela modalidade com algum conteúdo preenchido.
   if (question.question_type === 'training_week') {
+    const raw = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : {};
+    const planning: Record<string, string[]> =
+      raw.__planning && typeof raw.__planning === 'object' ? raw.__planning : {};
+    const week: Record<string, any[]> = {};
+    for (const k of Object.keys(raw)) {
+      if (k === '__planning') continue;
+      if (Array.isArray(raw[k])) week[k] = raw[k];
+    }
+    const hasContent = (s: any) =>
+      !!(String(s?.start_time || '').trim() ||
+        String(s?.session_type || '').trim() ||
+        (s?.duration_minutes !== '' && s?.duration_minutes != null) ||
+        (s?.distance_km !== '' && s?.distance_km != null) ||
+        String(s?.notes || '').trim());
+
+    // Coverage do planejamento: bloqueia se algum (modalidade, dia) planejado
+    // ficou sem sessão preenchida.
+    for (const [modality, days] of Object.entries(planning)) {
+      for (const day of days || []) {
+        const sessions = Array.isArray(week[day]) ? week[day] : [];
+        const ok = sessions.some((s: any) => s?.modality === modality && hasContent(s));
+        if (!ok) return `Preencha o treino de ${modality} — ${day}`;
+      }
+    }
+
     if (!required) return null;
-    const week = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : {};
-    const hasAnySession = Object.values(week).some((sessions: any) =>
+    const hasAnySession = Object.values(week).some((sessions) =>
       Array.isArray(sessions) && sessions.some((s: any) => {
         if (!s || typeof s !== 'object') return false;
         return !!(String(s.start_time || '').trim() ||
