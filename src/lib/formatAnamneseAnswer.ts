@@ -76,7 +76,10 @@ export function formatMeal(v: any): string {
   return lines.length ? lines.join('\n') : '(não respondeu)';
 }
 
-// { Segunda: [{modalidade,turno,intensidade,longao}], ... }
+// Suporta duas versões do formato da Semana de Treinamento:
+// - Antiga: { Segunda: [{modalidade, turno, intensidade, longao}], ... }
+// - Nova (ANAMNESE COMPLETA): { Segunda: [{modality, start_time, session_type,
+//   duration_minutes, distance_km, rpe, notes}], ..., __planning: {...} }
 export function formatTrainingWeek(v: any): string {
   const dias = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
   const labelMod: Record<string, string> = {
@@ -86,17 +89,35 @@ export function formatTrainingWeek(v: any): string {
   const labelTurno: Record<string, string> = { manha: 'manhã', tarde: 'tarde', noite: 'noite' };
   const out: string[] = [];
   for (const dia of dias) {
-    const sessions = Array.isArray(v[dia]) ? v[dia] : (v[dia] ? [v[dia]] : []);
-    const parts = sessions
-      .filter((s: any) => s && s.modalidade)
-      .map((s: any) => {
-        const mod = labelMod[s.modalidade] || s.modalidade;
-        if (s.modalidade === 'repouso') return mod;
+    const raw = v[dia];
+    const sessions = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+    const lines: string[] = [];
+    for (const s of sessions) {
+      if (!s || typeof s !== 'object') continue;
+      const modRaw = s.modality || s.modalidade;
+      if (!modRaw) continue;
+      const mod = labelMod[String(modRaw).toLowerCase()] || String(modRaw);
+      if (String(modRaw).toLowerCase() === 'repouso') { lines.push(mod); continue; }
+      // Novo formato — campos detalhados.
+      if ('modality' in s || 'start_time' in s || 'session_type' in s) {
+        const bits = [
+          s.start_time,
+          mod,
+          s.session_type,
+          s.duration_minutes ? `${s.duration_minutes}min` : null,
+          s.distance_km ? `${s.distance_km}km` : null,
+          s.rpe ? `RPE ${s.rpe}` : null,
+        ].filter(Boolean).join(' · ');
+        const notes = s.notes ? ` — ${String(s.notes).trim()}` : '';
+        lines.push(bits + notes);
+      } else {
+        // Formato antigo (modalidade/turno/intensidade/longao)
         const det = [labelTurno[s.turno] || s.turno, s.intensidade].filter(Boolean).join(', ');
         const longao = s.longao ? ' [longão]' : '';
-        return det ? `${mod} (${det})${longao}` : `${mod}${longao}`;
-      });
-    if (parts.length) out.push(`${dia}: ${parts.join(' + ')}`);
+        lines.push(det ? `${mod} (${det})${longao}` : `${mod}${longao}`);
+      }
+    }
+    if (lines.length) out.push(`${dia}:\n  • ${lines.join('\n  • ')}`);
   }
   return out.length ? out.join('\n') : '(não respondeu)';
 }
