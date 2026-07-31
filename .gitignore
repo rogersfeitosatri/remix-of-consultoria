@@ -23,3 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 .claude/worktrees/
+
+# Arquivos de ambiente com SEGREDOS (nunca versionar).
+# Obs.: o .env versionado contém apenas chaves PÚBLICAS (anon/Firebase/VAPID),
+# necessárias no build. Segredos (service role, OPENAI, ASAAS, ZAPI) devem
+# ficar somente nas secrets do Supabase/host — nunca em arquivo no repo.
+.env.local
+.env.*.local
+.env.production
+.env.secrets
