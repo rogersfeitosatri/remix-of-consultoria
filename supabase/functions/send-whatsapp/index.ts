@@ -161,6 +161,29 @@ Deno.serve(async (req) => {
       throw new Error('Client not found');
     }
 
+    // ── Autorização do CHAMADOR ────────────────────────────────────────────
+    // Chamadas internas (outras edge functions) usam a service role key e são
+    // liberadas. Qualquer outro chamador é um usuário logado: ele só pode
+    // enviar mensagem para um cliente que seja DELE. Sem isso, um atleta
+    // autenticado poderia disparar mensagem em nome da clínica para terceiros.
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const bearer = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (bearer !== supabaseKey) {
+      const { data: authData } = await createClient(
+        supabaseUrl,
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } },
+      ).auth.getUser();
+      const callerId = authData?.user?.id ?? null;
+      if (!callerId || callerId !== (client as any).user_id) {
+        console.warn('[send-whatsapp] Bloqueado: chamador não é dono do cliente', { clientId, callerId });
+        return new Response(
+          JSON.stringify({ success: false, error: 'forbidden' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
     // Block all automated messages for frozen clients
     if ((client as any).is_frozen) {
       console.log('[send-whatsapp] Skipping: client is frozen', clientId);
