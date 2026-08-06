@@ -45,13 +45,22 @@ export default function Auth() {
         const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
           redirectTo: `${window.location.origin}/auth`,
         });
-        
+
         if (error) {
-          toast({
-            title: 'Erro',
-            description: 'Não foi possível enviar o email de recuperação.',
-            variant: 'destructive',
-          });
+          // Mostra o MOTIVO real — antes a mensagem era sempre genérica, o que
+          // escondia causas tratáveis (SMTP não configurado, limite de envio,
+          // URL de redirect não autorizada).
+          const raw = error.message || '';
+          let description = `Não foi possível enviar o email de recuperação. (${raw})`;
+          if (/rate limit|too many|after \d+ seconds/i.test(raw)) {
+            description = 'Muitas tentativas em sequência. Aguarde alguns minutos e tente novamente.';
+          } else if (/smtp|sending|email provider|not configured/i.test(raw)) {
+            description = 'O envio de e-mail não está configurado no servidor. Redefina a senha pelo painel do Supabase.';
+          } else if (/redirect|url/i.test(raw)) {
+            description = 'A URL de redirecionamento não está autorizada no Supabase (Auth → URL Configuration).';
+          }
+          console.error('[auth] resetPasswordForEmail:', error);
+          toast({ title: 'Erro', description, variant: 'destructive' });
         } else {
           toast({
             title: 'Email enviado!',
@@ -62,10 +71,18 @@ export default function Auth() {
       } else if (mode === 'login') {
         const { error } = await signIn(formData.email, formData.password);
         if (error) {
-          let message = 'Erro ao fazer login. Verifique suas credenciais.';
-          if (error.message.includes('Invalid login credentials')) {
+          const raw = error.message || '';
+          let message = `Erro ao fazer login. (${raw})`;
+          if (/invalid login credentials/i.test(raw)) {
             message = 'Email ou senha incorretos.';
+          } else if (/email not confirmed/i.test(raw)) {
+            message = 'E-mail ainda não confirmado. Confirme o e-mail (ou marque como confirmado no painel do Supabase) para entrar.';
+          } else if (/rate limit|too many/i.test(raw)) {
+            message = 'Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.';
+          } else if (/user not found/i.test(raw)) {
+            message = 'Não existe usuário com este e-mail.';
           }
+          console.error('[auth] signInWithPassword:', error);
           toast({
             title: 'Erro no login',
             description: message,
