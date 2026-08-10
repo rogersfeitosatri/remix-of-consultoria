@@ -24,8 +24,14 @@ import {
   Snowflake,
   Play,
   RefreshCw,
-  Trophy
+  Trophy,
+  MoreHorizontal,
+  Settings2,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { AthletePanoramaCard } from '@/components/clients/AthletePanoramaCard';
 import { RacePrepTab } from '@/components/admin/RacePrepTab';
 import { useClients, useDeleteClient, useUpdateClient } from '@/hooks/useClients';
 import { useSchedulingSettings } from '@/hooks/useScheduling';
@@ -360,148 +366,85 @@ export default function ClientDetail() {
             </div>
           </div>
           
-          {/* Ações Principais */}
-          <div className="flex flex-wrap gap-2">
+          {/* Ações: 3 principais visíveis; o resto no menu para reduzir ruído. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={() => setShowEditForm(true)} className="gap-1">
+              <Edit2 className="h-4 w-4" /> Editar
+            </Button>
             {client.phone && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSendCheckin}
-                  disabled={sendingCheckin}
-                  className="gap-1 text-foreground"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  {sendingCheckin ? '...' : 'Enviar Check-in'}
+              <Button variant="outline" size="sm" onClick={handleSendCheckin} disabled={sendingCheckin}
+                className="gap-1 text-green-600 border-green-600/30 hover:bg-green-600/10">
+                <MessageCircle className="h-4 w-4" /> {sendingCheckin ? '...' : 'Enviar check-in'}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setShowRenewDialog(true)}
+              className="gap-1 text-primary border-primary/30 hover:bg-primary/10">
+              <RefreshCw className="h-4 w-4" /> Renovar
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  <MoreHorizontal className="h-4 w-4" /> Mais
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSendBooking}
-                  disabled={sendingBooking}
-                  className="gap-1 text-foreground"
-                >
-                  <CalendarCheck className="h-4 w-4" />
-                  {sendingBooking ? '...' : 'Enviar Consulta'}
-                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {client.phone && (
+                  <DropdownMenuItem onClick={handleSendBooking} disabled={sendingBooking}>
+                    <CalendarCheck className="h-4 w-4 mr-2" /> Enviar link de consulta
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}/analysis`)}>
+                  <Brain className="h-4 w-4 mr-2" /> Análise com IA
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {(client as any).is_frozen ? (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (confirm(`Descongelar o plano de ${client.name}? A data de término será estendida.`)) {
+                        unfreezeMutation.mutate({
+                          clientId: client.id,
+                          frozenAt: (client as any).frozen_at,
+                          currentEndDate: client.end_date,
+                        });
+                      }
+                    }}
+                  >
+                    <Play className="h-4 w-4 mr-2" /> Descongelar plano
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => setShowFreezeDialog(true)}>
+                    <Snowflake className="h-4 w-4 mr-2" /> Congelar plano
+                  </DropdownMenuItem>
+                )}
                 {client.athlete_user_id && (
                   <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSendCredentials}
-                      disabled={sendingCredentials}
-                      className="gap-1 text-foreground"
-                    >
-                      <Key className="h-4 w-4" />
-                      {sendingCredentials ? '...' : 'Enviar Senha'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowPasswordDialog(true)}
-                      className="gap-1 text-foreground"
-                    >
-                      <Lock className="h-4 w-4" />
-                      Alterar Senha
-                    </Button>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSendCredentials} disabled={sendingCredentials}>
+                      <Key className="h-4 w-4 mr-2" /> Enviar senha de acesso
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setShowPasswordDialog(true)}>
+                      <Lock className="h-4 w-4 mr-2" /> Alterar senha do atleta
+                    </DropdownMenuItem>
                   </>
                 )}
-              </>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/clients/${client.id}/analysis`)}
-              className="gap-1 text-foreground"
-            >
-              <Brain className="h-4 w-4" />
-              Análise IA
-            </Button>
-            {/* Freeze/Unfreeze Plan */}
-            {(client as any).is_frozen ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (confirm(`Deseja descongelar o plano de ${client.name}? A data de término será estendida.`)) {
-                    unfreezeMutation.mutate({
-                      clientId: client.id,
-                      frozenAt: (client as any).frozen_at,
-                      currentEndDate: client.end_date,
-                    });
-                  }
-                }}
-                disabled={unfreezeMutation.isPending}
-                className="gap-1 text-emerald-600 border-emerald-300 hover:bg-emerald-50"
-              >
-                <Play className="h-4 w-4" />
-                {unfreezeMutation.isPending ? '...' : `Descongelar (${differenceInCalendarDays(new Date(), new Date((client as any).frozen_at))}d)`}
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFreezeDialog(true)}
-                disabled={freezeMutation.isPending}
-                className="gap-1 text-blue-600 border-blue-300 hover:bg-blue-50"
-              >
-                <Snowflake className="h-4 w-4" />
-                {freezeMutation.isPending ? '...' : 'Congelar Plano'}
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowRenewDialog(true)}
-              className="gap-1 text-primary border-primary/30 hover:bg-primary/10"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Renovar Plano
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setShowEditForm(true)}
-              className="gap-1 text-foreground"
-            >
-              <Edit2 className="h-4 w-4" />
-              Editar
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDelete}
-              className="gap-1 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-            >
-              <Trash2 className="h-4 w-4" />
-              Excluir
-            </Button>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+                  <Trash2 className="h-4 w-4 mr-2" /> Excluir atleta
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-        
-        {/* Alerta de Prova Alvo */}
-        <TargetRaceAlert clientId={client.id} clientName={client.name} />
-        
-        {/* Resumo do Atleta */}
-        <AthleteSummarySection 
-          client={client}
-          onEditClient={() => setShowEditForm(true)}
-        />
-        
-        {/* Premium Client Details (se aplicável) */}
-        {(client.has_agenda_access || client.plan_type === 'premium') && (
-          <PremiumClientDetails clientId={client.id} clientName={client.name} />
-        )}
-        
-        {/* Automação de Check-ins */}
-        <AthleteCheckinSchedules clientId={client.id} />
-        
-        {/* Cobrança recorrente Asaas */}
-        <AsaasSubscriptionCard client={client as any} />
 
-        {/* Histórico de Planos */}
-        <PlanHistorySection clientId={client.id} />
-        
+        {/* Alerta de Prova Alvo (só aparece quando há prova) */}
+        <TargetRaceAlert clientId={client.id} clientName={client.name} />
+
+        {/* Panorama do acompanhamento — o contrato vigente e as pendências num
+            olhar. Os cards de configuração/cobrança que ficavam empilhados aqui
+            foram para a aba "Plano & gestão". */}
+        <AthletePanoramaCard clientId={client.id} onEditClient={() => setShowEditForm(true)} />
+
         {/* Tabs */}
         <Tabs
           value={searchParams.get('tab') || 'timeline'}
@@ -515,7 +458,11 @@ export default function ClientDetail() {
           <TabsList className="flex-wrap h-auto">
             <TabsTrigger value="timeline" className="gap-2">
               <History className="h-4 w-4" />
-              Timeline
+              Linha do tempo
+            </TabsTrigger>
+            <TabsTrigger value="gestao" className="gap-2">
+              <Settings2 className="h-4 w-4" />
+              Plano &amp; gestão
             </TabsTrigger>
             <TabsTrigger value="anamnese" className="gap-2">
               <ClipboardCheck className="h-4 w-4" />
@@ -544,6 +491,17 @@ export default function ClientDetail() {
               <h3 className="text-sm font-semibold mb-3 text-foreground">Histórico de Interações</h3>
               <AthleteTimeline clientId={client.id} />
             </div>
+          </TabsContent>
+
+          {/* Plano & gestão: reúne o que antes ficava empilhado acima das abas. */}
+          <TabsContent value="gestao" className="space-y-4">
+            <AthleteSummarySection client={client} onEditClient={() => setShowEditForm(true)} />
+            {(client.has_agenda_access || client.plan_type === 'premium') && (
+              <PremiumClientDetails clientId={client.id} clientName={client.name} />
+            )}
+            <AthleteCheckinSchedules clientId={client.id} />
+            <AsaasSubscriptionCard client={client as any} />
+            <PlanHistorySection clientId={client.id} />
           </TabsContent>
 
           <TabsContent value="pipeline" className="space-y-4">
