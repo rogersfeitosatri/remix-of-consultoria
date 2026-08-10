@@ -21,7 +21,7 @@ export function BottomNavigation({
 }) {
   return (
     <nav
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 border-t border-gray-800 bg-[#0b0c0e]/95 backdrop-blur-lg"
+      className="safe-fixed-bottom fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 border-t border-gray-800 bg-[#0b0c0e]/95 backdrop-blur-lg"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="grid grid-cols-5">
