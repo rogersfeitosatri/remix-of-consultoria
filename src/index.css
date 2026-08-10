@@ -116,6 +116,30 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   }
+
+  /* ─────────────── Área segura (notch / barra de status) ───────────────
+     O app usa viewport-fit=cover + status bar translúcida (index.html), o que
+     faz o conteúdo ser desenhado POR BAIXO da barra de status no celular.
+     Sem reservar o inset, o topo do app (cabeçalho, menu) fica escondido e
+     sem área de toque. Reservamos o espaço aqui, uma vez, para todo o app. */
+  #root {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    /* Barra de gestos do iOS não deve cobrir o rodapé/ações fixas. */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Elementos fixos precisam do inset no próprio deslocamento, pois o padding
+     do #root não os afeta (position: fixed sai do fluxo). */
+  .safe-fixed-top {
+    top: env(safe-area-inset-top, 0px);
+  }
+  /* Barra fixa no rodapé: mantém o fundo até a borda da tela e empurra o
+     conteúdo acima da barra de gestos. */
+  .safe-fixed-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 @layer utilities {

@@ -22,7 +22,9 @@ export function Layout({ children }: LayoutProps) {
       />
       
       {/* Mobile Header */}
-      <header className="fixed top-0 left-0 right-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background px-4 lg:hidden">
+      {/* safe-fixed-top: sem isso o menu ☰ fica embaixo da barra de status do
+          celular — visível pela metade e sem área de toque. */}
+      <header className="safe-fixed-top fixed left-0 right-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background px-4 lg:hidden">
         <button 
           onClick={() => setSidebarOpen(true)}
           className="p-2 rounded-lg hover:bg-muted transition-colors"

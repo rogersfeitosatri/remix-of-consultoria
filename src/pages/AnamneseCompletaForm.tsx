@@ -272,7 +272,7 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
       )}
 
       {/* barra de ações fixa */}
-      <div className="fixed inset-x-0 bottom-0 border-t bg-background/95 backdrop-blur px-4 py-3">
+      <div className="safe-fixed-bottom fixed inset-x-0 bottom-0 border-t bg-background/95 backdrop-blur px-4 py-3">
         <div className="mx-auto flex max-w-2xl items-center gap-2">
           {step > 0 && (
             <Button variant="outline" onClick={() => { setStep((s) => s - 1); window.scrollTo({ top: 0 }); }} className="gap-1.5">

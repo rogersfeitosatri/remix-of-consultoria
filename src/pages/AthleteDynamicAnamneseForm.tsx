@@ -850,7 +850,7 @@ export default function AthleteDynamicAnamneseForm() {
           )}
         </main>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 p-4">
+        <div className="safe-fixed-bottom fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 p-4">
           <div className="max-w-2xl mx-auto flex gap-3">
             {currentStepIndex > 0 && (
               <Button variant="outline" onClick={handleStepPrevious} className="flex-1 border-gray-700 text-white hover:bg-gray-800">
@@ -1084,7 +1084,7 @@ export default function AthleteDynamicAnamneseForm() {
       </main>
 
       {/* Navigation Buttons - Fixed at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 p-4">
+      <div className="safe-fixed-bottom fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 p-4">
         <div className="max-w-2xl mx-auto flex gap-3">
           {currentSectionIndex > 0 && (
             <Button

@@ -1033,7 +1033,7 @@ export default function PublicAnamneseForm() {
           )}
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4">
+        <div className="safe-fixed-bottom fixed bottom-0 left-0 right-0 bg-background border-t p-4">
           <div className="max-w-2xl mx-auto flex gap-3">
             {currentStepIndex > 0 && (
               <Button type="button" variant="outline" onClick={handleWizPrevious} className="flex-1">Anterior</Button>
