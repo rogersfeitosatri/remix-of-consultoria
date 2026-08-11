@@ -99,7 +99,9 @@ Deno.serve(async (req) => {
     const checkinLink = dispatch.link_checkin || `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
     const codigoAcesso = formatPhoneAsAccessCode(client.phone);
 
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp', {
+      headers: { Authorization: `Bearer ${serviceKey}` },
       body: {
         clientId: client.id,
         templateKey: 'checkin_reminder',
