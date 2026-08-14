@@ -457,6 +457,7 @@ export default function MealPlanEditor() {
         : 'Plano salvo.');
       await qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
       qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
+      qc.invalidateQueries({ queryKey: ['athlete-analysis', clientId] });
     } catch (e: any) {
       toast.error(`Não foi possível salvar: ${e.message || e}`);
     } finally {
@@ -495,6 +496,7 @@ export default function MealPlanEditor() {
       toast.success('Proposta salva. Abra o plano do atleta e clique em "Aplicar ajustes".');
       qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
       qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
+      qc.invalidateQueries({ queryKey: ['athlete-analysis', clientId] });
     } catch (e: any) {
       toast.error(`Falha ao salvar proposta: ${e.message || e}`);
     } finally {

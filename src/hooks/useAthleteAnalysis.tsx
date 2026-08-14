@@ -87,7 +87,9 @@ export function useAthleteAnalysis(clientId?: string | null) {
   return useQuery({
     queryKey: ['athlete-analysis', clientId],
     enabled: !!clientId,
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<AthleteAnalysis | null> => {
       if (!clientId) return null;
       const { data, error } = await (supabase as any)
