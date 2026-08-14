@@ -167,7 +167,7 @@ ${rules}`;
   };
 
   // Tenta múltiplos modelos Gemini com retry; ordem: flash → flash-lite → pro.
-  const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"];
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro"];
   let lastErr = "";
   let lastStatus = 0;
   for (const model of models) {
@@ -191,6 +191,8 @@ ${rules}`;
       }
       lastStatus = res.status;
       lastErr = `Gemini PDF [${res.status}] (${model}): ${JSON.stringify(json).slice(0, 300)}`;
+      // 404/403 = modelo indisponível: pula para o próximo (ou para o fallback OpenAI).
+      if ([400, 403, 404].includes(res.status)) break;
       if (![429, 500, 503, 504].includes(res.status)) throw new Error(lastErr);
       await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
     }
