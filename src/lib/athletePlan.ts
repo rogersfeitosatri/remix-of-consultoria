@@ -169,8 +169,32 @@ function buildFoodsFromMeal(meal: MealPlanMeal): PlanFoodGroup[] {
   return out;
 }
 
+const DAY_KEYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'] as const;
+
+export const DAY_LABELS: Record<string, string> = {
+  dom: 'Domingo', seg: 'Segunda', ter: 'Terça', qua: 'Quarta',
+  qui: 'Quinta', sex: 'Sexta', sab: 'Sábado',
+};
+
+/** Chave do dia de hoje (fuso America/Fortaleza). */
+export function todayDayKey(date = new Date()): string {
+  const wd = new Date(date.toLocaleString('en-US', { timeZone: 'America/Fortaleza' })).getDay();
+  return DAY_KEYS[wd];
+}
+
+/** Refeições do dia: usa a variação do dia da semana quando existir; senão, o plano base. */
+function mealsForToday(analysis: AthleteAnalysis | null | undefined): MealPlanMeal[] {
+  const mp: any = analysis?.meal_plan || {};
+  const vars = mp.day_variations || {};
+  const v = vars[todayDayKey()];
+  const dayMeals = Array.isArray(v) ? v : v?.meals;
+  if (Array.isArray(dayMeals) && dayMeals.length > 0) return dayMeals;
+  return mp.meals || [];
+}
+
 export function normalizeMeals(analysis: AthleteAnalysis | null | undefined): PlanMeal[] {
-  const meals = analysis?.meal_plan?.meals || [];
+  const meals = mealsForToday(analysis);
+
   return meals.map((meal, i) => {
     const { time, cleanName } = extractTime(meal.meal_name || `Refeição ${i + 1}`, meal.timing_note);
     // Remove um parêntese no fim do nome ("Café da Manhã (pré-treino…)") para

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Utensils } from 'lucide-react';
 import { MealCard } from './MealCard';
+import { DAY_LABELS, todayDayKey } from '@/lib/athletePlan';
 import type { PlanMeal } from '@/lib/athletePlan';
+
 
 export function MealPlanScreen({
   meals,
@@ -32,9 +34,13 @@ export function MealPlanScreen({
     <div className="space-y-3">
       {/* Slim progress header */}
       <div className="flex items-baseline justify-between px-1 pb-1">
-        <h1 className="text-2xl font-extrabold text-white">Plano de hoje</h1>
+        <div>
+          <h1 className="text-2xl font-extrabold text-white">Plano de hoje</h1>
+          <p className="text-xs text-gray-500 mt-0.5">{DAY_LABELS[todayDayKey()]}</p>
+        </div>
         <span className="text-sm text-gray-500">{done}/{meals.length} concluídas</span>
       </div>
+
 
       {meals.map((m) => (
         <MealCard
