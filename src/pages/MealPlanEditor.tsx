@@ -625,10 +625,15 @@ export default function MealPlanEditor() {
     }
     try {
       setImporting(true);
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('client_id', clientId!);
-      const { data, error } = await supabase.functions.invoke('import-meal-plan', { body: fd });
+      const buf = new Uint8Array(await file.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < buf.length; i += 0x8000) {
+        bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      }
+      const pdfBase64 = btoa(bin);
+      const { data, error } = await supabase.functions.invoke('import-meal-plan', {
+        body: { clientId, pdfBase64 },
+      });
       if (error) throw error;
       const meals = (data as any)?.meals || (data as any)?.meal_plan?.meals;
       if (!Array.isArray(meals) || !meals.length) throw new Error('PDF sem refeições reconhecíveis');
