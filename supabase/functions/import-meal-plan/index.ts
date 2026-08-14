@@ -167,7 +167,7 @@ ${rules}`;
   };
 
   // Tenta múltiplos modelos Gemini com retry; ordem: flash → flash-lite → pro.
-  const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"];
+  const models = ["gemini-2.5-flash", "gemini-2.5-pro"];
   let lastErr = "";
   let lastStatus = 0;
   for (const model of models) {
