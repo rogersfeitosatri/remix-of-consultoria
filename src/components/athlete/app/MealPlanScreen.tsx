@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Utensils } from 'lucide-react';
 import { MealCard } from './MealCard';
+import { DAY_LABELS, todayDayKey } from '@/lib/athletePlan';
 import type { PlanMeal } from '@/lib/athletePlan';
+
 
 export function MealPlanScreen({
   meals,
