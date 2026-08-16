@@ -59,7 +59,7 @@ function OperationRow({
   completing: boolean;
 }) {
   const manual = isManualOperation(op);
-  const lateDays = overdue && op.dueDate ? overdueBusinessDays(op, new Date(), holidays) : 0;
+  const lateDays = overdue && op.dueDate ? overdueBusinessDays(op, holidays, new Date()) : 0;
 
   return (
     <div
