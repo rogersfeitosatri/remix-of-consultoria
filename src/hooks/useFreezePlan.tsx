@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { differenceInCalendarDays, addDays, format } from 'date-fns';
-import { logOperationalEvent } from '@/lib/operationalEvents';
 
 export function useFreezePlan() {
   const queryClient = useQueryClient();
@@ -18,10 +17,7 @@ export function useFreezePlan() {
         } as any)
         .eq('id', clientId);
       if (error) throw error;
-      await logOperationalEvent({
-        clientId, entityType: 'client', entityId: clientId,
-        eventType: 'client_frozen', metadata: { freezeDate, reason: reason || null },
-      });
+      // ETAPA 6C: evento client_frozen é gravado pelo trigger canônico do banco.
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
@@ -80,10 +76,7 @@ export function useFreezePlan() {
         }
       }
 
-      await logOperationalEvent({
-        clientId, entityType: 'client', entityId: clientId,
-        eventType: 'client_unfrozen', metadata: { frozenDays, newEndDate },
-      });
+      // ETAPA 6C: evento client_unfrozen é gravado pelo trigger canônico do banco.
 
       return { frozenDays, newEndDate };
     },

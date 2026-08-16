@@ -106,14 +106,7 @@ export function useNutritionReviews() {
         .eq('id', review.id);
       if (error) throw error;
 
-      await logOperationalEvent({
-        clientId: review.client_id,
-        entityType: 'nutrition_review',
-        entityId: review.id,
-        eventType: 'nutrition_review_completed',
-        source: 'app',
-        metadata: { decision, scheduled_for: review.scheduled_for },
-      });
+      // ETAPA 6C: conclusão da revisão é registrada pelo trigger canônico do banco.
 
       // Gera a próxima obrigação do ciclo imediatamente.
       await (supabase as any).rpc('materialize_nutrition_reviews', { p_user_id: user?.id });

@@ -43,13 +43,7 @@ export function usePublishCurrentPlan() {
       const { error: pErr } = await db.rpc('publish_meal_plan_version', { p_version_id: versionId });
       if (pErr) throw pErr;
 
-      void logOperationalEvent({
-        clientId: input.clientId,
-        entityType: 'meal_plan',
-        entityId: versionId,
-        eventType: 'meal_plan_version_published',
-        metadata: { source: input.source, from_legacy: working.legacy },
-      });
+      // ETAPA 6C: meal_plan_published é registrado dentro da RPC publish_meal_plan_version.
       return versionId as string;
     },
     onSuccess: (_id, vars) => {
