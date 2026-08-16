@@ -11,14 +11,17 @@ CREATE TABLE IF NOT EXISTS public.dashboard_dismissals (
 
 ALTER TABLE public.dashboard_dismissals ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "select own dashboard dismissals" ON public.dashboard_dismissals;
 CREATE POLICY "select own dashboard dismissals"
   ON public.dashboard_dismissals FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "insert own dashboard dismissals" ON public.dashboard_dismissals;
 CREATE POLICY "insert own dashboard dismissals"
   ON public.dashboard_dismissals FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "delete own dashboard dismissals" ON public.dashboard_dismissals;
 CREATE POLICY "delete own dashboard dismissals"
   ON public.dashboard_dismissals FOR DELETE
   USING (auth.uid() = user_id);
