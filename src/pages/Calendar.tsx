@@ -132,58 +132,34 @@ export default function CalendarPage() {
     return map;
   }, [linkLogs]);
 
-  // Compute weekly stats for each week (sent vs scheduled-to-send)
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+  const sentByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    logsByDay.forEach((v, k) => map.set(k, v.success));
+    return map;
+  }, [logsByDay]);
+
+  // Resumo semanal (Etapa 4B): consultas reais, atenção e envios
   const getWeekStats = (week: Date[]) => {
-    let sent = 0;
-    let pending = 0;
-    let appts = 0;
-    week.forEach(day => {
-      const key = format(day, 'yyyy-MM-dd');
-      const log = logsByDay.get(key);
-      if (log) sent += log.success;
-      consultations.forEach(c => {
-        if (isSendLinkEventRow(c) && c.send_link_date === key) pending += 1;
-      });
-      (appointments || []).forEach(a => {
-        if ((a.status === 'scheduled' || a.status === 'confirmed') && a.appointment_date === key) appts += 1;
-      });
-    });
-    return { sent, pending, appts };
+    const stats = weekStats(
+      week.map(d => format(d, 'yyyy-MM-dd')),
+      (appointments || []) as any,
+      consultations as any,
+      sentByDay,
+      todayKey,
+    );
+    return { sent: stats.sentLinks, pending: stats.pendingLinks, appts: stats.appointments, attention: stats.attention };
   };
 
-  const getEventsForDate = (date: Date) => {
-    const events: { type: 'first' | 'sendLink' | 'appointment'; schedule?: ConsultationSchedule & { client_name: string }; client?: Client; appointment?: typeof appointments[0] }[] = [];
-
-    activeClients
-      .filter(c => {
-        if (!c.first_consultation_date) return false;
-        if (!isSameDay(parseISO(c.first_consultation_date), date)) return false;
-        const hasAppointment = (appointments || []).some(
-          apt => apt.client_id === c.id && apt.appointment_date === format(date, 'yyyy-MM-dd')
-        );
-        return !hasAppointment;
-      })
-      .forEach(client => {
-        events.push({ type: 'first', client });
-      });
-
-    (appointments || [])
-      .filter(apt =>
-        (apt.status === 'scheduled' || apt.status === 'confirmed') &&
-        apt.appointment_date === format(date, 'yyyy-MM-dd')
-      )
-      .forEach(apt => {
-        events.push({ type: 'appointment', appointment: apt });
-      });
-
-    consultations
-      .filter(c => isSendLinkEventRow(c) && isSameDay(parseISO(c.send_link_date), date))
-      .forEach(schedule => {
-        events.push({ type: 'sendLink', schedule });
-      });
-
-    return events;
-  };
+  /** Somente eventos REAIS: consultas existentes + envios de link pendentes. */
+  const getEventsForDate = (date: Date) =>
+    calendarEventsForDate(
+      (appointments || []) as any,
+      consultations as any,
+      format(date, 'yyyy-MM-dd'),
+      todayKey,
+    );
 
   const handleSendBookingLink = async (id: string) => {
     try {
