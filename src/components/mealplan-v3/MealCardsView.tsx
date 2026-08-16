@@ -79,6 +79,10 @@ export function MealCardsView({ text, onChange, cacheRef }: Props) {
   // Estado "qual opção está em edição": null = nenhuma.
   const [editing, setEditing] = useState<{ mi: number; oi: number } | null>(null);
   const [editText, setEditText] = useState<string>('');
+  // Compositor guiado aberto: gi = índice do alimento em edição (null = novo).
+  const [composer, setComposer] = useState<{ mi: number; oi: number; gi: number | null; nonce?: number } | null>(null);
+  const isComposing = (mi: number, oi: number) => composer?.mi === mi && composer?.oi === oi;
+
 
   // Enriquece com macros (debounce curto). Pausa enquanto edita para não
   // sobrescrever o texto do editor inline.
