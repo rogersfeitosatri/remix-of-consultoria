@@ -40,6 +40,7 @@ import { ScheduledCheckinsSection } from '@/components/forms/ScheduledCheckinsSe
 import { QuestionBankSection } from '@/components/forms/QuestionBankSection';
 import { AnamneseResponsesTab } from '@/components/forms/AnamneseResponsesTab';
 import { CheckinAuditTab } from '@/components/forms/CheckinAuditTab';
+import { SemanticReviewPanel } from '@/components/forms/SemanticReviewPanel';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 const TAB_PARAM_MAP: Record<string, string> = {
