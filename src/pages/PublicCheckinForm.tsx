@@ -128,6 +128,9 @@ export default function PublicCheckinForm() {
 
   const [form, setForm] = useState<Form | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  // ETAPA 3C — versão congelada do formulário vinculada ao disparo (quando houver token)
+  const [formVersionId, setFormVersionId] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
