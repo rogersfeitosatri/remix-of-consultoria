@@ -9747,6 +9747,18 @@ export type Database = {
         Args: { _trainer_id: string }
         Returns: boolean
       }
+      log_operational_event: {
+        Args: {
+          p_client_id: string
+          p_entity_id: string
+          p_entity_type: string
+          p_event_type: string
+          p_metadata?: Json
+          p_source?: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       log_security_event: {
         Args: {
           p_client_id?: string
