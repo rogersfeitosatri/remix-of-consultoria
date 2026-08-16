@@ -19,6 +19,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { appointmentForSchedule } from '@/lib/calendarProjection';
+import { getAthleteState } from '@/lib/athleteState';
 
 interface WeeklyPipelineViewProps {
   consultations: (ConsultationSchedule & { client_name: string })[];
