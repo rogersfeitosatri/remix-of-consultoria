@@ -27,14 +27,11 @@ interface Question {
   comment_field_label: string | null;
   comment_field_required: boolean;
   comment_field_type: 'short' | 'medium' | null;
+  // ETAPA 3C — metadados semânticos (key-first)
+  question_key?: string | null;
+  conditional_logic?: ConditionalLogic | null;
 }
 
-// Patterns to identify conditional questions about long training
-const LONG_TRAINING_TRIGGER_PATTERN = /realizou.*treino.*longo|treino.*longo.*semana/i;
-const LONG_TRAINING_DEPENDENT_PATTERNS = [
-  /como.*sentiu.*treino.*longo/i,
-  /suplementação.*treino/i,
-];
 
 interface Form {
   id: string;
