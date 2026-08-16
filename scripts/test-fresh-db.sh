@@ -66,6 +66,9 @@ create or replace function cron.schedule(text, text, text) returns bigint langua
 create or replace function cron.unschedule(text) returns boolean language sql as $$ select true $$;
 create table if not exists cron.job (jobid bigserial primary key, jobname text, schedule text, command text);
 create schema if not exists net;
+create or replace function storage.foldername(name text) returns text[] language sql immutable as
+  $$ select string_to_array(name, '/') $$;
+create schema if not exists pgmq;
 create or replace function net.http_post(url text, body jsonb default '{}'::jsonb, params jsonb default '{}'::jsonb,
   headers jsonb default '{}'::jsonb, timeout_milliseconds int default 5000) returns bigint language sql as $$ select 1::bigint $$;
 SQL
@@ -73,7 +76,7 @@ SQL
 ok=0; fail=0; : > "$DIR/failures.txt"
 for f in $(ls supabase/migrations/*.sql | sort); do
   # Extensões providas pela plataforma não existem num Postgres puro.
-  sed -E '/CREATE EXTENSION[^;]*(pg_graphql|supabase_vault|pg_stat_statements|pg_cron|pg_net|pgsodium)/Id' "$f" > "$DIR/current.sql"
+  sed -E '/CREATE EXTENSION[^;]*(pg_graphql|supabase_vault|pg_stat_statements|pg_cron|pg_net|pgsodium|pgmq|"http"|'http')/Id' "$f" > "$DIR/current.sql"
   if out=$($PSQL -q -v ON_ERROR_STOP=1 -f "$DIR/current.sql" 2>&1); then
     ok=$((ok+1))
   else
