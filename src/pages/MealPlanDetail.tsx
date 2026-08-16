@@ -552,6 +552,7 @@ export default function MealPlanDetail() {
 
             </div>
           </div>
+          <PublishPlanControl clientId={clientId} source="classic_editor" className="shrink-0" />
           {hasPlan && (
             <>
               <Button
@@ -566,15 +567,15 @@ export default function MealPlanDetail() {
                 <span className="hidden sm:inline">Avisar atleta</span>
               </Button>
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
                 className="gap-1.5 shrink-0"
                 onClick={() => sendToZonaNutri.mutate()}
                 disabled={sendToZonaNutri.isPending}
-                title="Enviar o plano (com os dias da semana) para o app Zona Nutri"
+                title="Envio externo legado — o canal oficial agora é Publicar"
               >
                 {sendToZonaNutri.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                <span className="hidden sm:inline">Enviar ao Zona Nutri</span>
+                <span className="hidden sm:inline">Envio externo (legado)</span>
               </Button>
             </>
           )}
