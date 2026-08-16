@@ -1,14 +1,23 @@
-import { Home, Utensils, Target, TrendingUp, User } from 'lucide-react';
+import { Home, Utensils, ClipboardCheck, CalendarDays, User } from 'lucide-react';
 
-export type AthleteScreen = 'dashboard' | 'plano' | 'orientacoes' | 'evolucao' | 'perfil' | 'provas';
+export type AthleteScreen =
+  | 'dashboard'
+  | 'plano'
+  | 'checkins'
+  | 'consultas'
+  | 'orientacoes'
+  | 'evolucao'
+  | 'perfil'
+  | 'provas';
 
 const TABS: { id: AthleteScreen; label: string; icon: typeof Home }[] = [
   { id: 'dashboard', label: 'Início', icon: Home },
   { id: 'plano', label: 'Plano', icon: Utensils },
-  { id: 'orientacoes', label: 'Estratégia', icon: Target },
-  { id: 'evolucao', label: 'Evolução', icon: TrendingUp },
+  { id: 'checkins', label: 'Check-ins', icon: ClipboardCheck },
+  { id: 'consultas', label: 'Consultas', icon: CalendarDays },
   { id: 'perfil', label: 'Perfil', icon: User },
 ];
+
 
 const GOLD = 'hsl(43,74%,49%)';
 
