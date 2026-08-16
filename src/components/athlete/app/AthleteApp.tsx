@@ -6,22 +6,29 @@ import { MealPlanScreen } from './MealPlanScreen';
 import { InstructionsScreen } from './InstructionsScreen';
 import { RacePlanScreen } from './RacePlanScreen';
 import { ProfileScreen } from './ProfileScreen';
+import { CheckinsScreen } from './CheckinsScreen';
+import { ConsultasScreen } from './ConsultasScreen';
+import { NextActionsCard } from './NextActionsCard';
 import { CheckinEvolutionCharts } from '@/components/checkin/CheckinEvolutionCharts';
 import { normalizeMeals } from '@/lib/athletePlan';
 import { useAthleteDailyLog } from '@/hooks/useAthleteDailyLog';
 import { useActiveRace } from '@/hooks/useNutriPeriodiza';
 import { useNutritionSupportWhatsapp } from '@/hooks/useNutritionSupportWhatsapp';
+import { useAthleteAreaData, useAthleteActions, markSeen, type AthleteAction } from '@/hooks/useAthleteArea';
 import type { AthleteAnalysis } from '@/hooks/useAthleteAnalysis';
 import logoRF from '@/assets/logo-rf.jpg';
 
 const SCREEN_TITLE: Record<AthleteScreen, string> = {
   dashboard: '',
   plano: 'Plano Alimentar',
+  checkins: 'Check-ins',
+  consultas: 'Consultas',
   orientacoes: 'Orientações',
   evolucao: 'Evolução',
   perfil: 'Perfil',
   provas: 'Plano de Prova',
 };
+
 
 export function AthleteApp({
   client,
