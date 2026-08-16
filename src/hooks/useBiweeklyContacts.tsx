@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { getAthleteState } from '@/lib/athleteState';
 
 // Contato quinzenal: além dos check-ins, um "oi" no WhatsApp a cada ~14 dias
 // para cada atleta ATIVO. Quem foi contatado nos últimos 14 dias fica "em dia";
@@ -33,12 +34,12 @@ export function useBiweeklyContacts() {
       // 1) Atletas ativos (não congelados / inativados).
       const { data: clients, error: cErr } = await supabase
         .from('clients')
-        .select('id, name, phone')
+        .select('id, name, phone, is_active, is_frozen, archived_at, ended_at, end_date, service_type, athlete_status')
         .eq('user_id', user!.id)
-        .eq('is_active', true)
-        .eq('is_frozen', false)
         .order('name');
       if (cErr) throw cErr;
+      // ETAPA 2B — estado operacional canônico.
+      const operational = (clients || []).filter((c: any) => getAthleteState(c).canAppearInOperationalQueues);
 
       // 2) Contatos recentes (janela de ~60 dias basta para o ciclo).
       const since = new Date(Date.now() - 60 * 86_400_000).toISOString();
@@ -55,7 +56,7 @@ export function useBiweeklyContacts() {
         }
       } catch { /* tabela pode não existir ainda → todos aparecem como pendentes */ }
 
-      return (clients || []).map((c: any) => {
+      return operational.map((c: any) => {
         const last = contactByClient.get(c.id) ?? null;
         const daysSince = last ? daysBetween(last) : null;
         const done = daysSince != null && daysSince < CONTACT_CYCLE_DAYS;
