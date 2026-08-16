@@ -1,15 +1,31 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import {
+  requireInternal,
+  denied,
+  logSecurityEvent,
+  restrictedCors,
+  hitRateLimit,
+  callerIp,
+} from "../_shared/authGuard.ts";
 
 interface CreateCalendarEventRequest {
   appointmentId: string;
 }
 
+/**
+ * ETAPA 6A — A. ADMIN/INTERNAL + E. PUBLIC ESCOPADO.
+ *
+ * Caller admin/interno: autenticado (requireInternal).
+ * Caller público (fluxo de agendamento em /agendar): só é aceito como
+ * CONTINUAÇÃO imediata do agendamento que acabou de ser criado —
+ * o appointment precisa estar `scheduled`, ter sido criado nos últimos
+ * 15 minutos e ainda NÃO possuir evento de calendário (idempotente).
+ * Um anônimo não consegue escolher um appointment_id qualquer.
+ */
+const PUBLIC_GRACE_MINUTES = 15;
+
 Deno.serve(async (req) => {
+  const corsHeaders = restrictedCors(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -22,7 +38,11 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { appointmentId }: CreateCalendarEventRequest = await req.json();
-    console.log('Creating calendar event for appointment:', appointmentId);
+    if (!appointmentId || typeof appointmentId !== 'string') {
+      return new Response(JSON.stringify({ error: 'Invalid request' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Get appointment details
     const { data: appointment, error: appointmentError } = await supabase
@@ -37,6 +57,31 @@ Deno.serve(async (req) => {
     if (appointmentError || !appointment) {
       throw new Error('Appointment not found');
     }
+
+    // ---- Modelo de confiança ----
+    const guard = await requireInternal(req);
+    if (!guard.ok) {
+      const ok = await hitRateLimit('create_calendar_event', callerIp(req), 20, 3600);
+      const createdAt = appointment.created_at ? new Date(appointment.created_at).getTime() : 0;
+      const fresh = Date.now() - createdAt < PUBLIC_GRACE_MINUTES * 60 * 1000;
+      const eligible =
+        ok &&
+        fresh &&
+        appointment.status === 'scheduled' &&
+        !appointment.google_calendar_event_id;
+
+      if (!eligible) {
+        await logSecurityEvent({
+          eventType: 'calendar_event_denied',
+          fn: 'create-calendar-event',
+          clientId: appointment.client_id ?? null,
+          entityId: appointmentId,
+          metadata: { reason: !ok ? 'rate_limited' : fresh ? 'not_eligible' : 'stale_appointment' },
+        });
+        return denied({ status: 403, error: 'Forbidden' }, corsHeaders);
+      }
+    }
+
 
     const adminUserId = appointment.client.user_id;
 
