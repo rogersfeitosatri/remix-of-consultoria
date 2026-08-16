@@ -23,6 +23,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AttachedPlanPanel } from '@/components/admin/AttachedPlanPanel';
 import { MealPlanLinksCard } from '@/components/admin/MealPlanLinksCard';
+import { PlanVersionsCard } from '@/components/mealplan/PlanVersionsCard';
 import {
   parseRaw, readSavedPlans, countMeals, variationCount, planTotals,
   duplicatePlan, setActivePlan, genPlanId, removeSavedPlan, removeAttachedPlan,
