@@ -371,8 +371,15 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // ETAPA 3C — o link carrega o token do disparo: o atleta sempre responde
+        // exatamente a versão congelada no momento do envio.
+        const dispatchToken = (dispatch as any).dispatch_token as string | undefined;
+        const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}${dispatchToken ? `&t=${dispatchToken}` : ''}`;
+        if (dispatchToken) {
+          await supabase.from('checkin_dispatches').update({ link_checkin: checkinLink }).eq('id', dispatch.id);
+        }
+
         const codigoAcesso = foreign ? client.email : formatPhoneAsAccessCode(client.phone);
-        const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
         const dueHoursLabel = schedule.due_in_hours ? `${schedule.due_in_hours}h` : 'Sem prazo definido';
 
         let sendError: any = null;
