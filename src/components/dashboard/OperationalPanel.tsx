@@ -128,7 +128,18 @@ export function OperationalPanel() {
         </div>
       ) : (
         <DashboardSection title="Pendências" count={total}>
-          {pending.map((op) => <OperationRow key={op.id} op={op} holidays={holidays} />)}
+          {pending.slice(0, showAll ? pending.length : VISIBLE).map((op) => (
+            <OperationRow key={op.id} op={op} holidays={holidays} />
+          ))}
+          {!showAll && pending.length > VISIBLE && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="w-full px-3 py-3 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Mostrar mais {pending.length - VISIBLE}
+            </button>
+          )}
         </DashboardSection>
       )}
 
