@@ -196,15 +196,45 @@ export default function PublicCheckinForm() {
           is_active: resolvedForm.is_active,
         });
 
-        const { data: questionsData, error: questionsError } = await supabase
-          .from('checkin_questions')
-          .select('*')
-          .eq('form_id', resolvedForm.id)
-          .order('order_index', { ascending: true });
+        // ETAPA 3C — se o link traz o token do disparo, o atleta responde EXATAMENTE
+        // a versão congelada no envio. Sem token, cai na definição atual do formulário.
+        const dispatchToken = new URLSearchParams(location.search).get('t');
+        let typedQuestions: Question[] | null = null;
 
-        if (questionsError) throw questionsError;
-        const typedQuestions = questionsData as Question[];
+        if (dispatchToken) {
+          const { data: dv } = await supabase
+            .rpc('get_checkin_dispatch_version' as any, { p_dispatch_token: dispatchToken });
+          const dispatchRow = Array.isArray(dv) && dv.length > 0 ? (dv[0] as any) : null;
+          if (dispatchRow?.form_version_id) {
+            setFormVersionId(dispatchRow.form_version_id);
+            const { data: vq } = await supabase
+              .from('checkin_form_version_questions' as any)
+              .select('*')
+              .eq('version_id', dispatchRow.form_version_id)
+              .order('order_index', { ascending: true });
+            if (vq && vq.length > 0) {
+              typedQuestions = (vq as any[]).map((q) => ({
+                ...q,
+                // a resposta é chaveada pela pergunta de origem, preservando o histórico
+                id: q.source_question_id ?? q.id,
+              })) as Question[];
+            }
+          }
+        }
+
+        if (!typedQuestions) {
+          const { data: questionsData, error: questionsError } = await supabase
+            .from('checkin_questions')
+            .select('*')
+            .eq('form_id', resolvedForm.id)
+            .order('order_index', { ascending: true });
+
+          if (questionsError) throw questionsError;
+          typedQuestions = questionsData as Question[];
+        }
+
         setQuestions(typedQuestions);
+
 
         // Initialize answers and comments
         const initialAnswers: Record<string, any> = {};
