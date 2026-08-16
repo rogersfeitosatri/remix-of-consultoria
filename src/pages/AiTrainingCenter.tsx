@@ -1,112 +1,124 @@
-import { useState } from 'react';
+/**
+ * ETAPA 5B — CENTRAL DE IA CANÔNICA.
+ * A IA é camada de APOIO: gera rascunhos, resume e sugere. Nunca publica plano,
+ * nunca fecha check-in, nunca conclui revisão e nunca envia feedback sozinha.
+ * Cada skill mostra: função, versão ativa, provider, modelo, regras, consumidores
+ * e o PROMPT EFETIVO real. O playground roda a mesma pipeline de produção.
+ */
+import { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
-  Brain,
-  UtensilsCrossed,
-  ClipboardCheck,
-  MessageCircle,
-  Save,
-  Loader2,
-  Play,
-  Copy,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  FileUp,
+  Brain, UtensilsCrossed, ClipboardCheck, Save, Loader2, Play, Copy,
+  ShieldCheck, History, FileUp, CheckCircle2, AlertTriangle, RotateCcw, FlaskConical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MealPlanSkillPanel } from '@/components/admin/MealPlanSkillPanel';
+import {
+  AI_SKILLS, getSkill, activeVersion, draftVersions, validateForActivation,
+  diffLines, diffSummary, buildEffectivePromptSections, effectivePromptText,
+  type AiSkillKey, type PromptVersion,
+} from '@/lib/aiSkills';
+import {
+  useAiPromptVersions, useCreateDraftVersion, useUpdateDraftVersion,
+  useActivatePromptVersion, useRollbackToVersion, useAiRuns, useRecentCheckinResponses,
+} from '@/hooks/useAiSkills';
 
-interface ContextConfig {
-  key: string;
-  label: string;
-  description: string;
-  icon: React.ReactNode;
-  variables: string[];
-}
+const SKILL_ICON: Record<AiSkillKey, React.ReactNode> = {
+  meal_plan_generation: <UtensilsCrossed className="h-4 w-4" />,
+  checkin_analysis: <ClipboardCheck className="h-4 w-4" />,
+};
 
-const CONTEXTS: ContextConfig[] = [
-  {
-    key: 'meal_plan_generation',
-    label: 'Plano Alimentar',
-    description: 'Prompt usado para gerar planos alimentares personalizados para cada atleta.',
-    icon: <UtensilsCrossed className="h-4 w-4" />,
-    variables: [
-      '{{nome_atleta}}', '{{peso}}', '{{altura}}', '{{idade}}',
-      '{{objetivo}}', '{{restricoes_alimentares}}', '{{alergias}}',
-      '{{horas_treino_semana}}', '{{tipo_treino}}', '{{prova_alvo}}',
-      '{{data_prova}}', '{{historico_lesoes}}', '{{suplementos_atuais}}',
-    ],
-  },
-  {
-    key: 'checkin_analysis',
-    label: 'Análise de Check-in',
-    description: 'Prompt para analisar os check-ins dos atletas e gerar insights.',
-    icon: <ClipboardCheck className="h-4 w-4" />,
-    variables: [
-      '{{nome_atleta}}', '{{peso_atual}}', '{{peso_anterior}}',
-      '{{nivel_energia}}', '{{qualidade_sono}}', '{{sintomas_digestivos}}',
-      '{{aderencia_plano}}', '{{observacoes_atleta}}', '{{historico_checkins}}',
-    ],
-  },
-  {
-    key: 'whatsapp_support',
-    label: 'Suporte WhatsApp',
-    description: 'Prompt para o assistente de suporte via WhatsApp.',
-    icon: <MessageCircle className="h-4 w-4" />,
-    variables: [
-      '{{nome_atleta}}', '{{plano_atual}}', '{{proximo_checkin}}',
-      '{{mensagem_atleta}}', '{{historico_conversa}}', '{{objetivo}}',
-    ],
-  },
-];
-
-interface AiPrompt {
-  id: string;
-  user_id: string;
-  context_key: string;
-  prompt_text: string;
-  created_at: string;
-  updated_at: string;
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    active: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30',
+    draft: 'bg-amber-500/15 text-amber-600 border-amber-500/30',
+    archived: 'bg-muted text-muted-foreground',
+  };
+  const label = status === 'active' ? 'Ativa (produção)' : status === 'draft' ? 'Rascunho' : 'Arquivada';
+  return <Badge variant="outline" className={map[status] || ''}>{label}</Badge>;
 }
 
 export default function AiTrainingCenter() {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [selectedContext, setSelectedContext] = useState(CONTEXTS[0].key);
-  const [promptText, setPromptText] = useState('');
-  const [promptLoaded, setPromptLoaded] = useState<string | null>(null);
-  const [testInput, setTestInput] = useState('');
-  const [testResult, setTestResult] = useState('');
-  const [testLoading, setTestLoading] = useState(false);
-  const [variablesOpen, setVariablesOpen] = useState(true);
-  const [playgroundOpen, setPlaygroundOpen] = useState(false);
+  const [skillKey, setSkillKey] = useState<AiSkillKey>('meal_plan_generation');
+  const skill = getSkill(skillKey)!;
+
+  const { data: versions = [], isLoading } = useAiPromptVersions(skillKey);
+  const createDraft = useCreateDraftVersion(skillKey);
+  const updateDraft = useUpdateDraftVersion(skillKey);
+  const activate = useActivatePromptVersion(skillKey);
+  const rollback = useRollbackToVersion(skillKey);
+  const { data: runs = [] } = useAiRuns(skillKey);
+  const { data: checkins = [] } = useRecentCheckinResponses();
+
+  const active = activeVersion(versions);
+  const drafts = draftVersions(versions);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftText, setDraftText] = useState('');
+  const [changeNotes, setChangeNotes] = useState('');
   const [importing, setImporting] = useState(false);
-  const [testProvider, setTestProvider] = useState<'gemini' | 'openai'>('gemini');
-  const [openaiModel, setOpenaiModel] = useState<string>('gpt-5.6-luna');
 
+  const [testCheckinId, setTestCheckinId] = useState<string>('');
+  const [testInput, setTestInput] = useState('');
+  const [testVersionId, setTestVersionId] = useState<string>('active');
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
-  // Importa o conteúdo de um arquivo (.md/.txt lido direto; .pdf transcrito via IA)
-  // para o editor do prompt.
+  const editingVersion = versions.find((v) => v.id === editingId) || null;
+  const baselineText = active?.prompt_text ?? '';
+  const diff = useMemo(() => diffLines(baselineText, draftText), [baselineText, draftText]);
+  const diffCount = diffSummary(diff);
+  const check = useMemo(() => validateForActivation(skill, draftText), [skill, draftText]);
+
+  const effectiveSections = useMemo(
+    () => buildEffectivePromptSections(skill, active?.prompt_text ?? '(nenhuma versão ativa)'),
+    [skill, active],
+  );
+
+  const startEditing = (v?: PromptVersion) => {
+    if (v) {
+      setEditingId(v.id);
+      setDraftText(v.prompt_text);
+      setChangeNotes(v.change_notes ?? '');
+    } else {
+      setEditingId(null);
+      setDraftText(active?.prompt_text ?? '');
+      setChangeNotes('');
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!draftText.trim()) return toast.error('Escreva o prompt antes de salvar.');
+    if (editingVersion?.status === 'draft') {
+      await updateDraft.mutateAsync({ versionId: editingVersion.id, promptText: draftText, changeNotes });
+    } else {
+      const created = await createDraft.mutateAsync({ promptText: draftText, changeNotes });
+      setEditingId(created.id);
+    }
+  };
+
+  const handleActivate = async (versionId: string) => {
+    await activate.mutateAsync(versionId);
+    setEditingId(null);
+  };
+
   const handleImportFile = async (file: File | null) => {
     if (!file) return;
-    const name = file.name.toLowerCase();
     try {
       setImporting(true);
+      const name = file.name.toLowerCase();
       if (name.endsWith('.pdf') || file.type === 'application/pdf') {
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -120,17 +132,14 @@ export default function AiTrainingCenter() {
         const { data, error } = await supabase.functions.invoke('extract-pdf-text', { body: { pdfBase64: base64 } });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
-        const text = data?.text || '';
-        if (!text.trim()) throw new Error('Não consegui extrair texto do PDF.');
-        setPromptText(text);
-        toast.success('PDF importado para o prompt.');
+        if (!data?.text?.trim()) throw new Error('Não consegui extrair texto do PDF.');
+        setDraftText(data.text);
       } else {
-        // .md / .markdown / .txt / outros textos
         const text = await file.text();
         if (!text.trim()) throw new Error('Arquivo vazio.');
-        setPromptText(text);
-        toast.success('Arquivo importado para o prompt.');
+        setDraftText(text);
       }
+      toast.success('Conteúdo importado para o rascunho.');
     } catch (e: any) {
       toast.error(e?.message || 'Erro ao importar o arquivo.');
     } finally {
@@ -138,326 +147,346 @@ export default function AiTrainingCenter() {
     }
   };
 
-  const currentContext = CONTEXTS.find((c) => c.key === selectedContext)!;
-
-  const { data: prompts, isLoading } = useQuery({
-    queryKey: ['ai_prompts', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('ai_prompts' as any)
-        .select('*')
-        .eq('user_id', user!.id);
-      if (error) throw error;
-      return (data as any[]) as AiPrompt[];
-    },
-    enabled: !!user?.id,
-  });
-
-  // Sync prompt text when context changes or data loads
-  const existingPrompt = prompts?.find((p) => p.context_key === selectedContext);
-  if (existingPrompt && promptLoaded !== selectedContext) {
-    setPromptText(existingPrompt.prompt_text);
-    setPromptLoaded(selectedContext);
-  } else if (!existingPrompt && promptLoaded !== selectedContext) {
-    setPromptText('');
-    setPromptLoaded(selectedContext);
-  }
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from('ai_prompts' as any)
-        .upsert(
-          {
-            user_id: user!.id,
-            context_key: selectedContext,
-            prompt_text: promptText,
-            updated_at: new Date().toISOString(),
-          } as any,
-          { onConflict: 'user_id,context_key' }
-        );
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ai_prompts', user?.id] });
-      toast.success('Prompt salvo com sucesso!');
-    },
-    onError: () => {
-      toast.error('Erro ao salvar o prompt.');
-    },
-  });
-
-  const handleTest = async () => {
-    if (!promptText.trim()) {
-      toast.error('Escreva um prompt antes de testar.');
-      return;
+  const handleRunPlayground = async () => {
+    if (skillKey === 'checkin_analysis' && !testCheckinId) {
+      return toast.error('Selecione um check-in real para o teste.');
     }
     setTestLoading(true);
-    setTestResult('');
+    setTestResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke('test-ai-prompt', {
+      const { data, error } = await supabase.functions.invoke('run-ai-skill', {
         body: {
-          context_key: selectedContext,
-          prompt_text: promptText,
-          test_input: testInput,
-          provider: testProvider,
-          openai_model: openaiModel,
+          skill_key: skillKey,
+          prompt_version_id: testVersionId === 'active' ? null : testVersionId,
+          checkin_response_id: testCheckinId || undefined,
+          test_input: testInput || undefined,
         },
       });
       if (error) throw error;
-      const usedProvider = data?.provider ? ` [${data.provider}/${data.model}]` : '';
-      setTestResult((data?.result || data?.output || JSON.stringify(data, null, 2)) + usedProvider);
-
-    } catch (err: any) {
-      setTestResult(`Erro: ${err.message || 'Falha ao gerar teste.'}`);
+      if (data?.error) throw new Error(data.error);
+      setTestResult(data);
+      toast.success('Teste executado (nada foi gravado no atleta).');
+    } catch (e: any) {
+      toast.error(e?.message || 'Falha ao executar o teste.');
     } finally {
       setTestLoading(false);
     }
   };
 
-  const copyVariable = (variable: string) => {
-    navigator.clipboard.writeText(variable);
-    toast.success(`${variable} copiado!`);
-  };
-
-  const handleContextChange = (key: string) => {
-    setSelectedContext(key);
-    setPromptLoaded(null);
-    setTestResult('');
-    setTestInput('');
-  };
-
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <Brain className="h-7 w-7 text-primary" />
+      <div className="space-y-6 pb-10">
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-primary/10 p-2"><Brain className="h-5 w-5 text-primary" /></div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Central de IA</h1>
-            <p className="text-muted-foreground text-sm">
-              Gerencie os prompts do sistema para cada contexto de IA.
+            <h1 className="text-2xl font-semibold tracking-tight">Central de IA</h1>
+            <p className="text-sm text-muted-foreground">
+              Configuração, versionamento e auditoria das funções de IA do sistema.
             </p>
           </div>
         </div>
 
-        <Tabs
-          value={selectedContext}
-          onValueChange={handleContextChange}
-          className="flex flex-col md:flex-row gap-6"
-        >
-          {/* Sidebar / Top tabs */}
-          <TabsList className="flex md:flex-col h-auto bg-transparent gap-1 md:w-56 shrink-0">
-            {CONTEXTS.map((ctx) => (
-              <TabsTrigger
-                key={ctx.key}
-                value={ctx.key}
-                className="justify-start gap-2 px-3 py-2.5 w-full data-[state=active]:bg-card data-[state=active]:shadow-sm"
-              >
-                {ctx.icon}
-                <span className="hidden sm:inline">{ctx.label}</span>
+        <Alert>
+          <ShieldCheck className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            A IA é uma camada de apoio. Ela não publica plano, não fecha check-in, não conclui revisão
+            estrutural e não envia feedback — toda decisão exige ação humana explícita.
+          </AlertDescription>
+        </Alert>
+
+        <Tabs value={skillKey} onValueChange={(v) => { setSkillKey(v as AiSkillKey); setEditingId(null); setTestResult(null); }}>
+          <TabsList>
+            {AI_SKILLS.map((s) => (
+              <TabsTrigger key={s.key} value={s.key} className="gap-2">
+                {SKILL_ICON[s.key]}{s.label}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          {/* Main content area */}
-          <div className="flex-1 min-w-0">
-            {CONTEXTS.map((ctx) => (
-              <TabsContent key={ctx.key} value={ctx.key} className="mt-0 space-y-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      {ctx.icon}
-                      <CardTitle className="text-lg">{ctx.label}</CardTitle>
+          {AI_SKILLS.map((s) => (
+            <TabsContent key={s.key} value={s.key} className="space-y-6 pt-4">
+              {/* ---------- Visão geral da função ---------- */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="text-base">{s.label}</CardTitle>
+                    {isLoading ? <Skeleton className="h-5 w-24" /> : active
+                      ? <div className="flex items-center gap-2"><StatusBadge status="active" /><Badge variant="secondary">v{active.version_number}</Badge></div>
+                      : <Badge variant="destructive">Sem versão ativa</Badge>}
+                  </div>
+                  <CardDescription>{s.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Execução</p>
+                    <p>Provider: <span className="font-medium">{active?.provider || s.provider}</span></p>
+                    <p>Modelo: <span className="font-medium">{active?.model || s.model}</span></p>
+                    <p>Fallbacks: {s.fallbackModels.join(', ')}</p>
+                    <p>Max tokens: {s.maxTokens} · Formato: {s.responseFormat}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Onde é usada</p>
+                    <div className="flex flex-wrap gap-1">
+                      {s.consumers.map((c) => <Badge key={c} variant="outline" className="font-mono text-[11px]">{c}</Badge>)}
                     </div>
-                    <CardDescription>{ctx.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* System Prompt Editor */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-sm font-medium">System Prompt</label>
-                        <div>
-                          <input
-                            id="prompt-file-import"
-                            type="file"
-                            accept=".md,.markdown,.txt,.pdf,text/markdown,text/plain,application/pdf"
-                            className="hidden"
-                            onChange={(e) => { handleImportFile(e.target.files?.[0] ?? null); e.currentTarget.value = ''; }}
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5"
-                            disabled={importing}
-                            onClick={() => document.getElementById('prompt-file-import')?.click()}
-                          >
-                            {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
-                            Importar PDF/MD
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Variáveis injetadas</p>
+                    <div className="flex flex-wrap gap-1">
+                      {s.variables.map((v) => <Badge key={v} variant="secondary" className="font-mono text-[11px]">{v}</Badge>)}
+                    </div>
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">Regras do sistema</p>
+                    <ul className="list-disc space-y-0.5 pl-5 text-muted-foreground">
+                      {s.systemRules.map((r) => <li key={r}>{r}</li>)}
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {s.hasModules && <MealPlanSkillPanel />}
+
+              {/* ---------- Editor + versionamento ---------- */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Prompt-base e versões</CardTitle>
+                  <CardDescription>
+                    Edições geram um rascunho. A produção só muda quando você ativa a versão.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => startEditing()}>
+                      Novo rascunho a partir da ativa
+                    </Button>
+                    {drafts.map((d) => (
+                      <Button key={d.id} size="sm" variant={editingId === d.id ? 'default' : 'outline'} onClick={() => startEditing(d)}>
+                        Editar rascunho v{d.version_number}
+                      </Button>
+                    ))}
+                    <label className="ml-auto">
+                      <input type="file" accept=".md,.markdown,.txt,.pdf" className="hidden"
+                        onChange={(e) => handleImportFile(e.target.files?.[0] ?? null)} />
+                      <Button size="sm" variant="ghost" asChild disabled={importing}>
+                        <span className="cursor-pointer">
+                          {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+                          Importar arquivo
+                        </span>
+                      </Button>
+                    </label>
+                  </div>
+
+                  <Textarea
+                    value={draftText}
+                    onChange={(e) => setDraftText(e.target.value)}
+                    placeholder="Escreva o prompt-base desta função..."
+                    className="min-h-[280px] font-mono text-xs"
+                  />
+                  <Input
+                    value={changeNotes}
+                    onChange={(e) => setChangeNotes(e.target.value)}
+                    placeholder="Notas da mudança (o que muda nesta versão e por quê)"
+                  />
+
+                  {!check.ok && draftText.trim() && (
+                    <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        <ul className="list-disc pl-4 text-xs">{check.errors.map((e) => <li key={e}>{e}</li>)}</ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {check.ok && check.warnings.length > 0 && (
+                    <Alert>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        <ul className="list-disc pl-4 text-xs">{check.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" onClick={handleSaveDraft} disabled={updateDraft.isPending || createDraft.isPending}>
+                      <Save className="mr-2 h-4 w-4" />Salvar rascunho
+                    </Button>
+                    <Button
+                      size="sm" variant="default"
+                      disabled={!editingVersion || editingVersion.status !== 'draft' || !check.ok || activate.isPending}
+                      onClick={() => editingVersion && handleActivate(editingVersion.id)}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />Ativar em produção
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Diferença vs. versão ativa: +{diffCount.added} / −{diffCount.removed} linhas
+                    </span>
+                  </div>
+
+                  {(diffCount.added > 0 || diffCount.removed > 0) && (
+                    <ScrollArea className="h-64 rounded-md border bg-muted/30 p-3">
+                      <pre className="text-[11px] leading-relaxed">
+                        {diff.map((l, i) => (
+                          <div key={i} className={
+                            l.type === 'added' ? 'text-emerald-600' :
+                            l.type === 'removed' ? 'text-destructive' : 'text-muted-foreground'
+                          }>
+                            {l.type === 'added' ? '+ ' : l.type === 'removed' ? '- ' : '  '}{l.text}
+                          </div>
+                        ))}
+                      </pre>
+                    </ScrollArea>
+                  )}
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <p className="flex items-center gap-2 text-sm font-medium"><History className="h-4 w-4" />Histórico</p>
+                    {isLoading && <Skeleton className="h-16 w-full" />}
+                    {!isLoading && versions.length === 0 && (
+                      <p className="text-sm text-muted-foreground">Nenhuma versão registrada ainda.</p>
+                    )}
+                    {versions.map((v) => (
+                      <div key={v.id} className="flex flex-wrap items-center gap-2 rounded-md border p-2 text-sm">
+                        <Badge variant="secondary">v{v.version_number}</Badge>
+                        <StatusBadge status={v.status} />
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(v.created_at).toLocaleString('pt-BR')}
+                          {v.change_notes ? ` · ${v.change_notes}` : ''}
+                        </span>
+                        <div className="ml-auto flex gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => { setDraftText(v.prompt_text); setEditingId(v.status === 'draft' ? v.id : null); }}>
+                            <Copy className="mr-1 h-3.5 w-3.5" />Carregar
                           </Button>
+                          {v.status === 'archived' && (
+                            <Button size="sm" variant="outline" disabled={rollback.isPending} onClick={() => rollback.mutate(v)}>
+                              <RotateCcw className="mr-1 h-3.5 w-3.5" />Rollback
+                            </Button>
+                          )}
+                          {v.status === 'draft' && (
+                            <Button size="sm" variant="outline" disabled={activate.isPending} onClick={() => handleActivate(v.id)}>
+                              Ativar
+                            </Button>
+                          )}
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground">Anexe um arquivo <strong>.md</strong>, <strong>.txt</strong> ou <strong>.pdf</strong> — o conteúdo substitui o texto abaixo (revise e clique em Salvar).</p>
-                      {isLoading ? (
-                        <Skeleton className="h-64 w-full" />
-                      ) : (
-                        <Textarea
-                          value={promptText}
-                          onChange={(e) => setPromptText(e.target.value)}
-                          placeholder="Escreva o prompt do sistema aqui..."
-                          className="font-mono text-sm min-h-[300px] resize-y"
-                          rows={12}
-                        />
-                      )}
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ---------- Prompt efetivo ---------- */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Prompt efetivo (o que a IA realmente recebe)</CardTitle>
+                  <CardDescription>Prompt-base + módulos + regras do sistema + contexto dinâmico + contrato de saída.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-72 rounded-md border bg-muted/30 p-3">
+                    <pre className="whitespace-pre-wrap text-[11px] leading-relaxed">{effectivePromptText(effectiveSections)}</pre>
+                  </ScrollArea>
+                  <Button size="sm" variant="ghost" className="mt-2"
+                    onClick={() => { navigator.clipboard.writeText(effectivePromptText(effectiveSections)); toast.success('Prompt efetivo copiado'); }}>
+                    <Copy className="mr-2 h-4 w-4" />Copiar
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* ---------- Playground ---------- */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base"><FlaskConical className="h-4 w-4" />Playground</CardTitle>
+                  <CardDescription>
+                    Roda a mesma pipeline de produção (mesmo provider, modelo, regras e contrato de saída).
+                    Nada é gravado no atleta — apenas a execução fica registrada na auditoria.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Versão do prompt</p>
+                      <Select value={testVersionId} onValueChange={setTestVersionId}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Versão ativa (produção)</SelectItem>
+                          {drafts.map((d) => <SelectItem key={d.id} value={d.id}>Rascunho v{d.version_number}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
-
-                    {/* Dynamic Variables */}
-                    <Collapsible open={variablesOpen} onOpenChange={setVariablesOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="gap-2 px-0 text-muted-foreground hover:text-foreground">
-                          <Sparkles className="h-4 w-4" />
-                          Variáveis disponíveis
-                          {variablesOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="pt-2">
-                        <div className="flex flex-wrap gap-2">
-                          {ctx.variables.map((v) => (
-                            <Badge
-                              key={v}
-                              variant="secondary"
-                              className="cursor-pointer hover:bg-primary/10 transition-colors gap-1"
-                              onClick={() => copyVariable(v)}
-                            >
-                              <Copy className="h-3 w-3" />
-                              {v}
-                            </Badge>
-                          ))}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    {/* Save Button — nos demais contextos. No Plano Alimentar o
-                        salvamento é feito por versão no painel da habilidade. */}
-                    {ctx.key !== 'meal_plan_generation' && (
-                      <div className="flex justify-end">
-                        <Button
-                          onClick={() => saveMutation.mutate()}
-                          disabled={saveMutation.isPending}
-                          className="gap-2"
-                        >
-                          {saveMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Save className="h-4 w-4" />
-                          )}
-                          Salvar Prompt
-                        </Button>
+                    {s.key === 'checkin_analysis' && (
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Check-in real</p>
+                        <Select value={testCheckinId} onValueChange={setTestCheckinId}>
+                          <SelectTrigger><SelectValue placeholder="Selecione um check-in" /></SelectTrigger>
+                          <SelectContent>
+                            {checkins.map((c: any) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.clients?.name} — {new Date(c.submitted_at).toLocaleDateString('pt-BR')}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
 
-                {/* Habilidade "Plano alimentar": versões + módulos + prontidão */}
-                {ctx.key === 'meal_plan_generation' && (
-                  <MealPlanSkillPanel promptText={promptText} setPromptText={setPromptText} />
-                )}
+                  {s.key === 'meal_plan_generation' && (
+                    <Textarea value={testInput} onChange={(e) => setTestInput(e.target.value)}
+                      placeholder="Contexto de teste (opcional): dados do atleta, instruções..."
+                      className="min-h-[100px] text-xs" />
+                  )}
 
-                {/* Test Playground */}
-                <Collapsible open={playgroundOpen} onOpenChange={setPlaygroundOpen}>
-                  <Card>
-                    <CollapsibleTrigger asChild>
-                      <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Play className="h-4 w-4 text-primary" />
-                            <CardTitle className="text-lg">Playground de Teste</CardTitle>
-                          </div>
-                          {playgroundOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </div>
-                        <CardDescription>Simule uma entrada para testar o prompt.</CardDescription>
-                      </CardHeader>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <CardContent className="space-y-4 pt-0">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Entrada do atleta (simulação)</label>
-                          <Textarea
-                            value={testInput}
-                            onChange={(e) => setTestInput(e.target.value)}
-                            placeholder="Ex: Atleta com 75kg, 1.80m, objetivo de perda de peso..."
-                            rows={4}
-                          />
-                        </div>
+                  <Button size="sm" onClick={handleRunPlayground} disabled={testLoading}>
+                    {testLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                    Executar teste
+                  </Button>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Provedor de IA</label>
-                            <select
-                              value={testProvider}
-                              onChange={(e) => setTestProvider(e.target.value as 'gemini' | 'openai')}
-                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                            >
-                              <option value="gemini">Google Gemini 2.5 Flash</option>
-                              <option value="openai">OpenAI (ChatGPT)</option>
-                            </select>
-                          </div>
-                          {testProvider === 'openai' && (
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">Modelo OpenAI</label>
-                              <select
-                                value={openaiModel}
-                                onChange={(e) => setOpenaiModel(e.target.value)}
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                              >
-                                <option value="gpt-5.6-luna">gpt-5.6-luna (padrão do sistema)</option>
-                                <option value="gpt-5.6-terra">gpt-5.6-terra</option>
-                                <option value="gpt-5-mini">gpt-5-mini</option>
-                                <option value="gpt-4o-mini">gpt-4o-mini (barato)</option>
-                                <option value="gpt-4o">gpt-4o</option>
-                              </select>
-                            </div>
-                          )}
-                        </div>
+                  {testResult && (
+                    <div className="space-y-2 rounded-md border p-3">
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <Badge variant="outline">{testResult.provider}/{testResult.model}</Badge>
+                        <Badge variant="outline">
+                          {testResult.prompt_version_number ? `v${testResult.prompt_version_number}` : 'sem versão'}
+                          {testResult.prompt_version_status ? ` · ${testResult.prompt_version_status}` : ''}
+                        </Badge>
+                        <Badge variant="outline">hash {testResult.effective_prompt_hash}</Badge>
+                        <Badge variant="secondary">não persistido</Badge>
+                      </div>
+                      <ScrollArea className="h-72 rounded bg-muted/30 p-3">
+                        <pre className="whitespace-pre-wrap text-[11px]">
+                          {typeof testResult.output === 'string' ? testResult.output : JSON.stringify(testResult.output, null, 2)}
+                        </pre>
+                      </ScrollArea>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-                        <Button
-                          onClick={handleTest}
-                          disabled={testLoading}
-                          variant="outline"
-                          className="gap-2"
-                        >
-
-                          {testLoading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Sparkles className="h-4 w-4" />
-                          )}
-                          Gerar Teste
-                        </Button>
-
-                        {(testResult || testLoading) && (
-                          <div className="bg-muted/50 rounded-lg p-4">
-                            <label className="text-sm font-medium mb-2 block">Resultado</label>
-                            {testLoading ? (
-                              <div className="space-y-2">
-                                <Skeleton className="h-4 w-full" />
-                                <Skeleton className="h-4 w-3/4" />
-                                <Skeleton className="h-4 w-5/6" />
-                              </div>
-                            ) : (
-                              <div className="whitespace-pre-wrap text-sm font-mono">
-                                {testResult}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              </TabsContent>
-            ))}
-          </div>
+              {/* ---------- Auditoria ---------- */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Auditoria de execuções</CardTitle>
+                  <CardDescription>Toda execução (produção e playground) registra versão, provider, modelo e resultado.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {runs.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma execução registrada ainda.</p>}
+                  {runs.map((r) => (
+                    <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-md border p-2 text-xs">
+                      <Badge variant={r.status === 'succeeded' ? 'secondary' : r.status === 'failed' ? 'destructive' : 'outline'}>
+                        {r.status}
+                      </Badge>
+                      <Badge variant="outline">{r.environment}</Badge>
+                      <span className="text-muted-foreground">
+                        {new Date(r.created_at).toLocaleString('pt-BR')} · {r.provider}/{r.model}
+                        {r.prompt_version_number ? ` · v${r.prompt_version_number}` : ''}
+                        {r.duration_ms ? ` · ${(r.duration_ms / 1000).toFixed(1)}s` : ''}
+                      </span>
+                      {r.error && <span className="text-destructive">{r.error}</span>}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          ))}
         </Tabs>
       </div>
     </Layout>
