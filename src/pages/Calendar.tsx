@@ -474,7 +474,7 @@ export default function CalendarPage() {
                                   onClick={() => {
                                     setSelectedAgendaDay(day);
                                     const dayEvents = getEventsForDate(day);
-                                    const hasLinks = dayEvents.some(e => e.type === 'sendLink');
+                                     const hasLinks = dayEvents.some(e => e.type === 'send_link');
                                     if (hasLinks) setLinkDialogDay(day);
                                   }}
                                   className={cn(
