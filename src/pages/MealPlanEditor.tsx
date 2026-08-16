@@ -32,6 +32,8 @@ import { MealCardsView } from '@/components/mealplan-v3/MealCardsView';
 import { TotalsPanel } from '@/components/mealplan-v3/TotalsPanel';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { mealsToText } from '@/lib/smartPlan/fromMeals';
+import { ImportPreviewDialog } from '@/components/mealplan-v3/ImportPreviewDialog';
+
 import { parseText } from '@/lib/smartPlan/parse';
 import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
@@ -225,6 +227,9 @@ export default function MealPlanEditor() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [importing, setImporting] = useState(false);
+  // Texto reconhecido na importação, aguardando revisão/confirmação do nutri.
+  const [pendingImport, setPendingImport] = useState<string | null>(null);
+
   const [generating, setGenerating] = useState(false);
   const [hasBackup, setHasBackup] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -637,9 +642,9 @@ export default function MealPlanEditor() {
       if (error) throw error;
       const meals = (data as any)?.meals || (data as any)?.meal_plan?.meals;
       if (!Array.isArray(meals) || !meals.length) throw new Error('PDF sem refeições reconhecíveis');
-      const imported = mealsToText(meals);
-      setText((text ? `${text}\n\n` : '') + imported);
-      toast.success(`PDF importado na aba atual: ${meals.length} refeições.`);
+      // Não grava direto: abre a etapa de revisão (Adicionar / Substituir / Cancelar).
+      setPendingImport(mealsToText(meals));
+
     } catch (e: any) {
       toast.error(`Falha ao importar: ${e.message || e}`);
     } finally {
@@ -886,6 +891,25 @@ export default function MealPlanEditor() {
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) importPdf(f); }}
               />
+
+              <ImportPreviewDialog
+                open={!!pendingImport}
+                importedText={pendingImport || ''}
+                targetLabel={DAY_TABS.find(d => d.key === activeDay)?.long || 'Todos os dias'}
+                hasExisting={!!text.trim()}
+                onAppend={() => {
+                  setText((text ? `${text}\n\n` : '') + (pendingImport || ''));
+                  setPendingImport(null);
+                  toast.success('Plano importado e adicionado à aba atual.');
+                }}
+                onReplace={() => {
+                  setText(pendingImport || '');
+                  setPendingImport(null);
+                  toast.success('Plano da aba substituído pelo arquivo importado.');
+                }}
+                onCancel={() => setPendingImport(null)}
+              />
+
 
               {/* Toolbar agrupada: ícones + tooltip. Mobile 32×32; desktop 64×64. */}
               <div className="mb-3 flex flex-wrap items-center gap-2 lg:gap-3">
