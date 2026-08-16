@@ -5,6 +5,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiJson, loadFoodTable, matchFood, foodMacros } from "../_shared/planPipeline.ts";
 import { loadMealPlanSkill, logGeneration } from "../_shared/skillPrompt.ts";
+import { loadSkillVersion, startAiRun, finishAiRun } from "../_shared/aiSkills.ts"; // ETAPA 6C
 import { loadWorkingPlan, saveWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
@@ -362,25 +363,62 @@ Regras: cada refeição aparece UMA vez, com id único. Use alimentos que o atle
     const genStub = { planModelVersion: 2, status: "generating", updatedAt: new Date().toISOString() };
     await saveWorkingPlan(supabase, { clientId, raw: { ...(existing || {}), ...genStub }, source: "ai_generated" });
 
-    // Observabilidade
+    // Observabilidade — ETAPA 6C: toda geração de plano por IA gera um ai_run.
     const t0 = Date.now();
     let usedFallback = false;
     let result: any = null;
     let provider = "-", model = "-";
+
+    const versionInfo = await loadSkillVersion(
+      supabase, client.user_id, "meal_plan_generation", skill.promptText,
+    );
+    const runSkill = {
+      ...versionInfo,
+      effectivePrompt: systemPrompt,
+      effectiveHash: skill.effectiveHash,
+    };
+    const run = await startAiRun(supabase, {
+      ownerUserId: client.user_id,
+      clientId,
+      skill: runSkill,
+      environment: "production",
+      // Sem conteúdo clínico completo: apenas referências e tamanhos.
+      inputSnapshot: {
+        modules: skill.includedModuleKeys,
+        prompt_chars: systemPrompt.length,
+        user_prompt_chars: userPrompt.length,
+        weight_kg: weightKg ?? null,
+      },
+      metadata: { fn: "generate-base-plan" },
+    });
+
+    let runError: string | null = null;
     try {
       const r = await callAiJson({ systemPrompt, userPrompt, perAttemptMs: 60_000 });
       result = r.data; provider = r.provider; model = r.model;
     } catch (e) {
-      console.warn("generate-base-plan: IA falhou, usando fallback determinístico:", (e as Error).message);
+      runError = (e as Error).message;
+      console.warn("generate-base-plan: IA falhou, usando fallback determinístico:", runError);
     }
     if (!Array.isArray(result?.meals) || !result.meals.length) {
       // Fallback determinístico: estrutura-base segura, marcada para revisão.
       usedFallback = true;
       result = fallbackBasePlan();
     }
+    // Falha do provider nunca é registrada como sucesso.
+    await finishAiRun(supabase, run, {
+      status: runError ? "failed" : "succeeded",
+      error: runError,
+      provider: provider !== "-" ? provider : undefined,
+      model: model !== "-" ? model : undefined,
+      // Referência segura da saída: sem plano completo.
+      output: runError ? undefined : { meals: result?.meals?.length ?? 0, used_fallback: usedFallback },
+      metadata: { fn: "generate-base-plan", used_fallback: usedFallback },
+    });
+
     console.log("generate-base-plan obs:", JSON.stringify({
       clientId, provider, model, usedFallback, durationMs: Date.now() - t0,
-      inputChars: userPrompt.length, mealsOut: result?.meals?.length ?? 0,
+      aiRunId: run.id, inputChars: userPrompt.length, mealsOut: result?.meals?.length ?? 0,
     }));
 
     // Garante ids únicos

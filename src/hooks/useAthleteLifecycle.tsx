@@ -72,13 +72,7 @@ export function useAthleteLifecycle() {
         .eq('id', clientId);
       if (error) throw error;
 
-      await logOperationalEvent({
-        clientId,
-        entityType: 'client',
-        entityId: clientId,
-        eventType: ACTION_EVENT[action],
-        metadata: { action, reason: reason ?? null },
-      });
+      // ETAPA 6C: eventos de ciclo de vida vêm do trigger canônico em clients.
 
       return action;
     },
