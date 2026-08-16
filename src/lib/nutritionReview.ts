@@ -58,8 +58,14 @@ export interface NutritionReview {
   last_notified_at: string | null;
   notification_count: number;
   metadata: Record<string, unknown>;
+  /** Check-in do ciclo que carrega a revisão estrutural (nunca um check-in extra). */
+  checkin_dispatch_id: string | null;
+  /** Resposta do atleta a esse check-in — principal insumo da revisão. */
+  checkin_response_id: string | null;
+  is_structural: boolean;
   created_at: string;
   updated_at: string;
+
 }
 
 export const REVIEW_STATUS_LABEL: Record<ReviewStatus, string> = {
@@ -166,3 +172,100 @@ export function nextOpenReview(reviews: NutritionReview[]): NutritionReview | nu
   const open = reviews.filter(isOpenReview).sort((a, b) => (a.scheduled_for < b.scheduled_for ? -1 : 1));
   return open[0] ?? null;
 }
+
+/* -------------------------------------------------------------------------
+ * REVISÃO ESTRUTURAL DO PLANO (ciclo fixo de 28 dias)
+ *
+ * Duas periodicidades DIFERENTES convivem no sistema:
+ *  1. frequência do check-in  → weekly (7d) | biweekly (14d) | monthly (28d)
+ *  2. revisão estrutural do plano → SEMPRE ciclo de 28 dias
+ *
+ * A revisão estrutural NÃO cria check-in extra: o check-in que já cairia
+ * naquela semana é marcado como "check-in de revisão".
+ *
+ * Quem recebe revisão estrutural de 28 dias: atletas SEM consulta recorrente
+ * (consultation_mode = 'none' ou 'initial_only'). Consulta única/inicial NÃO
+ * desativa as revisões futuras. Com consulta recorrente, a própria consulta é
+ * o marco da revisão — não existe revisão paralela de 28 dias.
+ * ---------------------------------------------------------------------- */
+
+export const STRUCTURAL_REVIEW_CYCLE_DAYS = 28;
+
+export type ConsultationMode = 'none' | 'initial_only' | 'recurring';
+export type StructuralReviewMode = 'every_28_days' | 'recurring_consultation';
+export type CheckinFrequency = 'weekly' | 'biweekly' | 'monthly';
+
+export const CHECKIN_FREQUENCY_DAYS: Record<CheckinFrequency, number> = {
+  weekly: 7,
+  biweekly: 14,
+  monthly: 28,
+};
+
+export const CONSULTATION_MODE_LABEL: Record<ConsultationMode, string> = {
+  none: 'Sem consultas',
+  initial_only: 'Apenas consulta inicial/única',
+  recurring: 'Consultas recorrentes',
+};
+
+export const STRUCTURAL_REVIEW_MODE_LABEL: Record<StructuralReviewMode, string> = {
+  every_28_days: 'Revisão estrutural a cada 28 dias',
+  recurring_consultation: 'Revisão estrutural acontece na consulta',
+};
+
+/** Derivação canônica quando o plano ainda não tem configuração estruturada. */
+export function deriveConsultationMode(input: {
+  has_consultations?: boolean | null;
+  consultation_count?: number | null;
+  consultation_frequency?: string | null;
+}): ConsultationMode {
+  if (!input.has_consultations) return 'none';
+  if ((input.consultation_count ?? 0) > 1) return 'recurring';
+  const f = (input.consultation_frequency || '').trim().toLowerCase();
+  if (f && !['single', 'unica', 'única', 'none'].includes(f)) return 'recurring';
+  return 'initial_only';
+}
+
+/** Modo efetivo: configuração do atleta > configuração do produto > derivação. */
+export function resolveStructuralReviewMode(client: {
+  structural_review_mode?: string | null;
+  consultation_mode?: string | null;
+  has_consultations?: boolean | null;
+  consultation_count?: number | null;
+  consultation_frequency?: string | null;
+}, product?: { structural_review_mode?: string | null } | null): StructuralReviewMode {
+  if (client.structural_review_mode === 'every_28_days' || client.structural_review_mode === 'recurring_consultation') {
+    return client.structural_review_mode;
+  }
+  if (product?.structural_review_mode === 'every_28_days' || product?.structural_review_mode === 'recurring_consultation') {
+    return product.structural_review_mode;
+  }
+  const mode = (client.consultation_mode as ConsultationMode | undefined) ?? deriveConsultationMode(client);
+  return mode === 'recurring' ? 'recurring_consultation' : 'every_28_days';
+}
+
+/** O atleta entra no ciclo obrigatório de 28 dias? */
+export function usesStructuralReviewCycle(
+  client: Parameters<typeof resolveStructuralReviewMode>[0],
+  product?: { structural_review_mode?: string | null } | null,
+): boolean {
+  return resolveStructuralReviewMode(client, product) === 'every_28_days';
+}
+
+export const STRUCTURAL_REVIEW_BADGE = 'REVISÃO DO PLANO';
+
+/** Estado do check-in vinculado à revisão (a data é a fonte, nunca a resposta). */
+export type ReviewCheckinState = 'answered' | 'awaiting_answer' | 'no_checkin';
+
+export function reviewCheckinState(
+  r: Pick<NutritionReview, 'checkin_dispatch_id' | 'checkin_response_id'>,
+): ReviewCheckinState {
+  if (r.checkin_response_id) return 'answered';
+  if (r.checkin_dispatch_id) return 'awaiting_answer';
+  return 'no_checkin';
+}
+
+export const REVIEW_CHECKIN_STATE_LABEL: Record<ReviewCheckinState, string> = {
+  answered: 'Check-in respondido',
+  awaiting_answer: 'Aguardando check-in',
+  no_checkin: 'Sem check-in vinculado',
+};

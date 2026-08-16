@@ -33,6 +33,8 @@ interface DispatchRow {
   error_message: string | null;
   responded_at: string | null;
   response_hours: number | null;
+  /** ETAPA 5A — este check-in também é a revisão estrutural do plano (28 dias). */
+  is_structural_review: boolean;
 }
 
 export function CheckinDispatchOverview() {
@@ -163,6 +165,16 @@ export function CheckinDispatchOverview() {
 
       const respList = responses || [];
 
+      // Check-ins que carregam a revisão estrutural do plano (ciclo de 28 dias).
+      const { data: structural } = await (supabase as any)
+        .from('nutrition_reviews')
+        .select('checkin_dispatch_id')
+        .eq('user_id', user.id)
+        .not('checkin_dispatch_id', 'is', null);
+      const structuralIds = new Set(
+        (structural || []).map((r: any) => r.checkin_dispatch_id as string),
+      );
+
       return dispatches.map((d: any) => {
         const sentAt = new Date(d.sent_at);
         const match = respList.find(
@@ -187,6 +199,7 @@ export function CheckinDispatchOverview() {
           error_message: d.error_message,
           responded_at: respondedAt,
           response_hours: hours,
+          is_structural_review: structuralIds.has(d.id),
         };
       });
     },
@@ -422,7 +435,12 @@ export function CheckinDispatchOverview() {
                     const canResend = d.status === 'failed' && !d.responded_at;
                     return (
                       <TableRow key={d.id}>
-                        <TableCell className="font-medium">{d.client_name}</TableCell>
+                        <TableCell className="font-medium">
+                          {d.client_name}
+                          {d.is_structural_review && (
+                            <Badge className="ml-2 text-[10px] align-middle">REVISÃO DO PLANO</Badge>
+                          )}
+                        </TableCell>
                         <TableCell>
                           {d.checkin_frequency
                             ? <Badge variant="outline">{CHECKIN_LABELS[d.checkin_frequency as CheckinFrequency] || d.checkin_frequency}</Badge>

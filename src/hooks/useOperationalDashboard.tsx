@@ -199,33 +199,55 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
     });
   }
 
-  // ---------- 4b. Revisões nutricionais vencidas (ETAPA 5A) ----------
+  // ---------- 4b. Revisão estrutural do plano (ETAPA 5A — ciclo fixo de 28 dias) ----------
+  // Só existe para atletas SEM consulta recorrente. Quando o check-in do ciclo é
+  // o próprio check-in de revisão, o dashboard mostra UMA pendência só:
+  // "Revisão do plano" (a devolutiva do check-in é feita dentro dela).
   const { data: reviews } = await (supabase as any)
     .from('nutrition_reviews')
-    .select('id, client_id, scheduled_for, status, missing_information')
+    .select('id, client_id, scheduled_for, status, missing_information, checkin_dispatch_id, checkin_response_id')
     .eq('user_id', userId)
     .in('status', ['scheduled', 'pending', 'waiting_information', 'in_review'])
     .lte('scheduled_for', todayKey);
+
+  const structuralResponseIds = new Set<string>();
 
   for (const rv of reviews || []) {
     const row = rv as any;
     const c = byId.get(row.client_id);
     if (!c || !c.state.canReceiveMealPlanActions) continue;
+    if (row.checkin_response_id) structuralResponseIds.add(row.checkin_response_id);
+    const checkinNote = row.checkin_response_id
+      ? 'Check-in de revisão respondido'
+      : row.checkin_dispatch_id
+        ? 'Check-in de revisão ainda não respondido'
+        : undefined;
     ops.push({
       id: `nutrition_review:${row.id}`,
       kind: 'nutrition_review',
       clientId: row.client_id,
       clientName: c.name,
       clientPhone: c.phone,
-      title: 'Revisão nutricional do ciclo',
-      subtitle: row.missing_information ? `Falta: ${row.missing_information}` : undefined,
+      title: 'Revisão do plano (ciclo de 4 semanas)',
+      subtitle: row.missing_information ? `Falta: ${row.missing_information}` : checkinNote,
       dueDate: row.scheduled_for,
       createdAt: null,
-      route: '/adjustments',
+      route: row.checkin_response_id ? `/checkin-review/${row.checkin_response_id}` : '/adjustments',
       sourceType: 'nutrition_review',
       sourceId: row.id,
     });
   }
+
+  // Evita duplicidade: "Devolutiva do check-in" + "Revisão do plano" do MESMO check-in.
+  if (structuralResponseIds.size) {
+    for (let i = ops.length - 1; i >= 0; i--) {
+      const op = ops[i];
+      if (op.kind === 'checkin_review' && op.sourceId && structuralResponseIds.has(op.sourceId)) {
+        ops.splice(i, 1);
+      }
+    }
+  }
+
 
 
   // ---------- 5. Renovações (plano vencendo em até 15 dias) ----------

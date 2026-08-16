@@ -3045,6 +3045,7 @@ export type Database = {
           checkin_start_date: string | null
           consultation_count: number | null
           consultation_frequency: string | null
+          consultation_mode: string | null
           created_at: string
           eligible_for_booking: boolean
           email: string | null
@@ -3080,6 +3081,7 @@ export type Database = {
           selected_plan_id: string | null
           service_type: string
           start_date: string
+          structural_review_mode: string | null
           total_frozen_days: number
           updated_at: string
           user_id: string
@@ -3101,6 +3103,7 @@ export type Database = {
           checkin_start_date?: string | null
           consultation_count?: number | null
           consultation_frequency?: string | null
+          consultation_mode?: string | null
           created_at?: string
           eligible_for_booking?: boolean
           email?: string | null
@@ -3136,6 +3139,7 @@ export type Database = {
           selected_plan_id?: string | null
           service_type: string
           start_date: string
+          structural_review_mode?: string | null
           total_frozen_days?: number
           updated_at?: string
           user_id: string
@@ -3157,6 +3161,7 @@ export type Database = {
           checkin_start_date?: string | null
           consultation_count?: number | null
           consultation_frequency?: string | null
+          consultation_mode?: string | null
           created_at?: string
           eligible_for_booking?: boolean
           email?: string | null
@@ -3192,6 +3197,7 @@ export type Database = {
           selected_plan_id?: string | null
           service_type?: string
           start_date?: string
+          structural_review_mode?: string | null
           total_frozen_days?: number
           updated_at?: string
           user_id?: string
@@ -6359,6 +6365,8 @@ export type Database = {
       nutrition_reviews: {
         Row: {
           cancel_reason: string | null
+          checkin_dispatch_id: string | null
+          checkin_response_id: string | null
           client_id: string
           created_at: string
           cycle_key: string
@@ -6366,6 +6374,7 @@ export type Database = {
           decision: string | null
           id: string
           interval_days: number
+          is_structural: boolean
           last_notified_at: string | null
           metadata: Json
           missing_information: string | null
@@ -6385,6 +6394,8 @@ export type Database = {
         }
         Insert: {
           cancel_reason?: string | null
+          checkin_dispatch_id?: string | null
+          checkin_response_id?: string | null
           client_id: string
           created_at?: string
           cycle_key?: string
@@ -6392,6 +6403,7 @@ export type Database = {
           decision?: string | null
           id?: string
           interval_days?: number
+          is_structural?: boolean
           last_notified_at?: string | null
           metadata?: Json
           missing_information?: string | null
@@ -6411,6 +6423,8 @@ export type Database = {
         }
         Update: {
           cancel_reason?: string | null
+          checkin_dispatch_id?: string | null
+          checkin_response_id?: string | null
           client_id?: string
           created_at?: string
           cycle_key?: string
@@ -6418,6 +6432,7 @@ export type Database = {
           decision?: string | null
           id?: string
           interval_days?: number
+          is_structural?: boolean
           last_notified_at?: string | null
           metadata?: Json
           missing_information?: string | null
@@ -6436,6 +6451,27 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "nutrition_reviews_checkin_dispatch_id_fkey"
+            columns: ["checkin_dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_dispatches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nutrition_reviews_checkin_dispatch_id_fkey"
+            columns: ["checkin_dispatch_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_send_audit"
+            referencedColumns: ["dispatch_id"]
+          },
+          {
+            foreignKeyName: "nutrition_reviews_checkin_response_id_fkey"
+            columns: ["checkin_response_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_responses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "nutrition_reviews_client_id_fkey"
             columns: ["client_id"]
@@ -7100,6 +7136,7 @@ export type Database = {
           checkin_frequency: string | null
           consultation_count: number
           consultation_frequency: string | null
+          consultation_mode: string | null
           created_at: string
           description: string | null
           has_checkin: boolean
@@ -7112,6 +7149,7 @@ export type Database = {
           plan_duration: string
           plan_type: string
           service_type: string
+          structural_review_mode: string | null
           suggested_value: number | null
           updated_at: string
           user_id: string
@@ -7122,6 +7160,7 @@ export type Database = {
           checkin_frequency?: string | null
           consultation_count?: number
           consultation_frequency?: string | null
+          consultation_mode?: string | null
           created_at?: string
           description?: string | null
           has_checkin?: boolean
@@ -7134,6 +7173,7 @@ export type Database = {
           plan_duration?: string
           plan_type?: string
           service_type?: string
+          structural_review_mode?: string | null
           suggested_value?: number | null
           updated_at?: string
           user_id: string
@@ -7144,6 +7184,7 @@ export type Database = {
           checkin_frequency?: string | null
           consultation_count?: number
           consultation_frequency?: string | null
+          consultation_mode?: string | null
           created_at?: string
           description?: string | null
           has_checkin?: boolean
@@ -7156,6 +7197,7 @@ export type Database = {
           plan_duration?: string
           plan_type?: string
           service_type?: string
+          structural_review_mode?: string | null
           suggested_value?: number | null
           updated_at?: string
           user_id?: string
@@ -9311,6 +9353,14 @@ export type Database = {
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
+      }
+      derive_consultation_mode: {
+        Args: {
+          p_count: number
+          p_frequency: string
+          p_has_consultations: boolean
+        }
+        Returns: string
       }
       email_queue_dispatch: { Args: never; Returns: undefined }
       enqueue_email: {
