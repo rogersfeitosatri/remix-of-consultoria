@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { differenceInCalendarDays, addDays, format } from 'date-fns';
+import { logOperationalEvent } from '@/lib/operationalEvents';
 
 export function useFreezePlan() {
   const queryClient = useQueryClient();
@@ -17,9 +18,14 @@ export function useFreezePlan() {
         } as any)
         .eq('id', clientId);
       if (error) throw error;
+      await logOperationalEvent({
+        clientId, entityType: 'client', entityId: clientId,
+        eventType: 'client_frozen', metadata: { freezeDate, reason: reason || null },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-panorama'] });
       toast.success('Plano congelado com sucesso');
     },
     onError: (err: any) => {
@@ -74,12 +80,18 @@ export function useFreezePlan() {
         }
       }
 
+      await logOperationalEvent({
+        clientId, entityType: 'client', entityId: clientId,
+        eventType: 'client_unfrozen', metadata: { frozenDays, newEndDate },
+      });
+
       return { frozenDays, newEndDate };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
       queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['athlete-panorama'] });
       toast.success(`Plano reativado! ${data.frozenDays} dias adicionados. Nova data de término: ${format(new Date(data.newEndDate + 'T12:00:00'), 'dd/MM/yyyy')}`);
     },
     onError: (err: any) => {
