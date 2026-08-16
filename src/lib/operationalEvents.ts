@@ -45,7 +45,11 @@ export type OperationalEventType =
   | 'athlete_checkin_form_override_removed'
   | 'anamnese_form_version_published'
   | 'anamnese_form_archived'
-  | 'question_template_created';
+  | 'question_template_created'
+  // ETAPA 4B — calendário operacional
+  | 'booking_link_sent_manual'
+  | 'appointment_completed'
+  | 'appointment_rescheduled';
 
 
 export interface LogEventInput {

@@ -19,6 +19,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { appointmentForSchedule } from '@/lib/calendarProjection';
+import { getAthleteState } from '@/lib/athleteState';
 
 interface WeeklyPipelineViewProps {
   consultations: (ConsultationSchedule & { client_name: string })[];
@@ -93,7 +95,7 @@ const STATUS_CONFIG: Record<PipelineStatus, { label: string; icon: any; classNam
     bgClass: 'bg-destructive/5 border-destructive/20',
   },
   first_consult: {
-    label: '1ª Consulta',
+    label: '1ª consulta (prevista)',
     icon: User,
     className: 'bg-primary/10 text-primary border-primary/30',
     bgClass: 'bg-primary/5 border-primary/20',
@@ -286,14 +288,19 @@ export function WeeklyPipelineView({
         const client = clientsById.get(schedule.client_id);
         const sendDate = parseISO(schedule.send_link_date);
 
-        // Check if there's a matching appointment in the same week or next 2 weeks (any non-cancelled status)
-        const matchingAppointment = (appointments || []).find(
-          (apt: any) =>
-            apt.client_id === schedule.client_id &&
-            apt.status !== 'cancelled' &&
-            apt.status !== 'no_show' &&
-            parseISO(apt.appointment_date) >= currentWeekStart
-        );
+        // ETAPA 4B: vínculo canônico schedule <-> appointment (id), com fallback por atleta/semana
+        const linked = appointmentForSchedule(schedule as any, (appointments || []) as any);
+        const matchingAppointment =
+          linked && !['cancelled', 'no_show'].includes(linked.status)
+            ? linked
+            : (appointments || []).find(
+                (apt: any) =>
+                  !apt.consultation_schedule_id &&
+                  apt.client_id === schedule.client_id &&
+                  apt.status !== 'cancelled' &&
+                  apt.status !== 'no_show' &&
+                  parseISO(apt.appointment_date) >= currentWeekStart
+              );
 
         // Calculate consultation number
         const clientConsultations = consultations
@@ -341,7 +348,9 @@ export function WeeklyPipelineView({
     // 2. Add first consultations for this week (clients without schedule entries)
     clients
       .filter(c => {
-        if (!c.first_consultation_date || !c.is_active) return false;
+        if (!c.first_consultation_date) return false;
+        // Somente atletas operacionais (não congelados/encerrados/arquivados)
+        if (!getAthleteState(c as any).isOperational) return false;
         if (processedClientIds.has(c.id)) return false;
         const firstDate = parseISO(c.first_consultation_date);
         return isWithinInterval(firstDate, { start: currentWeekStart, end: currentWeekEnd });
@@ -791,11 +800,12 @@ export function WeeklyPipelineView({
                         </Button>
                       )}
 
-                      {/* Mark as sent button */}
+                      {/* Registrar envio feito fora do sistema (external_manual) */}
                       {item.status === 'link_pending' && item.scheduleId && (
                         <Button
                           size="sm"
                           variant="ghost"
+                          title="Registrar envio manual (feito fora do sistema)"
                           className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
                           onClick={() => onMarkAsSent(item.scheduleId!)}
                         >

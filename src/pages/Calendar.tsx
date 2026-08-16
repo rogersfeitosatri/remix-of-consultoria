@@ -48,6 +48,13 @@ import { WeeklyPipelineView } from '@/components/scheduling/WeeklyPipelineView';
 import { PeriodicityControlView } from '@/components/scheduling/PeriodicityControlView';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import {
+  calendarEventsForDate,
+  googleSyncState,
+  isPendingSendLink,
+  weekStats,
+} from '@/lib/calendarProjection';
+import { logOperationalEvent } from '@/lib/operationalEvents';
 
 export default function CalendarPage() {
   const queryClient = useQueryClient();
@@ -96,14 +103,10 @@ export default function CalendarPage() {
     return { current: index + 1, total: client.consultation_count };
   };
 
-  const isFirstConsultationRow = (s: ConsultationSchedule) => {
-    const first = clientsById.get(s.client_id)?.first_consultation_date;
-    return !!first && s.scheduled_date === first && s.send_link_date === first;
-  };
+  /** ETAPA 4B: envio pendente = schedule pendente SEM consulta vinculada (vínculo canônico). */
+  const isSendLinkEventRow = (s: ConsultationSchedule) =>
+    isPendingSendLink(s as any, (appointments || []) as any);
 
-  const isSendLinkEventRow = (s: ConsultationSchedule) => {
-    return !isFirstConsultationRow(s) && s.status === 'pending';
-  };
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -136,58 +139,34 @@ export default function CalendarPage() {
     return map;
   }, [linkLogs]);
 
-  // Compute weekly stats for each week (sent vs scheduled-to-send)
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+  const sentByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    logsByDay.forEach((v, k) => map.set(k, v.success));
+    return map;
+  }, [logsByDay]);
+
+  // Resumo semanal (Etapa 4B): consultas reais, atenção e envios
   const getWeekStats = (week: Date[]) => {
-    let sent = 0;
-    let pending = 0;
-    let appts = 0;
-    week.forEach(day => {
-      const key = format(day, 'yyyy-MM-dd');
-      const log = logsByDay.get(key);
-      if (log) sent += log.success;
-      consultations.forEach(c => {
-        if (isSendLinkEventRow(c) && c.send_link_date === key) pending += 1;
-      });
-      (appointments || []).forEach(a => {
-        if ((a.status === 'scheduled' || a.status === 'confirmed') && a.appointment_date === key) appts += 1;
-      });
-    });
-    return { sent, pending, appts };
+    const stats = weekStats(
+      week.map(d => format(d, 'yyyy-MM-dd')),
+      (appointments || []) as any,
+      consultations as any,
+      sentByDay,
+      todayKey,
+    );
+    return { sent: stats.sentLinks, pending: stats.pendingLinks, appts: stats.appointments, attention: stats.attention };
   };
 
-  const getEventsForDate = (date: Date) => {
-    const events: { type: 'first' | 'sendLink' | 'appointment'; schedule?: ConsultationSchedule & { client_name: string }; client?: Client; appointment?: typeof appointments[0] }[] = [];
-
-    activeClients
-      .filter(c => {
-        if (!c.first_consultation_date) return false;
-        if (!isSameDay(parseISO(c.first_consultation_date), date)) return false;
-        const hasAppointment = (appointments || []).some(
-          apt => apt.client_id === c.id && apt.appointment_date === format(date, 'yyyy-MM-dd')
-        );
-        return !hasAppointment;
-      })
-      .forEach(client => {
-        events.push({ type: 'first', client });
-      });
-
-    (appointments || [])
-      .filter(apt =>
-        (apt.status === 'scheduled' || apt.status === 'confirmed') &&
-        apt.appointment_date === format(date, 'yyyy-MM-dd')
-      )
-      .forEach(apt => {
-        events.push({ type: 'appointment', appointment: apt });
-      });
-
-    consultations
-      .filter(c => isSendLinkEventRow(c) && isSameDay(parseISO(c.send_link_date), date))
-      .forEach(schedule => {
-        events.push({ type: 'sendLink', schedule });
-      });
-
-    return events;
-  };
+  /** Somente eventos REAIS: consultas existentes + envios de link pendentes. */
+  const getEventsForDate = (date: Date) =>
+    calendarEventsForDate(
+      (appointments || []) as any,
+      consultations as any,
+      format(date, 'yyyy-MM-dd'),
+      todayKey,
+    );
 
   const handleSendBookingLink = async (id: string) => {
     try {
@@ -208,12 +187,33 @@ export default function CalendarPage() {
     }
   };
 
+  /** ETAPA 4B: envio feito fora do sistema é registrado como external_manual (auditável). */
   const handleMarkAsSent = async (id: string) => {
     try {
-      await updateSchedule.mutateAsync({ id, status: 'sent' });
-      toast.success('Marcado como enviado');
+      const schedule = consultations.find(c => c.id === id);
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('consultation_schedules')
+        .update({
+          status: 'sent',
+          link_sent_at: new Date().toISOString(),
+          link_sent_source: 'external_manual',
+          link_sent_channel: 'manual',
+          link_sent_by: auth?.user?.id ?? null,
+        } as any)
+        .eq('id', id);
+      if (error) throw error;
+      await logOperationalEvent({
+        clientId: schedule?.client_id ?? null,
+        entityType: 'consultation_schedule',
+        entityId: id,
+        eventType: 'booking_link_sent_manual',
+        metadata: { source: 'external_manual' },
+      });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      toast.success('Envio manual registrado');
     } catch (error) {
-      toast.error('Erro ao atualizar status');
+      toast.error('Erro ao registrar envio manual');
     }
   };
 
@@ -404,7 +404,7 @@ export default function CalendarPage() {
                     Visão Mensal
                   </CardTitle>
                   <CardDescription className="text-xs sm:text-sm">
-                    Consultas agendadas, tarefas de envio e primeiras consultas
+                    Somente eventos reais: consultas existentes e envios de link pendentes
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-2 sm:p-4 lg:p-6">
@@ -438,11 +438,11 @@ export default function CalendarPage() {
                   <div className="flex flex-wrap gap-3 mb-4 text-xs">
                     <div className="flex items-center gap-1.5">
                       <span className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500" />
-                      <span className="text-muted-foreground">Consulta Agendada</span>
+                      <span className="text-muted-foreground">Consulta agendada</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="w-3 h-3 rounded bg-primary/20 border border-primary" />
-                      <span className="text-muted-foreground">1ª Consulta</span>
+                      <span className="w-3 h-3 rounded bg-amber-600/20 border border-amber-600" />
+                      <span className="text-muted-foreground">Aguardando confirmação</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500" />
@@ -496,7 +496,7 @@ export default function CalendarPage() {
                                   onClick={() => {
                                     setSelectedAgendaDay(day);
                                     const dayEvents = getEventsForDate(day);
-                                    const hasLinks = dayEvents.some(e => e.type === 'sendLink');
+                                     const hasLinks = dayEvents.some(e => e.type === 'send_link');
                                     if (hasLinks) setLinkDialogDay(day);
                                   }}
                                   className={cn(
@@ -544,13 +544,13 @@ export default function CalendarPage() {
                                   </div>
                                   {/* Mobile: show event dots only */}
                                   <div className="sm:hidden flex flex-wrap gap-0.5 items-center">
-                                    {events.slice(0, 4).map((event, i) => {
-                                      const dotClass =
-                                        event.type === 'appointment' ? 'bg-emerald-500' :
-                                        event.type === 'first' ? 'bg-primary' :
-                                        'bg-amber-500';
-                                      return <span key={i} className={cn('w-1.5 h-1.5 rounded-full', dotClass)} />;
-                                    })}
+                                     {events.slice(0, 4).map((event, i) => {
+                                       const dotClass =
+                                         event.type === 'appointment'
+                                           ? (event.needsAttention ? 'bg-amber-600' : 'bg-emerald-500')
+                                           : 'bg-amber-500';
+                                       return <span key={i} className={cn('w-1.5 h-1.5 rounded-full', dotClass)} />;
+                                     })}
                                     {events.length > 4 && (
                                       <span className="text-[8px] text-muted-foreground leading-none">+{events.length - 4}</span>
                                     )}
@@ -559,14 +559,26 @@ export default function CalendarPage() {
                                   <div className="hidden sm:block space-y-1 overflow-y-auto max-h-[85px]">
                               {events.map((event) => {
                                 if (event.type === 'appointment' && event.appointment) {
-                                  const apt = event.appointment;
+                                  const apt = event.appointment as any;
                                   const clientName = typeof apt.client?.name === 'string' ? apt.client.name : 'Cliente';
+                                  const sync = googleSyncState(apt);
+                                  const done = apt.status === 'completed';
                                   return (
                                     <Popover key={`apt-${apt.id}`}>
                                       <PopoverTrigger asChild>
-                                        <div className="text-[10px] sm:text-xs p-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-foreground truncate cursor-pointer hover:bg-emerald-500/30 transition-colors">
+                                        <div className={cn(
+                                          'text-[10px] sm:text-xs p-1 rounded border text-foreground truncate cursor-pointer transition-colors',
+                                          event.needsAttention
+                                            ? 'bg-amber-600/20 border-amber-600/40 hover:bg-amber-600/30'
+                                            : done
+                                              ? 'bg-muted border-border hover:bg-muted/70'
+                                              : 'bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/30',
+                                        )}
+                                          title={event.needsAttention ? 'Consulta passada aguardando confirmação' : undefined}
+                                        >
                                           <CalendarCheck2 className="h-2.5 w-2.5 inline mr-0.5" />
                                           {apt.appointment_time?.substring(0, 5)} {clientName}
+                                          {!done && sync !== 'synced' && <span className="ml-0.5 text-muted-foreground">•</span>}
                                         </div>
                                       </PopoverTrigger>
                                       <PopoverContent className="w-72 p-3" align="start">
@@ -618,33 +630,21 @@ export default function CalendarPage() {
                                   );
                                 }
 
-                                if (event.type === 'first' && event.client) {
+                                if (event.type === 'send_link' && event.schedule) {
+                                  const schedule = event.schedule as ConsultationSchedule & { client_name: string };
+                                  const consultNum = getConsultationNumber(schedule);
                                   return (
                                     <div
-                                      key={`first-${event.client.id}`}
-                                      className="text-[10px] sm:text-xs p-1 rounded bg-primary/20 border border-primary/30 text-foreground truncate"
-                                      title={`1ª Consulta: ${event.client.name}`}
-                                    >
-                                      <span className="hidden sm:inline">1ª </span>
-                                      {event.client.name}
-                                    </div>
-                                  );
-                                }
-
-                                if (event.type === 'sendLink' && event.schedule) {
-                                  const consultNum = getConsultationNumber(event.schedule);
-                                  return (
-                                    <div
-                                      key={`link-${event.schedule.id}`}
+                                      key={`link-${schedule.id}`}
                                       className="text-[10px] sm:text-xs p-1 rounded bg-amber-500/20 border border-amber-500/30 text-foreground truncate"
-                                      title={`Enviar Link: ${event.schedule.client_name}`}
+                                      title={`Enviar Link: ${schedule.client_name}`}
                                     >
                                       <Send className="h-2.5 w-2.5 inline mr-0.5" />
                                       <span className="hidden sm:inline">
-                                        {event.schedule.client_name}
+                                        {schedule.client_name}
                                         {consultNum && ` ${consultNum.current}/${consultNum.total}`}
                                       </span>
-                                      <span className="sm:hidden">{event.schedule.client_name.split(' ')[0]}</span>
+                                      <span className="sm:hidden">{schedule.client_name.split(' ')[0]}</span>
                                     </div>
                                   );
                                 }
@@ -673,6 +673,11 @@ export default function CalendarPage() {
                                 <CalendarCheck2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />{stats.appts}
                               </span>
                             )}
+                            {stats.attention > 0 && (
+                              <span className="flex items-center gap-0.5 text-amber-700 font-semibold" title={`${stats.attention} consulta(s) aguardando confirmação`}>
+                                <AlertCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />{stats.attention}
+                              </span>
+                            )}
                             {stats.sent === 0 && stats.pending === 0 && stats.appts === 0 && (
                               <span className="text-muted-foreground/50">—</span>
                             )}
@@ -690,10 +695,9 @@ export default function CalendarPage() {
                   <DayAgendaPanel
                     date={selectedAgendaDay}
                     appointments={appointments}
-                    scheduledLinks={consultations}
                     onOpenLinkDialog={() => {
                       const dayEvents = getEventsForDate(selectedAgendaDay);
-                      const hasLinks = dayEvents.some(e => e.type === 'sendLink');
+                      const hasLinks = dayEvents.some(e => e.type === 'send_link');
                       if (hasLinks) {
                         setLinkDialogDay(selectedAgendaDay);
                       }

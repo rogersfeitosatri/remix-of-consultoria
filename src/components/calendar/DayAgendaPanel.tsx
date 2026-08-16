@@ -1,3 +1,11 @@
+/**
+ * ETAPA 4B — Agenda do Dia.
+ *
+ * Usa a MESMA camada operacional do dashboard (useOperationalDashboard):
+ * mesmos SLAs em dias úteis, mesma deduplicação, mesmos rótulos.
+ * Operações derivadas (check-in, plano, anamnese, convite) NÃO têm checkbox:
+ * só se resolvem na entidade de origem.
+ */
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,91 +14,134 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   CalendarCheck2,
-  UtensilsCrossed,
-  MessageSquare,
-  Zap,
   CheckCircle2,
   AlertTriangle,
   User,
   Clock,
   ExternalLink,
   Send,
+  RefreshCw,
+  Loader2,
+  CloudOff,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { useTasksByDate, useCompleteTask, Task, TaskStatus, TASK_STATUS_LABELS, TASK_TYPE_LABELS } from '@/hooks/useTasks';
+import { useCompleteTask } from '@/hooks/useTasks';
+import { useOperationalDashboard } from '@/hooks/useOperationalDashboard';
+import { OPERATION_LABEL, overdueBusinessDays, type Operation } from '@/lib/dashboardOperations';
+import {
+  dayAgendaSections,
+  googleSyncState,
+  isManualOperation,
+  type AppointmentLike,
+} from '@/lib/calendarProjection';
 import { Link } from 'react-router-dom';
-
-interface ScheduledLinkItem {
-  id: string;
-  client_name: string;
-  send_link_date: string;
-  status: string;
-}
 
 interface DayAgendaPanelProps {
   date: Date;
-  appointments?: Array<{
-    id: string;
-    client_id: string;
-    appointment_date: string;
-    appointment_time: string;
-    status: string;
-    client?: { name: string; phone?: string };
-  }>;
-  scheduledLinks?: ScheduledLinkItem[];
+  appointments?: AppointmentLike[];
+  /** Envios de link pendentes já vêm como operação (booking_invite) do dashboard. */
   onOpenLinkDialog?: () => void;
 }
 
-const TYPE_ICONS: Record<string, typeof UtensilsCrossed> = {
-  meal_plan: UtensilsCrossed,
-  checkin_response: MessageSquare,
-  consultation_prep: CalendarCheck2,
-  diet_adjustment: Zap,
-  custom: CheckCircle2,
-};
+function OperationRow({
+  op,
+  overdue,
+  holidays,
+  onComplete,
+  completing,
+}: {
+  op: Operation;
+  overdue: boolean;
+  holidays: Set<string>;
+  onComplete: (id: string) => void;
+  completing: boolean;
+}) {
+  const manual = isManualOperation(op);
+  const lateDays = overdue && op.dueDate ? overdueBusinessDays(op, holidays, new Date()) : 0;
 
-const PRIORITY_COLORS: Record<string, string> = {
-  low: 'bg-muted text-muted-foreground',
-  medium: 'bg-primary/10 text-primary',
-  high: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-  urgent: 'bg-destructive/10 text-destructive',
-};
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-3 rounded-lg border p-2 transition-colors',
+        overdue ? 'border-destructive/20 bg-destructive/5' : 'border-border bg-muted/30 hover:bg-muted/50',
+      )}
+    >
+      {manual ? (
+        <Checkbox
+          checked={false}
+          onCheckedChange={() => op.sourceId && onComplete(op.sourceId)}
+          disabled={completing || !op.sourceId}
+          className="flex-shrink-0"
+          aria-label={`Concluir ${op.title}`}
+        />
+      ) : (
+        <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
+          <span className={cn('h-2 w-2 rounded-full', overdue ? 'bg-destructive' : 'bg-primary/60')} />
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className={cn('truncate text-sm font-medium', overdue && 'text-destructive')}>{op.title}</p>
+        <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+          <User className="h-3 w-3" />
+          {op.clientName}
+          {lateDays > 0 && <span className="text-destructive">• {lateDays}d úteis de atraso</span>}
+        </p>
+      </div>
+      <Badge variant="outline" className="hidden shrink-0 text-[10px] sm:inline-flex">
+        {OPERATION_LABEL[op.kind]}
+      </Badge>
+      <Button size="sm" variant="ghost" className="h-7 shrink-0 text-xs" asChild>
+        <Link to={op.route}>{manual ? <ExternalLink className="h-3 w-3" /> : 'Resolver'}</Link>
+      </Button>
+    </div>
+  );
+}
 
-export function DayAgendaPanel({ date, appointments = [], scheduledLinks = [], onOpenLinkDialog }: DayAgendaPanelProps) {
+export function DayAgendaPanel({ date, appointments = [], onOpenLinkDialog }: DayAgendaPanelProps) {
   const dateStr = format(date, 'yyyy-MM-dd');
-  const { data: tasks = [] } = useTasksByDate(dateStr);
+  const { operations, isLoading, error, refetch, holidays } = useOperationalDashboard();
   const completeTask = useCompleteTask();
 
-  const dayAppointments = useMemo(() => {
-    return appointments
-      .filter(a => a.appointment_date === dateStr && (a.status === 'scheduled' || a.status === 'confirmed'))
-      .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
-  }, [appointments, dateStr]);
+  const sections = useMemo(
+    () => dayAgendaSections(operations, appointments, dateStr, new Date()),
+    [operations, appointments, dateStr],
+  );
 
-  const dayLinks = useMemo(() => {
-    return scheduledLinks.filter(l => l.send_link_date === dateStr && l.status === 'pending');
-  }, [scheduledLinks, dateStr]);
+  const pendingInvites = useMemo(
+    () => sections.today.filter((o) => o.kind === 'booking_invite').length + sections.overdue.filter((o) => o.kind === 'booking_invite').length,
+    [sections],
+  );
 
-  const sortedTasks = useMemo(() => {
-    const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
-    return [...tasks].sort((a, b) => {
-      const aOverdue = a.status === 'overdue' ? 0 : 1;
-      const bOverdue = b.status === 'overdue' ? 0 : 1;
-      if (aOverdue !== bOverdue) return aOverdue - bOverdue;
-      return (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2);
-    });
-  }, [tasks]);
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando agenda…
+        </CardContent>
+      </Card>
+    );
+  }
 
-  const overdueCount = tasks.filter(t => t.status === 'overdue').length;
-  const totalItems = dayAppointments.length + tasks.length + dayLinks.length;
+  if (error) {
+    return (
+      <Card className="border-destructive/30">
+        <CardContent className="flex items-center justify-between gap-3 py-4">
+          <p className="text-sm text-destructive">Não foi possível carregar a agenda do dia.</p>
+          <Button size="sm" variant="outline" onClick={() => refetch()} className="gap-1">
+            <RefreshCw className="h-3 w-3" /> Tentar novamente
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
-  if (totalItems === 0) {
+  if (sections.total === 0) {
     return (
       <Card className="border-dashed">
         <CardContent className="py-6 text-center">
-          <CheckCircle2 className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+          <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
           <p className="text-sm text-muted-foreground">
             Nenhuma atividade para {format(date, "dd 'de' MMMM", { locale: ptBR })}
           </p>
@@ -102,42 +153,67 @@ export function DayAgendaPanel({ date, appointments = [], scheduledLinks = [], o
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base">
             📋 Agenda do Dia — {format(date, "dd 'de' MMMM", { locale: ptBR })}
           </CardTitle>
           <div className="flex items-center gap-1.5">
-            {overdueCount > 0 && (
-              <Badge variant="destructive" className="text-xs gap-1">
+            {sections.overdue.length > 0 && (
+              <Badge variant="destructive" className="gap-1 text-xs">
                 <AlertTriangle className="h-3 w-3" />
-                {overdueCount} atrasada{overdueCount > 1 ? 's' : ''}
+                {sections.overdue.length} atrasada{sections.overdue.length > 1 ? 's' : ''}
               </Badge>
             )}
             <Badge variant="secondary" className="text-xs">
-              {totalItems} item{totalItems > 1 ? 's' : ''}
+              {sections.total} item{sections.total > 1 ? 's' : ''}
             </Badge>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="max-h-[400px]">
-          <div className="space-y-2">
-            {/* Appointments */}
-            {dayAppointments.length > 0 && (
+        <ScrollArea className="max-h-[420px]">
+          <div className="space-y-3">
+            {sections.appointments.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Consultas</p>
-                {dayAppointments.map(apt => {
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Consultas</p>
+                {sections.appointments.map((apt) => {
                   const clientName = apt.client?.name || 'Cliente';
+                  const needsAttention = sections.attention.some((a) => a.id === apt.id);
+                  const sync = googleSyncState(apt);
                   return (
-                    <div key={apt.id} className="flex items-center gap-3 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
-                      <CalendarCheck2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{clientName}</p>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <div
+                      key={apt.id}
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg border p-2',
+                        needsAttention
+                          ? 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20'
+                          : 'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/20',
+                      )}
+                    >
+                      <CalendarCheck2
+                        className={cn(
+                          'h-4 w-4 flex-shrink-0',
+                          needsAttention ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400',
+                        )}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{clientName}</p>
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Clock className="h-3 w-3" />
                           {apt.appointment_time?.substring(0, 5)}
+                          {needsAttention && <span className="text-amber-600">• confirmar realização</span>}
+                          {apt.status === 'completed' && <span>• realizada</span>}
                         </p>
                       </div>
+                      {sync !== 'synced' && apt.status !== 'completed' && (
+                        <span
+                          className="flex items-center gap-1 text-[10px] text-muted-foreground"
+                          title={sync === 'pending' ? 'Sem evento no Google Agenda' : 'Sem link do Meet'}
+                        >
+                          <CloudOff className="h-3 w-3" />
+                          {sync === 'pending' ? 'sem Google' : 'sem Meet'}
+                        </span>
+                      )}
                       <Button size="sm" variant="ghost" className="h-7 text-xs" asChild>
                         <Link to={`/appointments/${apt.id}`}>
                           <ExternalLink className="h-3 w-3" />
@@ -149,83 +225,46 @@ export function DayAgendaPanel({ date, appointments = [], scheduledLinks = [], o
               </div>
             )}
 
-            {/* Scheduled Links */}
-            {dayLinks.length > 0 && (
+            {sections.overdue.length > 0 && (
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between mt-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Envio de Links ({dayLinks.length})
-                  </p>
-                  {onOpenLinkDialog && (
-                    <Button size="sm" variant="ghost" className="h-6 text-xs text-primary" onClick={onOpenLinkDialog}>
-                      Gerenciar
-                    </Button>
-                  )}
-                </div>
-                {dayLinks.map(link => (
-                  <div
-                    key={link.id}
-                    className="flex items-center gap-3 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-950/30 transition-colors"
-                    onClick={onOpenLinkDialog}
-                  >
-                    <Send className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{link.client_name}</p>
-                      <p className="text-xs text-muted-foreground">Enviar link de agendamento</p>
-                    </div>
-                  </div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-destructive">
+                  Atrasadas ({sections.overdue.length})
+                </p>
+                {sections.overdue.map((op) => (
+                  <OperationRow
+                    key={op.id}
+                    op={op}
+                    overdue
+                    holidays={holidays}
+                    onComplete={(id) => completeTask.mutate(id)}
+                    completing={completeTask.isPending}
+                  />
                 ))}
               </div>
             )}
 
-            {/* Tasks */}
-            {sortedTasks.length > 0 && (
+            {sections.today.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-3">Tarefas</p>
-                {sortedTasks.map(task => {
-                  const TypeIcon = TYPE_ICONS[task.task_type] || CheckCircle2;
-                  const isOverdue = task.status === 'overdue';
-
-                  return (
-                    <div
-                      key={task.id}
-                      className={cn(
-                        "flex items-center gap-3 p-2 rounded-lg border transition-colors",
-                        isOverdue
-                          ? "bg-destructive/5 border-destructive/20"
-                          : "bg-muted/30 border-border hover:bg-muted/50"
-                      )}
-                    >
-                      <Checkbox
-                        checked={task.status === 'done'}
-                        onCheckedChange={() => completeTask.mutate(task.id)}
-                        disabled={completeTask.isPending}
-                        className="flex-shrink-0"
-                      />
-                      <TypeIcon className={cn(
-                        "h-4 w-4 flex-shrink-0",
-                        isOverdue ? "text-destructive" : "text-muted-foreground"
-                      )} />
-                      <div className="flex-1 min-w-0">
-                        <p className={cn("text-sm font-medium truncate", isOverdue && "text-destructive")}>
-                          {task.title}
-                        </p>
-                        {task.client_name && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {task.client_name}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Badge className={cn("text-[10px] px-1.5 py-0", PRIORITY_COLORS[task.priority])}>
-                          {task.priority === 'urgent' ? '🔴' : task.priority === 'high' ? '🟡' : ''}
-                          {TASK_TYPE_LABELS[task.task_type]}
-                        </Badge>
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Do dia ({sections.today.length})
+                  </p>
+                  {pendingInvites > 0 && onOpenLinkDialog && (
+                    <Button size="sm" variant="ghost" className="h-6 text-xs text-primary" onClick={onOpenLinkDialog}>
+                      <Send className="mr-1 h-3 w-3" /> Gerenciar envios
+                    </Button>
+                  )}
+                </div>
+                {sections.today.map((op) => (
+                  <OperationRow
+                    key={op.id}
+                    op={op}
+                    overdue={false}
+                    holidays={holidays}
+                    onComplete={(id) => completeTask.mutate(id)}
+                    completing={completeTask.isPending}
+                  />
+                ))}
               </div>
             )}
           </div>
