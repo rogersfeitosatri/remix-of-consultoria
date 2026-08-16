@@ -4,14 +4,14 @@ import { requireInternal, denied, logSecurityEvent, restrictedCors } from "../_s
 Deno.serve(async (req) => {
   const corsHeaders = restrictedCors(req);
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders }
+    return new Response(null, { headers: corsHeaders });
+  }
 
   // ETAPA 6A — C. INTERNAL/CRON: nenhuma chamada anônima executa este processador.
   const guard = await requireInternal(req);
   if (!guard.ok) {
     await logSecurityEvent({ eventType: 'processor_invocation_denied', fn: 'send-consultation-reminder' });
     return denied(guard, corsHeaders);
-  });
   }
 
   try {
