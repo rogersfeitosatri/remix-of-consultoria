@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
         .from("clients")
         .select("id, phone")
         .eq("is_active", true)
-        .eq("is_frozen", true === false ? true : false)
+        .eq("is_frozen", false)
         .is("archived_at", null)
         .eq("phone", normalizedPhone)
         .maybeSingle();
