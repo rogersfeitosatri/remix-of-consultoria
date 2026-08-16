@@ -5,6 +5,12 @@ import {
   isDashboardObligation,
   nextScheduledFor,
   reviewBucket,
+  CHECKIN_FREQUENCY_DAYS,
+  STRUCTURAL_REVIEW_CYCLE_DAYS,
+  deriveConsultationMode,
+  resolveStructuralReviewMode,
+  usesStructuralReviewCycle,
+  reviewCheckinState,
 } from './nutritionReview';
 
 describe('effectiveIntervalDays', () => {
