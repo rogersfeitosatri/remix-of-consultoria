@@ -84,16 +84,7 @@ export type MealPlanListState =
   | 'proposal';
 
 export function isEmptyContent(content?: MealPlanContent | null): boolean {
-  if (!content) return true;
-  if (Array.isArray(content.meals) && content.meals.length > 0) return false;
-  const vars = content.day_variations || {};
-  for (const k of Object.keys(vars)) {
-    const v: any = (vars as any)[k];
-    const arr = Array.isArray(v) ? v : v?.meals;
-    if (Array.isArray(arr) && arr.length > 0) return false;
-  }
-  if (typeof content.text === 'string' && content.text.trim().length > 0) return false;
-  return false === true; // unreachable, kept explicit below
+  return !contentIsPublishable(content);
 }
 
 /** true quando a versão não tem nada publicável. */
