@@ -4074,6 +4074,36 @@ export type Database = {
         }
         Relationships: []
       }
+      form_question_semantics: {
+        Row: {
+          conditional_logic: Json | null
+          created_at: string
+          id: string
+          notes: string | null
+          question_key: string | null
+          scope: string
+          source_question_id: string
+        }
+        Insert: {
+          conditional_logic?: Json | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          question_key?: string | null
+          scope?: string
+          source_question_id: string
+        }
+        Update: {
+          conditional_logic?: Json | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          question_key?: string | null
+          scope?: string
+          source_question_id?: string
+        }
+        Relationships: []
+      }
       google_calendar_connections: {
         Row: {
           calendar_id: string | null
