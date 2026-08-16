@@ -537,14 +537,26 @@ export default function CalendarPage() {
                                   <div className="hidden sm:block space-y-1 overflow-y-auto max-h-[85px]">
                               {events.map((event) => {
                                 if (event.type === 'appointment' && event.appointment) {
-                                  const apt = event.appointment;
+                                  const apt = event.appointment as any;
                                   const clientName = typeof apt.client?.name === 'string' ? apt.client.name : 'Cliente';
+                                  const sync = googleSyncState(apt);
+                                  const done = apt.status === 'completed';
                                   return (
                                     <Popover key={`apt-${apt.id}`}>
                                       <PopoverTrigger asChild>
-                                        <div className="text-[10px] sm:text-xs p-1 rounded bg-emerald-500/20 border border-emerald-500/30 text-foreground truncate cursor-pointer hover:bg-emerald-500/30 transition-colors">
+                                        <div className={cn(
+                                          'text-[10px] sm:text-xs p-1 rounded border text-foreground truncate cursor-pointer transition-colors',
+                                          event.needsAttention
+                                            ? 'bg-amber-600/20 border-amber-600/40 hover:bg-amber-600/30'
+                                            : done
+                                              ? 'bg-muted border-border hover:bg-muted/70'
+                                              : 'bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/30',
+                                        )}
+                                          title={event.needsAttention ? 'Consulta passada aguardando confirmação' : undefined}
+                                        >
                                           <CalendarCheck2 className="h-2.5 w-2.5 inline mr-0.5" />
                                           {apt.appointment_time?.substring(0, 5)} {clientName}
+                                          {!done && sync !== 'synced' && <span className="ml-0.5 text-muted-foreground">•</span>}
                                         </div>
                                       </PopoverTrigger>
                                       <PopoverContent className="w-72 p-3" align="start">
