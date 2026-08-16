@@ -48,6 +48,12 @@ import { WeeklyPipelineView } from '@/components/scheduling/WeeklyPipelineView';
 import { PeriodicityControlView } from '@/components/scheduling/PeriodicityControlView';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import {
+  calendarEventsForDate,
+  googleSyncState,
+  isPendingSendLink,
+  weekStats,
+} from '@/lib/calendarProjection';
 
 export default function CalendarPage() {
   const queryClient = useQueryClient();
