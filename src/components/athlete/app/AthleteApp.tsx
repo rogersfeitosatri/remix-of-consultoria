@@ -65,8 +65,26 @@ export function AthleteApp({
   const { data: race } = useActiveRace(client?.id);
   const { data: supportWhatsapp } = useNutritionSupportWhatsapp(client?.id);
 
+  // ETAPA 5C — leitura canônica (dispatches, feedbacks publicados, consultas, plano publicado)
+  const { data: areaData } = useAthleteAreaData(client?.id);
+  const { actions, state } = useAthleteActions({
+    client,
+    clientId: client?.id,
+    anamnesePending: anamnesePending && !readOnly,
+    data: areaData,
+  });
+  const blockedReason = state.isOperational ? null : state.blockedReasons.join(' · ');
+
+  const handleAction = (a: AthleteAction) => {
+    if (a.kind === 'anamnese') { onFillAnamnese?.(); return; }
+    if (a.kind === 'plano') { markSeen(client?.id, 'plano'); setScreen('plano'); return; }
+    if (a.href) { window.open(a.href, '_blank', 'noopener'); return; }
+    if (a.screen) setScreen(a.screen as AthleteScreen);
+  };
+
   const firstName = (client?.name || 'Atleta').split(' ')[0];
   const profileEmail = client?.email || email;
+
 
   return (
     <div className="min-h-screen bg-[#0b0c0e] flex justify-center">
