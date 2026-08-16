@@ -257,6 +257,10 @@ export default function MealPlanHub() {
         {/* Links de acesso rápido */}
         {clientId && <MealPlanLinksCard clientId={clientId} />}
 
+        {/* Versões canônicas (Etapa 3A) */}
+        {clientId && <PlanVersionsCard clientId={clientId} />}
+
+
         {/* Histórico de plano alimentar */}
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Plano alimentar</h2>
