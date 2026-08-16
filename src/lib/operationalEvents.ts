@@ -13,7 +13,10 @@ export type OperationalEntityType =
   | 'checkin_response'
   | 'meal_plan'
   | 'task'
-  | 'race';
+  | 'race'
+  | 'checkin_form'
+  | 'anamnese_form'
+  | 'question_template';
 
 export type OperationalEventType =
   | 'client_frozen'
@@ -32,7 +35,18 @@ export type OperationalEventType =
   | 'meal_plan_sent'
   | 'task_created'
   | 'task_completed'
-  | 'race_updated';
+  | 'race_updated'
+  // ETAPA 3C — formulários versionados
+  | 'checkin_form_created'
+  | 'checkin_form_version_created'
+  | 'checkin_form_version_published'
+  | 'checkin_form_archived'
+  | 'athlete_checkin_form_override_set'
+  | 'athlete_checkin_form_override_removed'
+  | 'anamnese_form_version_published'
+  | 'anamnese_form_archived'
+  | 'question_template_created';
+
 
 export interface LogEventInput {
   clientId?: string | null;
