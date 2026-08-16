@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { getAthleteState } from '@/lib/athleteState';
 
 // Radar de atletas: cruza o CONTRATADO (periodicidade de check-in e consulta)
 // com o REALIZADO (envios, respostas, devolutivas, consultas) e aponta quem
@@ -66,9 +67,10 @@ export function useAthleteRadar() {
       const since = new Date(Date.now() - 180 * DAY).toISOString();
 
       const { data: clientsData } = await supabase.from('clients')
-        .select('id, name, phone, checkin_frequency, has_checkin, consultation_frequency, has_consultations, last_consultation_at')
-        .eq('user_id', uid).eq('is_active', true).eq('is_frozen', false).order('name');
-      const clients = clientsData ?? [];
+        .select('id, name, phone, checkin_frequency, has_checkin, consultation_frequency, has_consultations, last_consultation_at, is_active, is_frozen, archived_at, ended_at, end_date, service_type, athlete_status')
+        .eq('user_id', uid).order('name');
+      // ETAPA 2B — estado operacional canônico (nada de if espalhado).
+      const clients = (clientsData ?? []).filter((c: any) => getAthleteState(c).canAppearInOperationalQueues);
       if (!clients.length) return [];
       // checkin_responses/checkin_feedbacks NÃO têm user_id — o escopo vem dos
       // ids dos atletas do nutri (que já vieram filtrados por user_id).
@@ -130,16 +132,8 @@ export function useAthleteRadar() {
         const pend = pendingByClient.get(c.id);
         const issues: RadarIssue[] = [];
 
-        // 1) Você ainda não devolveu um check-in respondido.
-        if (pend) {
-          const d = daysSince(pend.oldest.submitted_at) ?? 0;
-          issues.push({
-            kind: 'nutri_pendente', days: d,
-            label: pend.count > 1
-              ? `${pend.count} check-ins aguardando sua devolutiva (mais antigo há ${d}d)`
-              : `Check-in aguardando sua devolutiva há ${d}d`,
-          });
-        }
+        // 1) Devolutiva pendente NÃO entra aqui: já é uma operação da fila
+        // principal do dashboard (evita item duplicado em duas telas).
 
         // 2) Você enviou e o atleta não respondeu (com 3 dias de folga).
         const dSent = daysSince(sentAt);
