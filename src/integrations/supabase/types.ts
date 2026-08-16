@@ -82,6 +82,7 @@ export type Database = {
       }
       ai_analyses: {
         Row: {
+          ai_run_id: string | null
           alerts: string[] | null
           athlete_profile_id: string | null
           caloric_deficit: Json
@@ -92,10 +93,14 @@ export type Database = {
           id: string
           macronutrients: Json
           model_used: string | null
+          prompt_version_id: string | null
+          prompt_version_number: number | null
+          provider: string | null
           raw_response: string | null
           updated_at: string
         }
         Insert: {
+          ai_run_id?: string | null
           alerts?: string[] | null
           athlete_profile_id?: string | null
           caloric_deficit: Json
@@ -106,10 +111,14 @@ export type Database = {
           id?: string
           macronutrients: Json
           model_used?: string | null
+          prompt_version_id?: string | null
+          prompt_version_number?: number | null
+          provider?: string | null
           raw_response?: string | null
           updated_at?: string
         }
         Update: {
+          ai_run_id?: string | null
           alerts?: string[] | null
           athlete_profile_id?: string | null
           caloric_deficit?: Json
@@ -120,6 +129,9 @@ export type Database = {
           id?: string
           macronutrients?: Json
           model_used?: string | null
+          prompt_version_id?: string | null
+          prompt_version_number?: number | null
+          provider?: string | null
           raw_response?: string | null
           updated_at?: string
         }
@@ -432,38 +444,68 @@ export type Database = {
       }
       ai_prompt_versions: {
         Row: {
+          activated_at: string | null
+          activated_by: string | null
           author_id: string | null
           author_name: string | null
+          change_notes: string | null
+          config: Json
           context_key: string
           created_at: string
           id: string
           is_active: boolean
+          max_tokens: number | null
+          model: string | null
           note: string | null
           prompt_text: string
+          provider: string | null
+          response_format: string | null
+          status: string
+          temperature: number | null
           user_id: string
           version_number: number
         }
         Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
           author_id?: string | null
           author_name?: string | null
+          change_notes?: string | null
+          config?: Json
           context_key: string
           created_at?: string
           id?: string
           is_active?: boolean
+          max_tokens?: number | null
+          model?: string | null
           note?: string | null
           prompt_text?: string
+          provider?: string | null
+          response_format?: string | null
+          status?: string
+          temperature?: number | null
           user_id: string
           version_number: number
         }
         Update: {
+          activated_at?: string | null
+          activated_by?: string | null
           author_id?: string | null
           author_name?: string | null
+          change_notes?: string | null
+          config?: Json
           context_key?: string
           created_at?: string
           id?: string
           is_active?: boolean
+          max_tokens?: number | null
+          model?: string | null
           note?: string | null
           prompt_text?: string
+          provider?: string | null
+          response_format?: string | null
+          status?: string
+          temperature?: number | null
           user_id?: string
           version_number?: number
         }
@@ -475,6 +517,7 @@ export type Database = {
           context_key: string
           created_at: string
           id: string
+          is_legacy: boolean
           prompt_text: string
           updated_at: string
           updated_by: string | null
@@ -485,6 +528,7 @@ export type Database = {
           context_key: string
           created_at?: string
           id?: string
+          is_legacy?: boolean
           prompt_text?: string
           updated_at?: string
           updated_by?: string | null
@@ -495,12 +539,93 @@ export type Database = {
           context_key?: string
           created_at?: string
           id?: string
+          is_legacy?: boolean
           prompt_text?: string
           updated_at?: string
           updated_by?: string | null
           user_id?: string
         }
         Relationships: []
+      }
+      ai_runs: {
+        Row: {
+          client_id: string | null
+          cost_estimate: number | null
+          created_at: string
+          duration_ms: number | null
+          effective_prompt_chars: number | null
+          effective_prompt_hash: string | null
+          environment: string
+          error: string | null
+          id: string
+          input_snapshot: Json
+          metadata: Json
+          model: string | null
+          output_snapshot: Json | null
+          prompt_version_id: string | null
+          prompt_version_number: number | null
+          provider: string | null
+          skill_key: string
+          status: string
+          tokens_input: number | null
+          tokens_output: number | null
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          cost_estimate?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          effective_prompt_chars?: number | null
+          effective_prompt_hash?: string | null
+          environment?: string
+          error?: string | null
+          id?: string
+          input_snapshot?: Json
+          metadata?: Json
+          model?: string | null
+          output_snapshot?: Json | null
+          prompt_version_id?: string | null
+          prompt_version_number?: number | null
+          provider?: string | null
+          skill_key: string
+          status?: string
+          tokens_input?: number | null
+          tokens_output?: number | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string | null
+          cost_estimate?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          effective_prompt_chars?: number | null
+          effective_prompt_hash?: string | null
+          environment?: string
+          error?: string | null
+          id?: string
+          input_snapshot?: Json
+          metadata?: Json
+          model?: string | null
+          output_snapshot?: Json | null
+          prompt_version_id?: string | null
+          prompt_version_number?: number | null
+          provider?: string | null
+          skill_key?: string
+          status?: string
+          tokens_input?: number | null
+          tokens_output?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_runs_prompt_version_id_fkey"
+            columns: ["prompt_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_prompt_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_skill_modules: {
         Row: {
@@ -2176,40 +2301,64 @@ export type Database = {
       }
       checkin_ai_analyses: {
         Row: {
+          ai_run_id: string | null
           alerts: string[] | null
           checkin_response_id: string
           client_id: string
           created_at: string
+          environment: string
           evolution_trend: string
           id: string
+          is_current: boolean
+          model: string | null
           model_used: string | null
+          prompt_version_id: string | null
+          prompt_version_number: number | null
+          provider: string | null
           raw_response: string | null
+          structured_output: Json | null
           suggested_feedback: string
           updated_at: string
           weekly_summary: string
         }
         Insert: {
+          ai_run_id?: string | null
           alerts?: string[] | null
           checkin_response_id: string
           client_id: string
           created_at?: string
+          environment?: string
           evolution_trend: string
           id?: string
+          is_current?: boolean
+          model?: string | null
           model_used?: string | null
+          prompt_version_id?: string | null
+          prompt_version_number?: number | null
+          provider?: string | null
           raw_response?: string | null
+          structured_output?: Json | null
           suggested_feedback: string
           updated_at?: string
           weekly_summary: string
         }
         Update: {
+          ai_run_id?: string | null
           alerts?: string[] | null
           checkin_response_id?: string
           client_id?: string
           created_at?: string
+          environment?: string
           evolution_trend?: string
           id?: string
+          is_current?: boolean
+          model?: string | null
           model_used?: string | null
+          prompt_version_id?: string | null
+          prompt_version_number?: number | null
+          provider?: string | null
           raw_response?: string | null
+          structured_output?: Json | null
           suggested_feedback?: string
           updated_at?: string
           weekly_summary?: string
@@ -9248,6 +9397,37 @@ export type Database = {
       }
     }
     Functions: {
+      activate_ai_prompt_version: {
+        Args: { p_version_id: string }
+        Returns: {
+          activated_at: string | null
+          activated_by: string | null
+          author_id: string | null
+          author_name: string | null
+          change_notes: string | null
+          config: Json
+          context_key: string
+          created_at: string
+          id: string
+          is_active: boolean
+          max_tokens: number | null
+          model: string | null
+          note: string | null
+          prompt_text: string
+          provider: string | null
+          response_format: string | null
+          status: string
+          temperature: number | null
+          user_id: string
+          version_number: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ai_prompt_versions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       add_business_days: {
         Args: { p_days: number; p_from: string; p_user_id?: string }
         Returns: string
