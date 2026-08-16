@@ -890,6 +890,25 @@ export default function MealPlanEditor() {
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) importPdf(f); }}
               />
 
+              <ImportPreviewDialog
+                open={!!pendingImport}
+                importedText={pendingImport || ''}
+                targetLabel={DAY_TABS.find(d => d.key === activeDay)?.long || 'Todos os dias'}
+                hasExisting={!!text.trim()}
+                onAppend={() => {
+                  setText((text ? `${text}\n\n` : '') + (pendingImport || ''));
+                  setPendingImport(null);
+                  toast.success('Plano importado e adicionado à aba atual.');
+                }}
+                onReplace={() => {
+                  setText(pendingImport || '');
+                  setPendingImport(null);
+                  toast.success('Plano da aba substituído pelo arquivo importado.');
+                }}
+                onCancel={() => setPendingImport(null)}
+              />
+
+
               {/* Toolbar agrupada: ícones + tooltip. Mobile 32×32; desktop 64×64. */}
               <div className="mb-3 flex flex-wrap items-center gap-2 lg:gap-3">
                 <div className="flex flex-wrap items-center gap-1.5 lg:gap-2">
