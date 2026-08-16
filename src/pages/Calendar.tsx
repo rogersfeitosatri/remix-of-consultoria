@@ -382,7 +382,7 @@ export default function CalendarPage() {
                     Visão Mensal
                   </CardTitle>
                   <CardDescription className="text-xs sm:text-sm">
-                    Consultas agendadas, tarefas de envio e primeiras consultas
+                    Somente eventos reais: consultas existentes e envios de link pendentes
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-2 sm:p-4 lg:p-6">
