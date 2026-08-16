@@ -4,6 +4,7 @@
 // com o check-in (update-meal-plan). NÃO inventa alimentos: estrutura o que veio.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiStructured } from "../_shared/aiClient.ts";
+import { saveWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -88,6 +89,9 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     };
 
+    // ETAPA 6B — o plano importado vira uma versão de trabalho canônica
+    // (meal_plan_versions), não mais raw_response. Colunas de análise (não-plano)
+    // do ai_analyses seguem preenchidas para compatibilidade de telas legadas.
     const record = {
       client_id: clientId,
       athlete_profile_id: profile?.id ?? null,
@@ -96,7 +100,6 @@ Deno.serve(async (req) => {
       caloric_deficit: { meal_plan: full.meal_plan },
       macronutrients: { strategic_orientations: full.strategic_orientations },
       alerts: full.alerts,
-      raw_response: JSON.stringify(full),
       model_used: `${provider}/${model}`,
     };
 
@@ -114,6 +117,12 @@ Deno.serve(async (req) => {
       if (error) throw new Error(`Falha ao salvar: ${error.message}`);
       saved = data;
     }
+
+    await saveWorkingPlan(supabase, {
+      clientId,
+      raw: full,
+      source: pdfBase64 ? "pdf_import" : isMarkdown ? "markdown_import" : "pdf_import",
+    });
 
     return new Response(JSON.stringify({ success: true, analysis: saved }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
