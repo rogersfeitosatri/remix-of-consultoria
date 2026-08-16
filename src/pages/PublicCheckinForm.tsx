@@ -415,7 +415,10 @@ export default function PublicCheckinForm() {
           form_id: formId,
           client_id: clientId,
           responses: responsesWithComments,
-        });
+          // ETAPA 3C — a resposta guarda a versão exata que o atleta viu
+          ...(formVersionId ? { form_version_id: formVersionId } : {}),
+        } as any);
+
 
       if (submitError) throw submitError;
 
