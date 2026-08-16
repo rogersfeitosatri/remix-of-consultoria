@@ -13,6 +13,11 @@ import { PersonStanding, Send, CheckCircle2, Phone, Clock, MessageCircle } from 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import {
+  isQuestionVisibleSemantic,
+  type ConditionalLogic,
+} from '@/lib/conditionalVisibility';
+
 
 interface Question {
   id: string;
