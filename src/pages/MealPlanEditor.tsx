@@ -225,6 +225,9 @@ export default function MealPlanEditor() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [importing, setImporting] = useState(false);
+  // Texto reconhecido na importação, aguardando revisão/confirmação do nutri.
+  const [pendingImport, setPendingImport] = useState<string | null>(null);
+
   const [generating, setGenerating] = useState(false);
   const [hasBackup, setHasBackup] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
