@@ -58,8 +58,14 @@ export interface NutritionReview {
   last_notified_at: string | null;
   notification_count: number;
   metadata: Record<string, unknown>;
+  /** Check-in do ciclo que carrega a revisão estrutural (nunca um check-in extra). */
+  checkin_dispatch_id: string | null;
+  /** Resposta do atleta a esse check-in — principal insumo da revisão. */
+  checkin_response_id: string | null;
+  is_structural: boolean;
   created_at: string;
   updated_at: string;
+
 }
 
 export const REVIEW_STATUS_LABEL: Record<ReviewStatus, string> = {
