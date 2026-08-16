@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { consultationCadenceWeeks } from '@/lib/periodicity';
 
 export type PeriodicityStatus =
   | 'on_track'   // 🟢 |desvio| <= 3
