@@ -651,6 +651,11 @@ export default function CalendarPage() {
                                 <CalendarCheck2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />{stats.appts}
                               </span>
                             )}
+                            {stats.attention > 0 && (
+                              <span className="flex items-center gap-0.5 text-amber-700 font-semibold" title={`${stats.attention} consulta(s) aguardando confirmação`}>
+                                <AlertCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3" />{stats.attention}
+                              </span>
+                            )}
                             {stats.sent === 0 && stats.pending === 0 && stats.appts === 0 && (
                               <span className="text-muted-foreground/50">—</span>
                             )}
