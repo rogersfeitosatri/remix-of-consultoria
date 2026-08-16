@@ -186,12 +186,33 @@ export default function CalendarPage() {
     }
   };
 
+  /** ETAPA 4B: envio feito fora do sistema é registrado como external_manual (auditável). */
   const handleMarkAsSent = async (id: string) => {
     try {
-      await updateSchedule.mutateAsync({ id, status: 'sent' });
-      toast.success('Marcado como enviado');
+      const schedule = consultations.find(c => c.id === id);
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('consultation_schedules')
+        .update({
+          status: 'sent',
+          link_sent_at: new Date().toISOString(),
+          link_sent_source: 'external_manual',
+          link_sent_channel: 'manual',
+          link_sent_by: auth?.user?.id ?? null,
+        } as any)
+        .eq('id', id);
+      if (error) throw error;
+      await logOperationalEvent({
+        clientId: schedule?.client_id ?? null,
+        entityType: 'consultation_schedule',
+        entityId: id,
+        eventType: 'booking_link_sent_manual',
+        metadata: { source: 'external_manual' },
+      });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      toast.success('Envio manual registrado');
     } catch (error) {
-      toast.error('Erro ao atualizar status');
+      toast.error('Erro ao registrar envio manual');
     }
   };
 
