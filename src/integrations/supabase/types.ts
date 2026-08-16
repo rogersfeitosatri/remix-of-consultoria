@@ -547,13 +547,164 @@ export type Database = {
         }
         Relationships: []
       }
-      anamnese_forms: {
+      anamnese_form_version_questions: {
+        Row: {
+          canonical_type: string
+          comment_field_label: string | null
+          comment_field_required: boolean
+          conditional_logic: Json | null
+          config: Json | null
+          domain: string | null
+          has_comment_field: boolean
+          id: string
+          is_adjustment_trigger: boolean
+          is_required: boolean
+          metadata: Json
+          metric_key: string | null
+          options: Json | null
+          order_index: number
+          question_key: string | null
+          question_text: string
+          question_type: string
+          scale_max: number | null
+          scale_min: number | null
+          section: string | null
+          source_question_id: string | null
+          subsection: string | null
+          unit: string | null
+          version_id: string
+        }
+        Insert: {
+          canonical_type: string
+          comment_field_label?: string | null
+          comment_field_required?: boolean
+          conditional_logic?: Json | null
+          config?: Json | null
+          domain?: string | null
+          has_comment_field?: boolean
+          id?: string
+          is_adjustment_trigger?: boolean
+          is_required?: boolean
+          metadata?: Json
+          metric_key?: string | null
+          options?: Json | null
+          order_index?: number
+          question_key?: string | null
+          question_text: string
+          question_type: string
+          scale_max?: number | null
+          scale_min?: number | null
+          section?: string | null
+          source_question_id?: string | null
+          subsection?: string | null
+          unit?: string | null
+          version_id: string
+        }
+        Update: {
+          canonical_type?: string
+          comment_field_label?: string | null
+          comment_field_required?: boolean
+          conditional_logic?: Json | null
+          config?: Json | null
+          domain?: string | null
+          has_comment_field?: boolean
+          id?: string
+          is_adjustment_trigger?: boolean
+          is_required?: boolean
+          metadata?: Json
+          metric_key?: string | null
+          options?: Json | null
+          order_index?: number
+          question_key?: string | null
+          question_text?: string
+          question_type?: string
+          scale_max?: number | null
+          scale_min?: number | null
+          section?: string | null
+          source_question_id?: string | null
+          subsection?: string | null
+          unit?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anamnese_form_version_questions_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "anamnese_form_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anamnese_form_versions: {
         Row: {
           created_at: string
+          created_by: string | null
+          description: string | null
+          form_id: string
+          id: string
+          metadata: Json
+          presentation_mode: string
+          published_at: string | null
+          published_by: string | null
+          status: string
+          superseded_at: string | null
+          title: string | null
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          form_id: string
+          id?: string
+          metadata?: Json
+          presentation_mode?: string
+          published_at?: string | null
+          published_by?: string | null
+          status?: string
+          superseded_at?: string | null
+          title?: string | null
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          form_id?: string
+          id?: string
+          metadata?: Json
+          presentation_mode?: string
+          published_at?: string | null
+          published_by?: string | null
+          status?: string
+          superseded_at?: string | null
+          title?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anamnese_form_versions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "anamnese_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anamnese_forms: {
+        Row: {
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          current_version_id: string | null
           description: string | null
           id: string
           is_active: boolean
           is_required: boolean
+          metadata: Json
+          model_kind: string | null
+          presentation_mode: string
           single_question_wizard: boolean
           title: string
           updated_at: string
@@ -561,11 +712,17 @@ export type Database = {
           version: number
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
+          current_version_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
           is_required?: boolean
+          metadata?: Json
+          model_kind?: string | null
+          presentation_mode?: string
           single_question_wizard?: boolean
           title: string
           updated_at?: string
@@ -573,11 +730,17 @@ export type Database = {
           version?: number
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
+          current_version_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
           is_required?: boolean
+          metadata?: Json
+          model_kind?: string | null
+          presentation_mode?: string
           single_question_wizard?: boolean
           title?: string
           updated_at?: string
@@ -588,15 +751,20 @@ export type Database = {
       }
       anamnese_questions: {
         Row: {
+          canonical_type: string | null
           comment_field_label: string | null
           comment_field_required: boolean
           conditional_logic: Json | null
           config: Json | null
           created_at: string
+          domain: string | null
           form_id: string
           has_comment_field: boolean
           id: string
+          is_adjustment_trigger: boolean
           is_required: boolean
+          metadata: Json
+          metric_key: string | null
           options: Json | null
           order_index: number
           question_key: string | null
@@ -605,18 +773,25 @@ export type Database = {
           scale_max: number | null
           scale_min: number | null
           section: string
+          semantic_review_required: boolean
           subsection: string | null
+          unit: string | null
         }
         Insert: {
+          canonical_type?: string | null
           comment_field_label?: string | null
           comment_field_required?: boolean
           conditional_logic?: Json | null
           config?: Json | null
           created_at?: string
+          domain?: string | null
           form_id: string
           has_comment_field?: boolean
           id?: string
+          is_adjustment_trigger?: boolean
           is_required?: boolean
+          metadata?: Json
+          metric_key?: string | null
           options?: Json | null
           order_index?: number
           question_key?: string | null
@@ -625,18 +800,25 @@ export type Database = {
           scale_max?: number | null
           scale_min?: number | null
           section?: string
+          semantic_review_required?: boolean
           subsection?: string | null
+          unit?: string | null
         }
         Update: {
+          canonical_type?: string | null
           comment_field_label?: string | null
           comment_field_required?: boolean
           conditional_logic?: Json | null
           config?: Json | null
           created_at?: string
+          domain?: string | null
           form_id?: string
           has_comment_field?: boolean
           id?: string
+          is_adjustment_trigger?: boolean
           is_required?: boolean
+          metadata?: Json
+          metric_key?: string | null
           options?: Json | null
           order_index?: number
           question_key?: string | null
@@ -645,7 +827,9 @@ export type Database = {
           scale_max?: number | null
           scale_min?: number | null
           section?: string
+          semantic_review_required?: boolean
           subsection?: string | null
+          unit?: string | null
         }
         Relationships: [
           {
@@ -664,9 +848,12 @@ export type Database = {
           client_id: string | null
           form_id: string
           form_version: number | null
+          form_version_id: string | null
           id: string
           internal_alerts: Json | null
           internal_notes: string | null
+          needs_form_version_review: boolean
+          questions_snapshot: Json | null
           respondent_email: string | null
           respondent_name: string | null
           responses: Json
@@ -683,9 +870,12 @@ export type Database = {
           client_id?: string | null
           form_id: string
           form_version?: number | null
+          form_version_id?: string | null
           id?: string
           internal_alerts?: Json | null
           internal_notes?: string | null
+          needs_form_version_review?: boolean
+          questions_snapshot?: Json | null
           respondent_email?: string | null
           respondent_name?: string | null
           responses: Json
@@ -702,9 +892,12 @@ export type Database = {
           client_id?: string | null
           form_id?: string
           form_version?: number | null
+          form_version_id?: string | null
           id?: string
           internal_alerts?: Json | null
           internal_notes?: string | null
+          needs_form_version_review?: boolean
+          questions_snapshot?: Json | null
           respondent_email?: string | null
           respondent_name?: string | null
           responses?: Json
@@ -735,6 +928,13 @@ export type Database = {
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "anamnese_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anamnese_responses_form_version_id_fkey"
+            columns: ["form_version_id"]
+            isOneToOne: false
+            referencedRelation: "anamnese_form_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -935,9 +1135,68 @@ export type Database = {
           },
         ]
       }
+      athlete_checkin_form_overrides: {
+        Row: {
+          checkin_form_id: string
+          client_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          reason: string | null
+          removed_at: string | null
+          removed_by: string | null
+          user_id: string
+        }
+        Insert: {
+          checkin_form_id: string
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          user_id: string
+        }
+        Update: {
+          checkin_form_id?: string
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_checkin_form_overrides_checkin_form_id_fkey"
+            columns: ["checkin_form_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_checkin_form_overrides_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_checkin_form_overrides_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       athlete_checkin_schedules: {
         Row: {
           checkin_form_id: string
+          checkin_form_version_policy: string
           client_id: string
           created_at: string
           due_at: string | null
@@ -955,6 +1214,7 @@ export type Database = {
         }
         Insert: {
           checkin_form_id: string
+          checkin_form_version_policy?: string
           client_id: string
           created_at?: string
           due_at?: string | null
@@ -972,6 +1232,7 @@ export type Database = {
         }
         Update: {
           checkin_form_id?: string
+          checkin_form_version_policy?: string
           client_id?: string
           created_at?: string
           due_at?: string | null
@@ -2031,6 +2292,7 @@ export type Database = {
           dispatch_token: string | null
           due_at: string | null
           error_message: string | null
+          form_version_id: string | null
           id: string
           link_checkin: string | null
           metadata: Json
@@ -2053,6 +2315,7 @@ export type Database = {
           dispatch_token?: string | null
           due_at?: string | null
           error_message?: string | null
+          form_version_id?: string | null
           id?: string
           link_checkin?: string | null
           metadata?: Json
@@ -2075,6 +2338,7 @@ export type Database = {
           dispatch_token?: string | null
           due_at?: string | null
           error_message?: string | null
+          form_version_id?: string | null
           id?: string
           link_checkin?: string | null
           metadata?: Json
@@ -2110,6 +2374,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_client_operational_state"
             referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "checkin_dispatches_form_version_id_fkey"
+            columns: ["form_version_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_form_versions"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "checkin_dispatches_schedule_id_fkey"
@@ -2209,33 +2480,181 @@ export type Database = {
           },
         ]
       }
-      checkin_forms: {
+      checkin_form_version_questions: {
+        Row: {
+          canonical_type: string
+          comment_field_label: string | null
+          comment_field_required: boolean
+          conditional_logic: Json | null
+          config: Json | null
+          domain: string | null
+          has_comment_field: boolean
+          id: string
+          is_adjustment_trigger: boolean
+          is_required: boolean
+          metadata: Json
+          metric_key: string | null
+          options: Json | null
+          order_index: number
+          question_key: string | null
+          question_text: string
+          question_type: string
+          scale_max: number | null
+          scale_min: number | null
+          source_question_id: string | null
+          unit: string | null
+          version_id: string
+        }
+        Insert: {
+          canonical_type: string
+          comment_field_label?: string | null
+          comment_field_required?: boolean
+          conditional_logic?: Json | null
+          config?: Json | null
+          domain?: string | null
+          has_comment_field?: boolean
+          id?: string
+          is_adjustment_trigger?: boolean
+          is_required?: boolean
+          metadata?: Json
+          metric_key?: string | null
+          options?: Json | null
+          order_index?: number
+          question_key?: string | null
+          question_text: string
+          question_type: string
+          scale_max?: number | null
+          scale_min?: number | null
+          source_question_id?: string | null
+          unit?: string | null
+          version_id: string
+        }
+        Update: {
+          canonical_type?: string
+          comment_field_label?: string | null
+          comment_field_required?: boolean
+          conditional_logic?: Json | null
+          config?: Json | null
+          domain?: string | null
+          has_comment_field?: boolean
+          id?: string
+          is_adjustment_trigger?: boolean
+          is_required?: boolean
+          metadata?: Json
+          metric_key?: string | null
+          options?: Json | null
+          order_index?: number
+          question_key?: string | null
+          question_text?: string
+          question_type?: string
+          scale_max?: number | null
+          scale_min?: number | null
+          source_question_id?: string | null
+          unit?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_form_version_questions_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_form_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkin_form_versions: {
         Row: {
           created_at: string
+          created_by: string | null
+          description: string | null
+          form_id: string
+          id: string
+          metadata: Json
+          published_at: string | null
+          published_by: string | null
+          status: string
+          superseded_at: string | null
+          title: string | null
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          form_id: string
+          id?: string
+          metadata?: Json
+          published_at?: string | null
+          published_by?: string | null
+          status?: string
+          superseded_at?: string | null
+          title?: string | null
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          form_id?: string
+          id?: string
+          metadata?: Json
+          published_at?: string | null
+          published_by?: string | null
+          status?: string
+          superseded_at?: string | null
+          title?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_form_versions_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkin_forms: {
+        Row: {
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          current_version_id: string | null
           description: string | null
           id: string
           is_active: boolean | null
           is_periodization: boolean
+          metadata: Json
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
+          current_version_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           is_periodization?: boolean
+          metadata?: Json
           title: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
+          current_version_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           is_periodization?: boolean
+          metadata?: Json
           title?: string
           updated_at?: string
           user_id?: string
@@ -2271,52 +2690,82 @@ export type Database = {
       }
       checkin_questions: {
         Row: {
+          canonical_type: string | null
           comment_field_label: string | null
           comment_field_required: boolean
           comment_field_type: string | null
+          conditional_logic: Json | null
+          config: Json | null
           created_at: string
+          domain: string | null
           form_id: string
           has_comment_field: boolean
           id: string
+          is_adjustment_trigger: boolean
           is_required: boolean | null
+          metadata: Json
+          metric_key: string | null
           options: Json | null
           order_index: number
+          question_key: string | null
           question_text: string
           question_type: string
           scale_max: number | null
           scale_min: number | null
+          semantic_review_required: boolean
+          unit: string | null
         }
         Insert: {
+          canonical_type?: string | null
           comment_field_label?: string | null
           comment_field_required?: boolean
           comment_field_type?: string | null
+          conditional_logic?: Json | null
+          config?: Json | null
           created_at?: string
+          domain?: string | null
           form_id: string
           has_comment_field?: boolean
           id?: string
+          is_adjustment_trigger?: boolean
           is_required?: boolean | null
+          metadata?: Json
+          metric_key?: string | null
           options?: Json | null
           order_index?: number
+          question_key?: string | null
           question_text: string
           question_type: string
           scale_max?: number | null
           scale_min?: number | null
+          semantic_review_required?: boolean
+          unit?: string | null
         }
         Update: {
+          canonical_type?: string | null
           comment_field_label?: string | null
           comment_field_required?: boolean
           comment_field_type?: string | null
+          conditional_logic?: Json | null
+          config?: Json | null
           created_at?: string
+          domain?: string | null
           form_id?: string
           has_comment_field?: boolean
           id?: string
+          is_adjustment_trigger?: boolean
           is_required?: boolean | null
+          metadata?: Json
+          metric_key?: string | null
           options?: Json | null
           order_index?: number
+          question_key?: string | null
           question_text?: string
           question_type?: string
           scale_max?: number | null
           scale_min?: number | null
+          semantic_review_required?: boolean
+          unit?: string | null
         }
         Relationships: [
           {
@@ -2382,7 +2831,10 @@ export type Database = {
           closed_reason: string | null
           dispatch_id: string | null
           form_id: string
+          form_version_id: string | null
           id: string
+          needs_form_version_review: boolean
+          questions_snapshot: Json | null
           responses: Json
           review_status: string
           reviewed_at: string | null
@@ -2395,7 +2847,10 @@ export type Database = {
           closed_reason?: string | null
           dispatch_id?: string | null
           form_id: string
+          form_version_id?: string | null
           id?: string
+          needs_form_version_review?: boolean
+          questions_snapshot?: Json | null
           responses: Json
           review_status?: string
           reviewed_at?: string | null
@@ -2408,7 +2863,10 @@ export type Database = {
           closed_reason?: string | null
           dispatch_id?: string | null
           form_id?: string
+          form_version_id?: string | null
           id?: string
+          needs_form_version_review?: boolean
+          questions_snapshot?: Json | null
           responses?: Json
           review_status?: string
           reviewed_at?: string | null
@@ -2435,6 +2893,13 @@ export type Database = {
             columns: ["form_id"]
             isOneToOne: false
             referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_responses_form_version_id_fkey"
+            columns: ["form_version_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_form_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -3581,6 +4046,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      form_migration_report: {
+        Row: {
+          captured_at: string
+          details: Json
+          id: string
+          metric: string
+          scope: string
+          value: number | null
+        }
+        Insert: {
+          captured_at?: string
+          details?: Json
+          id?: string
+          metric: string
+          scope: string
+          value?: number | null
+        }
+        Update: {
+          captured_at?: string
+          details?: Json
+          id?: string
+          metric?: string
+          scope?: string
+          value?: number | null
+        }
+        Relationships: []
       }
       google_calendar_connections: {
         Row: {
@@ -6441,6 +6933,8 @@ export type Database = {
       }
       plan_templates: {
         Row: {
+          anamnese_form_id: string | null
+          checkin_form_id: string | null
           checkin_frequency: string | null
           consultation_count: number
           consultation_frequency: string | null
@@ -6460,6 +6954,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          anamnese_form_id?: string | null
+          checkin_form_id?: string | null
           checkin_frequency?: string | null
           consultation_count?: number
           consultation_frequency?: string | null
@@ -6479,6 +6975,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          anamnese_form_id?: string | null
+          checkin_form_id?: string | null
           checkin_frequency?: string | null
           consultation_count?: number
           consultation_frequency?: string | null
@@ -6497,7 +6995,22 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "plan_templates_anamnese_form_id_fkey"
+            columns: ["anamnese_form_id"]
+            isOneToOne: false
+            referencedRelation: "anamnese_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_templates_checkin_form_id_fkey"
+            columns: ["checkin_form_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_forms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -6555,53 +7068,80 @@ export type Database = {
       }
       question_templates: {
         Row: {
+          canonical_type: string | null
           category: string
           comment_field_label: string | null
           comment_field_required: boolean | null
+          conditional_logic: Json | null
           created_at: string
+          domain: string | null
           has_comment_field: boolean
           id: string
+          is_adjustment_trigger: boolean
           is_required: boolean
+          metadata: Json
+          metric_key: string | null
           options: Json | null
+          question_key: string | null
           question_text: string
           question_type: string
           scale_max: number | null
           scale_min: number | null
           section: string
+          semantic_review_required: boolean
+          unit: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          canonical_type?: string | null
           category?: string
           comment_field_label?: string | null
           comment_field_required?: boolean | null
+          conditional_logic?: Json | null
           created_at?: string
+          domain?: string | null
           has_comment_field?: boolean
           id?: string
+          is_adjustment_trigger?: boolean
           is_required?: boolean
+          metadata?: Json
+          metric_key?: string | null
           options?: Json | null
+          question_key?: string | null
           question_text: string
           question_type: string
           scale_max?: number | null
           scale_min?: number | null
           section?: string
+          semantic_review_required?: boolean
+          unit?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          canonical_type?: string | null
           category?: string
           comment_field_label?: string | null
           comment_field_required?: boolean | null
+          conditional_logic?: Json | null
           created_at?: string
+          domain?: string | null
           has_comment_field?: boolean
           id?: string
+          is_adjustment_trigger?: boolean
           is_required?: boolean
+          metadata?: Json
+          metric_key?: string | null
           options?: Json | null
+          question_key?: string | null
           question_text?: string
           question_type?: string
           scale_max?: number | null
           scale_min?: number | null
           section?: string
+          semantic_review_required?: boolean
+          unit?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -8505,6 +9045,14 @@ export type Database = {
         Args: { p_days: number; p_from: string; p_user_id?: string }
         Returns: string
       }
+      archive_anamnese_form: {
+        Args: { p_archive?: boolean; p_form_id: string }
+        Returns: undefined
+      }
+      archive_checkin_form: {
+        Args: { p_archive?: boolean; p_form_id: string }
+        Returns: undefined
+      }
       calc_task_level: { Args: { p_xp: number }; Returns: number }
       calculate_next_booking_send_date: {
         Args: { p_cadence_weeks: number; p_last_appointment_at: string }
@@ -8526,6 +9074,7 @@ export type Database = {
           appointment_id: string
         }[]
       }
+      canonical_question_type: { Args: { p_type: string }; Returns: string }
       check_booking_send_duplicate: {
         Args: {
           _client_id: string
@@ -8608,6 +9157,15 @@ export type Database = {
         Returns: {
           available: boolean
           slot_time: string
+        }[]
+      }
+      get_checkin_dispatch_version: {
+        Args: { p_dispatch_token: string }
+        Returns: {
+          client_id: string
+          dispatch_id: string
+          form_id: string
+          form_version_id: string
         }[]
       }
       get_np_checkin_context: {
@@ -8776,6 +9334,14 @@ export type Database = {
           sequence_index: number
         }[]
       }
+      publish_anamnese_form_version: {
+        Args: { p_form_id: string; p_note?: string }
+        Returns: string
+      }
+      publish_checkin_form_version: {
+        Args: { p_form_id: string; p_note?: string }
+        Returns: string
+      }
       publish_meal_plan_version: {
         Args: { p_version_id: string }
         Returns: Json
@@ -8803,6 +9369,15 @@ export type Database = {
         }
         Returns: {
           appointment_id: string
+        }[]
+      }
+      resolve_checkin_form_for_client: {
+        Args: { p_client_id: string }
+        Returns: {
+          error_code: string
+          form_id: string
+          form_version_id: string
+          source: string
         }[]
       }
       resolve_public_checkin_form: {

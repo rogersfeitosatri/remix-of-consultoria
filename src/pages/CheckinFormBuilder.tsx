@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Plus, GripVertical, Trash2, Copy, ExternalLink, Eye, FileText, X, Edit, Trophy } from 'lucide-react';
 import { useCheckinFormWithQuestions, useUpdateCheckinForm, useAddCheckinQuestion, useUpdateCheckinQuestion, useDeleteCheckinQuestion, useCheckinFormResponses, useReorderCheckinQuestions, type QuestionType, type CheckinQuestion } from '@/hooks/useCheckinForms';
+import { FormVersionsPanel } from '@/components/forms/FormVersionsPanel';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -553,6 +554,9 @@ export default function CheckinFormBuilder() {
               <FileText className="h-4 w-4" />
               Perguntas ({questions.length})
             </TabsTrigger>
+            <TabsTrigger value="versions" className="gap-2">
+              Versões
+            </TabsTrigger>
             <TabsTrigger value="responses" className="gap-2">
               <Eye className="h-4 w-4" />
               Respostas ({responses.length})
@@ -953,6 +957,10 @@ export default function CheckinFormBuilder() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          </TabsContent>
+
+          <TabsContent value="versions" className="space-y-4">
+            {formId && <FormVersionsPanel kind="checkin" formId={formId} />}
           </TabsContent>
 
           <TabsContent value="responses" className="space-y-4">

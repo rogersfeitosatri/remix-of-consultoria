@@ -252,12 +252,25 @@ Deno.serve(async (req) => {
       totalAnalyzed++;
       try {
         const client = schedule.clients as any;
-        const form = schedule.checkin_forms as any;
 
-        if (!client?.phone || !form?.is_active) {
+        if (!client?.phone) { skipped++; continue; }
+
+        // ETAPA 3C — resolução canônica: override individual > plano/produto > schedule.
+        // Nunca "primeiro formulário ativo". Sem configuração => erro operacional, não envio.
+        const { data: resolvedRows } = await supabase
+          .rpc('resolve_checkin_form_for_client', { p_client_id: client.id });
+        const resolved = Array.isArray(resolvedRows) ? resolvedRows[0] : resolvedRows;
+
+        if (!resolved?.form_id || !resolved?.form_version_id || resolved?.error_code) {
           skipped++;
+          details.push({ client: client.name, reason: resolved?.error_code || 'checkin_form_not_configured' });
           continue;
         }
+
+        const form = { id: resolved.form_id as string, is_active: true };
+        const resolvedVersionId = resolved.form_version_id as string;
+        const resolvedSource = resolved.source as string;
+
 
         const foreign = isForeignPhone(client.phone);
 
@@ -331,6 +344,7 @@ Deno.serve(async (req) => {
             user_id: client.user_id,
             client_id: client.id,
             checkin_form_id: form.id,
+            form_version_id: resolvedVersionId,
             schedule_id: schedule.id,
             due_at: dueAt,
             response_deadline: dueAt,
@@ -338,8 +352,9 @@ Deno.serve(async (req) => {
             channel: foreign ? 'email' : 'whatsapp',
             source: forceReprocess ? 'manual_reprocess' : source,
             scheduled_for: now.toISOString(),
-            metadata: { frequency_type: schedule.frequency_type, run_id: runId },
+            metadata: { frequency_type: schedule.frequency_type, run_id: runId, form_source: resolvedSource, form_version_id: resolvedVersionId },
             link_checkin: `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`,
+
           })
           .select()
           .single();
@@ -356,8 +371,15 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // ETAPA 3C — o link carrega o token do disparo: o atleta sempre responde
+        // exatamente a versão congelada no momento do envio.
+        const dispatchToken = (dispatch as any).dispatch_token as string | undefined;
+        const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}${dispatchToken ? `&t=${dispatchToken}` : ''}`;
+        if (dispatchToken) {
+          await supabase.from('checkin_dispatches').update({ link_checkin: checkinLink }).eq('id', dispatch.id);
+        }
+
         const codigoAcesso = foreign ? client.email : formatPhoneAsAccessCode(client.phone);
-        const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
         const dueHoursLabel = schedule.due_in_hours ? `${schedule.due_in_hours}h` : 'Sem prazo definido';
 
         let sendError: any = null;

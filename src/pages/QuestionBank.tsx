@@ -45,6 +45,7 @@ import {
   type QuestionTemplate,
 } from '@/hooks/useQuestionBank';
 import { Library, Plus, Trash2, Edit, Copy, Loader2, FileText, ClipboardCheck } from 'lucide-react';
+import { canonicalQuestionType, QUESTION_DOMAINS } from '@/lib/questionTypes';
 import { toast } from 'sonner';
 
 export default function QuestionBank() {
@@ -71,6 +72,11 @@ export default function QuestionBank() {
   const [hasCommentField, setHasCommentField] = useState(false);
   const [commentFieldLabel, setCommentFieldLabel] = useState('');
   const [commentFieldRequired, setCommentFieldRequired] = useState(false);
+  // ETAPA 3C — semântica
+  const [questionKey, setQuestionKey] = useState('');
+  const [metricKey, setMetricKey] = useState('');
+  const [domain, setDomain] = useState('');
+  const [unit, setUnit] = useState('');
 
   const resetForm = () => {
     setQuestionText('');
@@ -83,6 +89,10 @@ export default function QuestionBank() {
     setHasCommentField(false);
     setCommentFieldLabel('');
     setCommentFieldRequired(false);
+    setQuestionKey('');
+    setMetricKey('');
+    setDomain('');
+    setUnit('');
     setEditingTemplate(null);
   };
 
@@ -99,6 +109,10 @@ export default function QuestionBank() {
       setHasCommentField(template.has_comment_field);
       setCommentFieldLabel(template.comment_field_label || '');
       setCommentFieldRequired(template.comment_field_required || false);
+      setQuestionKey(template.question_key || '');
+      setMetricKey(template.metric_key || '');
+      setDomain(template.domain || '');
+      setUnit(template.unit || '');
     } else {
       resetForm();
     }
@@ -126,7 +140,13 @@ export default function QuestionBank() {
         has_comment_field: hasCommentField,
         comment_field_label: hasCommentField ? commentFieldLabel : null,
         comment_field_required: hasCommentField ? commentFieldRequired : null,
-      };
+        question_key: questionKey.trim() || null,
+        metric_key: metricKey.trim() || null,
+        domain: domain || null,
+        unit: unit.trim() || null,
+        canonical_type: canonicalQuestionType(questionType),
+        is_adjustment_trigger: editingTemplate?.is_adjustment_trigger ?? false,
+      } as any;
 
       if (editingTemplate) {
         await updateTemplate.mutateAsync({ id: editingTemplate.id, ...data });
@@ -366,6 +386,57 @@ export default function QuestionBank() {
                   </Select>
                 </div>
               </div>
+
+              {/* ETAPA 3C — semântica: o que a pergunta MEDE (estável mesmo se o texto mudar) */}
+              <div className="rounded-md border p-3 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Semântica — permite comparar respostas ao longo do tempo mesmo que o texto da
+                  pergunta mude.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Chave da pergunta</Label>
+                    <Input
+                      value={questionKey}
+                      onChange={(e) => setQuestionKey(e.target.value)}
+                      placeholder="ex: peso_atual"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Métrica</Label>
+                    <Input
+                      value={metricKey}
+                      onChange={(e) => setMetricKey(e.target.value)}
+                      placeholder="ex: body_weight"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Domínio</Label>
+                    <Select value={domain} onValueChange={setDomain}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {QUESTION_DOMAINS.map((d) => (
+                          <SelectItem key={d.value} value={d.value}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Unidade</Label>
+                    <Input
+                      value={unit}
+                      onChange={(e) => setUnit(e.target.value)}
+                      placeholder="ex: kg, h, 1-10"
+                    />
+                  </div>
+                </div>
+              </div>
+
+
 
               {['multiple_choice', 'checkbox'].includes(questionType) && (
                 <div className="space-y-2">

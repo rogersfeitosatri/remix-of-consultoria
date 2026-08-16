@@ -64,6 +64,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import { FormVersionsPanel } from '@/components/forms/FormVersionsPanel';
 import { SortableQuestionCard } from '@/components/forms/SortableQuestionCard';
 import { SortableSectionHeader } from '@/components/forms/SortableSectionHeader';
 import { SubsectionHeader } from '@/components/forms/SubsectionHeader';
@@ -904,6 +905,8 @@ export default function AnamneseFormBuilder() {
             </Button>
           </div>
         </div>
+
+        {formId && <FormVersionsPanel kind="anamnese" formId={formId} />}
 
         {/* Questions */}
         {sortedQuestions.length === 0 && sections.length === 0 ? (

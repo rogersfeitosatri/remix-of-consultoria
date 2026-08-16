@@ -1,61 +1,93 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Resolves the correct check-in form to send to a specific athlete.
+ * ETAPA 3C — Resolução canônica do formulário de check-in de um atleta.
  *
- * Priority order:
- *  1. The form linked to the athlete's active schedule (athlete_checkin_schedules.checkin_form_id)
- *  2. The admin's first active form (fallback)
+ * Ordem oficial:
+ *   1. override individual do atleta (exceção explícita);
+ *   2. formulário definido pelo plano/produto contratado;
+ *   3. formulário explicitamente vinculado ao schedule ativo.
  *
- * Returns null if no usable form is found OR if the resolved form has zero questions
- * (an empty form would render a blank page for the athlete).
+ * NÃO existe mais fallback "primeiro formulário ativo": quando não há configuração,
+ * devolvemos um erro operacional para o admin resolver.
+ */
+export interface ResolvedCheckinForm {
+  id: string;
+  title: string;
+  versionId: string;
+  source: string;
+}
+
+export type ResolveCheckinFormResult =
+  | { ok: true; form: ResolvedCheckinForm }
+  | { ok: false; errorCode: 'checkin_form_not_configured' | 'checkin_form_version_not_published'; message: string };
+
+const MESSAGES: Record<string, string> = {
+  checkin_form_not_configured:
+    'Formulário de check-in não configurado para este atleta (defina no plano/produto ou crie um override).',
+  checkin_form_version_not_published:
+    'O formulário deste atleta não possui versão publicada. Publique uma versão antes de enviar.',
+};
+
+export async function resolveAthleteCheckinFormResult(
+  clientId: string,
+): Promise<ResolveCheckinFormResult> {
+  const { data, error } = await supabase.rpc("resolve_checkin_form_for_client" as never, {
+    p_client_id: clientId,
+  } as never);
+
+  if (error) {
+    return { ok: false, errorCode: 'checkin_form_not_configured', message: error.message };
+  }
+
+  const rows = data as unknown as any;
+  const row = (Array.isArray(rows) ? rows[0] : rows) as
+    | { form_id: string | null; form_version_id: string | null; source: string | null; error_code: string | null }
+    | null;
+
+  if (!row || row.error_code || !row.form_id || !row.form_version_id) {
+    const code = (row?.error_code as ResolveCheckinFormResult extends { ok: false } ? string : string) ??
+      'checkin_form_not_configured';
+    return {
+      ok: false,
+      errorCode: (code as 'checkin_form_not_configured' | 'checkin_form_version_not_published'),
+      message: MESSAGES[code] ?? MESSAGES.checkin_form_not_configured,
+    };
+  }
+
+  const { data: form } = await supabase
+    .from("checkin_forms")
+    .select("id, title, archived_at")
+    .eq("id", row.form_id)
+    .maybeSingle();
+
+  if (!form || (form as { archived_at?: string | null }).archived_at) {
+    return {
+      ok: false,
+      errorCode: 'checkin_form_not_configured',
+      message: 'O formulário configurado está arquivado. Ajuste a configuração do plano ou o override do atleta.',
+    };
+  }
+
+  return {
+    ok: true,
+    form: {
+      id: form.id,
+      title: form.title,
+      versionId: row.form_version_id,
+      source: row.source ?? 'unknown',
+    },
+  };
+}
+
+/**
+ * Compatibilidade com chamadas existentes: devolve o formulário ou null.
+ * Prefira `resolveAthleteCheckinFormResult` para exibir o erro operacional correto.
  */
 export async function resolveAthleteCheckinForm(
   clientId: string,
-  adminUserId: string,
-): Promise<{ id: string; title: string } | null> {
-  // 1) Prefer the form linked in the athlete's active schedule
-  const { data: schedule } = await supabase
-    .from("athlete_checkin_schedules")
-    .select("checkin_form_id")
-    .eq("client_id", clientId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  let formId = schedule?.checkin_form_id ?? null;
-
-  // 2) Fallback to admin's first active form
-  if (!formId) {
-    const { data: activeForm } = await supabase
-      .from("checkin_forms")
-      .select("id")
-      .eq("user_id", adminUserId)
-      .eq("is_active", true)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    formId = activeForm?.id ?? null;
-  }
-
-  if (!formId) return null;
-
-  // Validate: form must be active AND have at least one question
-  const { data: form } = await supabase
-    .from("checkin_forms")
-    .select("id, title, is_active")
-    .eq("id", formId)
-    .maybeSingle();
-
-  if (!form?.is_active) return null;
-
-  const { count } = await supabase
-    .from("checkin_questions")
-    .select("id", { count: "exact", head: true })
-    .eq("form_id", formId);
-
-  if (!count || count === 0) return null;
-
-  return { id: form.id, title: form.title };
+  _adminUserId?: string,
+): Promise<{ id: string; title: string; versionId?: string } | null> {
+  const result = await resolveAthleteCheckinFormResult(clientId);
+  return result.ok ? { id: result.form.id, title: result.form.title, versionId: result.form.versionId } : null;
 }
