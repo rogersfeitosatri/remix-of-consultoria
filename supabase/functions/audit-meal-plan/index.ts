@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiStructured } from "../_shared/aiClient.ts";
+import { saveWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -182,12 +183,12 @@ Retorne o plano completo corrigido mantendo a mesma estrutura. Ajuste as porçõ
       auditedData.meal_plan = editedAnalysis.meal_plan;
     }
 
-    // Save the audited analysis
-    const updatedRaw = JSON.stringify({ ...auditedData, _isNewFormat: true });
+    // ETAPA 6B — plano auditado vira versão de trabalho (draft/manual_editor)
+    // no store canônico; ai_analyses mantém só colunas de análise (não-plano).
+    const auditedRaw = { ...auditedData, _isNewFormat: true };
     const { error: updateError } = await supabase
       .from('ai_analyses')
       .update({
-        raw_response: updatedRaw,
         caloric_deficit: { meal_plan: auditedData.meal_plan },
         macronutrients: { strategic_orientations: auditedData.strategic_orientations },
         diagnosis: auditedData.athlete_summary,
@@ -202,6 +203,8 @@ Retorne o plano completo corrigido mantendo a mesma estrutura. Ajuste as porçõ
       console.error('Error saving audited analysis:', updateError);
       throw updateError;
     }
+
+    await saveWorkingPlan(supabase, { clientId, raw: auditedRaw, source: "manual_editor", reviewed: true });
 
     return new Response(JSON.stringify({ success: true, analysis: auditedData }), {
       status: 200,
