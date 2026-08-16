@@ -16,7 +16,9 @@ export type OperationalEntityType =
   | 'race'
   | 'checkin_form'
   | 'anamnese_form'
-  | 'question_template';
+  | 'question_template'
+  | 'nutrition_review';
+
 
 export type OperationalEventType =
   | 'client_frozen'
