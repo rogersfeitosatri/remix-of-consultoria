@@ -140,33 +140,16 @@ export default function PublicCheckinForm() {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
 
-  // Find the trigger question for long training
-  const longTrainingTriggerQuestion = questions.find(q => 
-    LONG_TRAINING_TRIGGER_PATTERN.test(q.question_text)
-  );
-
-  // Check if user answered "Sim" to long training question
-  const didLongTraining = longTrainingTriggerQuestion 
-    ? answers[longTrainingTriggerQuestion.id] === 'Sim'
-    : true; // Default to show if trigger question not found
-
-  // Function to check if a question should be visible
-  const isQuestionVisible = (question: Question): boolean => {
-    // Check if this is a dependent question (about long training details)
-    const isDependentQuestion = LONG_TRAINING_DEPENDENT_PATTERNS.some(pattern => 
-      pattern.test(question.question_text)
-    );
-    
-    // If it's a dependent question, only show if user did long training
-    if (isDependentQuestion) {
-      return didLongTraining;
-    }
-    
-    return true;
-  };
+  // ETAPA 3C — visibilidade resolvida por semântica (conditional_logic → question_key → legado)
+  const isQuestionVisible = (question: Question): boolean =>
+    isQuestionVisibleSemantic(question, questions, answers, {
+      formId: form?.id ?? formId ?? null,
+      formVersionId,
+    });
 
   // Get visible questions for rendering
   const visibleQuestions = questions.filter(isQuestionVisible);
+
 
   useEffect(() => {
     const fetchForm = async () => {
