@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { logOperationalEvent } from '@/lib/operationalEvents';
 
 export interface MealFoodGroup {
   group: string;
@@ -100,7 +101,7 @@ export function useAthleteAnalysis(clientId?: string | null) {
       if (error) throw error;
       const analysis = parseAnalysis(data);
 
-      // ETAPA 3A — o plano do atleta é SEMPRE a versão publicada, quando existir.
+      // ETAPA 3A/6B — o plano do atleta é SEMPRE a versão publicada.
       const { data: pub } = await (supabase as any)
         .from('meal_plan_versions')
         .select('content, orientations, published_at')
@@ -114,6 +115,17 @@ export function useAthleteAnalysis(clientId?: string | null) {
           strategic_orientations: pub.orientations ?? analysis?.strategic_orientations,
           updated_at: pub.published_at || analysis?.updated_at,
         } as AthleteAnalysis;
+      }
+      // Fallback legado READ-ONLY (atleta ainda não migrado) — medido para que
+      // possamos remover quando chegar a zero.
+      if (analysis?.meal_plan) {
+        void logOperationalEvent({
+          clientId,
+          entityType: 'meal_plan',
+          entityId: clientId,
+          eventType: 'legacy_meal_plan_fallback_used',
+          metadata: { surface: 'athlete_area' },
+        });
       }
       return analysis;
     },

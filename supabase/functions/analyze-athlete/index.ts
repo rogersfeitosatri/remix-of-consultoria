@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiStructured } from "../_shared/aiClient.ts";
 import { requireAdmin, assertClientOwnership } from "../_shared/adminAuth.ts";
+import { saveWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -120,6 +121,11 @@ Deno.serve(async (req) => {
       .eq('client_id', clientId)
       .maybeSingle();
 
+    // ETAPA 6B — analyze-athlete continua gravando campos de ANÁLISE em
+    // ai_analyses (diagnosis, alerts, energy_expenditure, macronutrients,
+    // model_used) e pode manter o raw do modelo para auditoria, mas o PLANO
+    // candidato deixa de usar raw_response como store: vira uma versão de
+    // trabalho (draft) via saveWorkingPlan, nunca sobrescrevendo a publicada.
     const analysisRecord = {
       client_id: clientId,
       athlete_profile_id: profile?.id || null,
@@ -135,7 +141,8 @@ Deno.serve(async (req) => {
         strategic_orientations: analysisData.strategic_orientations,
       },
       alerts: analysisData.alerts || [],
-      raw_response: JSON.stringify(analysisData),
+      // Raw do modelo preservado para auditoria (NÃO é mais o store do plano).
+      raw_response: JSON.stringify({ _audit_only: true, model_output: analysisData }),
       model_used: `${provider}/${model}`,
     };
 
@@ -163,6 +170,13 @@ Deno.serve(async (req) => {
       .from('clients')
       .update({ athlete_status: 'analysis_complete' })
       .eq('id', clientId);
+
+    // ETAPA 6B — plano candidato como DRAFT no store canônico.
+    await saveWorkingPlan(supabase, {
+      clientId,
+      raw: { ...analysisData, _isNewFormat: true },
+      source: "ai_generated",
+    });
 
     console.log('Analysis saved successfully');
 

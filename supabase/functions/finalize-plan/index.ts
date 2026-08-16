@@ -3,6 +3,7 @@
 // os dias têm cardápio validado.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { WEEKDAYS } from "../_shared/planPipeline.ts";
+import { saveWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,16 +88,20 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     };
 
+    // ETAPA 6B — plano finalizado vira versão de trabalho (draft) no store
+    // canônico; ai_analyses mantém só colunas de análise para telas legadas.
     const { data: profile } = await supabase.from("athlete_profiles").select("id").eq("client_id", job.client_id).maybeSingle();
     const record = {
       client_id: job.client_id, athlete_profile_id: profile?.id ?? null,
       diagnosis: full.athlete_summary, energy_expenditure: { carb_estimation: full.carb_estimation, carb_progression: {} },
       caloric_deficit: { meal_plan: full.meal_plan }, macronutrients: { strategic_orientations }, alerts: full.alerts,
-      raw_response: JSON.stringify(full), model_used: "pipeline", updated_at: new Date().toISOString(),
+      model_used: "pipeline", updated_at: new Date().toISOString(),
     };
     const { data: existing } = await supabase.from("ai_analyses").select("id").eq("client_id", job.client_id).maybeSingle();
     if (existing) await supabase.from("ai_analyses").update(record).eq("id", existing.id);
     else await supabase.from("ai_analyses").insert(record);
+
+    await saveWorkingPlan(supabase, { clientId: job.client_id, raw: full, source: "ai_generated" });
 
     const anyIssues = WEEKDAYS.some((wd) => byDay[wd].status === "correction_required");
     await supabase.from("plan_generation_jobs").update({
