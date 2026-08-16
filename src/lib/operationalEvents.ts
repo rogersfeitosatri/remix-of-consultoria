@@ -56,7 +56,13 @@ export type OperationalEventType =
   | 'nutrition_review_completed'
   | 'nutrition_review_rescheduled'
   | 'nutrition_review_cancelled'
-  | 'nutrition_review_created';
+  | 'nutrition_review_created'
+  // ETAPA 6B — plano alimentar canônico
+  | 'meal_plan_version_created'
+  | 'meal_plan_version_published'
+  | 'legacy_plan_migrated'
+  | 'legacy_plan_migration_needs_review'
+  | 'legacy_meal_plan_fallback_used';
 
 
 

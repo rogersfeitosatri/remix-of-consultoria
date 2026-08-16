@@ -14,6 +14,7 @@
  * evento `legacy_meal_plan_fallback_used`.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { logOperationalEvent } from '@/lib/operationalEvents';
 import {
   findPublished,
   findWorkingDraft,
@@ -67,16 +68,14 @@ export function rawToVersionFields(raw: any): {
 }
 
 async function logLegacyFallback(clientId: string, analysisId?: string | null) {
-  try {
-    await db.from('operational_events').insert({
-      entity_type: 'meal_plan',
-      entity_id: clientId,
-      client_id: clientId,
-      event_type: 'legacy_meal_plan_fallback_used',
-      // sem conteúdo clínico — apenas rastreio de uso do fallback
-      metadata: { ai_analysis_id: analysisId ?? null, surface: 'web' },
-    });
-  } catch { /* diagnóstico não pode quebrar a leitura */ }
+  await logOperationalEvent({
+    clientId,
+    entityType: 'meal_plan',
+    entityId: clientId,
+    eventType: 'legacy_meal_plan_fallback_used',
+    // sem conteúdo clínico — apenas rastreio de uso do fallback
+    metadata: { ai_analysis_id: analysisId ?? null, surface: 'web' },
+  });
 }
 
 export async function fetchVersions(clientId: string): Promise<MealPlanVersion[]> {
