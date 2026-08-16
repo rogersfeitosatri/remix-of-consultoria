@@ -8,8 +8,8 @@ import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
 export default function Dashboard() {
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto py-2">
-        <div className="flex justify-end mb-3">
+      <div className="mx-auto w-full max-w-2xl space-y-8 pb-16">
+        <div className="flex justify-end">
           <ThemeToggle />
         </div>
         <GoogleOAuthAlert />

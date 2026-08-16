@@ -2,32 +2,24 @@
  * ETAPA 2B — Painel operacional canônico do dashboard.
  * Uma lista única de operações, agrupada por urgência real (dias úteis).
  * Não existe "concluir/esconder": o item some quando é resolvido na origem.
+ *
+ * Camada visual (frontend-design): lista de trabalho, sem cards aninhados,
+ * sem badges por status, sem parágrafos. Só nome, ação, prazo e um CTA.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import {
-  AlertTriangle, CalendarClock, CheckCircle, ChevronDown, ClipboardList,
-  History, ListTodo, MessageSquare, RefreshCw, UtensilsCrossed, Video,
-} from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, Video } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useOperationalDashboard } from '@/hooks/useOperationalDashboard';
 import { useDailyAgenda } from '@/hooks/useDailyAgenda';
-import { overdueBusinessDays, OPERATION_LABEL, type Operation, type OperationKind } from '@/lib/dashboardOperations';
+import { overdueBusinessDays, toDateKey, type Operation } from '@/lib/dashboardOperations';
+import { DashboardSection, RowButton } from './DashboardSection';
 
-const ICONS: Record<OperationKind, JSX.Element> = {
-  checkin_review: <MessageSquare className="h-4 w-4" />,
-  meal_plan: <UtensilsCrossed className="h-4 w-4" />,
-  anamnese_review: <ClipboardList className="h-4 w-4" />,
-  booking_invite: <CalendarClock className="h-4 w-4" />,
-  renewal: <RefreshCw className="h-4 w-4" />,
-  manual_task: <ListTodo className="h-4 w-4" />,
-  legacy_task: <History className="h-4 w-4" />,
-};
+/** Quantas pendências ficam visíveis antes do "mostrar mais". */
+const VISIBLE = 12;
+
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -36,61 +28,34 @@ function greeting(): string {
   return 'Boa noite';
 }
 
-function formatDue(due: string | null): string {
-  if (!due) return 'Sem prazo';
-  return due.split('-').reverse().join('/');
-}
-
-function OperationRow({ op, accent, holidays }: { op: Operation; accent: string; holidays: Set<string> }) {
-  const navigate = useNavigate();
+/** Prazo em uma expressão curta: "Hoje", "Amanhã", "2 dias atrasado", "12/08". */
+function dueLabel(op: Operation, holidays: Set<string>): { text: string; late: boolean } {
   const late = overdueBusinessDays(op, holidays);
-
-  return (
-    <button
-      type="button"
-      onClick={() => navigate(op.route)}
-      className={`w-full text-left rounded-lg border border-border/60 bg-card p-3 border-l-4 ${accent} transition-colors hover:bg-muted/40`}
-    >
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 text-muted-foreground shrink-0">{ICONS[op.kind]}</span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium truncate">{op.clientName}</span>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-              {OPERATION_LABEL[op.kind]}
-            </Badge>
-            {late > 0 && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-red-500/30 text-red-500">
-                {late} {late === 1 ? 'dia útil' : 'dias úteis'} de atraso
-              </Badge>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">{op.title}</p>
-          {op.subtitle && <p className="text-[11px] text-muted-foreground/80 truncate">{op.subtitle}</p>}
-        </div>
-        <span className="text-[11px] text-muted-foreground shrink-0">{formatDue(op.dueDate)}</span>
-      </div>
-    </button>
-  );
+  if (late > 0) return { text: `${late} ${late === 1 ? 'dia' : 'dias'} atrasado`, late: true };
+  if (!op.dueDate) return { text: 'Sem prazo', late: false };
+  const today = toDateKey(new Date());
+  if (op.dueDate === today) return { text: 'Hoje', late: false };
+  const tomorrow = toDateKey(new Date(Date.now() + 86_400_000));
+  if (op.dueDate === tomorrow) return { text: 'Amanhã', late: false };
+  if (op.dueDate < today) return { text: 'Atrasado', late: true };
+  return { text: op.dueDate.slice(8, 10) + '/' + op.dueDate.slice(5, 7), late: false };
 }
 
-function Group({
-  title, icon, ops, accent, holidays, tone,
-}: {
-  title: string; icon: JSX.Element; ops: Operation[]; accent: string; holidays: Set<string>; tone: string;
-}) {
-  if (ops.length === 0) return null;
+function OperationRow({ op, holidays }: { op: Operation; holidays: Set<string> }) {
+  const navigate = useNavigate();
+  const due = dueLabel(op, holidays);
+
   return (
-    <section className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span className={tone}>{icon}</span>
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <Badge variant="secondary" className="text-[10px]">{ops.length}</Badge>
+    <RowButton onClick={() => navigate(op.route)} lateMark={due.late}>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-medium leading-tight">{op.clientName}</p>
+        <p className="mt-0.5 truncate text-sm text-muted-foreground">{op.title}</p>
       </div>
-      <div className="space-y-2">
-        {ops.map((op) => <OperationRow key={op.id} op={op} accent={accent} holidays={holidays} />)}
-      </div>
-    </section>
+      <span className={`shrink-0 text-xs ${due.late ? 'text-destructive' : 'text-muted-foreground'}`}>
+        {due.text}
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-muted-foreground" />
+    </RowButton>
   );
 }
 
@@ -98,137 +63,121 @@ export function OperationalPanel() {
   const { user } = useAuth();
   const { groups, legacy, total, isLoading, error, holidays } = useOperationalDashboard();
   const { appointments, isLoading: loadingAgenda } = useDailyAgenda();
+  const [legacyOpen, setLegacyOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
   const firstName = useMemo(
     () => user?.user_metadata?.full_name?.split(' ')[0] || '',
     [user],
   );
 
+  const pending = useMemo(
+    () => [...groups.overdue, ...groups.today, ...groups.upcoming],
+    [groups],
+  );
+
   if (isLoading || loadingAgenda) {
     return (
-      <div className="space-y-4 py-4">
-        <Skeleton className="h-16 w-full rounded-xl" />
-        <Skeleton className="h-32 w-full rounded-xl" />
-        <Skeleton className="h-24 w-full rounded-xl" />
+      <div className="space-y-6 py-4">
+        <Skeleton className="h-12 w-2/3 rounded-lg" />
+        <Skeleton className="h-40 w-full rounded-lg" />
+        <Skeleton className="h-24 w-full rounded-lg" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <Card className="border-destructive/40">
-        <CardContent className="flex items-center gap-3 py-5 text-sm">
-          <AlertTriangle className="h-5 w-5 text-destructive" />
-          <div>
-            <p className="font-medium">Não foi possível carregar a operação.</p>
-            <p className="text-muted-foreground">{error.message}</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-start gap-3 rounded-lg border border-destructive/40 p-4 text-sm">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+        <div>
+          <p className="font-medium">Não foi possível carregar a operação.</p>
+          <p className="text-muted-foreground">{error.message}</p>
+        </div>
+      </div>
     );
   }
 
+  const stats: string[] = [];
+  if (total > 0) stats.push(`${total} ${total === 1 ? 'pendência' : 'pendências'}`);
+  if (groups.overdue.length > 0) stats.push(`${groups.overdue.length} atrasada${groups.overdue.length > 1 ? 's' : ''}`);
+  if (appointments.length > 0) stats.push(`${appointments.length} consulta${appointments.length > 1 ? 's' : ''} hoje`);
+
   return (
-    <div className="space-y-7">
-      <div className="pt-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {greeting()}{firstName ? `, ${firstName}` : ''}.
+    <div className="space-y-8">
+      <header className="px-1 pt-1">
+        <h1 className="text-[22px] font-semibold tracking-tight sm:text-2xl">
+          {greeting()}{firstName ? `, ${firstName}` : ''}
         </h1>
-        <p className="text-muted-foreground mt-1">
-          {total === 0
-            ? 'Nenhuma pendência operacional. Tudo em dia!'
-            : <>Você tem <span className="font-medium text-foreground">{total} {total === 1 ? 'pendência' : 'pendências'}</span>
-                {groups.overdue.length > 0 && <> — <span className="text-red-500 font-medium">{groups.overdue.length} em atraso</span></>}.</>}
-        </p>
-      </div>
-
-      {/* Agenda do dia — contexto, não fila */}
-      {appointments.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Video className="h-4 w-4 text-primary" /> Agenda de hoje
-              <Badge variant="secondary" className="text-[10px]">{appointments.length}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {appointments.map((a) => (
-              <div key={a.id} className="flex items-center justify-between gap-3 rounded-lg border p-2.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{a.time} · {a.clientName}</p>
-                  <p className="text-[11px] text-muted-foreground">{a.durationMinutes} min</p>
-                </div>
-                {a.meetLink && (
-                  <Button size="sm" variant="outline" onClick={() => window.open(a.meetLink!, '_blank', 'noopener')}>
-                    Entrar
-                  </Button>
-                )}
-              </div>
+        {stats.length > 0 && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {stats.map((s, i) => (
+              <span key={s}>
+                {i > 0 && <span className="mx-1.5 opacity-40">•</span>}
+                <span className={i === 1 ? 'text-destructive' : undefined}>{s}</span>
+              </span>
             ))}
-          </CardContent>
-        </Card>
-      )}
+          </p>
+        )}
+      </header>
 
-      {total === 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-5 py-6">
-          <CheckCircle className="h-6 w-6 text-emerald-500" />
-          <div>
-            <p className="font-medium">Mesa limpa!</p>
-            <p className="text-sm text-muted-foreground">Nenhuma operação aguardando você.</p>
-          </div>
+      {total === 0 ? (
+        <div className="flex items-center gap-2.5 px-1 text-sm">
+          <Check className="h-4 w-4 text-primary" />
+          <span className="font-medium">Tudo em dia</span>
+          {appointments.length > 0 && (
+            <span className="text-muted-foreground">
+              · próxima consulta às {appointments[0].time}
+            </span>
+          )}
         </div>
+      ) : (
+        <DashboardSection title="Pendências" count={total}>
+          {pending.slice(0, showAll ? pending.length : VISIBLE).map((op) => (
+            <OperationRow key={op.id} op={op} holidays={holidays} />
+          ))}
+          {!showAll && pending.length > VISIBLE && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="w-full px-3 py-3 text-left text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Mostrar mais {pending.length - VISIBLE}
+            </button>
+          )}
+        </DashboardSection>
       )}
 
-      <Group
-        title="Atrasadas"
-        icon={<AlertTriangle className="h-4 w-4" />}
-        tone="text-red-500"
-        ops={groups.overdue}
-        accent="border-l-red-500"
-        holidays={holidays}
-      />
-      <Group
-        title="Para hoje"
-        icon={<CalendarClock className="h-4 w-4" />}
-        tone="text-yellow-600"
-        ops={groups.today}
-        accent="border-l-yellow-500"
-        holidays={holidays}
-      />
-      <Group
-        title="Próximas"
-        icon={<ListTodo className="h-4 w-4" />}
-        tone="text-muted-foreground"
-        ops={groups.upcoming}
-        accent="border-l-muted-foreground/30"
-        holidays={holidays}
-      />
+      {appointments.length > 0 && (
+        <DashboardSection title="Hoje" count={appointments.length}>
+          {appointments.map((a) => (
+            <div key={a.id} className="flex items-center gap-3 px-3 py-3">
+              <span className="w-12 shrink-0 text-sm tabular-nums text-muted-foreground">{a.time}</span>
+              <span className="min-w-0 flex-1 truncate text-[15px]">{a.clientName}</span>
+              {a.meetLink && (
+                <button
+                  type="button"
+                  aria-label={`Entrar na consulta de ${a.clientName}`}
+                  onClick={() => window.open(a.meetLink!, '_blank', 'noopener')}
+                  className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+                >
+                  <Video className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          ))}
+        </DashboardSection>
+      )}
 
-      {/* Pendências legadas: tarefas derivadas criadas por automações antigas */}
       {legacy.length > 0 && (
-        <Collapsible>
-          <Card className="border-dashed">
-            <CollapsibleTrigger asChild>
-              <CardHeader className="pb-2 cursor-pointer hover:bg-muted/30 transition-colors">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <History className="h-4 w-4 text-muted-foreground" /> Pendências antigas
-                    <Badge variant="secondary" className="text-[10px]">{legacy.length}</Badge>
-                  </CardTitle>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Tarefas geradas por automações desativadas. Resolva ou arquive em Tarefas.
-                </p>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="space-y-2">
-                {legacy.map((op) => (
-                  <OperationRow key={op.id} op={op} accent="border-l-muted-foreground/30" holidays={holidays} />
-                ))}
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
+        <Collapsible open={legacyOpen} onOpenChange={setLegacyOpen}>
+          <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
+            Pendências antigas ({legacy.length})
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${legacyOpen ? 'rotate-180' : ''}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-1 divide-y divide-border/50">
+            {legacy.map((op) => <OperationRow key={op.id} op={op} holidays={holidays} />)}
+          </CollapsibleContent>
         </Collapsible>
       )}
     </div>
