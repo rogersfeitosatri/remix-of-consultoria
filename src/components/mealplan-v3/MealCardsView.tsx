@@ -437,20 +437,75 @@ export function MealCardsView({ text, onChange, cacheRef }: Props) {
                       </div>
                     ) : (
                       <>
-                        {/* Prévia compacta dos alimentos */}
-                        <ul className="text-[11px] leading-snug text-muted-foreground space-y-0.5 mb-2">
-                          {o.groups.length === 0 && (
-                            <li className="italic opacity-70">Sem alimentos ainda</li>
+                        {/* Alimentos da opção — edição item a item */}
+                        <ul className="text-[11px] leading-snug space-y-0.5 mb-2">
+                          {o.groups.length === 0 && !isComposing(mi, oi) && (
+                            <li className="italic opacity-70 text-muted-foreground">Sem alimentos ainda</li>
                           )}
-                          {o.groups.slice(0, 6).map((g, gi) => (
-                            <li key={gi} className="truncate">
-                              {g.tokens.map(tokenToText).join(' ou ')}
+                          {o.groups.map((g, gi) => {
+                            const editingItem = composer?.mi === mi && composer?.oi === oi && composer?.gi === gi;
+                            if (editingItem) {
+                              return (
+                                <li key={gi}>
+                                  <FoodComposer
+                                    initialLine={tokenToText(g.tokens[0])}
+                                    context={`${meal.time ? meal.time + ' · ' : ''}${meal.name} · ${o.name || `Opção ${oi + 1}`}`}
+                                    onConfirm={(line) => { applyLine(mi, oi, gi, line); setComposer(null); }}
+                                    onCancel={() => setComposer(null)}
+                                  />
+                                </li>
+                              );
+                            }
+                            return (
+                              <li key={gi} className="group flex items-start gap-1">
+                                <span className="flex-1 min-w-0 text-muted-foreground break-words">
+                                  {g.tokens.map(tokenToText).join(' ou ')}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setComposer({ mi, oi, gi })}
+                                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                                  title="Editar alimento"
+                                  aria-label="Editar alimento"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeGroupItem(mi, oi, gi)}
+                                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                                  title="Remover alimento"
+                                  aria-label="Remover alimento"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </li>
+                            );
+                          })}
+                          {isComposing(mi, oi) && composer?.gi == null && (
+                            <li>
+                              <FoodComposer
+                                context={`${meal.time ? meal.time + ' · ' : ''}${meal.name} · ${o.name || `Opção ${oi + 1}`}`}
+                                onConfirm={(line) => { applyLine(mi, oi, null, line); setComposer({ mi, oi, gi: null, nonce: Date.now() }); }}
+                                onCancel={() => setComposer(null)}
+                                key={composer?.nonce ?? 'new'}
+                              />
                             </li>
-                          ))}
-                          {o.groups.length > 6 && (
-                            <li className="opacity-70">+ {o.groups.length - 6} …</li>
                           )}
                         </ul>
+
+                        {!isComposing(mi, oi) && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1 text-[11px] text-emerald-700 hover:bg-emerald-50 mb-1"
+                            onClick={() => setComposer({ mi, oi, gi: null })}
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Adicionar alimento
+                          </Button>
+                        )}
+
 
                         {/* Rodapé com macros abreviados */}
                         <div className="text-[11px] font-medium flex flex-wrap gap-x-2 gap-y-0.5 pt-1 border-t border-border/40">
