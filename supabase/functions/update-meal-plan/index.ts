@@ -4,6 +4,7 @@
 // curta para o admin enviar ao atleta explicando os ajustes.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiStructured } from "../_shared/aiClient.ts";
+import { loadWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,11 +31,11 @@ Deno.serve(async (req) => {
       .from("athlete_profiles").select("*").eq("client_id", clientId).maybeSingle();
 
     // Plano atual (obrigatório — é o que será atualizado)
+    // ETAPA 6B — plano de trabalho vem do store canônico, não de raw_response.
     const { data: currentAnalysis } = await supabase
-      .from("ai_analyses").select("*").eq("client_id", clientId).maybeSingle();
-    const currentPlan = currentAnalysis?.raw_response
-      ? safeParse(currentAnalysis.raw_response)
-      : null;
+      .from("ai_analyses").select("id, diagnosis").eq("client_id", clientId).maybeSingle();
+    const working = await loadWorkingPlan(supabase, clientId);
+    const currentPlan = working.raw;
     if (!currentPlan?.meal_plan) {
       throw new Error("Não há plano alimentar atual para atualizar. Gere o plano primeiro.");
     }
