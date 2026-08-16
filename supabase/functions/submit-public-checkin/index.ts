@@ -35,7 +35,7 @@ function json(payload: unknown, status = 200): Response {
 }
 
 /** Mensagens públicas nunca revelam existência de usuário, tenant ou erro de SQL. */
-function reject(code: string, status = 403): Response {
+function reject(code: string, _status = 403): Response {
   const messages: Record<string, string> = {
     INVALID_LINK: "Este link de check-in não é válido. Peça um novo ao seu nutricionista.",
     EXPIRED: "O prazo para responder este check-in expirou.",
@@ -44,7 +44,8 @@ function reject(code: string, status = 403): Response {
     RATE_LIMITED: "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
     INVALID_PAYLOAD: "Dados inválidos.",
   };
-  return json({ error: code, message: messages[code] ?? messages.NOT_ELIGIBLE }, status);
+  // status 200 de propósito: o cliente precisa LER o código para exibir a mensagem certa.
+  return json({ error: code, message: messages[code] ?? messages.NOT_ELIGIBLE }, 200);
 }
 
 function normalizePhoneToE164(phone: string): string {
