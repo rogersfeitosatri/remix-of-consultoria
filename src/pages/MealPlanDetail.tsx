@@ -64,11 +64,18 @@ export default function MealPlanDetail() {
     },
   });
 
-  const { data: analysisRow, isLoading } = useQuery({
+  // ETAPA 6B — o plano de trabalho vem do núcleo canônico; `ai_analyses` só é
+  // lido para os campos de ANÁLISE (diagnóstico/alertas), nunca para o plano.
+  const { data: working, isLoading } = useWorkingPlan(clientId);
+  const { data: analysisRow } = useQuery({
     queryKey: ['ai_analysis', clientId],
     enabled: !!clientId,
     queryFn: async () => {
-      const { data, error } = await supabase.from('ai_analyses').select('*').eq('client_id', clientId!).maybeSingle();
+      const { data, error } = await supabase
+        .from('ai_analyses')
+        .select('id, client_id, diagnosis, alerts, energy_expenditure, macronutrients, updated_at')
+        .eq('client_id', clientId!)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -93,7 +100,7 @@ export default function MealPlanDetail() {
     },
   });
 
-  const structured = parseStructured(analysisRow);
+  const structured: any = working?.raw ?? {};
   const isV2 = structured?.planModelVersion === 2 && Array.isArray(structured?.basePlan?.meals);
   const hasPlan = isV2 || !!structured?.meal_plan?.meals;
 
