@@ -7395,6 +7395,27 @@ export type Database = {
         }
         Relationships: []
       }
+      public_rate_limits: {
+        Row: {
+          bucket: string
+          count: number
+          key: string
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          count?: number
+          key: string
+          window_start: string
+        }
+        Update: {
+          bucket?: string
+          count?: number
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       push_tokens: {
         Row: {
           created_at: string
@@ -9668,6 +9689,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      hit_rate_limit: {
+        Args: {
+          p_bucket: string
+          p_key: string
+          p_max: number
+          p_window_seconds: number
+        }
+        Returns: boolean
+      }
       invoke_booking_links_processor: { Args: never; Returns: undefined }
       is_business_day: {
         Args: { p_date: string; p_user_id?: string }
@@ -9684,6 +9714,16 @@ export type Database = {
       is_trainer_of_current_athlete: {
         Args: { _trainer_id: string }
         Returns: boolean
+      }
+      log_security_event: {
+        Args: {
+          p_client_id?: string
+          p_entity_id?: string
+          p_event_type: string
+          p_function_name: string
+          p_metadata?: Json
+        }
+        Returns: undefined
       }
       mark_pending_reminders: {
         Args: never
@@ -9823,6 +9863,7 @@ export type Database = {
           valid: boolean
         }[]
       }
+      verify_internal_secret: { Args: { p_secret: string }; Returns: boolean }
       zn_promote_pending_to_lead: { Args: never; Returns: number }
     }
     Enums: {
