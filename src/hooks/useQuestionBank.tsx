@@ -17,12 +17,12 @@ export interface QuestionTemplate {
   comment_field_label: string | null;
   comment_field_required: boolean | null;
   // ETAPA 3C — semântica da pergunta (o que ela MEDE, não como está escrita)
-  question_key: string | null;
-  metric_key: string | null;
-  domain: string | null;
-  unit: string | null;
-  canonical_type: string | null;
-  is_adjustment_trigger: boolean | null;
+  question_key?: string | null;
+  metric_key?: string | null;
+  domain?: string | null;
+  unit?: string | null;
+  canonical_type?: string | null;
+  is_adjustment_trigger?: boolean | null;
   created_at: string;
   updated_at: string;
 }
