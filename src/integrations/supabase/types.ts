@@ -3361,6 +3361,9 @@ export type Database = {
           created_at: string
           id: string
           link_sent_at: string | null
+          link_sent_by: string | null
+          link_sent_channel: string | null
+          link_sent_source: string | null
           scheduled_date: string
           scheduled_time: string | null
           send_link_date: string
@@ -3378,6 +3381,9 @@ export type Database = {
           created_at?: string
           id?: string
           link_sent_at?: string | null
+          link_sent_by?: string | null
+          link_sent_channel?: string | null
+          link_sent_source?: string | null
           scheduled_date: string
           scheduled_time?: string | null
           send_link_date: string
@@ -3395,6 +3401,9 @@ export type Database = {
           created_at?: string
           id?: string
           link_sent_at?: string | null
+          link_sent_by?: string | null
+          link_sent_channel?: string | null
+          link_sent_source?: string | null
           scheduled_date?: string
           scheduled_time?: string | null
           send_link_date?: string
