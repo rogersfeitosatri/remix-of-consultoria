@@ -5,6 +5,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiJson, loadFoodTable, matchFood, foodMacros } from "../_shared/planPipeline.ts";
 import { loadMealPlanSkill, logGeneration } from "../_shared/skillPrompt.ts";
+import { loadSkillVersion, startAiRun, finishAiRun } from "../_shared/aiSkills.ts"; // ETAPA 6C
 import { loadWorkingPlan, saveWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
