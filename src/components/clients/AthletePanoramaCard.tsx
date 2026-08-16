@@ -234,8 +234,7 @@ function EditFollowUpDialog({ clientId, panorama, onClose }: {
                     <SelectItem value="weekly">Semanal</SelectItem>
                     <SelectItem value="biweekly">Quinzenal</SelectItem>
                     <SelectItem value="three_weeks">A cada 3 semanas</SelectItem>
-                    <SelectItem value="monthly">Mensal</SelectItem>
-                    <SelectItem value="daily">Diário</SelectItem>
+                    <SelectItem value="monthly">Mensal (4 semanas)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

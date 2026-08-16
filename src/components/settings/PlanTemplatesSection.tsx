@@ -252,7 +252,6 @@ export function PlanTemplatesSection() {
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="daily">Diário</SelectItem>
                       <SelectItem value="weekly">Semanal</SelectItem>
                       <SelectItem value="biweekly">Quinzenal</SelectItem>
                       <SelectItem value="three_weeks">3 semanas</SelectItem>

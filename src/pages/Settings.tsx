@@ -414,9 +414,9 @@ export default function Settings() {
     const hasCheckin = parseBoolean(row['Possui Check-in'] as string | number | null | undefined);
     const checkinFrequencyRaw = String(row['Frequência Check-in'] || '').toLowerCase().trim();
     const checkinFrequencyMap: Record<string, 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quarterly'> = {
-      'daily': 'daily',
-      'diário': 'daily',
-      'diario': 'daily',
+      'daily': 'weekly',
+      'diário': 'weekly',
+      'diario': 'weekly',
       'weekly': 'weekly',
       'semanal': 'weekly',
       'biweekly': 'biweekly',

@@ -5,54 +5,76 @@
  */
 
 export type CheckinPeriodicity =
-  | 'daily'
   | 'weekly'
   | 'biweekly'
+  | 'three_weeks'
   | 'monthly'
   | 'bimonthly'
   | 'quarterly';
 
 export type ConsultationPeriodicity = 'monthly' | 'biweekly' | 'weekly' | 'quarterly' | 'custom';
 
+/**
+ * ETAPA 3B — periodicidade canônica em MÚLTIPLOS DE SEMANA.
+ * "Mensal" = 4 semanas (28 dias). Não existe mais frequência diária.
+ */
+const CHECKIN_WEEKS: Record<CheckinPeriodicity, number> = {
+  weekly: 1,
+  biweekly: 2,
+  three_weeks: 3,
+  monthly: 4,
+  bimonthly: 8,
+  quarterly: 12,
+};
+
 const CHECKIN_DAYS: Record<CheckinPeriodicity, number> = {
-  daily: 1,
   weekly: 7,
   biweekly: 14,
-  monthly: 30,
-  bimonthly: 60,
-  quarterly: 90,
+  three_weeks: 21,
+  monthly: 28,
+  bimonthly: 56,
+  quarterly: 84,
 };
 
-const CHECKIN_GRACE_DAYS: Record<CheckinPeriodicity, number> = {
-  daily: 2,
-  weekly: 9,
-  biweekly: 16,
-  monthly: 35,
-  bimonthly: 65,
-  quarterly: 95,
-};
+/** Tolerância canônica: intervalo + 2 dias. */
+const GRACE_EXTRA_DAYS = 2;
 
 export const CHECKIN_PERIODICITY_LABELS: Record<CheckinPeriodicity, string> = {
-  daily: 'Diário',
   weekly: 'Semanal',
   biweekly: 'Quinzenal',
-  monthly: 'Mensal',
-  bimonthly: 'Bimestral',
-  quarterly: 'Trimestral',
+  three_weeks: 'A cada 3 semanas',
+  monthly: 'Mensal (4 semanas)',
+  bimonthly: 'Bimestral (8 semanas)',
+  quarterly: 'Trimestral (12 semanas)',
+};
+
+/** Frequências legadas que deixaram de existir são normalizadas para semanal. */
+const LEGACY_MAP: Record<string, CheckinPeriodicity> = {
+  daily: 'weekly',
+  '3weeks': 'three_weeks',
+  triweekly: 'three_weeks',
 };
 
 export function normalizeCheckinPeriodicity(value?: string | null): CheckinPeriodicity {
   const v = (value || '').toLowerCase();
-  return (v in CHECKIN_DAYS ? v : 'monthly') as CheckinPeriodicity;
+  if (v in CHECKIN_DAYS) return v as CheckinPeriodicity;
+  if (v in LEGACY_MAP) return LEGACY_MAP[v];
+  return 'monthly';
 }
+
+export function checkinIntervalWeeks(value?: string | null): number {
+  return CHECKIN_WEEKS[normalizeCheckinPeriodicity(value)];
+}
+
 
 export function checkinIntervalDays(value?: string | null): number {
   return CHECKIN_DAYS[normalizeCheckinPeriodicity(value)];
 }
 
 export function checkinGraceDays(value?: string | null): number {
-  return CHECKIN_GRACE_DAYS[normalizeCheckinPeriodicity(value)];
+  return CHECKIN_DAYS[normalizeCheckinPeriodicity(value)] + GRACE_EXTRA_DAYS;
 }
+
 
 /** Semanas entre consultas segundo a cadência do plano. */
 export function consultationCadenceWeeks(value?: string | number | null): number {

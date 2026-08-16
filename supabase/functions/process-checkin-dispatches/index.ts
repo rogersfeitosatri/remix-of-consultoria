@@ -33,7 +33,6 @@ function isForeignPhone(phone: string | null | undefined): boolean {
 
 function getFrequencyWeeks(frequencyType: string): number {
   switch (frequencyType) {
-    case 'daily': return 1;
     case 'weekly': return 1;
     case 'biweekly': return 2;
     case 'three_weeks': return 3;
@@ -334,13 +333,28 @@ Deno.serve(async (req) => {
             checkin_form_id: form.id,
             schedule_id: schedule.id,
             due_at: dueAt,
+            response_deadline: dueAt,
             status: 'sent',
+            channel: foreign ? 'email' : 'whatsapp',
+            source: forceReprocess ? 'manual_reprocess' : source,
+            scheduled_for: now.toISOString(),
+            metadata: { frequency_type: schedule.frequency_type, run_id: runId },
             link_checkin: `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`,
           })
           .select()
           .single();
 
-        if (dErr) { failed++; continue; }
+        if (dErr) {
+          // 23505 = unique_violation on (schedule_id, occurrence_date):
+          // outra execução já criou o dispatch desta ocorrência. Idempotência garantida pelo banco.
+          if ((dErr as any).code === '23505') {
+            skipped++;
+            details.push({ client: client.name, reason: 'duplicate_occurrence' });
+            continue;
+          }
+          failed++;
+          continue;
+        }
 
         const codigoAcesso = foreign ? client.email : formatPhoneAsAccessCode(client.phone);
         const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
