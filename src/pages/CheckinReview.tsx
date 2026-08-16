@@ -1285,7 +1285,7 @@ export default function CheckinReview() {
                         ) : (
                           <>
                             <CheckCircle2 className="h-4 w-4" />
-                            Conferir sem enviar
+                            Finalizar sem feedback
                           </>
                         )}
                       </Button>
@@ -1321,12 +1321,12 @@ export default function CheckinReview() {
                       {sendMutation.isPending ? (
                         <>
                           <RefreshCw className="h-4 w-4 animate-spin" />
-                          Enviando WhatsApp...
+                          Publicando...
                         </>
                       ) : (
                         <>
                           <Send className="h-4 w-4" />
-                          Enviar WhatsApp
+                          Publicar feedback
                         </>
                       )}
                     </Button>
@@ -1335,7 +1335,7 @@ export default function CheckinReview() {
 
                 {feedback?.sent_at && (
                   <p className="text-sm text-green-600 text-center">
-                    ✓ Feedback enviado em {format(parseISO(feedback.sent_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    ✓ Feedback publicado em {format(parseISO(feedback.sent_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                   </p>
                 )}
 
