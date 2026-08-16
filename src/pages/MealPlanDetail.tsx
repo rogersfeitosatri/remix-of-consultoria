@@ -23,6 +23,8 @@ import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send, Layers, MoreVertical, CircleCheck, CircleDashed } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { PublishPlanControl } from '@/components/mealplan/PublishPlanControl';
+import { useWorkingPlan, useSaveWorkingPlan } from '@/hooks/useWorkingPlan';
+import { workingPlanKey } from '@/hooks/useWorkingPlan';
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
 
@@ -42,23 +44,9 @@ interface Guidance {
 }
 const EMPTY_GUIDANCE: Guidance = { meals_count: '', target_kcal: '', target_cho_gkg: '', target_protein_gkg: '', target_fat_gkg: '', custom_instructions: '' };
 
-function parseStructured(row: any): any | null {
-  if (!row) return null;
-  try {
-    if (row.raw_response) {
-      const parsed = typeof row.raw_response === 'string' ? JSON.parse(row.raw_response) : row.raw_response;
-      if (parsed?.meal_plan) return { ...parsed, _isNewFormat: true, updated_at: row.updated_at };
-    }
-  } catch { /* fallthrough */ }
-  return {
-    _isNewFormat: false,
-    athlete_summary: row.diagnosis || '',
-    alerts: row.alerts || [],
-    strategic_orientations: (row.macronutrients as any)?.strategic_orientations,
-    meal_plan: (row.caloric_deficit as any)?.meal_plan,
-    updated_at: row.updated_at,
-  };
-}
+// ETAPA 6B: leitura do plano NÃO usa mais `ai_analyses.raw_response`/`caloric_deficit`.
+// O plano de trabalho vem de useWorkingPlan(clientId) (núcleo canônico, com
+// fallback legado read-only já embutido em loadWorkingPlan).
 
 export default function MealPlanDetail() {
   const { clientId } = useParams<{ clientId: string }>();
