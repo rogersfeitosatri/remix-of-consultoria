@@ -800,11 +800,12 @@ export function WeeklyPipelineView({
                         </Button>
                       )}
 
-                      {/* Mark as sent button */}
+                      {/* Registrar envio feito fora do sistema (external_manual) */}
                       {item.status === 'link_pending' && item.scheduleId && (
                         <Button
                           size="sm"
                           variant="ghost"
+                          title="Registrar envio manual (feito fora do sistema)"
                           className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
                           onClick={() => onMarkAsSent(item.scheduleId!)}
                         >
