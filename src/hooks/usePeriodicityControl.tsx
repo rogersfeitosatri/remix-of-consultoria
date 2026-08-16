@@ -34,12 +34,13 @@ export interface PeriodicityRow {
   has_completed_for_interval: boolean;
 }
 
+/** ETAPA 4B: cadência sempre em múltiplos de semana (fonte canônica: periodicity.ts). */
 function cadenceFromFrequency(freq: string | null): { weeks: number | null; days: number | null; label: string } {
   if (!freq) return { weeks: null, days: null, label: '—' };
   if (freq === 'six_weeks' || freq === '6_weeks') return { weeks: 6, days: 42, label: '6w (42d)' };
   if (freq === '4_weeks') return { weeks: 4, days: 28, label: '4w (28d)' };
-  if (freq === 'monthly') return { weeks: 4, days: 30, label: 'mensal (30d)' };
-  return { weeks: null, days: null, label: freq };
+  const weeks = consultationCadenceWeeks(freq);
+  return { weeks, days: weeks * 7, label: `${weeks}w (${weeks * 7}d)` };
 }
 
 function planLabel(client: any): string {
