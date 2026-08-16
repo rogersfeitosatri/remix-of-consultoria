@@ -402,7 +402,35 @@ export default function CheckinReview() {
     }
   };
 
-  // Mutation to approve feedback (with optional WhatsApp send)
+  /**
+   * ETAPA 3B — estado canônico da RESPOSTA (independente do feedback).
+   * received → reviewing → reviewed → closed
+   */
+  const setResponseState = async (
+    state: 'reviewing' | 'reviewed' | 'closed',
+    closedReason?: string,
+  ) => {
+    if (!responseId) return;
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth?.user?.id ?? null;
+    const patch: Record<string, unknown> = { review_status: state };
+    if (state === 'reviewed' || state === 'closed') {
+      patch.reviewed_at = new Date().toISOString();
+      patch.reviewed_by = uid;
+    }
+    if (state === 'closed') {
+      patch.closed_at = new Date().toISOString();
+      patch.closed_reason = closedReason ?? 'manual';
+    }
+    const { error } = await supabase
+      .from('checkin_responses')
+      .update(patch as never)
+      .eq('id', responseId);
+    if (error) console.error('[checkin] falha ao atualizar estado da resposta', error);
+    queryClient.invalidateQueries({ queryKey: ['checkin_response', responseId] });
+  };
+
+  // Mutation to approve feedback (rascunho aprovado, ainda NÃO publicado)
   const approveMutation = useMutation({
     mutationFn: async ({ sendWhatsApp = false }: { sendWhatsApp?: boolean } = {}) => {
       if (!feedback?.id) {
@@ -415,8 +443,9 @@ export default function CheckinReview() {
             suggested_feedback: aiAnalysis?.suggested_feedback,
             final_feedback: editedFeedback || null,
             status: 'approved',
+            publication_status: 'approved',
             approved_at: new Date().toISOString(),
-          });
+          } as never);
         if (error) throw error;
       } else {
         const { error } = await supabase
@@ -424,11 +453,13 @@ export default function CheckinReview() {
           .update({
             final_feedback: editedFeedback || feedback.final_feedback || null,
             status: 'approved',
+            publication_status: 'approved',
             approved_at: new Date().toISOString(),
-          })
+          } as never)
           .eq('id', feedback.id);
         if (error) throw error;
       }
+      await setResponseState('reviewed');
       return { sendWhatsApp };
     },
     onSuccess: async (data) => {
@@ -439,9 +470,9 @@ export default function CheckinReview() {
         await autoCompleteCheckinTask(checkinResponse.client_id);
       }
       if (data?.sendWhatsApp) {
-        toast.success('Feedback aprovado! Pronto para envio.');
+        toast.success('Feedback aprovado! Pronto para publicar.');
       } else {
-        toast.success('Check-in conferido com sucesso!');
+        toast.success('Check-in revisado com sucesso!');
       }
       setActiveTab('evolution');
     },
@@ -451,11 +482,10 @@ export default function CheckinReview() {
     },
   });
 
-  // Mutation to mark as reviewed without sending (just finalize)
+  // Finalizar SEM feedback: encerra a obrigação sem publicar nada para o atleta
   const markAsReviewedMutation = useMutation({
     mutationFn: async () => {
       if (!feedback?.id) {
-        // Create feedback with 'sent' status to mark as finalized without actually sending
         const { error } = await supabase
           .from('checkin_feedbacks')
           .insert({
@@ -465,25 +495,25 @@ export default function CheckinReview() {
             suggested_feedback: aiAnalysis?.suggested_feedback || null,
             final_feedback: editedFeedback || null,
             status: 'sent',
+            publication_status: 'not_published',
             approved_at: new Date().toISOString(),
-            sent_at: new Date().toISOString(),
             sent_via: 'manual_review',
-          });
+          } as never);
         if (error) throw error;
       } else {
-        // Update existing feedback to 'sent' status
         const { error } = await supabase
           .from('checkin_feedbacks')
           .update({
             final_feedback: editedFeedback || feedback.final_feedback || null,
             status: 'sent',
+            publication_status: 'not_published',
             approved_at: feedback.approved_at || new Date().toISOString(),
-            sent_at: new Date().toISOString(),
             sent_via: 'manual_review',
-          })
+          } as never)
           .eq('id', feedback.id);
         if (error) throw error;
       }
+      await setResponseState('closed', 'reviewed_without_feedback');
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
@@ -492,7 +522,7 @@ export default function CheckinReview() {
       if (checkinResponse?.client_id) {
         await autoCompleteCheckinTask(checkinResponse.client_id);
       }
-      toast.success('Check-in finalizado sem envio de WhatsApp');
+      toast.success('Check-in finalizado sem feedback');
       setActiveTab('evolution');
     },
     onError: (error) => {
@@ -501,13 +531,12 @@ export default function CheckinReview() {
     },
   });
 
-  // Mutation to send feedback via WhatsApp
+  // PUBLICAR feedback: envia no WhatsApp E libera na área do atleta
   const sendMutation = useMutation({
     mutationFn: async () => {
       if (!feedback?.id) throw new Error('Feedback not found');
       if (!checkinResponse?.client_id) throw new Error('Client not found');
-      
-      // Call WhatsApp send function
+
       const { data, error } = await supabase.functions.invoke('send-whatsapp', {
         body: { 
           clientId: checkinResponse.client_id,
@@ -515,21 +544,38 @@ export default function CheckinReview() {
           feedbackId: feedback.id,
         },
       });
-      
+
       if (error) throw error;
+
+      const { data: auth } = await supabase.auth.getUser();
+      await supabase
+        .from('checkin_feedbacks')
+        .update({
+          status: 'sent',
+          publication_status: 'published',
+          published_at: new Date().toISOString(),
+          published_by: auth?.user?.id ?? null,
+          sent_at: new Date().toISOString(),
+          sent_via: 'whatsapp',
+        } as never)
+        .eq('id', feedback.id);
+
+      await setResponseState('closed', 'feedback_published');
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
+      queryClient.invalidateQueries({ queryKey: ['pending_checkin_reviews'] });
       queryClient.invalidateQueries({ queryKey: ['pending_checkins_dashboard'] });
-      toast.success('Feedback enviado via WhatsApp!');
+      toast.success('Feedback publicado para o atleta e enviado no WhatsApp!');
       setActiveTab('evolution');
     },
     onError: (error: any) => {
       console.error('Error sending:', error);
-      toast.error('Erro ao enviar WhatsApp: ' + (error.message || 'Verifique a configuração'));
+      toast.error('Erro ao publicar feedback: ' + (error.message || 'Verifique a configuração'));
     },
   });
+
 
   const saveAdminDecisionMutation = useMutation({
     mutationFn: async () => {
