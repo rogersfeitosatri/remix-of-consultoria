@@ -286,14 +286,19 @@ export function WeeklyPipelineView({
         const client = clientsById.get(schedule.client_id);
         const sendDate = parseISO(schedule.send_link_date);
 
-        // Check if there's a matching appointment in the same week or next 2 weeks (any non-cancelled status)
-        const matchingAppointment = (appointments || []).find(
-          (apt: any) =>
-            apt.client_id === schedule.client_id &&
-            apt.status !== 'cancelled' &&
-            apt.status !== 'no_show' &&
-            parseISO(apt.appointment_date) >= currentWeekStart
-        );
+        // ETAPA 4B: vínculo canônico schedule <-> appointment (id), com fallback por atleta/semana
+        const linked = appointmentForSchedule(schedule as any, (appointments || []) as any);
+        const matchingAppointment =
+          linked && !['cancelled', 'no_show'].includes(linked.status)
+            ? linked
+            : (appointments || []).find(
+                (apt: any) =>
+                  !apt.consultation_schedule_id &&
+                  apt.client_id === schedule.client_id &&
+                  apt.status !== 'cancelled' &&
+                  apt.status !== 'no_show' &&
+                  parseISO(apt.appointment_date) >= currentWeekStart
+              );
 
         // Calculate consultation number
         const clientConsultations = consultations
