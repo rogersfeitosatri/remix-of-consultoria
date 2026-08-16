@@ -348,7 +348,9 @@ export function WeeklyPipelineView({
     // 2. Add first consultations for this week (clients without schedule entries)
     clients
       .filter(c => {
-        if (!c.first_consultation_date || !c.is_active) return false;
+        if (!c.first_consultation_date) return false;
+        // Somente atletas operacionais (não congelados/encerrados/arquivados)
+        if (!getAthleteState(c as any).isOperational) return false;
         if (processedClientIds.has(c.id)) return false;
         const firstDate = parseISO(c.first_consultation_date);
         return isWithinInterval(firstDate, { start: currentWeekStart, end: currentWeekEnd });
