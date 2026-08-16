@@ -596,33 +596,21 @@ export default function CalendarPage() {
                                   );
                                 }
 
-                                if (event.type === 'first' && event.client) {
+                                if (event.type === 'send_link' && event.schedule) {
+                                  const schedule = event.schedule as ConsultationSchedule & { client_name: string };
+                                  const consultNum = getConsultationNumber(schedule);
                                   return (
                                     <div
-                                      key={`first-${event.client.id}`}
-                                      className="text-[10px] sm:text-xs p-1 rounded bg-primary/20 border border-primary/30 text-foreground truncate"
-                                      title={`1ª Consulta: ${event.client.name}`}
-                                    >
-                                      <span className="hidden sm:inline">1ª </span>
-                                      {event.client.name}
-                                    </div>
-                                  );
-                                }
-
-                                if (event.type === 'sendLink' && event.schedule) {
-                                  const consultNum = getConsultationNumber(event.schedule);
-                                  return (
-                                    <div
-                                      key={`link-${event.schedule.id}`}
+                                      key={`link-${schedule.id}`}
                                       className="text-[10px] sm:text-xs p-1 rounded bg-amber-500/20 border border-amber-500/30 text-foreground truncate"
-                                      title={`Enviar Link: ${event.schedule.client_name}`}
+                                      title={`Enviar Link: ${schedule.client_name}`}
                                     >
                                       <Send className="h-2.5 w-2.5 inline mr-0.5" />
                                       <span className="hidden sm:inline">
-                                        {event.schedule.client_name}
+                                        {schedule.client_name}
                                         {consultNum && ` ${consultNum.current}/${consultNum.total}`}
                                       </span>
-                                      <span className="sm:hidden">{event.schedule.client_name.split(' ')[0]}</span>
+                                      <span className="sm:hidden">{schedule.client_name.split(' ')[0]}</span>
                                     </div>
                                   );
                                 }
