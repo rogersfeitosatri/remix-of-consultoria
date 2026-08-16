@@ -20,6 +20,8 @@ import { toast } from 'sonner';
 import { useState, useMemo } from 'react';
 import { ChangeAthletePasswordDialog } from './ChangeAthletePasswordDialog';
 import { PlanTypeBadge } from './PlanTypeBadge';
+import { AthleteStateBadges } from './AthleteStateBadges';
+import { getAthleteState } from '@/lib/athleteState';
 
 const SERVICE_LABELS = {
   nutrition: 'Nutrição',
@@ -286,7 +288,7 @@ Qualquer dúvida, estou à disposição! 💪`;
             key={client.id}
             className={cn(
               'glass-card rounded-xl p-5 transition-all hover:shadow-lg cursor-pointer hover:border-primary/50',
-              !client.is_active && 'opacity-60'
+              !getAthleteState(client as any).isOperational && 'opacity-60'
             )}
             onClick={() => navigate(`/clients/${client.id}`)}
           >
@@ -295,17 +297,13 @@ Qualquer dúvida, estou à disposição! 💪`;
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-lg font-semibold text-card-foreground">{client.name}</h3>
-                  {client.is_active && (() => {
+                  {/* ETAPA 2A — estado canônico + pendência de onboarding. */}
+                  <AthleteStateBadges client={client as any} />
+                  {getAthleteState(client as any).isOperational && (() => {
                     const score = calculateHealthScore(client);
                     return <HealthScoreBadge status={score.status} label={score.label} reasons={score.reasons} />;
                   })()}
-                  {!client.is_active && (
-                    <span className="alert-badge bg-muted text-muted-foreground">Inativo</span>
-                  )}
-                  {isExpired && client.is_active && (
-                    <span className="alert-badge bg-destructive/10 text-destructive">Vencido</span>
-                  )}
-                  {isExpiring && client.is_active && (
+                  {isExpiring && getAthleteState(client as any).isOperational && (
                     <span className="alert-badge bg-warning/10 text-warning">
                       {daysUntilExpiry} dias restantes
                     </span>
