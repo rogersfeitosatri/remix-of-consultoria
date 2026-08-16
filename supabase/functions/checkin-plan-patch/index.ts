@@ -39,9 +39,16 @@ const GI_SIGNALS = new Set(["GI_BLOATING", "GI_NAUSEA", "STOMACH_HEAVINESS", "PL
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
+    // ETAPA 1 — segurança: exige admin autenticado (ou chamada interna).
+    const auth = await requireAdmin(req);
+    if (!auth.ok) return json({ error: auth.error }, auth.status);
+
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { clientId } = await req.json();
     if (!clientId) throw new Error("clientId is required");
+
+    const owns = await assertClientOwnership(auth, clientId);
+    if (!owns.ok) return json({ error: owns.error }, owns.status);
 
     const { data: row } = await supabase.from("ai_analyses").select("id, raw_response").eq("client_id", clientId).maybeSingle();
     let stored: any = null;
