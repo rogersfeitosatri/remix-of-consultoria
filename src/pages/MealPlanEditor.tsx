@@ -1,8 +1,10 @@
 // Página do Editor Inteligente de Plano Alimentar (Fase 2 — multi-dia).
 // Rota: /meal-plans/:clientId/editor
-// - "Todos os dias" é o plano base (compatível com o formato legado em
-//   ai_analyses.raw_response.meal_plan.meals).
-// - Overrides por dia da semana ficam em raw_response.meal_plan.day_variations
+// ETAPA 6B — a fonte do plano é o núcleo canônico (meal_plans +
+// meal_plan_versions), acessado por useWorkingPlan/saveWorkingPlan.
+// `ai_analyses.raw_response` NÃO é mais store do plano.
+// - "Todos os dias" é o plano base (content.meals da versão de trabalho).
+// - Overrides por dia da semana ficam em content.day_variations
 //   (mapa { mon: [meals], tue: [...], ... }). Consumidores existentes seguem
 //   lendo `meals`.
 // - Cada aba tem seu próprio texto e rascunho local independente.
@@ -39,7 +41,8 @@ import { parseText } from '@/lib/smartPlan/parse';
 import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache, seedCacheFromMeals } from '@/lib/smartPlan/enrich';
-import { parseRaw, upsertActivePlan, planTotals as storedPlanTotals } from '@/lib/planHistory';
+import { planTotals as storedPlanTotals } from '@/lib/planHistory';
+import { useWorkingPlan, useSaveWorkingPlan, workingPlanKey } from '@/hooks/useWorkingPlan';
 import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
 import { WeekOverview } from '@/components/mealplan-v3/WeekOverview';
 import { useRecordSubstitutions } from '@/hooks/useSubstitutionHistory';
@@ -112,22 +115,17 @@ export default function MealPlanEditor() {
     },
   });
 
-  const { data: analysisRow } = useQuery({
-    queryKey: ['meal-plan-editor-row', clientId],
-    enabled: !!clientId,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('ai_analyses').select('*').eq('client_id', clientId!)
-        .order('updated_at', { ascending: false }).limit(1).maybeSingle();
-      return data;
-    },
-  });
+  // ETAPA 6B — plano de trabalho canônico (draft; na falta dele, a publicada).
+  const { data: working } = useWorkingPlan(clientId);
+  const rawPlan: any = working?.raw ?? {};
+  const workingVersionId = working?.versionId ?? null;
+  const saveWorking = useSaveWorkingPlan();
 
   // Constrói o estado inicial a partir do banco.
   const initialTexts = useMemo<PlanTexts>(() => {
     const out: PlanTexts = { ...EMPTY_TEXTS };
     try {
-      const raw = parseRaw(analysisRow?.raw_response);
+      const raw = rawPlan;
       const meals = raw?.meal_plan?.meals || raw?.meals || [];
       if (Array.isArray(meals) && meals.length) out.all = mealsToText(meals);
       const variations = raw?.meal_plan?.day_variations || {};
@@ -139,12 +137,12 @@ export default function MealPlanEditor() {
       }
     } catch { /* noop */ }
     return out;
-  }, [analysisRow]);
+  }, [working]);
 
   // Refeições JÁ SALVAS por dia (base = 'all'). O plano salvo já traz gramas e
   // macros por alimento — usamos direto para exibir na hora, sem re-enriquecer.
   const storedByDay = useMemo<Partial<Record<DayKey, any[]>>>(() => {
-    const raw = parseRaw(analysisRow?.raw_response);
+    const raw = rawPlan;
     const mp = raw?.meal_plan || {};
     const out: Partial<Record<DayKey, any[]>> = { all: Array.isArray(mp.meals) ? mp.meals : [] };
     const vars = mp.day_variations || {};
@@ -154,7 +152,7 @@ export default function MealPlanEditor() {
       if (Array.isArray(meals)) out[k as DayKey] = meals;
     }
     return out;
-  }, [analysisRow]);
+  }, [working]);
 
   const draftKey = clientId ? `smart-plan-draft-v2:${clientId}` : null;
   const [texts, setTexts] = useState<PlanTexts>(() => {
@@ -179,14 +177,14 @@ export default function MealPlanEditor() {
 
   // Hidrata do banco quando não há rascunho local (e usuário ainda não editou).
   useEffect(() => {
-    if (!analysisRow || !draftKey) return;
+    if (!working || !draftKey) return;
     if (dirtyRef.current) return;
     try {
       if (!localStorage.getItem(draftKey)) {
         setTexts(initialTexts);
       }
     } catch { /* noop */ }
-  }, [analysisRow, initialTexts, draftKey]);
+  }, [working, initialTexts, draftKey]);
 
   // Autosave em localStorage — síncrono, sem debounce, e só após edição real.
   // localStorage é rápido; escrever a cada tecla é seguro e garante que nada
@@ -241,7 +239,7 @@ export default function MealPlanEditor() {
   // variação de kcal/porções e elimina a lentidão no carregamento.
   useEffect(() => {
     try {
-      const raw = parseRaw(analysisRow?.raw_response);
+      const raw = rawPlan;
       const base = raw?.meal_plan?.meals || raw?.meals || [];
       if (Array.isArray(base) && base.length) seedCacheFromMeals(enrichCache.current, base);
       const variations = raw?.meal_plan?.day_variations || {};
@@ -251,7 +249,7 @@ export default function MealPlanEditor() {
         if (Array.isArray(meals) && meals.length) seedCacheFromMeals(enrichCache.current, meals);
       }
     } catch { /* noop */ }
-  }, [analysisRow]);
+  }, [working]);
 
   const [enrichedTotalsText, setEnrichedTotalsText] = useState<string>('');
   const [enrichedMeals, setEnrichedMeals] = useState<any[] | undefined>(undefined);
@@ -266,38 +264,32 @@ export default function MealPlanEditor() {
   // Hidrata orientações do banco.
   useEffect(() => {
     try {
-      const raw = analysisRow?.raw_response as any;
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      const parsed = rawPlan;
       const text =
         parsed?.strategic_orientations?.custom_notes ??
         parsed?.orientations_text ??
         '';
       if (typeof text === 'string') setOrientationsText(text);
     } catch { /* noop */ }
-  }, [analysisRow]);
+  }, [working]);
 
   const saveOrientations = async () => {
     if (!clientId) return;
     try {
       setOrientationsSaving(true);
-      const parsed = parseRaw(analysisRow?.raw_response);
-      const nextRaw = {
-        ...parsed,
-        strategic_orientations: {
-          ...(parsed?.strategic_orientations || {}),
-          custom_notes: orientationsText,
+      // ETAPA 6B — orientações oficiais vivem na versão canônica de trabalho.
+      await saveWorking({
+        clientId,
+        source: 'manual_editor',
+        raw: {
+          ...rawPlan,
+          strategic_orientations: {
+            ...(rawPlan?.strategic_orientations || {}),
+            custom_notes: orientationsText,
+          },
         },
-      };
-      const rawStr = JSON.stringify(nextRaw);
-      if (analysisRow?.id) {
-        const { error } = await supabase.from('ai_analyses').update({ raw_response: rawStr as any }).eq('id', analysisRow.id);
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: rawStr });
-        if (error) throw error;
-      }
+      });
       toast.success('Orientações salvas. Serão enviadas ao Zona Nutri no próximo envio.');
-      qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
       setOrientationsOpen(false);
     } catch (e: any) {
       toast.error(`Falha ao salvar orientações: ${e.message || e}`);
