@@ -33,6 +33,7 @@ import { TotalsPanel } from '@/components/mealplan-v3/TotalsPanel';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { mealsToText } from '@/lib/smartPlan/fromMeals';
 import { ImportPreviewDialog } from '@/components/mealplan-v3/ImportPreviewDialog';
+import { PublishPlanControl } from '@/components/mealplan/PublishPlanControl';
 
 import { parseText } from '@/lib/smartPlan/parse';
 import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
