@@ -5,6 +5,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiJson, loadFoodTable, matchFood, foodMacros } from "../_shared/planPipeline.ts";
 import { loadMealPlanSkill, logGeneration } from "../_shared/skillPrompt.ts";
+import { loadWorkingPlan, saveWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -273,9 +274,10 @@ Deno.serve(async (req) => {
     const { data: profile } = await supabase.from("athlete_profiles").select("*").eq("client_id", clientId).maybeSingle();
 
     // Idempotência simples: não regenerar se já está gerando.
-    const { data: existingRow } = await supabase.from("ai_analyses").select("id, raw_response").eq("client_id", clientId).maybeSingle();
-    let existing: any = null;
-    try { existing = existingRow?.raw_response ? JSON.parse(existingRow.raw_response) : null; } catch { /* */ }
+    // ETAPA 6B — estado do plano vem do store canônico, não de raw_response.
+    const { data: existingRow } = await supabase.from("ai_analyses").select("id").eq("client_id", clientId).maybeSingle();
+    const working = await loadWorkingPlan(supabase, clientId);
+    const existing: any = working.raw && Object.keys(working.raw).length ? working.raw : null;
     if (existing?.status === "generating") return json({ error: "Geração já em andamento." }, 409);
 
     const { data: anamnese } = await supabase
@@ -356,9 +358,9 @@ ${anamneseText || "N/I"}
 }
 Regras: cada refeição aparece UMA vez, com id único. Use alimentos que o atleta já consome. Substituições dentro do mesmo grupo. Crie 1–2 carbBlocks reutilizáveis para reforço de carboidrato. Não escreva orientações por dia da semana.`;
 
-    // Marca "generating"
+    // Marca "generating" — ETAPA 6B: grava na versão de trabalho, não em raw_response.
     const genStub = { planModelVersion: 2, status: "generating", updatedAt: new Date().toISOString() };
-    if (existingRow) await supabase.from("ai_analyses").update({ raw_response: JSON.stringify({ ...(existing || {}), ...genStub }) }).eq("id", existingRow.id);
+    await saveWorkingPlan(supabase, { clientId, raw: { ...(existing || {}), ...genStub }, source: "ai_generated" });
 
     // Observabilidade
     const t0 = Date.now();
@@ -414,14 +416,18 @@ Regras: cada refeição aparece UMA vez, com id único. Use alimentos que o atle
       _isNewFormat: true,
     };
 
+    // ETAPA 6B — plano-base vira versão de trabalho (draft) no store canônico.
+    // ai_analyses mantém só colunas de análise (não-plano) para telas legadas.
     const record = {
       client_id: clientId, athlete_profile_id: profile?.id ?? null,
       diagnosis: stored.athlete_summary, alerts: stored.alerts,
-      raw_response: JSON.stringify(stored), model_used: `v2-base/${model}`, updated_at: new Date().toISOString(),
+      model_used: `v2-base/${model}`, updated_at: new Date().toISOString(),
       energy_expenditure: {} as any, macronutrients: {} as any, caloric_deficit: { meal_plan: stored.meal_plan } as any,
     };
     if (existingRow) await supabase.from("ai_analyses").update(record).eq("id", existingRow.id);
     else await supabase.from("ai_analyses").insert(record);
+
+    await saveWorkingPlan(supabase, { clientId, raw: stored, source: "ai_generated" });
 
     // Registra a versão exata do prompt/módulos usada nesta geração.
     await logGeneration(supabase, {

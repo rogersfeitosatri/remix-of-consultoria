@@ -4,6 +4,7 @@
 // curta para o admin enviar ao atleta explicando os ajustes.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiStructured } from "../_shared/aiClient.ts";
+import { loadWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,11 +31,11 @@ Deno.serve(async (req) => {
       .from("athlete_profiles").select("*").eq("client_id", clientId).maybeSingle();
 
     // Plano atual (obrigatório — é o que será atualizado)
+    // ETAPA 6B — plano de trabalho vem do store canônico, não de raw_response.
     const { data: currentAnalysis } = await supabase
-      .from("ai_analyses").select("*").eq("client_id", clientId).maybeSingle();
-    const currentPlan = currentAnalysis?.raw_response
-      ? safeParse(currentAnalysis.raw_response)
-      : null;
+      .from("ai_analyses").select("id, diagnosis").eq("client_id", clientId).maybeSingle();
+    const working = await loadWorkingPlan(supabase, clientId);
+    const currentPlan = working.raw;
     if (!currentPlan?.meal_plan) {
       throw new Error("Não há plano alimentar atual para atualizar. Gere o plano primeiro.");
     }
@@ -154,9 +155,9 @@ TAREFA (siga as regras do sistema — ajustes conservadores, só o necessário):
       fallback: 'openai-gpt4o-mini',
     });
 
-    // Ajustes ficam como PROPOSTA (pending_update) até o admin clicar em
-    // "Aplicar ajustes ao plano". Mantém o plano atual intocado para envio ao
-    // Zona Nutri até a decisão explícita.
+    // ETAPA 6B — ajustes NUNCA mais viram "pending_update" dentro de
+    // raw_response. Viram uma PROPOSTA em meal_plan_change_proposals até o
+    // admin decidir aplicar; o plano de trabalho/publicado fica intocado.
     const hasChange = !analysisData.no_change_needed && !!analysisData.meal_plan;
 
     const pending_update = hasChange
@@ -181,12 +182,13 @@ TAREFA (siga as regras do sistema — ajustes conservadores, só o necessário):
       adjustments: analysisData.adjustments ?? [],
       attention_points: analysisData.attention_points ?? [],
       no_change_needed: analysisData.no_change_needed ?? false,
-      pending_update,
       _isNewFormat: true,
       last_update_reason: "checkin_update",
       updated_at: new Date().toISOString(),
     };
 
+    // Colunas de análise (não-plano) do ai_analyses seguem sendo atualizadas
+    // para compatibilidade de telas legadas de diagnóstico — SEM raw_response.
     const record = {
       diagnosis: merged.athlete_summary || currentAnalysis?.diagnosis || "",
       energy_expenditure: {
@@ -196,19 +198,47 @@ TAREFA (siga as regras do sistema — ajustes conservadores, só o necessário):
       caloric_deficit: { meal_plan: merged.meal_plan },
       macronutrients: { strategic_orientations: merged.strategic_orientations },
       alerts: merged.alerts || [],
-      raw_response: JSON.stringify(merged),
       model_used: `${provider}/${model}`,
       updated_at: new Date().toISOString(),
     };
 
-    const { data: saved, error: saveErr } = await supabase
-      .from("ai_analyses").update(record).eq("id", currentAnalysis.id).select().single();
-    if (saveErr) throw new Error(`Falha ao salvar plano atualizado: ${saveErr.message}`);
+    let saved: any = null;
+    if (currentAnalysis?.id) {
+      const { data, error: saveErr } = await supabase
+        .from("ai_analyses").update(record).eq("id", currentAnalysis.id).select().single();
+      if (saveErr) throw new Error(`Falha ao salvar plano atualizado: ${saveErr.message}`);
+      saved = data;
+    }
+
+    // ETAPA 6B — proposta de alteração (nunca escreve no plano publicado/trabalho).
+    let proposalId: string | null = null;
+    if (pending_update) {
+      const published = await supabase
+        .from("meal_plan_versions").select("id")
+        .eq("client_id", clientId).eq("status", "published").maybeSingle();
+      const { data: proposal, error: proposalErr } = await supabase
+        .from("meal_plan_change_proposals")
+        .insert({
+          user_id: client.user_id,
+          client_id: clientId,
+          current_published_version_id: published.data?.id ?? working.versionId ?? null,
+          proposed_changes: pending_update,
+          rationale: merged.adjustment_message || merged.checkin_reading || null,
+          ai_metadata: { model: `${provider}/${model}`, source: "update-meal-plan" },
+          status: "pending",
+          created_by: null,
+        })
+        .select("id")
+        .maybeSingle();
+      if (proposalErr) console.error("update-meal-plan: falha ao criar proposta:", proposalErr.message);
+      proposalId = proposal?.id ?? null;
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         analysis: saved,
+        proposalId,
         adjustment_message: merged.adjustment_message,
         checkin_reading: merged.checkin_reading,
         adjustments: merged.adjustments,

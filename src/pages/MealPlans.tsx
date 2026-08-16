@@ -14,18 +14,27 @@ import { ptBR } from 'date-fns/locale';
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
 
-// Índice de quais clientes já têm plano alimentar montado.
+// ETAPA 6B — índice canônico: "tem plano" = existe versão publicada em
+// meal_plan_versions. Nada de ai_analyses.caloric_deficit/raw_response.
 function useMealPlanIndex() {
   return useQuery({
     queryKey: ['meal-plan-index'],
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('ai_analyses').select('client_id, updated_at, caloric_deficit');
+      const { data, error } = await (supabase as any)
+        .from('meal_plan_versions')
+        .select('client_id, status, published_at, updated_at')
+        .in('status', ['published', 'draft', 'reviewed']);
       if (error) throw error;
       const map: Record<string, { hasPlan: boolean; updatedAt: string }> = {};
-      for (const row of data || []) {
-        const meals = (row.caloric_deficit as any)?.meal_plan?.meals;
-        map[(row as any).client_id] = { hasPlan: Array.isArray(meals) && meals.length > 0, updatedAt: (row as any).updated_at };
+      for (const row of (data || []) as any[]) {
+        const prev = map[row.client_id];
+        const isPublished = row.status === 'published';
+        const when = row.published_at || row.updated_at || '';
+        map[row.client_id] = {
+          hasPlan: (prev?.hasPlan ?? false) || isPublished,
+          updatedAt: when > (prev?.updatedAt || '') ? when : (prev?.updatedAt || ''),
+        };
       }
       return map;
     },

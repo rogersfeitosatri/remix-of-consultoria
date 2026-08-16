@@ -23,6 +23,8 @@ import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { ArrowLeft, Brain, Sparkles, FilePlus2, Loader2, ChevronDown, Wand2, Scale, BellRing, Check, RefreshCw, Copy, MessageSquare, FileUp, Send, Layers, MoreVertical, CircleCheck, CircleDashed } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { PublishPlanControl } from '@/components/mealplan/PublishPlanControl';
+import { useWorkingPlan, useSaveWorkingPlan } from '@/hooks/useWorkingPlan';
+import { workingPlanKey } from '@/hooks/useWorkingPlan';
 
 const PLAN_LABEL: Record<string, string> = { consultoria: 'Consultoria', premium: 'Premium', zona_nutri_diet: 'Zona Nutri Diet' };
 
@@ -42,23 +44,9 @@ interface Guidance {
 }
 const EMPTY_GUIDANCE: Guidance = { meals_count: '', target_kcal: '', target_cho_gkg: '', target_protein_gkg: '', target_fat_gkg: '', custom_instructions: '' };
 
-function parseStructured(row: any): any | null {
-  if (!row) return null;
-  try {
-    if (row.raw_response) {
-      const parsed = typeof row.raw_response === 'string' ? JSON.parse(row.raw_response) : row.raw_response;
-      if (parsed?.meal_plan) return { ...parsed, _isNewFormat: true, updated_at: row.updated_at };
-    }
-  } catch { /* fallthrough */ }
-  return {
-    _isNewFormat: false,
-    athlete_summary: row.diagnosis || '',
-    alerts: row.alerts || [],
-    strategic_orientations: (row.macronutrients as any)?.strategic_orientations,
-    meal_plan: (row.caloric_deficit as any)?.meal_plan,
-    updated_at: row.updated_at,
-  };
-}
+// ETAPA 6B: leitura do plano NÃO usa mais `ai_analyses.raw_response`/`caloric_deficit`.
+// O plano de trabalho vem de useWorkingPlan(clientId) (núcleo canônico, com
+// fallback legado read-only já embutido em loadWorkingPlan).
 
 export default function MealPlanDetail() {
   const { clientId } = useParams<{ clientId: string }>();
@@ -76,11 +64,19 @@ export default function MealPlanDetail() {
     },
   });
 
-  const { data: analysisRow, isLoading } = useQuery({
+  // ETAPA 6B — o plano de trabalho vem do núcleo canônico; `ai_analyses` só é
+  // lido para os campos de ANÁLISE (diagnóstico/alertas), nunca para o plano.
+  const { data: working, isLoading } = useWorkingPlan(clientId);
+  const { mutateAsync: saveWorking } = useSaveWorkingPlan();
+  const { data: analysisRow } = useQuery({
     queryKey: ['ai_analysis', clientId],
     enabled: !!clientId,
     queryFn: async () => {
-      const { data, error } = await supabase.from('ai_analyses').select('*').eq('client_id', clientId!).maybeSingle();
+      const { data, error } = await supabase
+        .from('ai_analyses')
+        .select('id, client_id, diagnosis, alerts, energy_expenditure, macronutrients, updated_at')
+        .eq('client_id', clientId!)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -105,7 +101,7 @@ export default function MealPlanDetail() {
     },
   });
 
-  const structured = parseStructured(analysisRow);
+  const structured: any = working?.raw ?? {};
   const isV2 = structured?.planModelVersion === 2 && Array.isArray(structured?.basePlan?.meals);
   const hasPlan = isV2 || !!structured?.meal_plan?.meals;
 
@@ -138,15 +134,11 @@ export default function MealPlanDetail() {
     return clone;
   })();
 
-  // Persiste o analysis completo em ai_analyses (sem refresh — usado nos saves).
+  // ETAPA 6B — persiste o plano de trabalho no núcleo canônico (rascunho).
+  // Nunca grava plano em `ai_analyses`; a versão publicada só muda por publicação.
   const persistStructured = async (next: any) => {
-    const raw = JSON.stringify({ ...next, _isNewFormat: true });
-    const { error } = await supabase.from('ai_analyses').update({
-      raw_response: raw,
-      caloric_deficit: { meal_plan: next.meal_plan } as any,
-      updated_at: new Date().toISOString(),
-    }).eq('client_id', clientId!);
-    if (error) throw error;
+    if (!clientId) return;
+    await saveWorking({ clientId, raw: next, source: 'classic_editor' });
   };
 
   // Salvamento vindo do editor quando estamos numa variação de dia.
@@ -219,6 +211,8 @@ export default function MealPlanDetail() {
   };
 
   const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: workingPlanKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: ['meal-plan-versions', clientId] });
     queryClient.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
     queryClient.invalidateQueries({ queryKey: ['meal-plan-index'] });
   };
@@ -408,29 +402,7 @@ export default function MealPlanDetail() {
         strategic_orientations: { meal_routine: [], training_strategy: [], supplementation: [], race_context: '' },
         alerts: [],
       };
-      const raw = JSON.stringify({ ...empty, _isNewFormat: true });
-      let profileId: string | null = null;
-      try {
-        const { data: prof } = await (supabase as any).from('athlete_profiles').select('id').eq('client_id', clientId).maybeSingle();
-        profileId = prof?.id ?? null;
-      } catch { /* ignore */ }
-
-      if (analysisRow) {
-        const { error } = await supabase.from('ai_analyses').update({
-          raw_response: raw, caloric_deficit: { meal_plan: empty.meal_plan } as any, updated_at: new Date().toISOString(),
-        }).eq('client_id', clientId!);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('ai_analyses').insert({
-          client_id: clientId!, athlete_profile_id: profileId,
-          diagnosis: '', raw_response: raw,
-          caloric_deficit: { meal_plan: empty.meal_plan } as any,
-          // These columns are NOT NULL on the table.
-          energy_expenditure: {} as any,
-          macronutrients: { strategic_orientations: empty.strategic_orientations } as any,
-        } as any);
-        if (error) throw error;
-      }
+      await saveWorking({ clientId: clientId!, raw: { ...empty, _isNewFormat: true }, source: 'classic_editor' });
     },
     onSuccess: () => { toast.success('Plano em branco criado. Clique em Editar Plano para começar.'); refresh(); },
     onError: (e: any) => toast.error(e.message || 'Erro ao criar plano'),

@@ -5,6 +5,7 @@
 // Secrets: ZONA_NUTRI_MEAL_PLAN_URL (endpoint do plano) e CONSULTORIA_API_KEY.
 // Opcional: ZONA_NUTRI_SYNC_URL. Se ausente, é derivada do endpoint do plano.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { loadPublishedPlan, loadWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -183,6 +184,15 @@ async function ensureZonaNutriProfile(params: {
   }
 }
 
+// ETAPA 6B — grava o marcador de envio ao Zona Nutri em meal_plan_status
+// (nunca no conteúdo do plano/versão). Idempotente por client_id.
+async function recordSentToZonaNutri(supabase: any, clientId: string, userId: string) {
+  await supabase.from("meal_plan_status").upsert(
+    { client_id: clientId, user_id: userId, status: "sent", sent_at: new Date().toISOString() },
+    { onConflict: "client_id" },
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -202,13 +212,23 @@ Deno.serve(async (req) => {
     const email = normalizeEmail(client.email);
     if (!email) throw new Error("Cliente sem e-mail; não é possível vincular ao Zona Nutri.");
 
+    // ETAPA 6B — fonte oficial é a versão PUBLICADA no store canônico.
+    // Fallback para o plano de trabalho (com log) só para não quebrar o envio
+    // enquanto ainda existem clientes sem versão publicada (legado/transição).
     const { data: analysis } = await supabase
-      .from("ai_analyses").select("*").eq("client_id", clientId).maybeSingle();
+      .from("ai_analyses").select("id, updated_at").eq("client_id", clientId).maybeSingle();
+    const published = await loadPublishedPlan(supabase, clientId);
     let plan: any = null;
-    try {
-      const raw = analysis?.raw_response;
-      plan = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    } catch { /* */ }
+    let sourceVersionId: string | null = null;
+    if (published) {
+      plan = { ...(published.metadata || {}), meal_plan: published.content || {}, strategic_orientations: published.orientations ?? undefined };
+      sourceVersionId = published.id;
+    } else {
+      console.log("legacy_meal_plan_fallback_used", JSON.stringify({ client_id: clientId, reason: "no_published_version" }));
+      const working = await loadWorkingPlan(supabase, clientId);
+      plan = working.raw;
+      sourceVersionId = working.versionId;
+    }
     if (!plan?.meal_plan?.meals) throw new Error("Não há plano alimentar para enviar.");
 
     // O endpoint do Zona Nutri resolve primeiro por external_id
@@ -330,8 +350,9 @@ Deno.serve(async (req) => {
           ({ text, body: responseBody } = await readResponse(res));
           if (res.ok) {
             try {
-              const updated = markSentToZonaNutri(plan);
-              await supabase.from("ai_analyses").update({ raw_response: JSON.stringify(updated) }).eq("id", analysis.id);
+              // ETAPA 6B — marcador de envio NUNCA mais em raw_response; vai
+              // para meal_plan_status (não mexe no conteúdo da versão publicada).
+              await recordSentToZonaNutri(supabase, client.id, client.user_id);
             } catch { /* não bloqueia */ }
             return json({ success: true, sent: true, linked: true, response: responseBody });
           }
@@ -346,10 +367,10 @@ Deno.serve(async (req) => {
       return json({ error: `Zona Nutri respondeu ${res.status}: ${text.slice(0, 500)}`, fallback: res.status >= 500 }, res.status >= 500 ? 200 : 502);
     }
 
-    // Marca envio no plano (destaque do plano enviado no hub do atleta).
+    // ETAPA 6B — marca envio via meal_plan_status (nunca escreve no conteúdo
+    // da versão — publicada ou de trabalho).
     try {
-      const updated = markSentToZonaNutri(plan);
-      await supabase.from("ai_analyses").update({ raw_response: JSON.stringify(updated) }).eq("id", analysis.id);
+      await recordSentToZonaNutri(supabase, client.id, client.user_id);
     } catch { /* não bloqueia */ }
 
     return json({ success: true, sent: true, linked: preSync.ok, response: responseBody });

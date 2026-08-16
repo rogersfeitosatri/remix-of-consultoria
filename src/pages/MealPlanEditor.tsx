@@ -1,8 +1,10 @@
 // Página do Editor Inteligente de Plano Alimentar (Fase 2 — multi-dia).
 // Rota: /meal-plans/:clientId/editor
-// - "Todos os dias" é o plano base (compatível com o formato legado em
-//   ai_analyses.raw_response.meal_plan.meals).
-// - Overrides por dia da semana ficam em raw_response.meal_plan.day_variations
+// ETAPA 6B — a fonte do plano é o núcleo canônico (meal_plans +
+// meal_plan_versions), acessado por useWorkingPlan/saveWorkingPlan.
+// `ai_analyses.raw_response` NÃO é mais store do plano.
+// - "Todos os dias" é o plano base (content.meals da versão de trabalho).
+// - Overrides por dia da semana ficam em content.day_variations
 //   (mapa { mon: [meals], tue: [...], ... }). Consumidores existentes seguem
 //   lendo `meals`.
 // - Cada aba tem seu próprio texto e rascunho local independente.
@@ -39,7 +41,9 @@ import { parseText } from '@/lib/smartPlan/parse';
 import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
 import { astToMeals, astToText } from '@/lib/smartPlan/serialize';
 import { enrichAst, makeEnrichCache, seedCacheFromMeals } from '@/lib/smartPlan/enrich';
-import { parseRaw, upsertActivePlan, planTotals as storedPlanTotals } from '@/lib/planHistory';
+import { planTotals as storedPlanTotals } from '@/lib/planHistory';
+import { useWorkingPlan, useSaveWorkingPlan, workingPlanKey } from '@/hooks/useWorkingPlan';
+import { loadWorkingPlan } from '@/lib/planStore';
 import { structuredAnalysisToPdfInput, downloadMealPlanPdf } from '@/lib/mealPlanPdf';
 import { WeekOverview } from '@/components/mealplan-v3/WeekOverview';
 import { useRecordSubstitutions } from '@/hooks/useSubstitutionHistory';
@@ -112,22 +116,17 @@ export default function MealPlanEditor() {
     },
   });
 
-  const { data: analysisRow } = useQuery({
-    queryKey: ['meal-plan-editor-row', clientId],
-    enabled: !!clientId,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('ai_analyses').select('*').eq('client_id', clientId!)
-        .order('updated_at', { ascending: false }).limit(1).maybeSingle();
-      return data;
-    },
-  });
+  // ETAPA 6B — plano de trabalho canônico (draft; na falta dele, a publicada).
+  const { data: working } = useWorkingPlan(clientId);
+  const rawPlan: any = working?.raw ?? {};
+  const workingVersionId = working?.versionId ?? null;
+  const saveWorking = useSaveWorkingPlan();
 
   // Constrói o estado inicial a partir do banco.
   const initialTexts = useMemo<PlanTexts>(() => {
     const out: PlanTexts = { ...EMPTY_TEXTS };
     try {
-      const raw = parseRaw(analysisRow?.raw_response);
+      const raw = rawPlan;
       const meals = raw?.meal_plan?.meals || raw?.meals || [];
       if (Array.isArray(meals) && meals.length) out.all = mealsToText(meals);
       const variations = raw?.meal_plan?.day_variations || {};
@@ -139,12 +138,12 @@ export default function MealPlanEditor() {
       }
     } catch { /* noop */ }
     return out;
-  }, [analysisRow]);
+  }, [working]);
 
   // Refeições JÁ SALVAS por dia (base = 'all'). O plano salvo já traz gramas e
   // macros por alimento — usamos direto para exibir na hora, sem re-enriquecer.
   const storedByDay = useMemo<Partial<Record<DayKey, any[]>>>(() => {
-    const raw = parseRaw(analysisRow?.raw_response);
+    const raw = rawPlan;
     const mp = raw?.meal_plan || {};
     const out: Partial<Record<DayKey, any[]>> = { all: Array.isArray(mp.meals) ? mp.meals : [] };
     const vars = mp.day_variations || {};
@@ -154,7 +153,7 @@ export default function MealPlanEditor() {
       if (Array.isArray(meals)) out[k as DayKey] = meals;
     }
     return out;
-  }, [analysisRow]);
+  }, [working]);
 
   const draftKey = clientId ? `smart-plan-draft-v2:${clientId}` : null;
   const [texts, setTexts] = useState<PlanTexts>(() => {
@@ -179,14 +178,14 @@ export default function MealPlanEditor() {
 
   // Hidrata do banco quando não há rascunho local (e usuário ainda não editou).
   useEffect(() => {
-    if (!analysisRow || !draftKey) return;
+    if (!working || !draftKey) return;
     if (dirtyRef.current) return;
     try {
       if (!localStorage.getItem(draftKey)) {
         setTexts(initialTexts);
       }
     } catch { /* noop */ }
-  }, [analysisRow, initialTexts, draftKey]);
+  }, [working, initialTexts, draftKey]);
 
   // Autosave em localStorage — síncrono, sem debounce, e só após edição real.
   // localStorage é rápido; escrever a cada tecla é seguro e garante que nada
@@ -241,7 +240,7 @@ export default function MealPlanEditor() {
   // variação de kcal/porções e elimina a lentidão no carregamento.
   useEffect(() => {
     try {
-      const raw = parseRaw(analysisRow?.raw_response);
+      const raw = rawPlan;
       const base = raw?.meal_plan?.meals || raw?.meals || [];
       if (Array.isArray(base) && base.length) seedCacheFromMeals(enrichCache.current, base);
       const variations = raw?.meal_plan?.day_variations || {};
@@ -251,7 +250,7 @@ export default function MealPlanEditor() {
         if (Array.isArray(meals) && meals.length) seedCacheFromMeals(enrichCache.current, meals);
       }
     } catch { /* noop */ }
-  }, [analysisRow]);
+  }, [working]);
 
   const [enrichedTotalsText, setEnrichedTotalsText] = useState<string>('');
   const [enrichedMeals, setEnrichedMeals] = useState<any[] | undefined>(undefined);
@@ -266,38 +265,32 @@ export default function MealPlanEditor() {
   // Hidrata orientações do banco.
   useEffect(() => {
     try {
-      const raw = analysisRow?.raw_response as any;
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      const parsed = rawPlan;
       const text =
         parsed?.strategic_orientations?.custom_notes ??
         parsed?.orientations_text ??
         '';
       if (typeof text === 'string') setOrientationsText(text);
     } catch { /* noop */ }
-  }, [analysisRow]);
+  }, [working]);
 
   const saveOrientations = async () => {
     if (!clientId) return;
     try {
       setOrientationsSaving(true);
-      const parsed = parseRaw(analysisRow?.raw_response);
-      const nextRaw = {
-        ...parsed,
-        strategic_orientations: {
-          ...(parsed?.strategic_orientations || {}),
-          custom_notes: orientationsText,
+      // ETAPA 6B — orientações oficiais vivem na versão canônica de trabalho.
+      await saveWorking({
+        clientId,
+        source: 'manual_editor',
+        raw: {
+          ...rawPlan,
+          strategic_orientations: {
+            ...(rawPlan?.strategic_orientations || {}),
+            custom_notes: orientationsText,
+          },
         },
-      };
-      const rawStr = JSON.stringify(nextRaw);
-      if (analysisRow?.id) {
-        const { error } = await supabase.from('ai_analyses').update({ raw_response: rawStr as any }).eq('id', analysisRow.id);
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: rawStr });
-        if (error) throw error;
-      }
+      });
       toast.success('Orientações salvas. Serão enviadas ao Zona Nutri no próximo envio.');
-      qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
       setOrientationsOpen(false);
     } catch (e: any) {
       toast.error(`Falha ao salvar orientações: ${e.message || e}`);
@@ -420,7 +413,7 @@ export default function MealPlanEditor() {
       }
       // Registra as substituições usadas — a IA aprende com o histórico.
       if (dayAsts.length) void recordSubs(dayAsts);
-      const currentRaw = parseRaw(analysisRow?.raw_response);
+      const currentRaw = rawPlan;
       try {
         localStorage.setItem(backupKey, JSON.stringify({
           raw_response: currentRaw,
@@ -437,32 +430,22 @@ export default function MealPlanEditor() {
         day_variations: dayVariations,
         daily_totals: { calories: bt.kcal, carbs_g: bt.cho, protein_g: bt.ptn, fat_g: bt.lip },
       };
-      // Atualiza a entrada ATIVA no histórico (aparece no hub em "Planos salvos").
-      const { raw: withHistory } = upsertActivePlan(currentRaw, mealPlan);
-      const nextRaw = { ...withHistory, editor: 'smart-plan-v3' };
-      const nowIso = new Date().toISOString();
-      // Coluna raw_response é TEXT → grava JSON string (convenção do sistema).
-      const rawStr = JSON.stringify(nextRaw);
-      if (analysisRow?.id) {
-        const { error } = await supabase.from('ai_analyses').update({ raw_response: rawStr, updated_at: nowIso } as any).eq('id', analysisRow.id);
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase as any).from('ai_analyses').insert({ client_id: clientId, raw_response: rawStr, updated_at: nowIso });
-        if (error) throw error;
-      }
+      // ETAPA 6B — salva no núcleo canônico (rascunho). A versão publicada só
+      // muda por publicação explícita.
+      await saveWorking({
+        clientId,
+        source: 'manual_editor',
+        raw: { ...currentRaw, meal_plan: mealPlan, editor: 'smart-plan-v3' },
+      });
       // Plano persistido no banco — banco passa a ser a fonte da verdade.
       // Limpa o rascunho local para que abrir aqui ou em outro dispositivo
       // hidrate do banco (evita divergência entre dispositivos).
       try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* noop */ }
-      // Mantém dirtyRef=false para que a hidratação do refetch atualize a UI
-      // com o que foi realmente salvo.
       dirtyRef.current = false;
       setSaveState('saved');
       toast.success(overrideDays.length
         ? `Plano salvo (base + ${overrideDays.length} variação(ões) de dia).`
         : 'Plano salvo.');
-      await qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
-      qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
       qc.invalidateQueries({ queryKey: ['athlete-analysis', clientId] });
     } catch (e: any) {
       toast.error(`Não foi possível salvar: ${e.message || e}`);
@@ -471,10 +454,10 @@ export default function MealPlanEditor() {
     }
   };
 
-  // Salva o conteúdo atual como PROPOSTA (pending_update) — o admin aplica/desfaz
-  // depois na página de detalhe do plano (MealPlanDetail).
+  // ETAPA 6B — proposta de ajuste vira `meal_plan_change_proposals` (nunca
+  // `raw_response.pending_update`). O admin aplica/desfaz no detalhe do plano.
   const saveAsProposal = async () => {
-    if (!clientId || !analysisRow?.id) { toast.error('Salve o plano ao menos uma vez antes de propor.'); return; }
+    if (!clientId) return;
     try {
       setSaving(true);
       const baseAst = parseText(texts.all);
@@ -486,23 +469,30 @@ export default function MealPlanEditor() {
         await enrichAst(ast, enrichCache.current);
         dayVariations[k] = astToMeals(ast);
       }
-      const currentRaw = parseRaw(analysisRow?.raw_response);
-      const pending_update = {
-        source: 'smart-plan-v3',
-        created_at: new Date().toISOString(),
-        meal_plan: {
-          ...(currentRaw.meal_plan || {}),
-          meals: baseMeals,
-          day_variations: dayVariations,
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth?.user?.id;
+      if (!userId) throw new Error('Sessão expirada.');
+      const published = (working?.versions || []).find((v) => v.status === 'published');
+      const { error } = await (supabase as any).from('meal_plan_change_proposals').insert({
+        user_id: userId,
+        created_by: userId,
+        client_id: clientId,
+        current_published_version_id: published?.id ?? null,
+        status: 'pending',
+        rationale: 'Proposta criada no Editor Inteligente',
+        ai_metadata: { source: 'smart-plan-v3' },
+        proposed_changes: {
+          meal_plan: {
+            ...(rawPlan?.meal_plan || {}),
+            meals: baseMeals,
+            day_variations: dayVariations,
+          },
         },
-      };
-      const nextRaw = { ...currentRaw, pending_update };
-      const { error } = await supabase.from('ai_analyses').update({ raw_response: JSON.stringify(nextRaw) }).eq('id', analysisRow.id);
+      });
       if (error) throw error;
       toast.success('Proposta salva. Abra o plano do atleta e clique em "Aplicar ajustes".');
-      qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
-      qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
-      qc.invalidateQueries({ queryKey: ['athlete-analysis', clientId] });
+      qc.invalidateQueries({ queryKey: workingPlanKey(clientId) });
+      qc.invalidateQueries({ queryKey: ['meal-plan-proposals', clientId] });
     } catch (e: any) {
       toast.error(`Falha ao salvar proposta: ${e.message || e}`);
     } finally {
@@ -536,13 +526,13 @@ export default function MealPlanEditor() {
   ];
 
   const undoSave = async () => {
-    if (!clientId || !analysisRow?.id) return;
+    if (!clientId) return;
     try {
       const raw = localStorage.getItem(backupKey);
       if (!raw) { toast.error('Sem backup para desfazer.'); return; }
       const { raw_response } = JSON.parse(raw);
-      const { error } = await supabase.from('ai_analyses').update({ raw_response: JSON.stringify(raw_response) }).eq('id', analysisRow.id);
-      if (error) throw error;
+      // ETAPA 6B — desfazer reescreve o RASCUNHO canônico (nunca a publicada).
+      await saveWorking({ clientId, source: 'manual_editor', raw: raw_response });
       // Reconstrói textos a partir do estado anterior.
       const meals = raw_response?.meal_plan?.meals || raw_response?.meals || [];
       const variations = raw_response?.meal_plan?.day_variations || {};
@@ -558,7 +548,6 @@ export default function MealPlanEditor() {
       localStorage.removeItem(backupKey);
       setHasBackup(false);
       toast.success('Último salvamento desfeito.');
-      qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
     } catch (e: any) {
       toast.error(`Não foi possível desfazer: ${e.message || e}`);
     }
@@ -572,11 +561,9 @@ export default function MealPlanEditor() {
       const { data, error } = await supabase.functions.invoke('generate-base-plan', { body: { clientId } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      await qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
-      const { data: fresh } = await supabase
-        .from('ai_analyses').select('raw_response').eq('client_id', clientId)
-        .order('updated_at', { ascending: false }).limit(1).maybeSingle();
-      const freshRaw = parseRaw(fresh?.raw_response);
+      await qc.invalidateQueries({ queryKey: workingPlanKey(clientId) });
+      const fresh = await loadWorkingPlan(clientId);
+      const freshRaw = fresh.raw;
       const meals = freshRaw?.meal_plan?.meals || freshRaw?.meals || [];
       if (Array.isArray(meals) && meals.length) {
         setText(mealsToText(meals));

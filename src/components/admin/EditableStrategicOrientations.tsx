@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Pencil, Save, X, Plus, Trash2, Loader2, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useSaveWorkingPlan } from '@/hooks/useWorkingPlan';
 
 interface Supp { supplement: string; recommendation: string }
 
@@ -21,6 +22,7 @@ export function EditableStrategicOrientations({
   const so = analysis?.strategic_orientations || {};
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const saveWorkingPlan = useSaveWorkingPlan();
 
   const [summary, setSummary] = useState<string>(analysis?.athlete_summary || '');
   const [mealRoutine, setMealRoutine] = useState<string[]>(so.meal_routine || []);
@@ -47,12 +49,16 @@ export function EditableStrategicOrientations({
         supplementation: cleanSupps,
         race_context: raceContext.trim(),
       };
-      const merged = { ...analysis, athlete_summary: summary.trim(), strategic_orientations: newSo, _isNewFormat: true };
+      // ETAPA 6B: orientações oficiais vão para o núcleo canônico (meal_plan_versions).
+      // `diagnosis` (resumo do atleta) continua em ai_analyses — não é plano.
+      await saveWorkingPlan({
+        clientId,
+        raw: { ...analysis, strategic_orientations: newSo },
+        source: 'classic_editor',
+      });
       const { error } = await supabase
         .from('ai_analyses')
         .update({
-          raw_response: JSON.stringify(merged),
-          macronutrients: { strategic_orientations: newSo } as any,
           diagnosis: summary.trim(),
           updated_at: new Date().toISOString(),
         })

@@ -23,6 +23,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { saveWorkingPlan } from '@/lib/planStore';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
@@ -1115,16 +1116,8 @@ export function EditableMealPlan({ analysis, clientId, athleteWeightKg, mealSche
       await onSavePlan(data.meal_plan);
       return;
     }
-    const updatedRaw = JSON.stringify({ ...data, _isNewFormat: true });
-    const { error } = await supabase
-      .from('ai_analyses')
-      .update({
-        raw_response: updatedRaw,
-        caloric_deficit: { meal_plan: data.meal_plan } as any,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('client_id', clientId);
-    if (error) throw error;
+    // ETAPA 6B: grava sempre no núcleo canônico (nunca em ai_analyses.raw_response).
+    await saveWorkingPlan({ clientId, raw: { ...data, _isNewFormat: true }, source: 'classic_editor' });
   };
 
   // -- Per-meal edit/save (preview ↔ edição) --

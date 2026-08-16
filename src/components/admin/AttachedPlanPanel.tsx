@@ -15,6 +15,7 @@ import {
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
+import { logOperationalEvent } from '@/lib/operationalEvents';
 
 const WEEKDAYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
 const DAY_LABEL: Record<string, string> = {
@@ -25,6 +26,8 @@ interface DayMacro { day: string; kcal: number; cho_g: number; protein_g: number
 interface Totals { kcal: number; cho_g: number; protein_g: number; fat_g: number; meals: number }
 interface AttachedPlan {
   id: string;
+  versionId: string | null;
+  legacy: boolean;
   date: string;          // ISO
   label: string;
   text: string;
@@ -71,25 +74,69 @@ export function AttachedPlanPanel({
   const queryClient = useQueryClient();
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Histórico dos planos anexados vive em ai_analyses.raw_response.attached_plans[].
+  // ETAPA 6B: histórico dos planos anexados vive em `meal_plan_versions`
+  // (source='attached_plan'). `ai_analyses.raw_response` só é lido como
+  // fallback read-only quando o atleta ainda não tem nenhuma versão anexada.
+  const sortAttached = (list: AttachedPlan[]) => [...list].sort((a, b) => {
+    const as = a.sent_to_zona_nutri ? (a.sent_at || a.date || '') : '';
+    const bs = b.sent_to_zona_nutri ? (b.sent_at || b.date || '') : '';
+    if (as && bs) return bs.localeCompare(as);
+    if (as) return -1;
+    if (bs) return 1;
+    return (b.date || '').localeCompare(a.date || '');
+  });
+
+  const dbVersionToAttached = (v: any): AttachedPlan => {
+    const meta = v.metadata || {};
+    return {
+      id: v.id,
+      versionId: v.id,
+      legacy: false,
+      date: meta.date || v.created_at,
+      label: meta.label || `Plano v${v.version_number}`,
+      text: v.content?.text || '',
+      orientations: v.orientations || meta.orientations || '',
+      summary: meta.summary || '',
+      totals: { ...EMPTY_TOTALS, ...(meta.totals || {}) },
+      per_day: meta.per_day || [],
+      meal_names: meta.meal_names || [],
+      version: v.version_number,
+      sent_to_zona_nutri: !!meta.zona_nutri_sent_at,
+      sent_at: meta.zona_nutri_sent_at || null,
+    };
+  };
+
   const { data: history = [], refetch } = useQuery({
     queryKey: ['attached-plans', clientId],
     enabled: !!clientId,
     queryFn: async (): Promise<AttachedPlan[]> => {
-      const { data } = await supabase.from('ai_analyses').select('raw_response').eq('client_id', clientId).maybeSingle();
+      const { data, error } = await (supabase as any)
+        .from('meal_plan_versions')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('source', 'attached_plan')
+        .neq('status', 'archived')
+        .order('version_number', { ascending: false });
+      if (error) throw error;
+      if (Array.isArray(data) && data.length > 0) {
+        return sortAttached(data.map(dbVersionToAttached));
+      }
+      // Fallback legado read-only.
+      const { data: row } = await supabase.from('ai_analyses').select('id, raw_response').eq('client_id', clientId).maybeSingle();
       try {
-        const raw = typeof data?.raw_response === 'string' ? JSON.parse(data.raw_response) : data?.raw_response;
+        const raw = typeof row?.raw_response === 'string' ? JSON.parse(row.raw_response) : row?.raw_response;
         const list = raw?.attached_plans;
-        // Ordena por ENVIO ao Zona Nutri: enviados primeiro (envio mais recente
-        // no topo); os não enviados depois, por data de salvamento.
-        return Array.isArray(list) ? [...list].sort((a, b) => {
-          const as = a.sent_to_zona_nutri ? (a.sent_at || a.date || '') : '';
-          const bs = b.sent_to_zona_nutri ? (b.sent_at || b.date || '') : '';
-          if (as && bs) return bs.localeCompare(as);
-          if (as) return -1;
-          if (bs) return 1;
-          return (b.date || '').localeCompare(a.date || '');
-        }) : [];
+        if (Array.isArray(list) && list.length > 0) {
+          void logOperationalEvent({
+            clientId,
+            entityType: 'meal_plan',
+            entityId: clientId,
+            eventType: 'legacy_meal_plan_fallback_used',
+            metadata: { surface: 'attached-plan-panel', ai_analysis_id: row?.id },
+          });
+          return sortAttached(list.map((p: any) => ({ ...p, versionId: null, legacy: true })));
+        }
+        return [];
       } catch { return []; }
     },
   });
@@ -149,29 +196,46 @@ export function AttachedPlanPanel({
     }
   };
 
-  // Grava o raw_response mesclando attached_plans (sem apagar meal_plan etc.).
-  const persistAttached = async (nextList: AttachedPlan[]) => {
-    const { data: row } = await supabase.from('ai_analyses').select('raw_response').eq('client_id', clientId).maybeSingle();
-    let raw: any = {};
-    try { raw = typeof row?.raw_response === 'string' ? JSON.parse(row.raw_response) : (row?.raw_response || {}); } catch { raw = {}; }
-    raw.attached_plans = nextList;
+  // ETAPA 6B — cada plano anexado vira uma VERSÃO canônica (nunca publicada
+  // automaticamente): `meal_plan_versions` com source='attached_plan'.
+  const createAttachedVersion = async (entry: {
+    text: string; orientations: string; label: string; date: string;
+    summary: string; totals: Totals; per_day: DayMacro[]; meal_names: string[];
+    sentAt?: string | null;
+  }): Promise<string> => {
+    const { data, error } = await (supabase as any).rpc('create_meal_plan_version', {
+      p_client_id: clientId,
+      p_content: { text: entry.text },
+      p_source: 'attached_plan',
+      p_orientations: entry.orientations || null,
+      p_status: 'reviewed',
+      p_metadata: {
+        label: entry.label,
+        date: entry.date,
+        summary: entry.summary,
+        totals: entry.totals,
+        per_day: entry.per_day,
+        meal_names: entry.meal_names,
+        ...(entry.sentAt ? { zona_nutri_sent_at: entry.sentAt } : {}),
+      },
+    });
+    if (error) throw error;
+    return data as string;
+  };
 
-    if (row) {
-      const { error } = await supabase.from('ai_analyses')
-        .update({ raw_response: JSON.stringify(raw), updated_at: new Date().toISOString() })
-        .eq('client_id', clientId);
-      if (error) throw error;
-    } else {
-      // Nenhuma análise ainda: cria a linha mínima com o histórico.
-      const { data: prof } = await (supabase as any).from('athlete_profiles').select('id').eq('client_id', clientId).maybeSingle();
-      const { error } = await supabase.from('ai_analyses').insert({
-        client_id: clientId,
-        athlete_profile_id: prof?.id ?? null,
-        diagnosis: '',
-        raw_response: JSON.stringify(raw),
-      } as any);
-      if (error) throw error;
+  /** Marca UMA versão anexada como enviada ao Zona Nutri (as demais perdem o destaque). */
+  const markSentToZn = async (versionId: string, sentAt: string) => {
+    const others = history.filter((h) => h.versionId && h.versionId !== versionId && h.sent_to_zona_nutri);
+    for (const o of others) {
+      const meta = { label: o.label, date: o.date, summary: o.summary, totals: o.totals, per_day: o.per_day, meal_names: o.meal_names };
+      await (supabase as any).from('meal_plan_versions').update({ metadata: meta }).eq('id', o.versionId);
     }
+    const target = history.find((h) => h.versionId === versionId);
+    const meta = target
+      ? { label: target.label, date: target.date, summary: target.summary, totals: target.totals, per_day: target.per_day, meal_names: target.meal_names, zona_nutri_sent_at: sentAt }
+      : { zona_nutri_sent_at: sentAt };
+    const { error } = await (supabase as any).from('meal_plan_versions').update({ metadata: meta }).eq('id', versionId);
+    if (error) throw error;
   };
 
   // Cada save é um NOVO plano (constrói histórico) — não edita o mesmo.
@@ -192,21 +256,18 @@ export function AttachedPlanPanel({
       }
       const now = new Date();
       const version = (history[0]?.version ?? 0) + 1;
-      const entry: AttachedPlan = {
-        id: `${now.getTime()}-${version}`,
-        date: now.toISOString(),
-        label: label.trim() || `Plano v${version} — ${fmtDate(now.toISOString())}`,
+      await createAttachedVersion({
         text,
         orientations: orientations.trim() || a?.orientations || '',
+        label: label.trim() || `Plano v${version} — ${fmtDate(now.toISOString())}`,
+        date: now.toISOString(),
         summary: a?.summary || '',
         totals: a?.totals || EMPTY_TOTALS,
         per_day: a?.per_day || [],
         meal_names: a?.meal_names || [],
-        version,
-      };
-      await persistAttached([entry, ...history]);
+      });
       await refetch();
-      queryClient.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['meal-plan-versions', clientId] });
       queryClient.invalidateQueries({ queryKey: ['meal-plan-hub-analysis', clientId] });
       toast.success(`Plano salvo (v${version}). Histórico atualizado.`);
       // Limpa o editor para o próximo — cada save é um novo plano.
@@ -242,33 +303,31 @@ export function AttachedPlanPanel({
       }
       if (data?.error) throw new Error(data.error);
 
-      // Registra/atualiza o plano enviado no histórico de anexados e o destaca.
+      // Registra/atualiza o plano enviado no histórico canônico e o destaca.
       try {
         const now = new Date().toISOString();
-        // Se o texto atual bate com um plano já salvo, marca esse; senão, cria um.
-        const existing = history.find((h) => (h.text || '').trim() === text.trim());
-        let list: AttachedPlan[];
-        if (existing) {
-          list = history.map((h) => h.id === existing.id
-            ? { ...h, sent_to_zona_nutri: true, sent_at: now }
-            : { ...h, sent_to_zona_nutri: false });
+        const existing = history.find((h) => (h.text || '').trim() === text.trim() && h.versionId);
+        if (existing?.versionId) {
+          await markSentToZn(existing.versionId, now);
         } else {
           const version = (history[0]?.version ?? 0) + 1;
-          const entry: AttachedPlan = {
-            id: `${Date.now()}-${version}`, date: now,
+          const newId = await createAttachedVersion({
+            text,
+            orientations: orientations.trim() || analysis?.orientations || '',
             label: label.trim() || `Plano v${version} — ${fmtDate(now)}`,
-            text, orientations: orientations.trim() || analysis?.orientations || '',
-            summary: analysis?.summary || '', totals: analysis?.totals || EMPTY_TOTALS,
-            per_day: analysis?.per_day || [], meal_names: analysis?.meal_names || [], version,
-            sent_to_zona_nutri: true, sent_at: now,
-          };
-          list = [entry, ...history.map((h) => ({ ...h, sent_to_zona_nutri: false }))];
+            date: now,
+            summary: analysis?.summary || '',
+            totals: analysis?.totals || EMPTY_TOTALS,
+            per_day: analysis?.per_day || [],
+            meal_names: analysis?.meal_names || [],
+            sentAt: now,
+          });
+          await markSentToZn(newId, now);
         }
-        await persistAttached(list);
         await refetch();
       } catch { /* não bloqueia o sucesso do envio */ }
 
-      queryClient.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['meal-plan-versions', clientId] });
       queryClient.invalidateQueries({ queryKey: ['meal-plan-hub-analysis', clientId] });
       toast.success('Plano enviado ao Zona Nutri e destacado no histórico!');
     } catch (e: any) {
