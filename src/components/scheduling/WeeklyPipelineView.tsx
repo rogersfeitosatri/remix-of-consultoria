@@ -93,7 +93,7 @@ const STATUS_CONFIG: Record<PipelineStatus, { label: string; icon: any; classNam
     bgClass: 'bg-destructive/5 border-destructive/20',
   },
   first_consult: {
-    label: '1ª Consulta',
+    label: '1ª consulta (prevista)',
     icon: User,
     className: 'bg-primary/10 text-primary border-primary/30',
     bgClass: 'bg-primary/5 border-primary/20',
