@@ -216,7 +216,40 @@ export function MealCardsView({ text, onChange, cacheRef }: Props) {
     setEditText('');
   };
 
+  // ── Compositor guiado de alimento (adicionar / editar item da opção) ──
+  const applyLine = (mi: number, oi: number, gi: number | null, line: string) =>
+    mutate((a) => {
+      const meal = a.meals[mi];
+      if (!meal) return;
+      const opts = optionsOf(meal).map((o) => ({ ...o, groups: [...o.groups] }));
+      const groups = [...opts[oi].groups];
+      const parsed = parseGroupLine(line);
+      if (!parsed.tokens.length) return;
+      if (gi == null) {
+        groups.push(parsed);
+      } else {
+        const subs = groups[gi]?.tokens.slice(1) ?? [];
+        groups[gi] = { tokens: [parsed.tokens[0], ...subs] };
+      }
+      opts[oi] = { ...opts[oi], groups };
+      meal.options = opts.length > 1 ? opts : undefined;
+      const primary = opts.find((o) => o.primary) || opts[0];
+      meal.groups = primary.groups;
+    });
+
+  const removeGroupItem = (mi: number, oi: number, gi: number) =>
+    mutate((a) => {
+      const meal = a.meals[mi];
+      if (!meal) return;
+      const opts = optionsOf(meal).map((o) => ({ ...o, groups: [...o.groups] }));
+      opts[oi].groups.splice(gi, 1);
+      meal.options = opts.length > 1 ? opts : undefined;
+      const primary = opts.find((o) => o.primary) || opts[0];
+      meal.groups = primary.groups;
+    });
+
   const meals = useMemo(() => ast.meals, [ast]);
+
   if (!meals.length) {
     return (
       <div className="mb-3 rounded-md border bg-muted/30 p-6 text-center text-sm text-muted-foreground">
