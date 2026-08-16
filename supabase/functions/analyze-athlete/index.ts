@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiStructured } from "../_shared/aiClient.ts";
+import { requireAdmin, assertClientOwnership } from "../_shared/adminAuth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,9 +18,26 @@ Deno.serve(async (req) => {
 
     if (!supabaseUrl || !supabaseServiceKey) throw new Error('Supabase configuration is missing');
 
+    // ETAPA 1 — segurança: exige admin autenticado (ou chamada interna).
+    const auth = await requireAdmin(req);
+    if (!auth.ok) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { clientId, adminGuidance } = await req.json();
     if (!clientId) throw new Error('clientId is required');
+
+    const owns = await assertClientOwnership(auth, clientId);
+    if (!owns.ok) {
+      return new Response(JSON.stringify({ error: owns.error }), {
+        status: owns.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     console.log('Analyzing athlete for client:', clientId);
 

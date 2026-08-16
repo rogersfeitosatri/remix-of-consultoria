@@ -3,6 +3,7 @@
 // para escrever a mensagem curta ao atleta. Guarda histórico de versões.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiJson } from "../_shared/planPipeline.ts";
+import { requireAdmin, assertClientOwnership } from "../_shared/adminAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
