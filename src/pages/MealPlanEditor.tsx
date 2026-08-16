@@ -637,9 +637,9 @@ export default function MealPlanEditor() {
       if (error) throw error;
       const meals = (data as any)?.meals || (data as any)?.meal_plan?.meals;
       if (!Array.isArray(meals) || !meals.length) throw new Error('PDF sem refeições reconhecíveis');
-      const imported = mealsToText(meals);
-      setText((text ? `${text}\n\n` : '') + imported);
-      toast.success(`PDF importado na aba atual: ${meals.length} refeições.`);
+      // Não grava direto: abre a etapa de revisão (Adicionar / Substituir / Cancelar).
+      setPendingImport(mealsToText(meals));
+
     } catch (e: any) {
       toast.error(`Falha ao importar: ${e.message || e}`);
     } finally {
