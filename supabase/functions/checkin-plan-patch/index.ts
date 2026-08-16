@@ -155,7 +155,7 @@ Escreva SOMENTE {"summaryForAthlete": string} — 2 a 4 frases explicando o ajus
       professionalReviewRequired, version: next.planVersionNumber,
     }));
 
-    return json({ success: true, planAction: "patch", signals, carbloadChange, professionalReviewRequired, summaryForAthlete });
+    return json({ success: true, planAction: "proposal", proposalId, signals, carbloadChange, professionalReviewRequired, summaryForAthlete });
   } catch (error) {
     console.error("checkin-plan-patch:", error);
     return json({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
