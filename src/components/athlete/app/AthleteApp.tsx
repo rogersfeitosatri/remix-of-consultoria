@@ -111,39 +111,47 @@ export function AthleteApp({
         </header>
 
         <main className="px-4 pt-4">
-          {screen === 'dashboard' && anamnesePending && !readOnly && (
-            <button
-              onClick={onFillAnamnese}
-              className="w-full mb-4 text-left rounded-3xl p-4 border border-[hsl(43,74%,49%)]/40 active:scale-[0.99] transition-transform"
-              style={{ background: 'linear-gradient(135deg, rgba(191,150,54,0.18), rgba(0,0,0,0.2))' }}
-            >
-              <p className="font-bold text-white">📝 Complete sua anamnese</p>
-              <p className="text-sm text-gray-300 mt-0.5">É o primeiro passo para o seu nutricionista montar seu plano. Toque para preencher.</p>
-            </button>
+          {blockedReason && (
+            <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+              <p className="text-sm font-semibold text-amber-200">Acompanhamento pausado</p>
+              <p className="text-xs text-amber-100/80 mt-0.5">
+                {blockedReason}. Seu histórico continua disponível, mas não há ações pendentes agora.
+              </p>
+            </div>
           )}
 
           {screen === 'dashboard' && (
-            <DashboardScreen
-              firstName={firstName}
-              meals={meals}
-              race={race}
-              checkins={checkins}
-              weightKg={weightKg}
-              supportWhatsapp={supportWhatsapp}
-              onOpenRace={() => setScreen('provas')}
-              onGoPlano={() => setScreen('plano')}
-              onGoEvolucao={() => setScreen('evolucao')}
-              onGoOrientacoes={() => setScreen('orientacoes')}
-            />
+            <div className="space-y-6">
+              <NextActionsCard actions={actions} onAction={handleAction} />
+              <DashboardScreen
+                firstName={firstName}
+                meals={meals}
+                race={race}
+                checkins={checkins}
+                weightKg={weightKg}
+                supportWhatsapp={supportWhatsapp}
+                onOpenRace={() => setScreen('provas')}
+                onGoPlano={() => setScreen('plano')}
+                onGoEvolucao={() => setScreen('evolucao')}
+                onGoOrientacoes={() => setScreen('orientacoes')}
+              />
+            </div>
           )}
 
           {screen === 'plano' && (
             <MealPlanScreen meals={meals} completedMeals={completedMeals} onToggleMeal={toggleMeal} readOnly={readOnly} />
           )}
 
+          {screen === 'checkins' && (
+            <CheckinsScreen data={areaData} clientId={client?.id} blockedReason={blockedReason} />
+          )}
+
+          {screen === 'consultas' && <ConsultasScreen data={areaData} blockedReason={blockedReason} />}
+
           {screen === 'orientacoes' && <InstructionsScreen analysis={analysis} />}
 
           {screen === 'provas' && <RacePlanScreen clientId={client.id} onBack={() => setScreen('dashboard')} />}
+
 
           {screen === 'evolucao' && (
             <div className="space-y-4">
