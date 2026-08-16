@@ -96,14 +96,10 @@ export default function CalendarPage() {
     return { current: index + 1, total: client.consultation_count };
   };
 
-  const isFirstConsultationRow = (s: ConsultationSchedule) => {
-    const first = clientsById.get(s.client_id)?.first_consultation_date;
-    return !!first && s.scheduled_date === first && s.send_link_date === first;
-  };
+  /** ETAPA 4B: envio pendente = schedule pendente SEM consulta vinculada (vínculo canônico). */
+  const isSendLinkEventRow = (s: ConsultationSchedule) =>
+    isPendingSendLink(s as any, (appointments || []) as any);
 
-  const isSendLinkEventRow = (s: ConsultationSchedule) => {
-    return !isFirstConsultationRow(s) && s.status === 'pending';
-  };
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
