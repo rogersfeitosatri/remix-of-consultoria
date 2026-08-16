@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiJson } from "../_shared/aiClient.ts";
+import { requireAdmin } from "../_shared/adminAuth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,6 +19,15 @@ Deno.serve(async (req) => {
 
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase configuration is missing');
+    }
+
+    // ETAPA 1 — segurança: análise de check-in é ação de admin.
+    const auth = await requireAdmin(req);
+    if (!auth.ok) {
+      return new Response(JSON.stringify({ error: auth.error }), {
+        status: auth.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);

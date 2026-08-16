@@ -138,6 +138,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ai_analyses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ai_analyses_dedup_backup: {
@@ -224,6 +231,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ai_chat_conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       ai_chat_escalations: {
@@ -270,6 +284,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_chat_escalations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "ai_chat_escalations_conversation_id_fkey"
@@ -703,6 +724,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "anamnese_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "anamnese_responses_form_id_fkey"
             columns: ["form_id"]
             isOneToOne: false
@@ -720,6 +748,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           duration_minutes: number
+          frozen_at: string | null
+          frozen_from_status: string | null
           google_calendar_event_id: string | null
           google_meet_link: string | null
           id: string
@@ -741,6 +771,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           duration_minutes?: number
+          frozen_at?: string | null
+          frozen_from_status?: string | null
           google_calendar_event_id?: string | null
           google_meet_link?: string | null
           id?: string
@@ -762,6 +794,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           duration_minutes?: number
+          frozen_at?: string | null
+          frozen_from_status?: string | null
           google_calendar_event_id?: string | null
           google_meet_link?: string | null
           id?: string
@@ -782,6 +816,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "appointments_consultation_schedule_id_fkey"
@@ -840,6 +881,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "athlete_attachments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       athlete_challenge_progress: {
@@ -877,6 +925,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_challenge_progress_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -947,6 +1002,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "athlete_checkin_schedules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       athlete_completed_races: {
@@ -987,6 +1049,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_completed_races_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1037,6 +1106,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_periodization_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "athlete_periodization_method_id_fkey"
@@ -1308,6 +1384,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "athlete_profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       athlete_summary_audit_logs: {
@@ -1346,6 +1429,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "athlete_summary_audit_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       athlete_whatsapp_settings: {
@@ -1380,6 +1470,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_whatsapp_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1460,6 +1557,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1748,6 +1852,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "challenge_daily_marks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       challenge_weekly_marks: {
@@ -1792,6 +1903,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_weekly_marks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1849,6 +1967,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_ai_analyses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -1962,6 +2087,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "checkin_dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "checkin_dispatches_schedule_id_fkey"
             columns: ["schedule_id"]
             isOneToOne: false
@@ -2040,6 +2172,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_feedbacks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -2166,6 +2305,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "checkin_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "checkin_responses_form_id_fkey"
             columns: ["form_id"]
             isOneToOne: false
@@ -2206,6 +2352,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_contacts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -2281,6 +2434,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "client_plan_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       clients: {
@@ -2290,6 +2450,7 @@ export type Database = {
           admin_notes_short: string | null
           admin_summary: string | null
           ai_whatsapp_enabled: boolean
+          archived_at: string | null
           asaas_customer_id: string | null
           asaas_subscription_id: string | null
           asaas_subscription_status: string | null
@@ -2304,6 +2465,7 @@ export type Database = {
           eligible_for_booking: boolean
           email: string | null
           end_date: string
+          ended_at: string | null
           first_consultation_date: string | null
           freeze_reason: string | null
           frozen_at: string | null
@@ -2343,6 +2505,7 @@ export type Database = {
           admin_notes_short?: string | null
           admin_summary?: string | null
           ai_whatsapp_enabled?: boolean
+          archived_at?: string | null
           asaas_customer_id?: string | null
           asaas_subscription_id?: string | null
           asaas_subscription_status?: string | null
@@ -2357,6 +2520,7 @@ export type Database = {
           eligible_for_booking?: boolean
           email?: string | null
           end_date: string
+          ended_at?: string | null
           first_consultation_date?: string | null
           freeze_reason?: string | null
           frozen_at?: string | null
@@ -2396,6 +2560,7 @@ export type Database = {
           admin_notes_short?: string | null
           admin_summary?: string | null
           ai_whatsapp_enabled?: boolean
+          archived_at?: string | null
           asaas_customer_id?: string | null
           asaas_subscription_id?: string | null
           asaas_subscription_status?: string | null
@@ -2410,6 +2575,7 @@ export type Database = {
           eligible_for_booking?: boolean
           email?: string | null
           end_date?: string
+          ended_at?: string | null
           first_consultation_date?: string | null
           freeze_reason?: string | null
           frozen_at?: string | null
@@ -2531,6 +2697,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "consult_invite_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       consultation_schedule_rules: {
@@ -2583,6 +2756,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consultation_schedule_rules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -2653,6 +2833,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "consultation_schedules_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       daily_control_cycles: {
@@ -2687,6 +2874,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_control_cycles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -2787,6 +2981,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diet_adjustment_alerts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -2945,6 +3146,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evolution_analyses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -3324,6 +3532,33 @@ export type Database = {
         }
         Relationships: []
       }
+      holidays: {
+        Row: {
+          created_at: string
+          holiday_date: string
+          id: string
+          name: string
+          scope: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          holiday_date: string
+          id?: string
+          name: string
+          scope?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          holiday_date?: string
+          id?: string
+          name?: string
+          scope?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       journey_day_dynamics: {
         Row: {
           afternoon_cho_pct: number | null
@@ -3445,6 +3680,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "journey_phase_transitions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "journey_phase_transitions_from_phase_id_fkey"
             columns: ["from_phase_id"]
             isOneToOne: false
@@ -3554,6 +3796,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "journey_phases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       journey_week_sessions: {
@@ -3662,6 +3911,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journey_weeks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "journey_weeks_journey_phase_id_fkey"
@@ -3820,6 +4076,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "meal_plan_status_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "meal_plan_status_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
@@ -3936,6 +4199,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "metabolic_screening_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       notification_preferences: {
@@ -3967,6 +4237,7 @@ export type Database = {
           race_distance_km: number
           race_name: string | null
           race_type: string
+          source: string
           target_time_minutes: number | null
           updated_at: string
           user_id: string
@@ -3981,6 +4252,7 @@ export type Database = {
           race_distance_km: number
           race_name?: string | null
           race_type?: string
+          source?: string
           target_time_minutes?: number | null
           updated_at?: string
           user_id: string
@@ -3995,6 +4267,7 @@ export type Database = {
           race_distance_km?: number
           race_name?: string | null
           race_type?: string
+          source?: string
           target_time_minutes?: number | null
           updated_at?: string
           user_id?: string
@@ -4006,6 +4279,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "np_athlete_races_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -4139,6 +4419,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "np_body_assessments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "np_body_assessments_consultation_id_fkey"
             columns: ["consultation_id"]
             isOneToOne: false
@@ -4258,6 +4545,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "np_consultations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       np_daily_activities: {
@@ -4341,11 +4635,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "np_event_dispatches_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "np_event_dispatches_race_id_fkey"
             columns: ["race_id"]
             isOneToOne: false
             referencedRelation: "np_athlete_races"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "np_event_dispatches_race_id_fkey"
+            columns: ["race_id"]
+            isOneToOne: false
+            referencedRelation: "v_athlete_current_target_race"
+            referencedColumns: ["race_id"]
           },
         ]
       }
@@ -4466,6 +4774,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "np_gut_training_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       np_lab_results: {
@@ -4524,6 +4839,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "np_lab_results_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -4824,6 +5146,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "np_periodization_weeks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       np_phase_protocols: {
@@ -4896,11 +5225,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "np_phase_protocols_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
             foreignKeyName: "np_phase_protocols_race_goal_id_fkey"
             columns: ["race_goal_id"]
             isOneToOne: false
             referencedRelation: "np_athlete_races"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "np_phase_protocols_race_goal_id_fkey"
+            columns: ["race_goal_id"]
+            isOneToOne: false
+            referencedRelation: "v_athlete_current_target_race"
+            referencedColumns: ["race_id"]
           },
         ]
       }
@@ -5195,6 +5538,45 @@ export type Database = {
         }
         Relationships: []
       }
+      operational_events: {
+        Row: {
+          actor_user_id: string | null
+          client_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          event_type: string
+          id: string
+          metadata: Json
+          source: string
+          user_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          source?: string
+          user_id?: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -5254,6 +5636,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -5403,6 +5792,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "periodiza_suggestions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "periodiza_suggestions_consultation_id_fkey"
@@ -5634,6 +6030,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_generation_jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
         ]
       }
@@ -5885,6 +6288,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_checkins_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "scheduled_checkins_form_id_fkey"
@@ -6432,6 +6842,7 @@ export type Database = {
         Row: {
           client_id: string | null
           completed_at: string | null
+          completion_mode: string
           created_at: string
           day_of_week: number
           description: string | null
@@ -6453,6 +6864,8 @@ export type Database = {
           reminder_minutes_before: number
           reminder_sent_at: string | null
           source: Database["public"]["Enums"]["task_source"]
+          source_id: string | null
+          source_type: string | null
           status: Database["public"]["Enums"]["task_status"]
           task_type: Database["public"]["Enums"]["task_type"]
           title: string
@@ -6463,6 +6876,7 @@ export type Database = {
         Insert: {
           client_id?: string | null
           completed_at?: string | null
+          completion_mode?: string
           created_at?: string
           day_of_week: number
           description?: string | null
@@ -6484,6 +6898,8 @@ export type Database = {
           reminder_minutes_before?: number
           reminder_sent_at?: string | null
           source?: Database["public"]["Enums"]["task_source"]
+          source_id?: string | null
+          source_type?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           task_type?: Database["public"]["Enums"]["task_type"]
           title: string
@@ -6494,6 +6910,7 @@ export type Database = {
         Update: {
           client_id?: string | null
           completed_at?: string | null
+          completion_mode?: string
           created_at?: string
           day_of_week?: number
           description?: string | null
@@ -6515,6 +6932,8 @@ export type Database = {
           reminder_minutes_before?: number
           reminder_sent_at?: string | null
           source?: Database["public"]["Enums"]["task_source"]
+          source_id?: string | null
+          source_type?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           task_type?: Database["public"]["Enums"]["task_type"]
           title?: string
@@ -6529,6 +6948,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "tasks_parent_task_id_fkey"
@@ -6617,6 +7043,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_broadcast_recipients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "whatsapp_broadcast_recipients_contact_id_fkey"
@@ -6807,6 +7240,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "whatsapp_message_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
       }
       whatsapp_scheduled_messages: {
@@ -6869,6 +7309,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_scheduled_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
           },
           {
             foreignKeyName: "whatsapp_scheduled_messages_scheduled_checkin_id_fkey"
@@ -7601,10 +8048,94 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "whatsapp_message_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
         ]
+      }
+      v_athlete_current_target_race: {
+        Row: {
+          client_id: string | null
+          race_date: string | null
+          race_distance_km: number | null
+          race_id: string | null
+          race_name: string | null
+          race_type: string | null
+          source: string | null
+          target_time_minutes: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "np_athlete_races_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "np_athlete_races_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      v_client_operational_state: {
+        Row: {
+          client_id: string | null
+          has_consultations: boolean | null
+          has_nutrition: boolean | null
+          has_training: boolean | null
+          is_active: boolean | null
+          is_archived: boolean | null
+          is_ended: boolean | null
+          is_frozen: boolean | null
+          is_in_onboarding: boolean | null
+          is_operational: boolean | null
+          name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          has_consultations?: never
+          has_nutrition?: never
+          has_training?: never
+          is_active?: boolean | null
+          is_archived?: never
+          is_ended?: never
+          is_frozen?: never
+          is_in_onboarding?: never
+          is_operational?: never
+          name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          has_consultations?: never
+          has_nutrition?: never
+          has_training?: never
+          is_active?: boolean | null
+          is_archived?: never
+          is_ended?: never
+          is_frozen?: never
+          is_in_onboarding?: never
+          is_operational?: never
+          name?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
+      add_business_days: {
+        Args: { p_days: number; p_from: string; p_user_id?: string }
+        Returns: string
+      }
       calc_task_level: { Args: { p_xp: number }; Returns: number }
       calculate_next_booking_send_date: {
         Args: { p_cadence_weeks: number; p_last_appointment_at: string }
@@ -7802,6 +8333,10 @@ export type Database = {
         Returns: boolean
       }
       invoke_booking_links_processor: { Args: never; Returns: undefined }
+      is_business_day: {
+        Args: { p_date: string; p_user_id?: string }
+        Returns: boolean
+      }
       is_client_eligible_for_booking: {
         Args: { _client_id: string }
         Returns: {
@@ -7809,6 +8344,7 @@ export type Database = {
           reason: string
         }[]
       }
+      is_client_operational: { Args: { _client_id: string }; Returns: boolean }
       is_trainer_of_current_athlete: {
         Args: { _trainer_id: string }
         Returns: boolean
