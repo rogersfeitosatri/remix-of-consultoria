@@ -108,9 +108,11 @@ export function useNutritionReviews() {
 
       await logOperationalEvent({
         clientId: review.client_id,
+        entityType: 'nutrition_review',
+        entityId: review.id,
         eventType: 'nutrition_review_completed',
         source: 'app',
-        payload: { review_id: review.id, decision, scheduled_for: review.scheduled_for },
+        metadata: { decision, scheduled_for: review.scheduled_for },
       });
 
       // Gera a próxima obrigação do ciclo imediatamente.
@@ -169,9 +171,11 @@ export function useNutritionReviews() {
       if (error) throw error;
       await logOperationalEvent({
         clientId: review.client_id,
+        entityType: 'nutrition_review',
+        entityId: review.id,
         eventType: 'nutrition_review_rescheduled',
         source: 'app',
-        payload: { review_id: review.id, from: review.scheduled_for, to: date },
+        metadata: { from: review.scheduled_for, to: date },
       });
     },
     onSuccess: () => {
