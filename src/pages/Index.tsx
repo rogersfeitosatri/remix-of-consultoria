@@ -1,6 +1,6 @@
 import { Layout } from '@/components/layout/Layout';
 import { GoogleOAuthAlert } from '@/components/dashboard/GoogleOAuthAlert';
-import { ActionCenterPanel } from '@/components/dashboard/ActionCenterPanel';
+import { OperationalPanel } from '@/components/dashboard/OperationalPanel';
 import { BiweeklyContactPanel } from '@/components/dashboard/BiweeklyContactPanel';
 import { AthleteRadarPanel } from '@/components/dashboard/AthleteRadarPanel';
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle';
@@ -13,7 +13,7 @@ export default function Dashboard() {
           <ThemeToggle />
         </div>
         <GoogleOAuthAlert />
-        <ActionCenterPanel />
+        <OperationalPanel />
         <AthleteRadarPanel />
         <BiweeklyContactPanel />
       </div>
