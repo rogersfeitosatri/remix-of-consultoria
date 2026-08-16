@@ -54,6 +54,7 @@ import {
   isPendingSendLink,
   weekStats,
 } from '@/lib/calendarProjection';
+import { logOperationalEvent } from '@/lib/operationalEvents';
 
 export default function CalendarPage() {
   const queryClient = useQueryClient();
