@@ -218,10 +218,35 @@ export default function PublicCheckinForm() {
             .order('order_index', { ascending: true });
 
           if (questionsError) throw questionsError;
-          typedQuestions = questionsData as Question[];
+          typedQuestions = (questionsData as any[]) as Question[];
+        }
+
+        // ETAPA 3C — camada de compatibilidade semântica: enriquece perguntas de
+        // versões congeladas (imutáveis) sem alterar o snapshot histórico.
+        try {
+          const ids = typedQuestions.map((q) => q.id);
+          const { data: sem } = await supabase
+            .from('form_question_semantics' as any)
+            .select('source_question_id, question_key, conditional_logic')
+            .in('source_question_id', ids);
+          if (sem && sem.length > 0) {
+            const map = new Map<string, any>((sem as any[]).map((s) => [s.source_question_id, s]));
+            typedQuestions = typedQuestions.map((q) => {
+              const s = map.get(q.id);
+              if (!s) return q;
+              return {
+                ...q,
+                question_key: q.question_key ?? s.question_key ?? null,
+                conditional_logic: q.conditional_logic ?? s.conditional_logic ?? null,
+              };
+            });
+          }
+        } catch {
+          // fallback silencioso: sem overrides, a resolução legada continua válida
         }
 
         setQuestions(typedQuestions);
+
 
 
         // Initialize answers and comments
