@@ -3066,6 +3066,7 @@ export type Database = {
           monthly_value: number
           name: string
           notes: string | null
+          nutrition_review_interval_days: number | null
           onboarding_status: string | null
           onboarding_type: string | null
           payment_date: string | null
@@ -3121,6 +3122,7 @@ export type Database = {
           monthly_value: number
           name: string
           notes?: string | null
+          nutrition_review_interval_days?: number | null
           onboarding_status?: string | null
           onboarding_type?: string | null
           payment_date?: string | null
@@ -3176,6 +3178,7 @@ export type Database = {
           monthly_value?: number
           name?: string
           notes?: string | null
+          nutrition_review_interval_days?: number | null
           onboarding_status?: string | null
           onboarding_type?: string | null
           payment_date?: string | null
@@ -4697,6 +4700,7 @@ export type Database = {
           decided_at: string | null
           decided_by: string | null
           id: string
+          nutrition_review_id: string | null
           proposed_changes: Json
           rationale: string | null
           resulting_version_id: string | null
@@ -4714,6 +4718,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           id?: string
+          nutrition_review_id?: string | null
           proposed_changes?: Json
           rationale?: string | null
           resulting_version_id?: string | null
@@ -4731,6 +4736,7 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           id?: string
+          nutrition_review_id?: string | null
           proposed_changes?: Json
           rationale?: string | null
           resulting_version_id?: string | null
@@ -4751,6 +4757,13 @@ export type Database = {
             columns: ["current_published_version_id"]
             isOneToOne: false
             referencedRelation: "meal_plan_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_change_proposals_nutrition_review_id_fkey"
+            columns: ["nutrition_review_id"]
+            isOneToOne: false
+            referencedRelation: "nutrition_reviews"
             referencedColumns: ["id"]
           },
           {
@@ -6343,6 +6356,116 @@ export type Database = {
           },
         ]
       }
+      nutrition_reviews: {
+        Row: {
+          cancel_reason: string | null
+          client_id: string
+          created_at: string
+          cycle_key: string
+          cycle_start: string | null
+          decision: string | null
+          id: string
+          interval_days: number
+          last_notified_at: string | null
+          metadata: Json
+          missing_information: string | null
+          needs_review: boolean
+          notes: string | null
+          notification_count: number
+          override_without_checkin: boolean
+          result_plan_version_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          scheduled_for: string
+          source: string
+          source_plan_version_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancel_reason?: string | null
+          client_id: string
+          created_at?: string
+          cycle_key?: string
+          cycle_start?: string | null
+          decision?: string | null
+          id?: string
+          interval_days?: number
+          last_notified_at?: string | null
+          metadata?: Json
+          missing_information?: string | null
+          needs_review?: boolean
+          notes?: string | null
+          notification_count?: number
+          override_without_checkin?: boolean
+          result_plan_version_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheduled_for: string
+          source?: string
+          source_plan_version_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancel_reason?: string | null
+          client_id?: string
+          created_at?: string
+          cycle_key?: string
+          cycle_start?: string | null
+          decision?: string | null
+          id?: string
+          interval_days?: number
+          last_notified_at?: string | null
+          metadata?: Json
+          missing_information?: string | null
+          needs_review?: boolean
+          notes?: string | null
+          notification_count?: number
+          override_without_checkin?: boolean
+          result_plan_version_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          scheduled_for?: string
+          source?: string
+          source_plan_version_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nutrition_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nutrition_reviews_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "nutrition_reviews_result_plan_version_id_fkey"
+            columns: ["result_plan_version_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plan_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nutrition_reviews_source_plan_version_id_fkey"
+            columns: ["source_plan_version_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plan_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_payment_settings: {
         Row: {
           anamnese_form_id: string | null
@@ -6984,6 +7107,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          nutrition_review_interval_days: number | null
           order_index: number
           plan_duration: string
           plan_type: string
@@ -7005,6 +7129,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          nutrition_review_interval_days?: number | null
           order_index?: number
           plan_duration?: string
           plan_type?: string
@@ -7026,6 +7151,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          nutrition_review_interval_days?: number | null
           order_index?: number
           plan_duration?: string
           plan_type?: string
@@ -9338,6 +9464,14 @@ export type Database = {
           client_name: string
           client_phone: string
           google_meet_link: string
+        }[]
+      }
+      materialize_nutrition_reviews: {
+        Args: { p_user_id?: string }
+        Returns: {
+          created: number
+          paused: number
+          resumed: number
         }[]
       }
       move_to_dlq: {

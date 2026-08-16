@@ -11,6 +11,7 @@ import { addBusinessDays, businessDaysBetween, type HolidaySet } from './busines
 
 export type OperationKind =
   | 'checkin_review'
+  | 'nutrition_review'
   | 'meal_plan'
   | 'anamnese_review'
   | 'booking_invite'
@@ -41,6 +42,7 @@ export interface Operation {
 
 export const OPERATION_LABEL: Record<OperationKind, string> = {
   checkin_review: 'Check-in aguardando devolutiva',
+  nutrition_review: 'Revisão nutricional',
   meal_plan: 'Plano alimentar',
   anamnese_review: 'Anamnese para revisar',
   booking_invite: 'Convite de consulta',
@@ -52,12 +54,13 @@ export const OPERATION_LABEL: Record<OperationKind, string> = {
 /** Prioridade de desempate quando duas operações vencem no mesmo dia. */
 const KIND_WEIGHT: Record<OperationKind, number> = {
   checkin_review: 0,
-  meal_plan: 1,
-  anamnese_review: 2,
-  booking_invite: 3,
-  renewal: 4,
-  manual_task: 5,
-  legacy_task: 6,
+  nutrition_review: 1,
+  meal_plan: 2,
+  anamnese_review: 3,
+  booking_invite: 4,
+  renewal: 5,
+  manual_task: 6,
+  legacy_task: 7,
 };
 
 export const SLA_BUSINESS_DAYS: Partial<Record<OperationKind, number>> = {
@@ -65,6 +68,7 @@ export const SLA_BUSINESS_DAYS: Partial<Record<OperationKind, number>> = {
   meal_plan: 3,
   anamnese_review: 3,
 };
+
 
 export function toDateKey(d: Date): string {
   const y = d.getFullYear();

@@ -16,7 +16,9 @@ export type OperationalEntityType =
   | 'race'
   | 'checkin_form'
   | 'anamnese_form'
-  | 'question_template';
+  | 'question_template'
+  | 'nutrition_review';
+
 
 export type OperationalEventType =
   | 'client_frozen'
@@ -49,7 +51,13 @@ export type OperationalEventType =
   // ETAPA 4B — calendário operacional
   | 'booking_link_sent_manual'
   | 'appointment_completed'
-  | 'appointment_rescheduled';
+  | 'appointment_rescheduled'
+  // ETAPA 5A — revisões nutricionais
+  | 'nutrition_review_completed'
+  | 'nutrition_review_rescheduled'
+  | 'nutrition_review_cancelled'
+  | 'nutrition_review_created';
+
 
 
 export interface LogEventInput {
