@@ -468,6 +468,7 @@ export default function Forms() {
 
           {/* Question Bank */}
           <TabsContent value="banco" className="space-y-4 mt-4">
+            <SemanticReviewPanel />
             <QuestionBankSection />
           </TabsContent>
         </Tabs>
