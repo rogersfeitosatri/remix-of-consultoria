@@ -73,8 +73,14 @@ create or replace function net.http_post(url text, body jsonb default '{}'::json
   headers jsonb default '{}'::jsonb, timeout_milliseconds int default 5000) returns bigint language sql as $$ select 1::bigint $$;
 SQL
 
-ok=0; fail=0; : > "$DIR/failures.txt"
+# Seeds de DADOS que dependem de uma conta real (não existem em banco vazio).
+DATA_SEEDS='20260721144633'
+
+ok=0; fail=0; skipped=0; : > "$DIR/failures.txt"
 for f in $(ls supabase/migrations/*.sql | sort); do
+  case "$(basename "$f")" in
+    *"$DATA_SEEDS"*) skipped=$((skipped+1)); continue;;
+  esac
   # Extensões providas pela plataforma não existem num Postgres puro.
   sed -E '/CREATE EXTENSION[^;]*(pg_graphql|supabase_vault|pg_stat_statements|pg_cron|pg_net|pgsodium|pgmq|"http"|'http')/Id' "$f" > "$DIR/current.sql"
   if out=$($PSQL -q -v ON_ERROR_STOP=1 -f "$DIR/current.sql" 2>&1); then
@@ -85,7 +91,7 @@ for f in $(ls supabase/migrations/*.sql | sort); do
   fi
 done
 
-echo "aplicadas=$ok falharam=$fail"
+echo "aplicadas=$ok falharam=$fail seeds_de_dados_ignorados=$skipped"
 $PSQL -tAc "select count(*) || ' tabelas em public' from information_schema.tables where table_schema='public' and table_type='BASE TABLE';"
 [ "$fail" -gt 0 ] && { echo '--- falhas ---'; cat "$DIR/failures.txt"; }
 $RUN pg_ctl -D "$DIR/data" stop >/dev/null 2>&1
