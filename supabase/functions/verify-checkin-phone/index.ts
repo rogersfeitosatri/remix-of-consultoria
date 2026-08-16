@@ -137,7 +137,9 @@ Deno.serve(async (req) => {
     }
 
     // Fallback: find client by phone (also covers stale/invalid ?client=...)
-    // Fetch in pages to avoid missing matches in larger datasets.
+    // ETAPA 1 — o fallback só pode encontrar atletas OPERACIONAIS
+    // (ativos, não congelados, não arquivados). Isso evita que telefone
+    // de atleta inativo/congelado abra formulário de check-in.
     const pageSize = 1000;
     let from = 0;
     let matchedClientId: string | null = null;
@@ -148,6 +150,9 @@ Deno.serve(async (req) => {
         .from("clients")
         .select("id, phone")
         .not("phone", "is", null)
+        .eq("is_active", true)
+        .eq("is_frozen", false)
+        .is("archived_at", null)
         .range(from, to);
 
       if (candError) {
