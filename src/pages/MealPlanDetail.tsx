@@ -133,15 +133,11 @@ export default function MealPlanDetail() {
     return clone;
   })();
 
-  // Persiste o analysis completo em ai_analyses (sem refresh — usado nos saves).
+  // ETAPA 6B — persiste o plano de trabalho no núcleo canônico (rascunho).
+  // Nunca grava plano em `ai_analyses`; a versão publicada só muda por publicação.
   const persistStructured = async (next: any) => {
-    const raw = JSON.stringify({ ...next, _isNewFormat: true });
-    const { error } = await supabase.from('ai_analyses').update({
-      raw_response: raw,
-      caloric_deficit: { meal_plan: next.meal_plan } as any,
-      updated_at: new Date().toISOString(),
-    }).eq('client_id', clientId!);
-    if (error) throw error;
+    if (!clientId) return;
+    await saveWorking({ clientId, raw: next, source: 'classic_editor' });
   };
 
   // Salvamento vindo do editor quando estamos numa variação de dia.
@@ -214,6 +210,8 @@ export default function MealPlanDetail() {
   };
 
   const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: workingPlanKey(clientId) });
+    queryClient.invalidateQueries({ queryKey: ['meal-plan-versions', clientId] });
     queryClient.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
     queryClient.invalidateQueries({ queryKey: ['meal-plan-index'] });
   };
@@ -403,29 +401,7 @@ export default function MealPlanDetail() {
         strategic_orientations: { meal_routine: [], training_strategy: [], supplementation: [], race_context: '' },
         alerts: [],
       };
-      const raw = JSON.stringify({ ...empty, _isNewFormat: true });
-      let profileId: string | null = null;
-      try {
-        const { data: prof } = await (supabase as any).from('athlete_profiles').select('id').eq('client_id', clientId).maybeSingle();
-        profileId = prof?.id ?? null;
-      } catch { /* ignore */ }
-
-      if (analysisRow) {
-        const { error } = await supabase.from('ai_analyses').update({
-          raw_response: raw, caloric_deficit: { meal_plan: empty.meal_plan } as any, updated_at: new Date().toISOString(),
-        }).eq('client_id', clientId!);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('ai_analyses').insert({
-          client_id: clientId!, athlete_profile_id: profileId,
-          diagnosis: '', raw_response: raw,
-          caloric_deficit: { meal_plan: empty.meal_plan } as any,
-          // These columns are NOT NULL on the table.
-          energy_expenditure: {} as any,
-          macronutrients: { strategic_orientations: empty.strategic_orientations } as any,
-        } as any);
-        if (error) throw error;
-      }
+      await saveWorking({ clientId: clientId!, raw: { ...empty, _isNewFormat: true }, source: 'classic_editor' });
     },
     onSuccess: () => { toast.success('Plano em branco criado. Clique em Editar Plano para começar.'); refresh(); },
     onError: (e: any) => toast.error(e.message || 'Erro ao criar plano'),
