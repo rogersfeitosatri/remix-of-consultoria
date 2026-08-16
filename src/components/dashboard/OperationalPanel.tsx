@@ -17,6 +17,10 @@ import { useDailyAgenda } from '@/hooks/useDailyAgenda';
 import { overdueBusinessDays, toDateKey, type Operation } from '@/lib/dashboardOperations';
 import { DashboardSection, RowButton } from './DashboardSection';
 
+/** Quantas pendências ficam visíveis antes do "mostrar mais". */
+const VISIBLE = 12;
+
+
 function greeting(): string {
   const h = new Date().getHours();
   if (h < 12) return 'Bom dia';
@@ -60,6 +64,7 @@ export function OperationalPanel() {
   const { groups, legacy, total, isLoading, error, holidays } = useOperationalDashboard();
   const { appointments, isLoading: loadingAgenda } = useDailyAgenda();
   const [legacyOpen, setLegacyOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const firstName = useMemo(
     () => user?.user_metadata?.full_name?.split(' ')[0] || '',
