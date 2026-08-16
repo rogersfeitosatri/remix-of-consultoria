@@ -27,6 +27,9 @@ import {
   Trophy,
   MoreHorizontal,
   Settings2,
+  Archive,
+  CircleSlash,
+  RotateCcw,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -61,6 +64,9 @@ import { PipelineTimelineTab } from '@/components/admin/PipelineTimelineTab';
 import { PipelineAuditPanel } from '@/components/admin/PipelineAuditPanel';
 import { useQuery } from '@tanstack/react-query';
 import { useFreezePlan } from '@/hooks/useFreezePlan';
+import { useAthleteLifecycle } from '@/hooks/useAthleteLifecycle';
+import { getAthleteState } from '@/lib/athleteState';
+import { AthleteStateBadges } from '@/components/clients/AthleteStateBadges';
 import { differenceInCalendarDays } from 'date-fns';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -102,6 +108,7 @@ export default function ClientDetail() {
   const [sendingBooking, setSendingBooking] = useState(false);
   const [sendingCredentials, setSendingCredentials] = useState(false);
   const { freezeMutation, unfreezeMutation } = useFreezePlan();
+  const lifecycle = useAthleteLifecycle();
   const client = clients.find(c => c.id === clientId);
   
   // Fetch checkin responses for evolution charts
@@ -326,15 +333,7 @@ export default function ClientDetail() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-2xl font-bold text-foreground">{client.name}</h1>
-                  <Badge variant={client.is_active ? 'default' : 'secondary'}>
-                    {client.is_active ? 'Ativo' : 'Inativo'}
-                  </Badge>
-                  {(client as any).is_frozen && (
-                    <Badge variant="outline" className="gap-1 border-blue-400 text-blue-600 bg-blue-50">
-                      <Snowflake className="h-3 w-3" />
-                      Congelado
-                    </Badge>
-                  )}
+                  <AthleteStateBadges client={client as any} size="md" />
                 </div>
                 <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-muted-foreground">
                   {client.email && (
@@ -427,6 +426,46 @@ export default function ClientDetail() {
                       <Lock className="h-4 w-4 mr-2" /> Alterar senha do atleta
                     </DropdownMenuItem>
                   </>
+                )}
+                <DropdownMenuSeparator />
+                {/* ETAPA 2A — transições de ciclo de vida pelo serviço central */}
+                {getAthleteState(client as any).isArchived ? (
+                  <DropdownMenuItem
+                    onClick={() => lifecycle.unarchive(client.id)}
+                    disabled={lifecycle.isPending}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" /> Desarquivar atleta
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (confirm(`Arquivar ${client.name}? Ele sai das filas operacionais, mas o histórico é preservado.`)) {
+                        lifecycle.archive(client.id);
+                      }
+                    }}
+                    disabled={lifecycle.isPending}
+                  >
+                    <Archive className="h-4 w-4 mr-2" /> Arquivar atleta
+                  </DropdownMenuItem>
+                )}
+                {getAthleteState(client as any).isOperational ? (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (confirm(`Encerrar o acompanhamento de ${client.name}? Automações e disparos param imediatamente.`)) {
+                        lifecycle.endFollowUp(client.id);
+                      }
+                    }}
+                    disabled={lifecycle.isPending}
+                  >
+                    <CircleSlash className="h-4 w-4 mr-2" /> Encerrar acompanhamento
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => lifecycle.reactivate(client.id)}
+                    disabled={lifecycle.isPending}
+                  >
+                    <Play className="h-4 w-4 mr-2" /> Reativar atleta
+                  </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
