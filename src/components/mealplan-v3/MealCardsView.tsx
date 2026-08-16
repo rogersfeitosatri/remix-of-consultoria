@@ -18,6 +18,8 @@ import { enrichAst, makeEnrichCache } from '@/lib/smartPlan/enrich';
 import type { MealOption, MealBlock, PlanAst } from '@/lib/smartPlan/ast';
 import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
 import { SmartPlanEditor } from './SmartPlanEditor';
+import { FoodComposer } from './FoodComposer';
+
 
 // "08:00 Café da manhã" | "08:00 - Café" | "08:00 — Café" | "Café da manhã"
 function parseMealTitleInput(raw: string): { time: string | null; name: string } {
