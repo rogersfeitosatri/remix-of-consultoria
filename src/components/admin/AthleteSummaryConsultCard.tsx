@@ -304,7 +304,7 @@ export function AthleteSummaryConsultCard({
     onError: (e: any) => toast.error('Erro ao atualizar: ' + (e?.message || '')),
   });
 
-  // Delete completed appointment
+  // ETAPA 6 — dado clínico/histórico não sofre hard delete: consulta é CANCELADA.
   const deleteAppointmentMutation = useMutation({
     mutationFn: async (id: string) => {
       // Unlink any schedule pointing to this appointment and revert to pending
@@ -312,16 +312,20 @@ export function AthleteSummaryConsultCard({
         .from('consultation_schedules')
         .update({ appointment_id: null, status: 'pending', confirmed_at: null, confirmation_status: null })
         .eq('appointment_id', id);
-      const { error } = await supabase.from('appointments').delete().eq('id', id);
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['athlete-appointments', client.id] });
       queryClient.invalidateQueries({ queryKey: ['athlete-consultation-schedules', client.id] });
-      toast.success('Consulta excluída');
+      toast.success('Consulta cancelada');
     },
-    onError: (e: any) => toast.error('Erro ao excluir: ' + (e?.message || '')),
+    onError: (e: any) => toast.error('Erro ao cancelar: ' + (e?.message || '')),
   });
+
 
   // Confirm consultation 1 and generate remaining pipeline
   const confirmAndGeneratePipelineMutation = useMutation({
