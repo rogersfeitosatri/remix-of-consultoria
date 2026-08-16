@@ -27,7 +27,8 @@ import {
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useNutritionReviews, type ReviewWithClient } from '@/hooks/useNutritionReviews';
 import {
-  REVIEW_DECISION_LABEL, REVIEW_STATUS_LABEL, todayKey, type ReviewDecision,
+  REVIEW_DECISION_LABEL, REVIEW_STATUS_LABEL, REVIEW_CHECKIN_STATE_LABEL,
+  STRUCTURAL_REVIEW_BADGE, reviewCheckinState, todayKey, type ReviewDecision,
 } from '@/lib/nutritionReview';
 
 const fmt = (d: string) => format(parseISO(d.slice(0, 10)), "dd 'de' MMM, yyyy", { locale: ptBR });
