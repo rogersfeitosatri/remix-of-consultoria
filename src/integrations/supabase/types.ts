@@ -4930,6 +4930,30 @@ export type Database = {
           },
         ]
       }
+      meal_plan_legacy_report: {
+        Row: {
+          client_id: string
+          created_at: string
+          detail: Json
+          id: string
+          outcome: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          detail?: Json
+          id?: string
+          outcome: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          detail?: Json
+          id?: string
+          outcome?: string
+        }
+        Relationships: []
+      }
       meal_plan_migration_report: {
         Row: {
           client_id: string
@@ -9460,6 +9484,14 @@ export type Database = {
       archive_checkin_form: {
         Args: { p_archive?: boolean; p_form_id: string }
         Returns: undefined
+      }
+      backfill_legacy_meal_plans: {
+        Args: never
+        Returns: {
+          already: number
+          migrated: number
+          skipped_empty: number
+        }[]
       }
       calc_task_level: { Args: { p_xp: number }; Returns: number }
       calculate_next_booking_send_date: {
