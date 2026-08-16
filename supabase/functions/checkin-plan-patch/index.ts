@@ -4,6 +4,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAiJson } from "../_shared/planPipeline.ts";
 import { requireAdmin, assertClientOwnership } from "../_shared/adminAuth.ts";
+import { loadWorkingPlan, saveWorkingPlan } from "../_shared/mealPlanStore.ts"; // ETAPA 6B
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,10 +51,10 @@ Deno.serve(async (req) => {
     const owns = await assertClientOwnership(auth, clientId);
     if (!owns.ok) return json({ error: owns.error }, owns.status);
 
-    const { data: row } = await supabase.from("ai_analyses").select("id, raw_response").eq("client_id", clientId).maybeSingle();
-    let stored: any = null;
-    try { stored = row?.raw_response ? JSON.parse(row.raw_response) : null; } catch { /* */ }
-    if (!row || stored?.planModelVersion !== 2) {
+    // ETAPA 6B — plano v2 lido do store canônico, não de raw_response.
+    const working = await loadWorkingPlan(supabase, clientId);
+    const stored: any = working.raw && Object.keys(working.raw).length ? working.raw : null;
+    if (!stored || stored?.planModelVersion !== 2) {
       return json({ error: "Este atleta não tem plano v2. Gere o plano-base (v2) primeiro." }, 400);
     }
 
@@ -117,7 +118,10 @@ Escreva SOMENTE {"summaryForAthlete": string} — 2 a 4 frases explicando o ajus
       athlete_summary: stored.athlete_summary,
       updatedAt: new Date().toISOString(),
     };
-    await supabase.from("ai_analyses").update({ raw_response: JSON.stringify(next), updated_at: new Date().toISOString() }).eq("id", row.id);
+    // ETAPA 6B — histórico analítico do patch vai para a versão de trabalho
+    // (metadata), NUNCA mais para ai_analyses.raw_response. A proposta de
+    // mudança real (abaixo) é o mecanismo de revisão humana.
+    await saveWorkingPlan(supabase, { clientId, raw: next, source: "checkin_update" });
 
     // Proposta pendente vinculada ao check-in e à versão publicada atual (se houver)
     let proposalId: string | null = null;

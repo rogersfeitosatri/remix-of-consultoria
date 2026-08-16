@@ -4,6 +4,11 @@
 //   check-ins, avaliações, exames).
 // - Histórico do plano alimentar: rascunho local (não salvo) e planos salvos
 //   com data. O botão "Voltar" nas telas filhas retorna aqui.
+//
+// ETAPA 6B: histórico de "Planos salvos" e "Anexar plano" migrado para
+// `meal_plan_versions` (via useMealPlanVersions). `ai_analyses.raw_response`
+// só é lido como FALLBACK read-only (atletas ainda não migrados) — nunca
+// mais gravado por este arquivo.
 
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -26,11 +31,33 @@ import { MealPlanLinksCard } from '@/components/admin/MealPlanLinksCard';
 import { PlanVersionsCard } from '@/components/mealplan/PlanVersionsCard';
 import {
   parseRaw, readSavedPlans, countMeals, variationCount, planTotals,
-  duplicatePlan, setActivePlan, genPlanId, removeSavedPlan, removeAttachedPlan,
   type SavedPlan,
 } from '@/lib/planHistory';
+import { saveWorkingPlan, versionToRaw } from '@/lib/planStore';
+import { useMealPlanVersions, useCreateMealPlanVersion, mealPlanVersionsKey } from '@/hooks/useMealPlanVersions';
+import { logOperationalEvent } from '@/lib/operationalEvents';
+import type { MealPlanVersion } from '@/lib/mealPlanCore';
 
 type DraftPreview = { hasDraft: boolean; days: number; chars: number } | null;
+
+// Entrada de "Plano salvo" exibida no card — pode vir de uma versão canônica
+// (meal_plan_versions) ou, em fallback, de um registro legado read-only.
+interface DisplayPlan extends SavedPlan {
+  legacy: boolean;
+  versionId: string | null;
+  statusLabel?: string;
+}
+
+interface DisplayAttached {
+  id: string;
+  versionId: string | null;
+  legacy: boolean;
+  date: string;
+  label: string;
+  sent_to_zona_nutri: boolean;
+  sent_at: string | null;
+  totals?: { kcal?: number; meals?: number };
+}
 
 function readDraft(clientId?: string): DraftPreview {
   if (!clientId) return null;
@@ -62,9 +89,16 @@ export default function MealPlanHub() {
   const qc = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Núcleo canônico: versões do plano deste atleta.
+  const { data: versions = [], isLoading: versionsLoading } = useMealPlanVersions(clientId);
+  const createVersion = useCreateMealPlanVersion();
+  const hasCanonicalHistory = versions.length > 0;
+
+  // Fallback legado READ-ONLY — só é consultado quando não há nenhuma versão
+  // canônica ainda (atleta não migrado). Nunca é gravado de volta.
   const { data: analysisRow } = useQuery({
     queryKey: ['meal-plan-hub-analysis', clientId],
-    enabled: !!clientId,
+    enabled: !!clientId && !versionsLoading && !hasCanonicalHistory,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('ai_analyses')
@@ -78,16 +112,51 @@ export default function MealPlanHub() {
 
   const rawObj = useMemo(() => parseRaw(analysisRow?.raw_response), [analysisRow]);
 
-  // Histórico de planos salvos (fallback: sintetiza uma entrada do meal_plan
-  // canônico quando ainda não há histórico — planos salvos antes desta versão).
-  const savedPlans: SavedPlan[] = useMemo(() => {
+  // Registra (uma vez por carga) o uso do fallback legado, sem conteúdo clínico.
+  useMemo(() => {
+    if (!clientId || versionsLoading || hasCanonicalHistory) return;
+    if (!analysisRow) return;
+    const hasLegacyContent = !!rawObj?.saved_plans?.length || !!rawObj?.attached_plans?.length || !!rawObj?.meal_plan;
+    if (hasLegacyContent) {
+      void logOperationalEvent({
+        clientId,
+        entityType: 'meal_plan',
+        entityId: clientId,
+        eventType: 'legacy_meal_plan_fallback_used',
+        metadata: { surface: 'meal-plan-hub', ai_analysis_id: analysisRow.id },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, versionsLoading, hasCanonicalHistory, analysisRow]);
+
+  // Versões canônicas do "editor inteligente" (tudo exceto planos anexados),
+  // já excluindo arquivadas.
+  const savedPlans: DisplayPlan[] = useMemo(() => {
+    if (hasCanonicalHistory) {
+      return versions
+        .filter((v) => v.source !== 'attached_plan' && v.status !== 'archived')
+        .map((v): DisplayPlan => ({
+          id: v.id,
+          versionId: v.id,
+          legacy: v.source === 'legacy_import',
+          label: v.source === 'legacy_import' ? `Versão migrada (v${v.version_number})` : `v${v.version_number}`,
+          savedAt: v.published_at || v.created_at,
+          meal_plan: v.content as any,
+          sent_to_zona_nutri: !!(v.metadata as any)?.zona_nutri_sent_at,
+          sent_at: (v.metadata as any)?.zona_nutri_sent_at || null,
+          statusLabel: v.status,
+        }));
+    }
+    // Fallback legado (read-only).
     const list = readSavedPlans(rawObj);
-    if (list.length) return list;
+    if (list.length) return list.map((p) => ({ ...p, legacy: true, versionId: null }));
     const mp = rawObj?.meal_plan;
     if (mp && countMeals(mp) > 0) {
       return [{
         id: rawObj.active_plan_id || 'legacy',
-        label: 'Plano atual',
+        legacy: true,
+        versionId: null,
+        label: 'Plano atual (legado)',
         savedAt: analysisRow?.updated_at || new Date().toISOString(),
         meal_plan: mp,
         sent_to_zona_nutri: !!rawObj?.zona_nutri_sent_at,
@@ -95,21 +164,53 @@ export default function MealPlanHub() {
       }];
     }
     return [];
-  }, [rawObj, analysisRow]);
+  }, [versions, hasCanonicalHistory, rawObj, analysisRow]);
 
-  // Planos salvos pela área "Anexar plano" (texto livre) — histórico separado.
-  const attachedPlans = useMemo(() => {
+  // Planos salvos pela área "Anexar plano" (texto livre) — versões com
+  // source='attached_plan', ou fallback legado (attached_plans[]).
+  const attachedPlans: DisplayAttached[] = useMemo(() => {
+    if (hasCanonicalHistory) {
+      const list = versions
+        .filter((v) => v.source === 'attached_plan' && v.status !== 'archived')
+        .map((v): DisplayAttached => ({
+          id: v.id,
+          versionId: v.id,
+          legacy: false,
+          date: v.created_at,
+          label: (v.metadata as any)?.label || `Plano v${v.version_number}`,
+          sent_to_zona_nutri: !!(v.metadata as any)?.zona_nutri_sent_at,
+          sent_at: (v.metadata as any)?.zona_nutri_sent_at || null,
+          totals: (v.metadata as any)?.totals,
+        }));
+      return [...list].sort((a, b) => {
+        const as = a.sent_to_zona_nutri ? (a.sent_at || a.date || '') : '';
+        const bs = b.sent_to_zona_nutri ? (b.sent_at || b.date || '') : '';
+        if (as && bs) return String(bs).localeCompare(String(as));
+        if (as) return -1;
+        if (bs) return 1;
+        return String(b.date || '').localeCompare(String(a.date || ''));
+      });
+    }
     const list = Array.isArray(rawObj?.attached_plans) ? rawObj.attached_plans : [];
-    // Enviados ao Zona Nutri primeiro (envio mais recente no topo); depois o resto por data.
-    return [...list].sort((a: any, b: any) => {
-      const as = a?.sent_to_zona_nutri ? (a.sent_at || a.date || '') : '';
-      const bs = b?.sent_to_zona_nutri ? (b.sent_at || b.date || '') : '';
+    const mapped: DisplayAttached[] = list.map((p: any) => ({
+      id: p.id,
+      versionId: null,
+      legacy: true,
+      date: p.date,
+      label: p.label,
+      sent_to_zona_nutri: !!p.sent_to_zona_nutri,
+      sent_at: p.sent_at || null,
+      totals: p.totals,
+    }));
+    return [...mapped].sort((a, b) => {
+      const as = a.sent_to_zona_nutri ? (a.sent_at || a.date || '') : '';
+      const bs = b.sent_to_zona_nutri ? (b.sent_at || b.date || '') : '';
       if (as && bs) return String(bs).localeCompare(String(as));
       if (as) return -1;
       if (bs) return 1;
-      return String(b?.date || '').localeCompare(String(a?.date || ''));
+      return String(b.date || '').localeCompare(String(a.date || ''));
     });
-  }, [rawObj]);
+  }, [versions, hasCanonicalHistory, rawObj]);
 
   // Pedido para abrir um plano anexado no painel "Anexar plano".
   const [openAttached, setOpenAttached] = useState<{ id: string; nonce: number } | undefined>(undefined);
@@ -117,92 +218,103 @@ export default function MealPlanHub() {
 
   const draft = useMemo(() => readDraft(clientId), [clientId, analysisRow]);
 
-  // Persiste o rawObj (coluna TEXT → JSON string) e atualiza a UI.
-  const persistRaw = async (nextRaw: any) => {
-    if (analysisRow?.id) {
-      const { error } = await supabase.from('ai_analyses')
-        .update({ raw_response: JSON.stringify(nextRaw), updated_at: new Date().toISOString() })
-        .eq('id', analysisRow.id);
-      if (error) throw error;
-    } else {
-      const { error } = await (supabase as any).from('ai_analyses')
-        .insert({ client_id: clientId, raw_response: JSON.stringify(nextRaw) });
-      if (error) throw error;
-    }
-    await qc.invalidateQueries({ queryKey: ['meal-plan-hub-analysis', clientId] });
-    qc.invalidateQueries({ queryKey: ['meal-plan-editor-row', clientId] });
-    qc.invalidateQueries({ queryKey: ['ai_analysis', clientId] });
-  };
-
   const openEditor = () => navigate(`/meal-plans/${clientId}/editor`);
 
-  // Garante que saved_plans exista (materializa o histórico legado) e retorna
-  // { raw, id } com o id real da entrada equivalente a `sp`.
-  const ensureMaterialized = (sp: SavedPlan): { raw: any; id: string } => {
-    if (Array.isArray(rawObj?.saved_plans) && rawObj.saved_plans.length) {
-      return { raw: rawObj, id: sp.id };
-    }
-    const id = sp.id && sp.id !== 'legacy' ? sp.id : genPlanId();
-    const raw = { ...rawObj, saved_plans: [{ ...sp, id }], active_plan_id: id };
-    return { raw, id };
-  };
-
-  // Abre um plano salvo para edição (torna-o o plano ativo do editor).
-  const editPlan = async (sp: SavedPlan) => {
-    setBusyId(sp.id);
+  // Abre uma versão para edição: garante um draft de trabalho derivado dela e
+  // navega para o editor (nunca edita a versão publicada in-place).
+  const editPlan = async (p: DisplayPlan) => {
+    if (!clientId) return;
+    setBusyId(p.id);
     try {
-      const { raw, id } = ensureMaterialized(sp);
-      const next = setActivePlan(raw, id) ?? raw;
-      await persistRaw(next);
+      if (!p.legacy) {
+        await saveWorkingPlan({
+          clientId,
+          raw: versionToRaw(versions.find((v) => v.id === p.versionId) || undefined),
+          source: 'manual_editor',
+        });
+        await qc.invalidateQueries({ queryKey: mealPlanVersionsKey(clientId) });
+      }
       navigate(`/meal-plans/${clientId}/editor`);
     } catch (e: any) {
       toast.error(e.message || 'Não foi possível abrir o plano.');
     } finally { setBusyId(null); }
   };
 
-  // Exclui um plano do histórico do editor.
-  const deleteSaved = async (sp: SavedPlan) => {
-    if (!window.confirm(`Excluir "${sp.label}"? Esta ação não pode ser desfeita.`)) return;
-    setBusyId(sp.id);
+  // Exclui (arquiva) uma versão do histórico. Versões publicadas nunca são
+  // arquivadas/excluídas — a base bloqueia e mantém a história intacta.
+  const deleteSaved = async (p: DisplayPlan) => {
+    if (p.legacy) {
+      toast.error('Este registro é legado (somente leitura) e não pode ser excluído por aqui.');
+      return;
+    }
+    if (p.statusLabel === 'published') {
+      toast.error('Uma versão publicada não pode ser excluída — ela é o histórico oficial do atleta.');
+      return;
+    }
+    if (!window.confirm(`Excluir "${p.label}"? Esta ação não pode ser desfeita.`)) return;
+    setBusyId(p.id);
     try {
-      // Materializa o histórico legado antes de excluir (para persistir corretamente).
-      const base = (Array.isArray(rawObj?.saved_plans) && rawObj.saved_plans.length)
-        ? rawObj
-        : { ...rawObj, saved_plans: savedPlans.map((p) => ({ ...p, id: p.id === 'legacy' ? genPlanId() : p.id })) };
-      const realId = sp.id === 'legacy' ? base.saved_plans[0]?.id : sp.id;
-      await persistRaw(removeSavedPlan(base, realId));
+      const { error } = await (supabase as any)
+        .from('meal_plan_versions')
+        .update({ status: 'archived' })
+        .eq('id', p.versionId)
+        .in('status', ['draft', 'reviewed']);
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: mealPlanVersionsKey(clientId) });
       toast.success('Plano excluído.');
     } catch (e: any) {
       toast.error(e.message || 'Não foi possível excluir o plano.');
     } finally { setBusyId(null); }
   };
 
-  // Exclui um plano anexado (texto livre) do histórico.
-  const deleteAttached = async (id: string, label?: string) => {
-    if (!window.confirm(`Excluir "${label || 'plano anexado'}"? Esta ação não pode ser desfeita.`)) return;
-    setBusyId(id);
+  // Exclui (arquiva) um plano anexado do histórico.
+  const deleteAttached = async (p: DisplayAttached) => {
+    if (p.legacy) {
+      toast.error('Este registro é legado (somente leitura) e não pode ser excluído por aqui.');
+      return;
+    }
+    if (!window.confirm(`Excluir "${p.label || 'plano anexado'}"? Esta ação não pode ser desfeita.`)) return;
+    setBusyId(p.id);
     try {
-      await persistRaw(removeAttachedPlan(rawObj, id));
+      const { error } = await (supabase as any)
+        .from('meal_plan_versions')
+        .update({ status: 'archived' })
+        .eq('id', p.versionId)
+        .in('status', ['draft', 'reviewed']);
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: mealPlanVersionsKey(clientId) });
       toast.success('Plano excluído.');
     } catch (e: any) {
       toast.error(e.message || 'Não foi possível excluir o plano.');
     } finally { setBusyId(null); }
   };
 
-  // Duplica um plano salvo (nova cópia editável, sem envio) e abre no editor.
-  const duplicate = async (sp: SavedPlan) => {
-    setBusyId(sp.id);
+  // Duplica uma versão (nova draft editável, sem envio) e abre no editor.
+  const duplicate = async (p: DisplayPlan) => {
+    if (!clientId) return;
+    if (p.legacy) {
+      toast.error('Este registro é legado; abra-o no editor e salve para criar uma versão editável.');
+      return;
+    }
+    setBusyId(p.id);
     try {
-      const { raw, id } = ensureMaterialized(sp);
-      const dup = duplicatePlan(raw, id);
-      if (!dup) { toast.error('Não foi possível duplicar.'); return; }
-      await persistRaw(dup.raw);
+      const src = versions.find((v) => v.id === p.versionId);
+      if (!src) throw new Error('Versão não encontrada.');
+      await createVersion.mutateAsync({
+        clientId,
+        content: src.content,
+        orientations: src.orientations,
+        source: src.source,
+        parentVersionId: src.id,
+        metadata: { ...(src.metadata || {}), zona_nutri_sent_at: undefined },
+      });
       toast.success('Plano duplicado. Abrindo cópia para edição.');
       navigate(`/meal-plans/${clientId}/editor`);
     } catch (e: any) {
       toast.error(e.message || 'Não foi possível duplicar o plano.');
     } finally { setBusyId(null); }
   };
+
   const openClientTab = (tab?: string) => {
     const params = new URLSearchParams();
     params.set('from', 'meal-plan-hub');
@@ -348,6 +460,11 @@ export default function MealPlanHub() {
                                     Enviado ao Zona Nutri
                                   </Badge>
                                 )}
+                                {p.legacy && (
+                                  <Badge variant="outline" className="text-[10px] border-muted-foreground/40 text-muted-foreground">
+                                    Legado
+                                  </Badge>
+                                )}
                               </div>
                               <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground flex-wrap">
                                 <span className="flex items-center gap-1">
@@ -383,7 +500,7 @@ export default function MealPlanHub() {
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                       <FileEdit className="h-3 w-3" /> Do anexar plano (texto livre)
                     </p>
-                    {attachedPlans.map((p: any) => (
+                    {attachedPlans.map((p) => (
                       <div key={p.id} className={`rounded-lg border p-3 transition-colors ${p.sent_to_zona_nutri ? 'border-emerald-500/60 bg-emerald-500/5 ring-1 ring-emerald-500/30' : 'hover:bg-accent/50'}`}>
                         <div className="flex items-center gap-3">
                           <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${p.sent_to_zona_nutri ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-500/10 text-amber-600'}`}>
@@ -394,6 +511,11 @@ export default function MealPlanHub() {
                               <p className="font-medium text-sm truncate">{p.label || 'Plano anexado'}</p>
                               <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600">Texto livre</Badge>
                               {p.sent_to_zona_nutri && <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">Enviado ao Zona Nutri</Badge>}
+                              {p.legacy && (
+                                <Badge variant="outline" className="text-[10px] border-muted-foreground/40 text-muted-foreground">
+                                  Legado
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground flex-wrap">
                               {p.date && (
@@ -402,8 +524,8 @@ export default function MealPlanHub() {
                                   {format(parseISO(p.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                                 </span>
                               )}
-                              {p.totals?.meals > 0 && <span>· {p.totals.meals} refeição{p.totals.meals > 1 ? 'ões' : ''}</span>}
-                              {p.totals?.kcal > 0 && <span>· ~{p.totals.kcal} kcal</span>}
+                              {(p.totals?.meals || 0) > 0 && <span>· {p.totals!.meals} refeição{(p.totals!.meals || 0) > 1 ? 'ões' : ''}</span>}
+                              {(p.totals?.kcal || 0) > 0 && <span>· ~{p.totals!.kcal} kcal</span>}
                             </div>
                           </div>
                         </div>
@@ -411,7 +533,7 @@ export default function MealPlanHub() {
                           <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => openAttachedPlan(p.id)}>
                             <Pencil className="h-3 w-3" /> Abrir no anexar plano
                           </Button>
-                          <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs text-destructive hover:text-destructive" disabled={busyId === p.id} onClick={() => deleteAttached(p.id, p.label)}>
+                          <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs text-destructive hover:text-destructive" disabled={busyId === p.id} onClick={() => deleteAttached(p)}>
                             <Trash2 className="h-3 w-3" /> Excluir
                           </Button>
                         </div>
