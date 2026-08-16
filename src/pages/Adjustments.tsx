@@ -35,10 +35,18 @@ const fmtShort = (d: string) => format(parseISO(d.slice(0, 10)), 'dd/MM/yy', { l
 
 function StatusBadge({ r }: { r: ReviewWithClient }) {
   const late = r.scheduled_for < todayKey() && r.status !== 'completed' && r.status !== 'cancelled';
+  const checkin = reviewCheckinState(r);
   return (
     <div className="flex flex-wrap items-center gap-1">
+      <Badge className="text-[10px]">{STRUCTURAL_REVIEW_BADGE}</Badge>
       <Badge variant={late ? 'destructive' : 'outline'} className="text-[10px]">
         {REVIEW_STATUS_LABEL[r.status]}
+      </Badge>
+      <Badge
+        variant={checkin === 'answered' ? 'secondary' : 'outline'}
+        className="text-[10px]"
+      >
+        {REVIEW_CHECKIN_STATE_LABEL[checkin]}
       </Badge>
       {r.source === 'manual_extra_review' && (
         <Badge variant="secondary" className="text-[10px]">Extra</Badge>
@@ -49,7 +57,7 @@ function StatusBadge({ r }: { r: ReviewWithClient }) {
         </Badge>
       )}
       {r.override_without_checkin && (
-        <Badge variant="outline" className="text-[10px]">Sem check-in</Badge>
+        <Badge variant="outline" className="text-[10px]">Revisada sem check-in</Badge>
       )}
     </div>
   );
@@ -71,12 +79,20 @@ function ReviewRow({ r, onOpen }: { r: ReviewWithClient; onOpen: (r: ReviewWithC
           <p className="text-[11px] text-amber-600 mt-1">Falta: {r.missing_information}</p>
         )}
       </div>
-      <Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={() => onOpen(r)}>
-        Revisar <ArrowRight className="h-3.5 w-3.5" />
-      </Button>
+      <div className="flex shrink-0 items-center gap-1">
+        {r.checkin_response_id && (
+          <Button size="sm" variant="ghost" asChild>
+            <Link to={`/checkin-review/${r.checkin_response_id}`}>Ver check-in</Link>
+          </Button>
+        )}
+        <Button size="sm" variant="outline" className="gap-1" onClick={() => onOpen(r)}>
+          Revisar <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }
+
 
 export default function Adjustments() {
   const push = usePushNotifications();
