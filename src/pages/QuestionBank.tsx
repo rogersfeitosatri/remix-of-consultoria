@@ -387,6 +387,57 @@ export default function QuestionBank() {
                 </div>
               </div>
 
+              {/* ETAPA 3C — semântica: o que a pergunta MEDE (estável mesmo se o texto mudar) */}
+              <div className="rounded-md border p-3 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Semântica — permite comparar respostas ao longo do tempo mesmo que o texto da
+                  pergunta mude.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Chave da pergunta</Label>
+                    <Input
+                      value={questionKey}
+                      onChange={(e) => setQuestionKey(e.target.value)}
+                      placeholder="ex: peso_atual"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Métrica</Label>
+                    <Input
+                      value={metricKey}
+                      onChange={(e) => setMetricKey(e.target.value)}
+                      placeholder="ex: body_weight"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Domínio</Label>
+                    <Select value={domain} onValueChange={setDomain}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {QUESTION_DOMAINS.map((d) => (
+                          <SelectItem key={d.value} value={d.value}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Unidade</Label>
+                    <Input
+                      value={unit}
+                      onChange={(e) => setUnit(e.target.value)}
+                      placeholder="ex: kg, h, 1-10"
+                    />
+                  </div>
+                </div>
+              </div>
+
+
+
               {['multiple_choice', 'checkbox'].includes(questionType) && (
                 <div className="space-y-2">
                   <Label>Opções (uma por linha)</Label>
