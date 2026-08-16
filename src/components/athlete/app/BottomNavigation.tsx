@@ -35,7 +35,10 @@ export function BottomNavigation({
     >
       <div className="grid grid-cols-5">
         {TABS.map((t) => {
-          const isActive = active === t.id || (t.id === 'dashboard' && active === 'provas');
+          const isActive =
+            active === t.id ||
+            (t.id === 'dashboard' && ['provas', 'orientacoes', 'evolucao'].includes(active));
+
           const Icon = t.icon;
           return (
             <button
