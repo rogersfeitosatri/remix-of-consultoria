@@ -45,6 +45,7 @@ import {
   type QuestionTemplate,
 } from '@/hooks/useQuestionBank';
 import { Library, Plus, Trash2, Edit, Copy, Loader2, FileText, ClipboardCheck } from 'lucide-react';
+import { canonicalQuestionType, QUESTION_DOMAINS } from '@/lib/questionTypes';
 import { toast } from 'sonner';
 
 export default function QuestionBank() {
@@ -71,6 +72,11 @@ export default function QuestionBank() {
   const [hasCommentField, setHasCommentField] = useState(false);
   const [commentFieldLabel, setCommentFieldLabel] = useState('');
   const [commentFieldRequired, setCommentFieldRequired] = useState(false);
+  // ETAPA 3C — semântica
+  const [questionKey, setQuestionKey] = useState('');
+  const [metricKey, setMetricKey] = useState('');
+  const [domain, setDomain] = useState('');
+  const [unit, setUnit] = useState('');
 
   const resetForm = () => {
     setQuestionText('');
@@ -83,6 +89,10 @@ export default function QuestionBank() {
     setHasCommentField(false);
     setCommentFieldLabel('');
     setCommentFieldRequired(false);
+    setQuestionKey('');
+    setMetricKey('');
+    setDomain('');
+    setUnit('');
     setEditingTemplate(null);
   };
 
@@ -99,6 +109,10 @@ export default function QuestionBank() {
       setHasCommentField(template.has_comment_field);
       setCommentFieldLabel(template.comment_field_label || '');
       setCommentFieldRequired(template.comment_field_required || false);
+      setQuestionKey(template.question_key || '');
+      setMetricKey(template.metric_key || '');
+      setDomain(template.domain || '');
+      setUnit(template.unit || '');
     } else {
       resetForm();
     }
@@ -126,7 +140,13 @@ export default function QuestionBank() {
         has_comment_field: hasCommentField,
         comment_field_label: hasCommentField ? commentFieldLabel : null,
         comment_field_required: hasCommentField ? commentFieldRequired : null,
-      };
+        question_key: questionKey.trim() || null,
+        metric_key: metricKey.trim() || null,
+        domain: domain || null,
+        unit: unit.trim() || null,
+        canonical_type: canonicalQuestionType(questionType),
+        is_adjustment_trigger: editingTemplate?.is_adjustment_trigger ?? false,
+      } as any;
 
       if (editingTemplate) {
         await updateTemplate.mutateAsync({ id: editingTemplate.id, ...data });
