@@ -522,13 +522,13 @@ export default function CalendarPage() {
                                   </div>
                                   {/* Mobile: show event dots only */}
                                   <div className="sm:hidden flex flex-wrap gap-0.5 items-center">
-                                    {events.slice(0, 4).map((event, i) => {
-                                      const dotClass =
-                                        event.type === 'appointment' ? 'bg-emerald-500' :
-                                        event.type === 'first' ? 'bg-primary' :
-                                        'bg-amber-500';
-                                      return <span key={i} className={cn('w-1.5 h-1.5 rounded-full', dotClass)} />;
-                                    })}
+                                     {events.slice(0, 4).map((event, i) => {
+                                       const dotClass =
+                                         event.type === 'appointment'
+                                           ? (event.needsAttention ? 'bg-amber-600' : 'bg-emerald-500')
+                                           : 'bg-amber-500';
+                                       return <span key={i} className={cn('w-1.5 h-1.5 rounded-full', dotClass)} />;
+                                     })}
                                     {events.length > 4 && (
                                       <span className="text-[8px] text-muted-foreground leading-none">+{events.length - 4}</span>
                                     )}
