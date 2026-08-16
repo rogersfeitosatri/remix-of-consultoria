@@ -16,11 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Loader2, Users, UserX, Filter, Flag, Snowflake, UserPlus } from 'lucide-react';
+import { Plus, Search, Loader2, Users, UserX, Filter, Flag, Snowflake, UserPlus, Archive } from 'lucide-react';
 import { ZnLeadsList } from '@/components/clients/ZnLeadsList';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { getAthleteState } from '@/lib/athleteState';
 
 const SERVICE_OPTIONS = [
   { value: 'all', label: 'Todos os Serviços' },
@@ -89,17 +90,27 @@ export default function Clients() {
     }
   }, [searchQuery, serviceFilter, planFilter, targetRaceFilter, activeTab]);
 
-  const activeClients = useMemo(() => {
-    return clients.filter(c => c.is_active && !(c as any).is_frozen);
+  // ETAPA 2A — os grupos vêm do estado canônico (`getAthleteState`), nunca de
+  // combinações locais de flags.
+  const grouped = useMemo(() => {
+    const active: Client[] = [];
+    const frozen: Client[] = [];
+    const ended: Client[] = [];
+    const archived: Client[] = [];
+    for (const c of clients) {
+      const s = getAthleteState(c as any);
+      if (s.isArchived) archived.push(c);
+      else if (s.isFrozen) frozen.push(c);
+      else if (s.isOperational) active.push(c);
+      else ended.push(c);
+    }
+    return { active, frozen, ended, archived };
   }, [clients]);
 
-  const frozenClients = useMemo(() => {
-    return clients.filter(c => (c as any).is_frozen);
-  }, [clients]);
-
-  const inactiveClients = useMemo(() => {
-    return clients.filter(c => !c.is_active && !(c as any).is_frozen);
-  }, [clients]);
+  const activeClients = grouped.active;
+  const frozenClients = grouped.frozen;
+  const inactiveClients = grouped.ended;
+  const archivedClients = grouped.archived;
 
   const applyFilters = (clientList: Client[]) => {
     return clientList.filter(c => {
@@ -156,6 +167,12 @@ export default function Clients() {
       new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
     );
   }, [searchQuery, inactiveClients, serviceFilter, planFilter, targetRaceFilter, targetRaceAlerts]);
+
+  const filteredArchivedClients = useMemo(() => {
+    return applyFilters(archivedClients).sort((a, b) =>
+      new Date(b.end_date).getTime() - new Date(a.end_date).getTime()
+    );
+  }, [searchQuery, archivedClients, serviceFilter, planFilter, targetRaceFilter, targetRaceAlerts]);
 
   const handleSubmit = async (
     data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
@@ -472,7 +489,7 @@ export default function Clients() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5">
             <TabsTrigger value="active" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <Users className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden xs:inline">Ativos</span> ({activeClients.length})
@@ -483,7 +500,11 @@ export default function Clients() {
             </TabsTrigger>
             <TabsTrigger value="inactive" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <UserX className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Inativos</span> ({inactiveClients.length})
+              <span className="hidden xs:inline">Encerrados</span> ({inactiveClients.length})
+            </TabsTrigger>
+            <TabsTrigger value="archived" className="gap-1 sm:gap-2 text-xs sm:text-sm">
+              <Archive className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Arquivados</span> ({archivedClients.length})
             </TabsTrigger>
             <TabsTrigger value="leads" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <UserPlus className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -537,7 +558,7 @@ export default function Clients() {
           <TabsContent value="inactive" className="mt-6">
             <div className="mb-4 flex items-center justify-between">
               <span className="text-sm text-muted-foreground">
-                {filteredInactiveClients.length} atletas inativos encontrados
+                {filteredInactiveClients.length} atletas encerrados
               </span>
               <ExportClientsButton 
                 clients={filteredInactiveClients} 
@@ -548,11 +569,36 @@ export default function Clients() {
             {filteredInactiveClients.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <UserX className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhum atleta inativo</p>
+                <p>Nenhum atleta encerrado</p>
               </div>
             ) : (
               <ClientsList
                 clients={filteredInactiveClients}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="archived" className="mt-6">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {filteredArchivedClients.length} atletas arquivados (fora das filas operacionais, histórico preservado)
+              </span>
+              <ExportClientsButton
+                clients={filteredArchivedClients}
+                targetRaceAlerts={targetRaceAlerts}
+                filename="atletas_arquivados"
+              />
+            </div>
+            {filteredArchivedClients.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Archive className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum atleta arquivado</p>
+              </div>
+            ) : (
+              <ClientsList
+                clients={filteredArchivedClients}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
               />
