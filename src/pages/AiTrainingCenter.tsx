@@ -245,7 +245,7 @@ export default function AiTrainingCenter() {
                 </CardContent>
               </Card>
 
-              {s.hasModules && <MealPlanSkillPanel />}
+              {s.hasModules && <MealPlanSkillPanel promptText={draftText} setPromptText={setDraftText} />}
 
               {/* ---------- Editor + versionamento ---------- */}
               <Card>
