@@ -2024,6 +2024,7 @@ export type Database = {
       }
       checkin_dispatches: {
         Row: {
+          channel: string
           checkin_form_id: string
           client_id: string
           created_at: string
@@ -2032,14 +2033,20 @@ export type Database = {
           error_message: string | null
           id: string
           link_checkin: string | null
+          metadata: Json
+          occurrence_date: string | null
           provider_response: Json | null
+          response_deadline: string | null
           schedule_id: string | null
+          scheduled_for: string | null
           sent_at: string
+          source: string | null
           status: string
           user_id: string
           whatsapp_log_id: string | null
         }
         Insert: {
+          channel?: string
           checkin_form_id: string
           client_id: string
           created_at?: string
@@ -2048,14 +2055,20 @@ export type Database = {
           error_message?: string | null
           id?: string
           link_checkin?: string | null
+          metadata?: Json
+          occurrence_date?: string | null
           provider_response?: Json | null
+          response_deadline?: string | null
           schedule_id?: string | null
+          scheduled_for?: string | null
           sent_at?: string
+          source?: string | null
           status?: string
           user_id: string
           whatsapp_log_id?: string | null
         }
         Update: {
+          channel?: string
           checkin_form_id?: string
           client_id?: string
           created_at?: string
@@ -2064,9 +2077,14 @@ export type Database = {
           error_message?: string | null
           id?: string
           link_checkin?: string | null
+          metadata?: Json
+          occurrence_date?: string | null
           provider_response?: Json | null
+          response_deadline?: string | null
           schedule_id?: string | null
+          scheduled_for?: string | null
           sent_at?: string
+          source?: string | null
           status?: string
           user_id?: string
           whatsapp_log_id?: string | null
@@ -2113,6 +2131,9 @@ export type Database = {
           created_at: string
           final_feedback: string | null
           id: string
+          publication_status: string
+          published_at: string | null
+          published_by: string | null
           sent_at: string | null
           sent_via: string | null
           status: string
@@ -2129,6 +2150,9 @@ export type Database = {
           created_at?: string
           final_feedback?: string | null
           id?: string
+          publication_status?: string
+          published_at?: string | null
+          published_by?: string | null
           sent_at?: string | null
           sent_via?: string | null
           status?: string
@@ -2145,6 +2169,9 @@ export type Database = {
           created_at?: string
           final_feedback?: string | null
           id?: string
+          publication_status?: string
+          published_at?: string | null
+          published_by?: string | null
           sent_at?: string | null
           sent_via?: string | null
           status?: string
@@ -2215,6 +2242,33 @@ export type Database = {
         }
         Relationships: []
       }
+      checkin_migration_report: {
+        Row: {
+          details: Json
+          id: string
+          label: string
+          metric: string
+          taken_at: string
+          value: number
+        }
+        Insert: {
+          details?: Json
+          id?: string
+          label: string
+          metric: string
+          taken_at?: string
+          value: number
+        }
+        Update: {
+          details?: Json
+          id?: string
+          label?: string
+          metric?: string
+          taken_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
       checkin_questions: {
         Row: {
           comment_field_label: string | null
@@ -2274,26 +2328,91 @@ export type Database = {
           },
         ]
       }
+      checkin_response_corrections: {
+        Row: {
+          client_id: string | null
+          corrected_by: string
+          corrected_value: Json | null
+          created_at: string
+          id: string
+          original_value: Json | null
+          question_id: string
+          question_text: string | null
+          reason: string | null
+          response_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          corrected_by: string
+          corrected_value?: Json | null
+          created_at?: string
+          id?: string
+          original_value?: Json | null
+          question_id: string
+          question_text?: string | null
+          reason?: string | null
+          response_id: string
+        }
+        Update: {
+          client_id?: string | null
+          corrected_by?: string
+          corrected_value?: Json | null
+          created_at?: string
+          id?: string
+          original_value?: Json | null
+          question_id?: string
+          question_text?: string | null
+          reason?: string | null
+          response_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_response_corrections_response_id_fkey"
+            columns: ["response_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_responses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checkin_responses: {
         Row: {
           client_id: string
+          closed_at: string | null
+          closed_reason: string | null
+          dispatch_id: string | null
           form_id: string
           id: string
           responses: Json
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           submitted_at: string
         }
         Insert: {
           client_id: string
+          closed_at?: string | null
+          closed_reason?: string | null
+          dispatch_id?: string | null
           form_id: string
           id?: string
           responses: Json
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           submitted_at?: string
         }
         Update: {
           client_id?: string
+          closed_at?: string | null
+          closed_reason?: string | null
+          dispatch_id?: string | null
           form_id?: string
           id?: string
           responses?: Json
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           submitted_at?: string
         }
         Relationships: [
@@ -4035,6 +4154,82 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      meal_plan_change_proposals: {
+        Row: {
+          ai_metadata: Json
+          checkin_response_id: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          current_published_version_id: string | null
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          proposed_changes: Json
+          rationale: string | null
+          resulting_version_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_metadata?: Json
+          checkin_response_id?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          current_published_version_id?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          proposed_changes?: Json
+          rationale?: string | null
+          resulting_version_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_metadata?: Json
+          checkin_response_id?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_published_version_id?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          proposed_changes?: Json
+          rationale?: string | null
+          resulting_version_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_plan_change_proposals_checkin_response_id_fkey"
+            columns: ["checkin_response_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_responses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_change_proposals_current_published_version_id_fkey"
+            columns: ["current_published_version_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plan_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_change_proposals_resulting_version_id_fkey"
+            columns: ["resulting_version_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plan_versions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meal_plan_migration_report: {
         Row: {

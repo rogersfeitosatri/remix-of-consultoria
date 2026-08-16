@@ -45,10 +45,10 @@ interface PendingCheckinResponse {
 
 const FREQUENCY_OPTIONS = [
   { value: 'all', label: 'Todos' },
-  { value: 'daily', label: 'Diário' },
   { value: 'weekly', label: 'Semanal' },
   { value: 'biweekly', label: 'Quinzenal' },
-  { value: 'monthly', label: 'Mensal' },
+  { value: 'three_weeks', label: 'A cada 3 semanas' },
+  { value: 'monthly', label: 'Mensal (4 semanas)' },
   { value: 'bimonthly', label: 'Bimestral' },
   { value: 'quarterly', label: 'Trimestral' },
 ];

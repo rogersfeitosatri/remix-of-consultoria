@@ -103,7 +103,8 @@ Escreva SOMENTE {"summaryForAthlete": string} — 2 a 4 frases explicando o ajus
       summaryForAthlete = String(r.data?.summaryForAthlete || "").slice(0, 600);
     } catch { summaryForAthlete = carbloadChange ? "Fizemos um pequeno ajuste no seu carbload com base no seu último check-in, mantendo os alimentos que você já tolera bem." : "Seu plano segue mantido — está indo bem, sem necessidade de mudanças agora."; }
 
-    // Aplica o patch (sem regenerar o plano)
+    // ETAPA 3B — o check-in NUNCA altera o plano publicado.
+    // Ele registra o patch analítico e cria uma PROPOSTA de alteração para revisão humana.
     const patch = {
       createdAt: new Date().toISOString(), signals,
       carbloadChange, summaryForAthlete, professionalReviewRequired, newMealNotes: [],
@@ -118,12 +119,43 @@ Escreva SOMENTE {"summaryForAthlete": string} — 2 a 4 frases explicando o ajus
     };
     await supabase.from("ai_analyses").update({ raw_response: JSON.stringify(next), updated_at: new Date().toISOString() }).eq("id", row.id);
 
+    // Proposta pendente vinculada ao check-in e à versão publicada atual (se houver)
+    let proposalId: string | null = null;
+    if (carbloadChange || professionalReviewRequired) {
+      const { data: lastResponse } = await supabase
+        .from("checkin_responses").select("id")
+        .eq("client_id", clientId).order("submitted_at", { ascending: false }).limit(1).maybeSingle();
+
+      const { data: publishedVersion } = await supabase
+        .from("meal_plan_versions").select("id")
+        .eq("client_id", clientId).eq("status", "published")
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+      const { data: proposal } = await supabase
+        .from("meal_plan_change_proposals")
+        .insert({
+          user_id: client?.user_id,
+          client_id: clientId,
+          checkin_response_id: lastResponse?.id ?? null,
+          current_published_version_id: publishedVersion?.id ?? null,
+          proposed_changes: { signals, carbloadChange, professionalReviewRequired },
+          rationale: summaryForAthlete,
+          ai_metadata: { source: "checkin-plan-patch", reasonCodes },
+          status: "pending",
+          created_by: auth.userId ?? null,
+        })
+        .select("id")
+        .maybeSingle();
+      proposalId = proposal?.id ?? null;
+    }
+
+
     console.log("checkin-plan-patch obs:", JSON.stringify({
       clientId, signals, carbloadChange: carbloadChange ? `${carbloadChange.fromDays}->${carbloadChange.toDays}` : "keep",
       professionalReviewRequired, version: next.planVersionNumber,
     }));
 
-    return json({ success: true, planAction: "patch", signals, carbloadChange, professionalReviewRequired, summaryForAthlete });
+    return json({ success: true, planAction: "proposal", proposalId, signals, carbloadChange, professionalReviewRequired, summaryForAthlete });
   } catch (error) {
     console.error("checkin-plan-patch:", error);
     return json({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
