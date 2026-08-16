@@ -67,7 +67,7 @@ export default function MealPlanDetail() {
   // ETAPA 6B — o plano de trabalho vem do núcleo canônico; `ai_analyses` só é
   // lido para os campos de ANÁLISE (diagnóstico/alertas), nunca para o plano.
   const { data: working, isLoading } = useWorkingPlan(clientId);
-  const { mutateAsync: saveWorking } = useSaveWorkingPlan();
+  const saveWorking = useSaveWorkingPlan();
   const { data: analysisRow } = useQuery({
     queryKey: ['ai_analysis', clientId],
     enabled: !!clientId,
