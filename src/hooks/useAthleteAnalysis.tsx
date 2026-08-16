@@ -98,7 +98,24 @@ export function useAthleteAnalysis(clientId?: string | null) {
         .eq('client_id', clientId)
         .maybeSingle();
       if (error) throw error;
-      return parseAnalysis(data);
+      const analysis = parseAnalysis(data);
+
+      // ETAPA 3A — o plano do atleta é SEMPRE a versão publicada, quando existir.
+      const { data: pub } = await (supabase as any)
+        .from('meal_plan_versions')
+        .select('content, orientations, published_at')
+        .eq('client_id', clientId)
+        .eq('status', 'published')
+        .maybeSingle();
+      if (pub?.content) {
+        return {
+          ...(analysis || {}),
+          meal_plan: pub.content,
+          strategic_orientations: pub.orientations ?? analysis?.strategic_orientations,
+          updated_at: pub.published_at || analysis?.updated_at,
+        } as AthleteAnalysis;
+      }
+      return analysis;
     },
   });
 }

@@ -33,6 +33,7 @@ import { TotalsPanel } from '@/components/mealplan-v3/TotalsPanel';
 import { useAthleteWeight } from '@/hooks/useAthleteWeight';
 import { mealsToText } from '@/lib/smartPlan/fromMeals';
 import { ImportPreviewDialog } from '@/components/mealplan-v3/ImportPreviewDialog';
+import { PublishPlanControl } from '@/components/mealplan/PublishPlanControl';
 
 import { parseText } from '@/lib/smartPlan/parse';
 import { sortMealsByTimeInText } from '@/lib/smartPlan/sortMeals';
@@ -841,9 +842,12 @@ export default function MealPlanEditor() {
           <Button variant="ghost" size="sm" onClick={() => navigate(`/meal-plans/${clientId}`)}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
           </Button>
-          <div className="text-right">
-            <h1 className="text-lg md:text-xl font-bold">Editor inteligente</h1>
-            <p className="text-xs text-muted-foreground">{client?.name || '—'}</p>
+          <div className="flex items-center gap-3">
+            <PublishPlanControl clientId={clientId} source="manual_editor" onBeforePublish={savePlan} />
+            <div className="text-right">
+              <h1 className="text-lg md:text-xl font-bold">Editor inteligente</h1>
+              <p className="text-xs text-muted-foreground">{client?.name || '—'}</p>
+            </div>
           </div>
         </div>
 

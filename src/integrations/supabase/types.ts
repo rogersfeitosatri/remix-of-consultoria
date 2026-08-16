@@ -4036,6 +4036,39 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_plan_migration_report: {
+        Row: {
+          client_id: string
+          created_at: string
+          details: Json
+          id: string
+          outcome: string
+          published_version_id: string | null
+          user_id: string | null
+          versions_created: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          details?: Json
+          id?: string
+          outcome: string
+          published_version_id?: string | null
+          user_id?: string | null
+          versions_created?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          outcome?: string
+          published_version_id?: string | null
+          user_id?: string | null
+          versions_created?: number
+        }
+        Relationships: []
+      }
       meal_plan_status: {
         Row: {
           client_id: string
@@ -4087,6 +4120,147 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_plan_versions: {
+        Row: {
+          ai_metadata: Json
+          client_id: string
+          content: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          meal_plan_id: string
+          metadata: Json
+          needs_review: boolean
+          orientations: Json | null
+          parent_version_id: string | null
+          published_at: string | null
+          source: string
+          status: string
+          superseded_at: string | null
+          updated_at: string
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          ai_metadata?: Json
+          client_id: string
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          meal_plan_id: string
+          metadata?: Json
+          needs_review?: boolean
+          orientations?: Json | null
+          parent_version_id?: string | null
+          published_at?: string | null
+          source?: string
+          status?: string
+          superseded_at?: string | null
+          updated_at?: string
+          user_id: string
+          version_number: number
+        }
+        Update: {
+          ai_metadata?: Json
+          client_id?: string
+          content?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          meal_plan_id?: string
+          metadata?: Json
+          needs_review?: boolean
+          orientations?: Json | null
+          parent_version_id?: string | null
+          published_at?: string | null
+          source?: string
+          status?: string
+          superseded_at?: string | null
+          updated_at?: string
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_plan_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_versions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meal_plan_versions_meal_plan_id_fkey"
+            columns: ["meal_plan_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_versions_parent_version_id_fkey"
+            columns: ["parent_version_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plan_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_plans: {
+        Row: {
+          client_id: string
+          created_at: string
+          current_version_id: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          current_version_id?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          current_version_id?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "v_client_operational_state"
+            referencedColumns: ["client_id"]
+          },
+          {
+            foreignKeyName: "meal_plans_current_version_fkey"
+            columns: ["current_version_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plan_versions"
             referencedColumns: ["id"]
           },
         ]
@@ -8190,6 +8364,20 @@ export type Database = {
         }
         Returns: string
       }
+      create_meal_plan_version: {
+        Args: {
+          p_ai_metadata?: Json
+          p_client_id: string
+          p_content: Json
+          p_metadata?: Json
+          p_needs_review?: boolean
+          p_orientations?: Json
+          p_parent_version_id?: string
+          p_source?: string
+          p_status?: string
+        }
+        Returns: string
+      }
       create_public_booking_appointment: {
         Args: { p_date: string; p_time: string; p_token: string }
         Returns: {
@@ -8393,6 +8581,10 @@ export type Database = {
           sequence_index: number
         }[]
       }
+      publish_meal_plan_version: {
+        Args: { p_version_id: string }
+        Returns: Json
+      }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
@@ -8433,6 +8625,7 @@ export type Database = {
         Returns: undefined
       }
       seed_default_zn_plans: { Args: { p_user_id: string }; Returns: undefined }
+      try_jsonb: { Args: { p_text: string }; Returns: Json }
       validate_booking_email: {
         Args: { p_email: string; p_token: string }
         Returns: {
