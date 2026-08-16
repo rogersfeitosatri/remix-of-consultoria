@@ -1,13 +1,9 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { MessageCircle, Check, ChevronDown, HeartHandshake, Undo2, Loader2 } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBiweeklyContacts, CONTACT_CYCLE_DAYS, type ContactRow } from '@/hooks/useBiweeklyContacts';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { DashboardSection } from './DashboardSection';
 
 function waLink(phone: string | null, name: string): string | null {
   const digits = String(phone ?? '').replace(/\D/g, '');
@@ -18,20 +14,17 @@ function waLink(phone: string | null, name: string): string | null {
   return `https://wa.me/${withCc}?text=${encodeURIComponent(msg)}`;
 }
 
-function sinceLabel(r: ContactRow): { text: string; overdue: boolean } {
-  if (r.daysSince == null) return { text: 'Nunca contatado', overdue: true };
-  if (r.daysSince === 0) return { text: 'Contato hoje', overdue: false };
-  const overdue = r.daysSince >= CONTACT_CYCLE_DAYS;
-  return { text: `há ${r.daysSince} dia${r.daysSince > 1 ? 's' : ''}`, overdue };
+function sinceLabel(r: ContactRow): string {
+  if (r.daysSince == null) return 'nunca';
+  if (r.daysSince === 0) return 'hoje';
+  return `${r.daysSince} dias`;
 }
 
 export function BiweeklyContactPanel() {
   const { pending, done, total, isLoading, markContacted, undoContact } = useBiweeklyContacts();
   const [doneOpen, setDoneOpen] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(false);
 
-  if (isLoading) return null;
-  if (total === 0) return null; // sem atletas ativos → nada a mostrar
+  if (isLoading || total === 0 || pending.length === 0) return null;
 
   const openWa = (r: ContactRow) => {
     const link = waLink(r.phone, r.name);
@@ -40,102 +33,52 @@ export function BiweeklyContactPanel() {
   };
 
   return (
-    <Collapsible open={panelOpen} onOpenChange={setPanelOpen}>
-      <Card className="mt-3 border-primary/30">
-        <CollapsibleTrigger asChild>
-          <CardHeader className="pb-2 cursor-pointer hover:bg-muted/30 transition-colors">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <HeartHandshake className="h-4 w-4 text-primary" /> Contato quinzenal
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Badge variant={pending.length ? 'default' : 'secondary'} className="text-[11px]">
-                  {pending.length} pendente{pending.length !== 1 ? 's' : ''}
-                </Badge>
-                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Um "oi" no WhatsApp a cada {CONTACT_CYCLE_DAYS} dias com quem está ativo — além dos check-ins.
-              Marque <strong>Falei</strong> ao concluir; volta sozinho no próximo ciclo.
-            </p>
-          </CardHeader>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CardContent className="space-y-2">
-            {pending.length === 0 ? (
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700">
-                ✅ Todos os ativos foram contatados neste ciclo. Bom trabalho!
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {pending.map((r) => {
-                  const s = sinceLabel(r);
-                  return (
-                    <div key={r.id} className="rounded-lg border p-2.5 sm:p-2">
-                      <div className="flex items-start gap-2 sm:items-center">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{r.name}</p>
-                          <span className={`text-[11px] ${s.overdue ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                            {s.text}
-                          </span>
-                        </div>
-                        <div className="hidden sm:flex items-center gap-2">
-                          <Button size="sm" variant="outline" className="h-8 gap-1 text-xs text-green-600 border-green-600/30 hover:bg-green-600/10"
-                            onClick={() => openWa(r)}>
-                            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                          </Button>
-                          <Button size="sm" className="h-8 gap-1 text-xs" onClick={() => { markContacted(r.id); toast.success(`Contato com ${r.name.split(' ')[0]} registrado.`); }}>
-                            <Check className="h-3.5 w-3.5" /> Falei
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="mt-2 grid grid-cols-2 gap-2 sm:hidden">
-                        <Button size="sm" variant="outline" className="h-9 gap-1 text-xs text-green-600 border-green-600/30 hover:bg-green-600/10"
-                          onClick={() => openWa(r)}>
-                          <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                        </Button>
-                        <Button size="sm" className="h-9 gap-1 text-xs" onClick={() => { markContacted(r.id); toast.success(`Contato com ${r.name.split(' ')[0]} registrado.`); }}>
-                          <Check className="h-3.5 w-3.5" /> Falei
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+    <DashboardSection title="Contatos" count={pending.length}>
+      {pending.map((r) => (
+        <div key={r.id} className="group flex items-center gap-2 rounded-md transition-colors hover:bg-muted/50">
+          <button
+            type="button"
+            onClick={() => openWa(r)}
+            className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-3 text-left"
+          >
+            <span className="min-w-0 flex-1 truncate text-[15px]">{r.name}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">{sinceLabel(r)}</span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+          </button>
+          <button
+            type="button"
+            aria-label={`Marcar contato com ${r.name}`}
+            onClick={() => { markContacted(r.id); toast.success(`Contato com ${r.name.split(' ')[0]} registrado.`); }}
+            className="mr-1.5 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+          >
+            <Check className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
 
-            {done.length > 0 && (
-              <Collapsible open={doneOpen} onOpenChange={setDoneOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1.5 px-0 text-muted-foreground">
-                    <Check className="h-3.5 w-3.5 text-emerald-600" /> Em dia neste ciclo ({done.length})
-                    <ChevronDown className={`h-4 w-4 transition-transform ${doneOpen ? 'rotate-180' : ''}`} />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-1.5 pt-1">
-                  {done.map((r) => (
-                    <div key={r.id} className="flex items-center gap-2 rounded-lg border bg-muted/20 p-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm truncate">{r.name}</p>
-                        {r.lastContactedAt && (
-                          <span className="text-[11px] text-muted-foreground">
-                            Falei em {format(parseISO(r.lastContactedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
-                          </span>
-                        )}
-                      </div>
-                      <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs text-muted-foreground"
-                        onClick={() => { undoContact(r.id); }}>
-                        <Undo2 className="h-3 w-3" /> Desfazer
-                      </Button>
-                    </div>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
+      {done.length > 0 && (
+        <Collapsible open={doneOpen} onOpenChange={setDoneOpen}>
+          <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
+            Em dia neste ciclo de {CONTACT_CYCLE_DAYS} dias ({done.length})
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${doneOpen ? 'rotate-180' : ''}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            {done.map((r) => (
+              <div key={r.id} className="flex items-center gap-2 px-3 py-2">
+                <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{r.name}</span>
+                <button
+                  type="button"
+                  aria-label={`Desfazer contato com ${r.name}`}
+                  onClick={() => undoContact(r.id)}
+                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </DashboardSection>
   );
 }
