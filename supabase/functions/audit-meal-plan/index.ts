@@ -204,7 +204,7 @@ Retorne o plano completo corrigido mantendo a mesma estrutura. Ajuste as porçõ
       throw updateError;
     }
 
-    await saveWorkingPlan(supabase, { clientId, raw: auditedRaw, source: "manual_editor", reviewed: true });
+    await saveWorkingPlan(supabase, { clientId, raw: auditedRaw, source: "manual_editor" });
 
     return new Response(JSON.stringify({ success: true, analysis: auditedData }), {
       status: 200,
