@@ -90,7 +90,7 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
         title: 'Devolutiva do check-in',
         dueDate: slaDueDate(row.submitted_at, SLA_BUSINESS_DAYS.checkin_review!, holidays),
         createdAt: row.submitted_at,
-        route: `/checkin-hub?client=${row.client_id}`,
+        route: `/checkin-review/${row.id}`,
         sourceType: 'checkin_response',
         sourceId: row.id,
       });
@@ -136,7 +136,7 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
       subtitle: anamnese ? 'Anamnese respondida' : 'Sem anamnese vinculada',
       dueDate: slaDueDate(ref, SLA_BUSINESS_DAYS.meal_plan!, holidays),
       createdAt: ref,
-      route: `/meal-plans?client=${row.client_id}`,
+      route: `/meal-plans/${row.client_id}`,
       sourceType: 'meal_plan_status',
       sourceId: row.id,
     });
@@ -163,7 +163,7 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
       subtitle: 'Vincular ou cadastrar o atleta',
       dueDate: slaDueDate(row.submitted_at, SLA_BUSINESS_DAYS.anamnese_review!, holidays),
       createdAt: row.submitted_at,
-      route: '/forms?tab=anamnese-responses',
+      route: `/anamnese-response/${row.id}`,
       sourceType: 'anamnese_response',
       sourceId: row.id,
     });
@@ -193,7 +193,7 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
       subtitle: row.scheduled_date ? `Consulta prevista para ${row.scheduled_date}` : undefined,
       dueDate: row.send_link_date,
       createdAt: null,
-      route: `/scheduling?client=${row.client_id}`,
+      route: '/scheduling/periodicity',
       sourceType: 'consultation_schedule',
       sourceId: row.id,
     });
