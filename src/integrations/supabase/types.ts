@@ -4036,6 +4036,39 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_plan_migration_report: {
+        Row: {
+          client_id: string
+          created_at: string
+          details: Json
+          id: string
+          outcome: string
+          published_version_id: string | null
+          user_id: string | null
+          versions_created: number
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          details?: Json
+          id?: string
+          outcome: string
+          published_version_id?: string | null
+          user_id?: string | null
+          versions_created?: number
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          details?: Json
+          id?: string
+          outcome?: string
+          published_version_id?: string | null
+          user_id?: string | null
+          versions_created?: number
+        }
+        Relationships: []
+      }
       meal_plan_status: {
         Row: {
           client_id: string
@@ -8592,6 +8625,7 @@ export type Database = {
         Returns: undefined
       }
       seed_default_zn_plans: { Args: { p_user_id: string }; Returns: undefined }
+      try_jsonb: { Args: { p_text: string }; Returns: Json }
       validate_booking_email: {
         Args: { p_email: string; p_token: string }
         Returns: {
