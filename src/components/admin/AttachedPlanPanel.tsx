@@ -15,6 +15,7 @@ import {
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
+import { logOperationalEvent } from '@/lib/operationalEvents';
 
 const WEEKDAYS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
 const DAY_LABEL: Record<string, string> = {
@@ -25,6 +26,8 @@ interface DayMacro { day: string; kcal: number; cho_g: number; protein_g: number
 interface Totals { kcal: number; cho_g: number; protein_g: number; fat_g: number; meals: number }
 interface AttachedPlan {
   id: string;
+  versionId: string | null;
+  legacy: boolean;
   date: string;          // ISO
   label: string;
   text: string;
@@ -71,25 +74,69 @@ export function AttachedPlanPanel({
   const queryClient = useQueryClient();
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Histórico dos planos anexados vive em ai_analyses.raw_response.attached_plans[].
+  // ETAPA 6B: histórico dos planos anexados vive em `meal_plan_versions`
+  // (source='attached_plan'). `ai_analyses.raw_response` só é lido como
+  // fallback read-only quando o atleta ainda não tem nenhuma versão anexada.
+  const sortAttached = (list: AttachedPlan[]) => [...list].sort((a, b) => {
+    const as = a.sent_to_zona_nutri ? (a.sent_at || a.date || '') : '';
+    const bs = b.sent_to_zona_nutri ? (b.sent_at || b.date || '') : '';
+    if (as && bs) return bs.localeCompare(as);
+    if (as) return -1;
+    if (bs) return 1;
+    return (b.date || '').localeCompare(a.date || '');
+  });
+
+  const dbVersionToAttached = (v: any): AttachedPlan => {
+    const meta = v.metadata || {};
+    return {
+      id: v.id,
+      versionId: v.id,
+      legacy: false,
+      date: meta.date || v.created_at,
+      label: meta.label || `Plano v${v.version_number}`,
+      text: v.content?.text || '',
+      orientations: v.orientations || meta.orientations || '',
+      summary: meta.summary || '',
+      totals: { ...EMPTY_TOTALS, ...(meta.totals || {}) },
+      per_day: meta.per_day || [],
+      meal_names: meta.meal_names || [],
+      version: v.version_number,
+      sent_to_zona_nutri: !!meta.zona_nutri_sent_at,
+      sent_at: meta.zona_nutri_sent_at || null,
+    };
+  };
+
   const { data: history = [], refetch } = useQuery({
     queryKey: ['attached-plans', clientId],
     enabled: !!clientId,
     queryFn: async (): Promise<AttachedPlan[]> => {
-      const { data } = await supabase.from('ai_analyses').select('raw_response').eq('client_id', clientId).maybeSingle();
+      const { data, error } = await (supabase as any)
+        .from('meal_plan_versions')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('source', 'attached_plan')
+        .neq('status', 'archived')
+        .order('version_number', { ascending: false });
+      if (error) throw error;
+      if (Array.isArray(data) && data.length > 0) {
+        return sortAttached(data.map(dbVersionToAttached));
+      }
+      // Fallback legado read-only.
+      const { data: row } = await supabase.from('ai_analyses').select('id, raw_response').eq('client_id', clientId).maybeSingle();
       try {
-        const raw = typeof data?.raw_response === 'string' ? JSON.parse(data.raw_response) : data?.raw_response;
+        const raw = typeof row?.raw_response === 'string' ? JSON.parse(row.raw_response) : row?.raw_response;
         const list = raw?.attached_plans;
-        // Ordena por ENVIO ao Zona Nutri: enviados primeiro (envio mais recente
-        // no topo); os não enviados depois, por data de salvamento.
-        return Array.isArray(list) ? [...list].sort((a, b) => {
-          const as = a.sent_to_zona_nutri ? (a.sent_at || a.date || '') : '';
-          const bs = b.sent_to_zona_nutri ? (b.sent_at || b.date || '') : '';
-          if (as && bs) return bs.localeCompare(as);
-          if (as) return -1;
-          if (bs) return 1;
-          return (b.date || '').localeCompare(a.date || '');
-        }) : [];
+        if (Array.isArray(list) && list.length > 0) {
+          void logOperationalEvent({
+            clientId,
+            entityType: 'meal_plan',
+            entityId: clientId,
+            eventType: 'legacy_meal_plan_fallback_used',
+            metadata: { surface: 'attached-plan-panel', ai_analysis_id: row?.id },
+          });
+          return sortAttached(list.map((p: any) => ({ ...p, versionId: null, legacy: true })));
+        }
+        return [];
       } catch { return []; }
     },
   });
