@@ -416,11 +416,11 @@ export default function CalendarPage() {
                   <div className="flex flex-wrap gap-3 mb-4 text-xs">
                     <div className="flex items-center gap-1.5">
                       <span className="w-3 h-3 rounded bg-emerald-500/20 border border-emerald-500" />
-                      <span className="text-muted-foreground">Consulta Agendada</span>
+                      <span className="text-muted-foreground">Consulta agendada</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="w-3 h-3 rounded bg-primary/20 border border-primary" />
-                      <span className="text-muted-foreground">1ª Consulta</span>
+                      <span className="w-3 h-3 rounded bg-amber-600/20 border border-amber-600" />
+                      <span className="text-muted-foreground">Aguardando confirmação</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="w-3 h-3 rounded bg-amber-500/20 border border-amber-500" />
