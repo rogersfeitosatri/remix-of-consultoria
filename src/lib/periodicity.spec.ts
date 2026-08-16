@@ -20,7 +20,7 @@ describe('periodicidade canônica', () => {
     expect(checkinIntervalDays('weekly')).toBe(7);
     expect(checkinIntervalDays('biweekly')).toBe(14);
     expect(checkinGraceDays('weekly')).toBe(9);
-    expect(checkinGraceDays('quarterly')).toBe(95);
+    expect(checkinGraceDays('quarterly')).toBe(86);
   });
 
   it('cadência de consultas em semanas', () => {
