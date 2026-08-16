@@ -199,6 +199,35 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
     });
   }
 
+  // ---------- 4b. Revisões nutricionais vencidas (ETAPA 5A) ----------
+  const { data: reviews } = await (supabase as any)
+    .from('nutrition_reviews')
+    .select('id, client_id, scheduled_for, status, missing_information')
+    .eq('user_id', userId)
+    .in('status', ['scheduled', 'pending', 'waiting_information', 'in_review'])
+    .lte('scheduled_for', todayKey);
+
+  for (const rv of reviews || []) {
+    const row = rv as any;
+    const c = byId.get(row.client_id);
+    if (!c || !c.state.canReceiveMealPlanActions) continue;
+    ops.push({
+      id: `nutrition_review:${row.id}`,
+      kind: 'nutrition_review',
+      clientId: row.client_id,
+      clientName: c.name,
+      clientPhone: c.phone,
+      title: 'Revisão nutricional do ciclo',
+      subtitle: row.missing_information ? `Falta: ${row.missing_information}` : undefined,
+      dueDate: row.scheduled_for,
+      createdAt: null,
+      route: '/adjustments',
+      sourceType: 'nutrition_review',
+      sourceId: row.id,
+    });
+  }
+
+
   // ---------- 5. Renovações (plano vencendo em até 15 dias) ----------
   const renewalLimit = toDateKey(new Date(Date.now() + 15 * 86_400_000));
   for (const c of operational) {
