@@ -393,22 +393,6 @@ export default function PublicCheckinForm() {
     try {
       const clientId = verifiedClientId;
 
-      // Re-check 36h expiration at submission time
-      const { data: recheck } = await supabase.functions.invoke('verify-checkin-phone', {
-        body: {
-          clientId: clientId,
-          phone: athletePhone,
-          formId: formId,
-        },
-      });
-
-      if (typeof recheck?.windowHours === 'number') setWindowHours(recheck.windowHours);
-      if (recheck?.expired) {
-        setLinkExpired(true);
-        setSubmitting(false);
-        return;
-      }
-
       // Prepare responses with comments
       const responsesWithComments: Record<string, any> = {};
       questions.forEach((q) => {
@@ -418,27 +402,37 @@ export default function PublicCheckinForm() {
         };
       });
 
-      // Submit response (no .select() since public users don't have SELECT permission)
-      const { error: submitError } = await supabase
-        .from('checkin_responses')
-        .insert({
-          form_id: formId,
-          client_id: clientId,
-          responses: responsesWithComments,
-          // ETAPA 3C — a resposta guarda a versão exata que o atleta viu
-          ...(formVersionId ? { form_version_id: formVersionId } : {}),
-        } as any);
+      // ETAPA 6A — o envio público passa SEMPRE pela edge function escopada.
+      // O browser anônimo não escreve mais direto em checkin_responses:
+      // o dispatch (token ou telefone + último envio) é quem autoriza,
+      // e o servidor revalida prazo, estado do atleta e duplicidade.
+      const dispatchToken = new URLSearchParams(location.search).get('t');
+      const { data: result, error: submitError } = await supabase.functions.invoke(
+        'submit-public-checkin',
+        {
+          body: {
+            formId,
+            clientId,
+            dispatchToken: dispatchToken || undefined,
+            phone: athletePhone,
+            responses: responsesWithComments,
+          },
+        },
+      );
 
-
-      if (submitError) throw submitError;
-
-      // Notify admin via WhatsApp (fire-and-forget)
-      supabase.functions.invoke('notify-checkin-response', {
-        body: { clientId, formId, responses: responsesWithComments },
-      }).catch(err => console.warn('Admin notification failed:', err));
+      if (submitError || (result && result.error)) {
+        const code = result?.error;
+        if (code === 'EXPIRED') {
+          setLinkExpired(true);
+          return;
+        }
+        toast.error(result?.message ?? 'Não foi possível enviar agora. Tente novamente.');
+        return;
+      }
 
       setSubmitted(true);
       toast.success('Checkin enviado com sucesso!');
+
     } catch (error) {
       console.error('Error submitting form:', error);
       toast.error('Erro ao enviar formulário. Tente novamente.');

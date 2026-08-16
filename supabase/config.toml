@@ -126,3 +126,6 @@ verify_jwt = false
 [functions.zn-sync-retry]
 verify_jwt = false
 
+
+[functions.submit-public-checkin]
+verify_jwt = false

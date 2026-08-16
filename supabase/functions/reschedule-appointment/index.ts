@@ -1,9 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { requireInternal, denied, logSecurityEvent, restrictedCors } from "../_shared/authGuard.ts";
 
 interface RescheduleRequest {
   appointmentId: string;
@@ -13,8 +9,16 @@ interface RescheduleRequest {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = restrictedCors(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // ETAPA 6A — C. INTERNAL/CRON: nenhuma chamada anônima executa este processador.
+  const guard = await requireInternal(req);
+  if (!guard.ok) {
+    await logSecurityEvent({ eventType: 'processor_invocation_denied', fn: 'reschedule-appointment' });
+    return denied(guard, corsHeaders);
   }
 
   try {

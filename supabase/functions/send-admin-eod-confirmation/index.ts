@@ -1,9 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { requireInternal, denied, logSecurityEvent, restrictedCors } from "../_shared/authGuard.ts";
 
 const ADMIN_PHONE = '5599984817697';
 
@@ -27,8 +23,16 @@ function formatTimeHHMM(t: string): string {
 const numberEmoji = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
 Deno.serve(async (req) => {
+  const corsHeaders = restrictedCors(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // ETAPA 6A — C. INTERNAL/CRON: nenhuma chamada anônima executa este processador.
+  const guard = await requireInternal(req);
+  if (!guard.ok) {
+    await logSecurityEvent({ eventType: 'processor_invocation_denied', fn: 'send-admin-eod-confirmation' });
+    return denied(guard, corsHeaders);
   }
 
   try {

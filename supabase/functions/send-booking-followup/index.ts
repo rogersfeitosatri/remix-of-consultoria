@@ -4,14 +4,18 @@
 // triggeredBy='followup_cron' e templateKey 'booking_followup_v1'. O duplicate guard
 // e a checagem de elegibilidade ficam a cargo de send-booking-link.
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { requireInternal, denied, logSecurityEvent, restrictedCors } from "../_shared/authGuard.ts";
 
 Deno.serve(async (req) => {
+  const corsHeaders = restrictedCors(req);
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  // ETAPA 6A — C. INTERNAL/CRON: nenhuma chamada anônima executa este processador.
+  const guard = await requireInternal(req);
+  if (!guard.ok) {
+    await logSecurityEvent({ eventType: 'processor_invocation_denied', fn: 'send-booking-followup' });
+    return denied(guard, corsHeaders);
+  }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

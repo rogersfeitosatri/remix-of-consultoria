@@ -7,11 +7,7 @@
 //
 // Idempotente via tabela np_event_dispatches (UNIQUE em client_id, race_id, event_type, event_key).
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { requireInternal, denied, logSecurityEvent, restrictedCors } from "../_shared/authGuard.ts";
 
 type RacePhase = 'base' | 'build' | 'specific' | 'peak' | 'taper' | 'race';
 
@@ -63,7 +59,15 @@ function renderTemplate(body: string, vars: Record<string, string | number>): st
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = restrictedCors(req);
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  // ETAPA 6A — C. INTERNAL/CRON: nenhuma chamada anônima executa este processador.
+  const guard = await requireInternal(req);
+  if (!guard.ok) {
+    await logSecurityEvent({ eventType: 'processor_invocation_denied', fn: 'send-race-prep-whatsapp' });
+    return denied(guard, corsHeaders);
+  }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

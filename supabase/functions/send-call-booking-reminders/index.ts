@@ -1,9 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+import { requireInternal, denied, logSecurityEvent, restrictedCors } from "../_shared/authGuard.ts";
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
   let result = template;
@@ -157,8 +153,16 @@ async function createCalendarEventForBooking(
 
 // ─── Main Handler ───────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
+  const corsHeaders = restrictedCors(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // ETAPA 6A — C. INTERNAL/CRON: nenhuma chamada anônima executa este processador.
+  const guard = await requireInternal(req);
+  if (!guard.ok) {
+    await logSecurityEvent({ eventType: 'processor_invocation_denied', fn: 'send-call-booking-reminders' });
+    return denied(guard, corsHeaders);
   }
 
   try {
