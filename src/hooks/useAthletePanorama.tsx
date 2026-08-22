@@ -63,13 +63,20 @@ export function useAthletePanorama(clientId?: string) {
     enabled: !!clientId,
     staleTime: 30_000,
     queryFn: async (): Promise<Panorama | null> => {
-      const { data: c } = await supabase.from('clients')
-        .select('plan_type, plan_duration, start_date, end_date, is_frozen, has_consultations, consultation_frequency, consultation_count, consultations_completed, last_consultation_at, has_checkin, checkin_frequency')
+      // Atenção: só colunas que EXISTEM em `clients`. Pedir uma coluna
+      // inexistente faz o Supabase retornar erro e o card sumir sem aviso —
+      // por isso o erro é propagado em vez de virar `null` silencioso.
+      const { data: c, error: cErr } = await supabase.from('clients')
+        .select('plan_type, plan_duration, start_date, end_date, is_frozen, has_consultations, consultation_frequency, consultation_count, last_consultation_at, has_checkin, checkin_frequency')
         .eq('id', clientId!).maybeSingle();
+      if (cErr) {
+        console.error('[panorama] falha ao ler o atleta:', cErr);
+        throw cErr;
+      }
       if (!c) return null;
 
       const today = new Date().toISOString().slice(0, 10);
-      const [dispatch, resp, apptDone, apptNext, profile] = await Promise.all([
+      const [dispatch, resp, apptDone, apptNext, profile, doneCount] = await Promise.all([
         (supabase as any).from('checkin_dispatches').select('sent_at')
           .eq('client_id', clientId).order('sent_at', { ascending: false }).limit(1),
         supabase.from('checkin_responses').select('id, submitted_at')
@@ -82,6 +89,10 @@ export function useAthletePanorama(clientId?: string) {
           .gte('appointment_date', today).order('appointment_date', { ascending: true }).limit(1),
         (supabase as any).from('athlete_profiles').select('target_race, target_deadline')
           .eq('client_id', clientId).maybeSingle(),
+        // Consultas já realizadas: contadas dos agendamentos (a coluna
+        // `consultations_completed` é de consultation_schedule_rules, não de clients).
+        (supabase as any).from('appointments').select('id', { count: 'exact', head: true })
+          .eq('client_id', clientId).in('status', ['completed', 'confirmed']).lte('appointment_date', today),
       ]);
 
       const responses = (resp.data ?? []) as any[];
@@ -147,7 +158,7 @@ export function useAthletePanorama(clientId?: string) {
         hasConsultations: !!(c as any).has_consultations,
         consultationFrequency: (c as any).consultation_frequency ?? null,
         consultationCount: (c as any).consultation_count ?? null,
-        consultationsDone: Number((c as any).consultations_completed) || 0,
+        consultationsDone: Number(doneCount?.count) || 0,
         hasCheckin: !!(c as any).has_checkin,
         checkinFrequency: (c as any).checkin_frequency ?? null,
         lastConsultation, nextConsultation,

@@ -31,11 +31,24 @@ const PEND_TONE: Record<PendKind, string> = {
 const fmt = (d: string | null) => (d ? format(parseISO(d), 'dd/MM/yy', { locale: ptBR }) : '—');
 
 export function AthletePanoramaCard({ clientId, onEditClient }: { clientId: string; onEditClient?: () => void }) {
-  const { data: p, isLoading } = useAthletePanorama(clientId);
+  const { data: p, isLoading, isError, error } = useAthletePanorama(clientId);
   const [editing, setEditing] = useState(false);
   const navigate = useNavigate();
 
-  if (isLoading || !p) return null;
+  if (isLoading) return null;
+  // Falha visível: antes o card sumia sem deixar rastro quando a consulta
+  // quebrava, o que fez a reforma parecer "não aplicada".
+  if (isError) {
+    return (
+      <Card className="mb-4 border-destructive/40">
+        <CardContent className="p-4 text-sm text-destructive flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          Não foi possível carregar o panorama. {(error as any)?.message ?? ''}
+        </CardContent>
+      </Card>
+    );
+  }
+  if (!p) return null;
 
   // Faixa do contrato: responde "que plano é esse?" num olhar.
   const modality = [
