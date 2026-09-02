@@ -82,7 +82,10 @@ for f in $(ls supabase/migrations/*.sql | sort); do
     *"$DATA_SEEDS"*) skipped=$((skipped+1)); continue;;
   esac
   # Extensões providas pela plataforma não existem num Postgres puro.
-  sed -E '/CREATE EXTENSION[^;]*(pg_graphql|supabase_vault|pg_stat_statements|pg_cron|pg_net|pgsodium|pgmq|"http"|'http')/Id' "$f" > "$DIR/current.sql"
+  # transaction_timeout só existe do PostgreSQL 17 em diante; o dump inicial vem
+  # de um Supabase 17.6. Num Postgres 16 local a linha aborta a primeira migração
+  # e derruba as 180 seguintes em cascata — falha do ambiente, não do schema.
+  sed -E '/SET transaction_timeout/Id; /CREATE EXTENSION[^;]*(pg_graphql|supabase_vault|pg_stat_statements|pg_cron|pg_net|pgsodium|pgmq|"http"|'http')/Id' "$f" > "$DIR/current.sql"
   if out=$($PSQL -q -v ON_ERROR_STOP=1 -f "$DIR/current.sql" 2>&1); then
     ok=$((ok+1))
   else
