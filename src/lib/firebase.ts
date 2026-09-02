@@ -17,10 +17,17 @@
 // credenciais ainda não estão configuradas. Os @ts-ignore evitam erro de tsc local
 // (o pacote 'firebase' é instalado no ambiente de produção).
 
-// Usa o valor do .env apenas se for real; ignora placeholders "__PREENCHER..." e vazios.
+import { verificarEnv } from './envGuard';
+
+// Usa o valor do .env apenas se for real; ignora placeholders "__PREENCHER...", vazios
+// e valores corrompidos (bolinhas de máscara de painel, caracteres fora do ASCII).
 function envOr(value: unknown, fallback: string): string {
   const v = typeof value === 'string' ? value.trim() : '';
   if (!v || v.startsWith('__') || v.includes('PREENCHER')) return fallback;
+  if (verificarEnv('firebase', v)) {
+    console.warn("[firebase] valor de ambiente corrompido; usando o padrão do código.");
+    return fallback;
+  }
   return v;
 }
 
