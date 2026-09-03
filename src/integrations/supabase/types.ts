@@ -9527,6 +9527,10 @@ export type Database = {
           reason: string
         }[]
       }
+      complete_first_consultation: {
+        Args: { p_schedule_id: string }
+        Returns: Json
+      }
       create_call_booking: {
         Args: {
           p_booking_date: string
