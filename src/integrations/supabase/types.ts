@@ -9493,6 +9493,7 @@ export type Database = {
           skipped_empty: number
         }[]
       }
+      booking_send_date: { Args: { p_scheduled_date: string }; Returns: string }
       calc_task_level: { Args: { p_xp: number }; Returns: number }
       calculate_next_booking_send_date: {
         Args: { p_cadence_weeks: number; p_last_appointment_at: string }
