@@ -9,6 +9,8 @@ export interface LinkBioItem {
   description: string | null;
   link_url: string | null;
   image_url: string | null;
+  /** Define a etiqueta e o ícone do link em /bio. Ver src/lib/linkBioCategories.ts. */
+  category?: string | null;
   order_index: number;
   is_active: boolean;
   created_at: string;

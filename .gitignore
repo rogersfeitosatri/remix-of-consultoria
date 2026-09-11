@@ -32,3 +32,6 @@ dist-ssr
 .env.*.local
 .env.production
 .env.secrets
+
+# Cache incremental do tsc (npx tsc -b). Artefato local, não versionado.
+*.tsbuildinfo

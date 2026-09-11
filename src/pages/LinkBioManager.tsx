@@ -12,6 +12,8 @@ import { Plus, Edit, Trash2, ExternalLink, Link as LinkIcon, Loader2, Eye, GripV
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { ImageUploadDialog } from '@/components/linkbio/ImageUploadDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CATEGORIAS_DISPONIVEIS, resolverCategoria, rotuloDeSelecao } from '@/lib/linkBioCategories';
 import {
   DndContext,
   closestCenter,
@@ -78,7 +80,14 @@ function SortableLinkItem({ item, onEdit, onDelete, onToggleActive }: SortableLi
       )}
       
       <div className="flex-1 min-w-0">
-        <h3 className="font-medium truncate">{item.title}</h3>
+        <div className="flex items-baseline gap-2 min-w-0">
+          <h3 className="font-medium truncate">{item.title}</h3>
+          {resolverCategoria(item.category).etiqueta && (
+            <span className="text-[10px] tracking-wider text-muted-foreground shrink-0">
+              {resolverCategoria(item.category).etiqueta}
+            </span>
+          )}
+        </div>
         {item.description && (
           <p className="text-sm text-muted-foreground truncate">{item.description}</p>
         )}
@@ -134,6 +143,7 @@ export default function LinkBioManager() {
     description: '',
     link_url: '',
     image_url: '',
+    category: '',
     is_active: true,
     order_index: 0,
   });
@@ -179,6 +189,7 @@ export default function LinkBioManager() {
       description: '',
       link_url: '',
       image_url: '',
+      category: '',
       is_active: true,
       order_index: items.length,
     });
@@ -193,6 +204,7 @@ export default function LinkBioManager() {
         description: item.description || '',
         link_url: item.link_url || '',
         image_url: item.image_url || '',
+        category: item.category || '',
         is_active: item.is_active,
         order_index: item.order_index,
       });
@@ -208,15 +220,18 @@ export default function LinkBioManager() {
       return;
     }
 
+    // Categoria em branco é ausência de categoria, e no banco isso é NULL.
+    const payload = { ...formData, category: formData.category || null };
+
     try {
       if (editingItem) {
         await updateItem.mutateAsync({
           id: editingItem.id,
-          ...formData,
+          ...payload,
         });
         toast.success('Link atualizado com sucesso!');
       } else {
-        await createItem.mutateAsync(formData);
+        await createItem.mutateAsync(payload);
         toast.success('Link criado com sucesso!');
       }
       setIsDialogOpen(false);
@@ -306,6 +321,31 @@ export default function LinkBioManager() {
                       placeholder="Breve descrição do link"
                       rows={2}
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Categoria</Label>
+                    <Select
+                      value={formData.category || 'padrao'}
+                      onValueChange={(valor) =>
+                        setFormData({ ...formData, category: valor === 'padrao' ? '' : valor })
+                      }
+                    >
+                      <SelectTrigger id="category">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="padrao">Sem categoria</SelectItem>
+                        {CATEGORIAS_DISPONIVEIS.map((chave) => (
+                          <SelectItem key={chave} value={chave}>
+                            {rotuloDeSelecao(chave)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Define a etiqueta e o ícone do link na página /bio.
+                    </p>
                   </div>
                   
                   <div className="space-y-2">
