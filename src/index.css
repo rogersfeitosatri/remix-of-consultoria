@@ -143,6 +143,14 @@
 }
 
 @layer utilities {
+  /* Fontes exclusivas da página pública /bio. O resto do app não as usa. */
+  .font-bio-display {
+    font-family: 'Sora', 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+  .font-bio-mono {
+    font-family: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
   .glass-card {
     @apply bg-card/80 backdrop-blur-xl border border-border/50 shadow-lg;
   }
