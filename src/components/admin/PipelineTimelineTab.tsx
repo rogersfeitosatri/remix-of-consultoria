@@ -3,7 +3,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CalendarCheck, Send, CheckCircle2, Clock, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { CalendarCheck, Send, CheckCircle2, Clock, XCircle, AlertCircle, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -36,6 +48,8 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Clock; variant
 
 export function PipelineTimelineTab({ clientId }: PipelineTimelineTabProps) {
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const qc = useQueryClient();
 
   const { data: schedules = [], isLoading, refetch } = useQuery({
     queryKey: ['pipeline-timeline', clientId],
@@ -70,6 +84,25 @@ export function PipelineTimelineTab({ clientId }: PipelineTimelineTabProps) {
       toast.error(e.message || 'Erro ao reenviar link');
     } finally {
       setResendingId(null);
+    }
+  };
+
+  const handleDelete = async (sch: ScheduleRow) => {
+    setDeletingId(sch.id);
+    try {
+      if (sch.appointment_id) {
+        await supabase.from('appointments').update({ status: 'cancelled' }).eq('id', sch.appointment_id);
+      }
+      const { error } = await supabase.from('consultation_schedules').delete().eq('id', sch.id);
+      if (error) throw error;
+      toast.success('Consulta excluída da pipeline.');
+      await refetch();
+      qc.invalidateQueries({ queryKey: ['audit-schedules', clientId] });
+      qc.invalidateQueries({ queryKey: ['audit-appointments', clientId] });
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao excluir consulta');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -141,18 +174,46 @@ export function PipelineTimelineTab({ clientId }: PipelineTimelineTabProps) {
                     </p>
                   </div>
 
-                  {canResend && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleResendLink(sch.id)}
-                      disabled={resendingId === sch.id}
-                      className="gap-1 text-xs"
-                    >
-                      <Send className="h-3 w-3" />
-                      {resendingId === sch.id ? 'Enviando...' : 'Reenviar link'}
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {canResend && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleResendLink(sch.id)}
+                        disabled={resendingId === sch.id}
+                        className="gap-1 text-xs"
+                      >
+                        <Send className="h-3 w-3" />
+                        {resendingId === sch.id ? 'Enviando...' : 'Reenviar link'}
+                      </Button>
+                    )}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={deletingId === sch.id}
+                          className="gap-1 text-xs text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Excluir
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Excluir esta consulta da pipeline?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            A consulta #{idx + 1} será removida da pipeline. Se houver um agendamento
+                            vinculado, ele será cancelado. Esta ação não pode ser desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleDelete(sch)}>Excluir</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               </div>
             </div>

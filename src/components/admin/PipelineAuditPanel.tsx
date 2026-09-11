@@ -156,43 +156,17 @@ export function PipelineAuditPanel({ clientId }: Props) {
         }
         toast.success('1ª consulta desmarcada como realizada.');
       } else {
-        // Marcar como realizada
-        const { error: schedErr } = await supabase
-          .from('consultation_schedules')
-          .update({
-            status: 'completed',
-            confirmed_at: new Date().toISOString(),
-          })
-          .eq('id', firstSchedule.id);
-        if (schedErr) throw schedErr;
-
-        // Criar appointment retroativo se não existir
-        if (!firstSchedule.appointment_id) {
-          const { data: userData } = await supabase.auth.getUser();
-          const { data: newAppt, error: apptErr } = await supabase
-            .from('appointments')
-            .insert({
-              client_id: clientId,
-              user_id: userData.user?.id,
-              appointment_date: firstSchedule.scheduled_date,
-              appointment_time: firstSchedule.scheduled_time || '09:00:00',
-              duration_minutes: 60,
-              status: 'completed',
-              timezone: 'America/Fortaleza',
-              created_by: 'admin_manual_audit',
-              notes_admin: 'Marcada como realizada manualmente via auditoria.',
-            })
-            .select('id')
-            .single();
-          if (apptErr) throw apptErr;
-          if (newAppt) {
-            await supabase
-              .from('consultation_schedules')
-              .update({ appointment_id: newAppt.id })
-              .eq('id', firstSchedule.id);
-          }
-        }
-        toast.success('1ª consulta marcada como realizada. Recalculando envios futuros...');
+        // Marcar como realizada + gerar todas as consultas seguintes (RPC canônica)
+        const { data: res, error: rpcErr } = await (supabase as any).rpc('complete_first_consultation', {
+          p_schedule_id: firstSchedule.id,
+        });
+        if (rpcErr) throw rpcErr;
+        const created = (res as any)?.created ?? 0;
+        toast.success(
+          created > 0
+            ? `1ª consulta marcada como realizada. ${created} consulta(s) futura(s) geradas.`
+            : '1ª consulta marcada como realizada.',
+        );
       }
 
       // Forçar recálculo da pipeline tocando no plano (dispara sync_pipeline_on_plan_change)
@@ -229,7 +203,7 @@ export function PipelineAuditPanel({ clientId }: Props) {
   const autoSchedules = schedules.filter((s) => isAutoCreated(s.created_at));
   const manualSchedules = schedules.filter((s) => !isAutoCreated(s.created_at));
   const autoAppointments = appointments.filter(
-    (a) => a.created_by === 'admin_manual_audit' || isAutoCreated(a.created_at),
+    (a) => (a.notes_admin || '').includes('auditoria') || isAutoCreated(a.created_at),
   );
 
   return (
@@ -378,7 +352,8 @@ export function PipelineAuditPanel({ clientId }: Props) {
               </h4>
               <div className="space-y-2">
                 {appointments.map((a) => {
-                  const auto = a.created_by === 'admin_manual_audit' || isAutoCreated(a.created_at);
+                  const isAudit = (a.notes_admin || '').includes('auditoria');
+                  const auto = isAudit || isAutoCreated(a.created_at);
                   return (
                     <div key={a.id} className="rounded-lg border bg-card/50 p-3 text-xs space-y-1">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -389,12 +364,7 @@ export function PipelineAuditPanel({ clientId }: Props) {
                           {auto && (
                             <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30 text-[10px] gap-1">
                               <Bot className="h-3 w-3" />
-                              {a.created_by === 'admin_manual_audit' ? 'Retroativa (auditoria)' : 'Automático'}
-                            </Badge>
-                          )}
-                          {a.created_by && a.created_by !== 'admin_manual_audit' && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              {a.created_by}
+                              {isAudit ? 'Retroativa (auditoria)' : 'Automático'}
                             </Badge>
                           )}
                         </div>
