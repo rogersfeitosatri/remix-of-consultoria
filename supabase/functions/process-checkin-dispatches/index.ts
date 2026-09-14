@@ -8,7 +8,7 @@ import { identity, localDay, operational } from "../_shared/publicCheckin.ts";
 const OUTBOUND_PAUSED = true;
 const EMAIL_CLIENTS = new Set(['6f8b9c07-4607-4ec1-8844-ed02996c39e9']);
 const EXCLUDED = new Set(['24fb6e32-b1e1-4101-9943-d3fcff32e5c9']);
-const HOLD = new Set(['5f718610-e763-43bf-8b29-918232a2e7b6']); // Flavia: 14/09 vs 21/09 not confirmed.
+const HOLD = new Set<string>(); // Flavia confirmed the 14/09 cycle. Individual pauses use inactive schedules.
 Deno.serve(async(req)=>{
  const cors=restrictedCors(req);
  const reply=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{...cors,'Content-Type':'application/json'}});
