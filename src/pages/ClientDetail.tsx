@@ -40,8 +40,7 @@ import { useClients, useDeleteClient, useUpdateClient } from '@/hooks/useClients
 import { useSchedulingSettings } from '@/hooks/useScheduling';
 import { useCheckinForms } from '@/hooks/useCheckinForms';
 import { supabase } from '@/integrations/supabase/client';
-import { createCheckinDispatchForSend, markDispatchSent, markDispatchFailed } from '@/lib/checkinDispatch';
-import { resolveAthleteCheckinForm } from '@/lib/resolveAthleteCheckinForm';
+import { sendManualCheckin } from '@/lib/sendManualCheckin';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useState } from 'react';
@@ -157,44 +156,14 @@ export default function ClientDetail() {
     return `+55 ${phone}`;
   };
   
-  const handleSendCheckin = async () => {
-    if (!client?.phone) {
-      toast.error('Cliente não possui telefone cadastrado');
-      return;
-    }
-    const activeForm = await resolveAthleteCheckinForm(client.id, user!.id);
-    if (!activeForm) {
-      toast.error('Nenhum formulário de check-in válido para este atleta (verifique se o formulário tem perguntas).');
-      return;
-    }
+  const handleSendCheckin = async (dryRun = false) => {
+    if (!client) return;
     setSendingCheckin(true);
-    let dispatchId: string | null = null;
     try {
-      const checkinLink = `https://rogersfeitosa.com.br/form/${activeForm.id}?client=${client.id}`;
-      const codigoAcesso = formatPhoneAsAccessCode(client.phone);
-      const context = {
-        nome: client.name.split(' ')[0],
-        link_checkin: checkinLink,
-        checkin_link: checkinLink,
-        data: format(new Date(), "dd/MM/yyyy", { locale: ptBR }),
-        codigo_acesso: codigoAcesso,
-      };
-      // REGRA OBRIGATÓRIA: criar dispatch ANTES do envio
-      dispatchId = await createCheckinDispatchForSend({
-        clientId: client.id,
-        userId: user!.id,
-        linkCheckin: checkinLink,
-        source: 'manual_client_detail',
-      });
-      const { data: sendResult, error } = await supabase.functions.invoke('send-whatsapp', {
-        body: { clientId: client.id, templateKey: 'checkin_reminder', context },
-      });
-      if (error) throw error;
-      await markDispatchSent(dispatchId, sendResult);
-      toast.success('Check-in enviado via WhatsApp!');
+      const result = await sendManualCheckin(client.id, dryRun);
+      toast.success(result.message);
     } catch (error: any) {
-      if (dispatchId) await markDispatchFailed(dispatchId, error.message || 'erro');
-      toast.error('Erro ao enviar check-in: ' + (error.message || 'Verifique as configurações'));
+      toast.error(error.message);
     } finally {
       setSendingCheckin(false);
     }
@@ -371,11 +340,14 @@ export default function ClientDetail() {
               <Edit2 className="h-4 w-4" /> Editar
             </Button>
             {client.phone && (
-              <Button variant="outline" size="sm" onClick={handleSendCheckin} disabled={sendingCheckin}
+              <Button variant="outline" size="sm" onClick={() => handleSendCheckin()} disabled={sendingCheckin}
                 className="gap-1 text-green-600 border-green-600/30 hover:bg-green-600/10">
                 <MessageCircle className="h-4 w-4" /> {sendingCheckin ? '...' : 'Enviar check-in'}
               </Button>
             )}
+            <Button variant="outline" size="sm" onClick={() => handleSendCheckin(true)} disabled={sendingCheckin}>
+              Verificar envio
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowRenewDialog(true)}
               className="gap-1 text-primary border-primary/30 hover:bg-primary/10">
               <RefreshCw className="h-4 w-4" /> Renovar
