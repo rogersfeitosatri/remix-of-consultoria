@@ -1,3 +1,5 @@
+import { occurrence } from '../../../supabase/functions/_shared/checkinCadence';
+import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,14 +45,45 @@ export function CheckinScheduleAuditBanner() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const runAudit = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('audit-checkin-schedules', { body: {} });
-      if (error) throw error;
-      setResults(data?.results ?? []);
-      if ((data?.results ?? []).length > 0) setOpen(true);
+      const {data:auth,error:authError}=await supabase.auth.getUser();
+      if(authError || !auth.user)throw new Error('Entre novamente para conferir a agenda.');
+      const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+      const {data:schedules,error}=await supabase.from('athlete_checkin_schedules')
+        .select('client_id,start_date,frequency_type,clients(id,name,checkin_start_date,checkin_frequency,is_active,is_frozen,archived_at,ended_at,end_date,has_checkin)')
+        .eq('user_id',auth.user.id).eq('is_active',true);
+      if(error)throw error;
+      const calendar: Array<{client_id:string;scheduled_send_date:string}>=[];
+      for(let offset=0;;offset+=1000){
+        const {data:page,error:calendarError}=await supabase.from('scheduled_checkins')
+          .select('client_id,scheduled_send_date').eq('user_id',auth.user.id)
+          .eq('status','pending').gte('scheduled_send_date',today).order('id').range(offset,offset+999);
+        if(calendarError)throw calendarError;
+        calendar.push(...(page||[]));if(!page||page.length<1000)break;
+      }
+      const audit:AuditResult[]=[];
+      for(const schedule of schedules||[]){
+        const c=schedule.clients;
+        if(!c?.is_active||c.is_frozen||c.archived_at||c.ended_at||!c.has_checkin||c.end_date<today)continue;
+        // Explicit holds/exclusions stay unchanged and never trigger bulk fixes.
+        if(['24fb6e32-b1e1-4101-9943-d3fcff32e5c9','5f718610-e763-43bf-8b29-918232a2e7b6'].includes(c.id))continue;
+        const frequency=c.checkin_frequency||schedule.frequency_type;
+        const anchor=c.checkin_start_date||schedule.start_date;
+        const dates=calendar.filter(x=>x.client_id===c.id).map(x=>x.scheduled_send_date).sort();
+        const wrong=dates.filter(d=>occurrence(anchor,frequency,d)!==d || d>c.end_date);
+        if(!wrong.length)continue;
+        audit.push({client_id:c.id,client_name:c.name,configured_frequency:frequency,
+          expected_interval_days:({weekly:7,biweekly:14,monthly:28} as Record<string,number>)[frequency]||0,
+          last_sent_date:null,next_scheduled_date:dates[0]||null,expected_next_date:null,
+          interval_discrepancy_days:0,errors:['Há previsões fora da cadência ou da vigência. Revise o planejamento.'],
+          future_dates_wrong:wrong.length,status:'warning'});
+      }
+      setResults(audit);
+      if(audit.length)setOpen(true);
     } catch (e: any) {
       toast({ title: 'Falha na auditoria', description: e.message, variant: 'destructive' });
     } finally {
@@ -63,27 +96,8 @@ export function CheckinScheduleAuditBanner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const runFix = async (clientId?: string) => {
-    setFixing(clientId ?? 'all');
-    try {
-      const body = clientId ? { client_ids: [clientId] } : { fix_all: true };
-      const { data, error } = await supabase.functions.invoke('fix-checkin-schedules', { body });
-      if (error) throw error;
-      const logs = data?.logs ?? [];
-      const totalDeleted = logs.reduce((a: number, l: any) => a + (l.deleted_future || 0), 0);
-      const totalInserted = logs.reduce((a: number, l: any) => a + (l.inserted_future || 0), 0);
-      const totalOverdue = logs.reduce((a: number, l: any) => a + (l.marked_overdue || 0), 0);
-      toast({
-        title: 'Correção concluída',
-        description: `${logs.length} atleta(s): ${totalDeleted} datas removidas, ${totalInserted} recriadas, ${totalOverdue} marcadas como atrasadas. Nenhum WhatsApp enviado.`,
-      });
-      qc.invalidateQueries({ queryKey: ['scheduled_checkins'] });
-      await runAudit();
-    } catch (e: any) {
-      toast({ title: 'Falha na correção', description: e.message, variant: 'destructive' });
-    } finally {
-      setFixing(null);
-    }
+  const runFix = (clientId?: string) => {
+    if(clientId)navigate(`/clients/${clientId}/checkin-planning`);
   };
 
   if (loading && results.length === 0) return null;
@@ -113,10 +127,7 @@ export function CheckinScheduleAuditBanner() {
             <Button size="sm" variant="outline" onClick={runAudit} disabled={loading}>
               {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Auditar agora'}
             </Button>
-            <Button size="sm" onClick={() => runFix()} disabled={fixing !== null}>
-              {fixing === 'all' ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wrench className="h-3 w-3 mr-1" />}
-              Corrigir todos
-            </Button>
+
           </div>
         </div>
         <CollapsibleContent>
@@ -155,7 +166,7 @@ export function CheckinScheduleAuditBanner() {
                   onClick={() => runFix(r.client_id)}
                   disabled={fixing !== null}
                 >
-                  {fixing === r.client_id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Corrigir este'}
+                  {fixing === r.client_id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Ver planejamento'}
                 </Button>
               </div>
             ))}

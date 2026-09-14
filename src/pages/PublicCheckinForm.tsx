@@ -491,7 +491,7 @@ export default function PublicCheckinForm() {
           </div>
           <h1 className="text-2xl font-bold mb-2">Checkin Enviado!</h1>
           <p className="text-muted-foreground mb-6">
-            Suas respostas foram registradas com sucesso. Seu assessor receberá uma notificação.
+          Suas respostas foram registradas com sucesso e estão disponíveis para avaliação do seu assessor.
           </p>
           <Button variant="outline" onClick={() => window.close()}>
             Fechar
@@ -510,7 +510,7 @@ export default function PublicCheckinForm() {
           </div>
           <h1 className="text-2xl font-bold mb-2">Prazo Encerrado</h1>
           <p className="text-muted-foreground mb-4">
-            O prazo de {windowHours} horas para preencher este check-in já foi encerrado.
+            O prazo para preencher este check-in já foi encerrado.
           </p>
           <p className="text-muted-foreground mb-6">
             Caso queira informar algo ao seu nutricionista, envie diretamente pelo contato abaixo.
@@ -587,7 +587,7 @@ export default function PublicCheckinForm() {
 
               {verifiedClientId && (
                 <p className="text-xs text-muted-foreground">
-                  Telefone confirmado: {formatPhoneForDisplay(athletePhone)}
+                  Acesso confirmado: {formatPhoneForDisplay(athletePhone)}
                 </p>
               )}
             </CardContent>

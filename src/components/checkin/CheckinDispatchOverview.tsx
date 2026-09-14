@@ -75,6 +75,7 @@ export function CheckinDispatchOverview() {
   };
 
   const [reprocessing, setReprocessing] = useState(false);
+  const [simulationSummary, setSimulationSummary] = useState<string | null>(null);
   const handleReprocess = async () => {
 
     setReprocessing(true);
@@ -83,10 +84,13 @@ export function CheckinDispatchOverview() {
         body: { source: 'manual', dryRun: true },
       });
       if (error) throw error;
-      toast.info(`Envios pausados. ${data?.totalEligible || 0} check-ins elegíveis na simulação. Nenhuma mensagem enviada.`);
+      const summary = `Envios pausados. ${data?.totalEligible || 0} check-ins elegíveis na simulação. Nenhuma mensagem enviada.`;
+      setSimulationSummary(summary);
+      toast.info(summary);
       await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-overview'] });
       await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-runs'] });
     } catch (err: any) {
+      setSimulationSummary('Não foi possível concluir a simulação. Os envios continuam pausados.');
       toast.error(`Falha ao reprocessar: ${err.message || 'erro'}`);
     } finally {
       setReprocessing(false);
@@ -237,7 +241,8 @@ export function CheckinDispatchOverview() {
           <div className="flex items-start gap-3">
             <Activity className="h-5 w-5 text-primary mt-0.5" />
             <div>
-              <div className="text-sm font-semibold">Cron Automático — Diário 07:00 (Fortaleza)</div>
+              <div className="text-sm font-semibold">Disparos automáticos pausados</div>
+              {simulationSummary && <p role="status" className="text-sm mt-2">{simulationSummary}</p>}
               {lastRun ? (
                 <div className="text-xs text-muted-foreground mt-1">
                   Última execução: {formatDistanceToNow(new Date(lastRun.started_at), { addSuffix: true, locale: ptBR })}
