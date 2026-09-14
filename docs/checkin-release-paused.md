@@ -17,3 +17,12 @@ Após recuperar o navegador e o usuário entrar como administrador, o fluxo visu
 Testes locais: `npm run build`, `npm exec -- tsc --noEmit -p tsconfig.app.json`, `npm test`; funções: `deno check --node-modules-dir=none supabase/functions/process-checkin-dispatches/index.ts supabase/functions/verify-checkin-phone/index.ts supabase/functions/submit-public-checkin/index.ts supabase/functions/send-transactional-email/index.ts`; testes de cadência/validação: `deno test --node-modules-dir=none tests/checkin/`.
 
 Conferência final: simulação administrativa mostrou 26 elegíveis, zero disparos. Auditoria identificou mais duas previsões pendentes fora da cadência, sem ciclo válido restante na vigência; canceladas com registro em checkin_configuration_changes. Total de previsões incompatíveis canceladas nesta entrega: 31.
+
+
+## Correção do envio manual — 14/09/2026
+
+O botão no cadastro e na lista de atletas ainda chamava send-whatsapp, que retornava 503 whatsapp_migration_paused; a interface ocultava a resposta atrás de FunctionsHttpError. Agora ambos usam send-manual-checkin. A função exige JWT de administrador e dono do atleta, recusa chamadas internas/cron, verifica conexão Z-API, formulário e modelo, reserva o convite com versão e token, e registra sent somente após aceitação com ID do provedor. Respostas incertas permanecem pending para evitar repetição. A função antiga e o processador automático continuam pausados.
+
+Verificar envio, no cadastro do atleta, executa somente a conferência: não cria convite nem envia mensagem. Teste na sessão administrativa em produção confirmou WhatsApp conectado, formulário e mensagem válidos. Zero convites e logs criados pela nova função durante os testes; zero cron ativo. Build de produção e TypeScript concluídos, Deno check concluído e 19 testes passaram, incluindo 10 cenários do envio manual com provedor simulado. Chamada anônima à função publicada recusada com 403. Nenhuma entrega real foi testada porque não houve envio aos atletas.
+
+O canal de e-mail continua aguardando configuração. Esta liberação é exclusiva para check-ins manuais por WhatsApp, sem reativar agendamentos ou os outros tipos de mensagem.
