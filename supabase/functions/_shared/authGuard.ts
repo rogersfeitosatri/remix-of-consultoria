@@ -10,7 +10,7 @@
 //   D. SIGNED WEBHOOK       -> validação de token do provedor (na própria função)
 //   E. PUBLIC TOKEN-SCOPED  -> token do dispatch/booking (na própria função)
 //   F. OAUTH CALLBACK       -> state/PKCE (na própria função)
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.108.2";
 
 export const publicCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,6 +20,7 @@ export const publicCorsHeaders = {
 
 /** Origens confiáveis do painel administrativo / app do atleta. */
 const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/consultoria-smoky\.vercel\.app$/,
   /^https?:\/\/localhost(:\d+)?$/,
   /^https:\/\/([a-z0-9-]+\.)*rogersfeitosa\.com\.br$/,
   /^https:\/\/([a-z0-9-]+\.)*zonanutri\.com$/,

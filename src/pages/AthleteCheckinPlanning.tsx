@@ -1,3 +1,4 @@
+import { occurrence } from '../../supabase/functions/_shared/checkinCadence';
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -70,53 +71,12 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
 
 function projectFutureDates(schedule: ScheduleRow, fromDate: Date, weeksAhead = 16, endDate?: Date | null): Date[] {
   const out: Date[] = [];
-  const start = parseISO(schedule.start_date);
-  const horizonByWeeks = addWeeks(fromDate, weeksAhead);
-  // Respect plan end_date: never project beyond plan vigency
-  const horizon = endDate && isBefore(endDate, horizonByWeeks) ? endDate : horizonByWeeks;
-
-  const stepWeeks = (() => {
-    switch (schedule.frequency_type) {
-      case 'weekly': return 1;
-      case 'biweekly': return 2;
-      case 'three_weeks': return 3;
-      case 'monthly': return 4;
-      case 'bimonthly': return 8;
-      case 'quarterly': return 12;
-      default: return 1;
-    }
-  })();
-
-  // Always honor weekly_days when present (defaults to Monday)
-  const days = schedule.weekly_days?.length ? schedule.weekly_days : [1];
-  const startDay = startOfDay(start);
-  const firstDow = days[0];
-
-  // SYNC com process-checkin-dispatches: para frequências > semanal, o primeiro
-  // disparo só é elegível APÓS start_date + freqWeeks*7 dias. Para semanal, o
-  // primeiro pode cair na primeira ocorrência do dia da semana >= start_date.
-  const firstEligible = stepWeeks > 1
-    ? addDays(startDay, stepWeeks * 7)
-    : startDay;
-
-  // Ancora cursor no primeiro dia-da-semana configurado >= firstEligible.
-  const initialOffset = (firstDow - firstEligible.getDay() + 7) % 7;
-  let cursor = addDays(firstEligible, initialOffset);
-
-  while (isBefore(cursor, horizon)) {
-    for (const dow of days) {
-      const offset = (dow - cursor.getDay() + 7) % 7;
-      const d = addDays(cursor, offset);
-      // Projeções incluem datas a partir de hoje (não filtra por fromDate exato,
-      // para que datas futuras próximas apareçam mesmo quando geradas hoje cedo).
-      if (!isBefore(d, startOfDay(fromDate)) && isBefore(d, horizon)) out.push(d);
-    }
-    cursor = addWeeks(cursor, stepWeeks);
+  const horizon = addWeeks(fromDate, weeksAhead);
+  for (let day = startOfDay(fromDate); day <= horizon && (!endDate || day <= endDate); day = addDays(day, 1)) {
+    const date = format(day, 'yyyy-MM-dd');
+    if (occurrence(schedule.start_date, schedule.frequency_type, date) === date) out.push(day);
   }
-
-  const map = new Map<string, Date>();
-  out.forEach(d => map.set(d.toISOString().slice(0, 10), d));
-  return Array.from(map.values()).sort((a, b) => a.getTime() - b.getTime());
+  return out;
 }
 
 const WEEKDAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -144,7 +104,7 @@ export default function AthleteCheckinPlanning() {
     queryKey: ['client-name', clientId],
     enabled: !!clientId,
     queryFn: async () => {
-      const { data } = await supabase.from('clients').select('id, name, checkin_frequency, user_id, end_date').eq('id', clientId!).maybeSingle();
+      const { data } = await supabase.from('clients').select('id, name, checkin_frequency, checkin_start_date, user_id, end_date').eq('id', clientId!).maybeSingle();
       return data;
     },
   });
@@ -155,7 +115,7 @@ export default function AthleteCheckinPlanning() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('checkin_dispatches')
-        .select('id, client_id, user_id, checkin_form_id, schedule_id, sent_at, due_at, status, link_checkin, checkin_forms(title)')
+        .select('id, client_id, user_id, checkin_form_id, schedule_id, sent_at, scheduled_for, created_at, due_at, status, link_checkin, checkin_forms(title)')
         .eq('client_id', clientId!)
         .order('sent_at', { ascending: false });
       if (error) throw error;
@@ -255,7 +215,7 @@ export default function AthleteCheckinPlanning() {
 
   const planningRows = useMemo(() => {
     return dispatches.map(d => {
-      const sentDate = parseISO(d.sent_at);
+      const sentDate = parseISO(d.sent_at || (d as any).scheduled_for || (d as any).created_at);
       const matchedResponse = responses.find(r =>
         r.form_id === d.checkin_form_id && parseISO(r.submitted_at) >= sentDate
       );
@@ -269,10 +229,10 @@ export default function AthleteCheckinPlanning() {
     const planEnd = client?.end_date ? parseISO(client.end_date) : null;
     const items: { date: Date; formTitle: string; formId: string; scheduleId: string; sendTime: string; frequency: string }[] = [];
     schedules.filter(s => s.is_active).forEach(s => {
-      projectFutureDates(s, now, 16, planEnd).forEach(d => {
+      projectFutureDates({...s,start_date:client?.checkin_start_date || s.start_date,frequency_type:client?.checkin_frequency || s.frequency_type}, now, 16, planEnd).forEach(d => {
         const exists = dispatches.some(disp =>
           disp.checkin_form_id === s.checkin_form_id &&
-          format(parseISO(disp.sent_at), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')
+          format(parseISO(disp.sent_at || (disp as any).scheduled_for || (disp as any).created_at), 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd')
         );
         if (!exists) items.push({
           date: d,
@@ -289,7 +249,7 @@ export default function AthleteCheckinPlanning() {
 
   const openEdit = (d: DispatchRow) => {
     setEditing(d);
-    setEditDate(format(parseISO(d.sent_at), "yyyy-MM-dd'T'HH:mm"));
+    setEditDate(format(parseISO(d.sent_at || (d as any).scheduled_for || (d as any).created_at), "yyyy-MM-dd'T'HH:mm"));
     setEditFormId(d.checkin_form_id);
   };
 
@@ -381,7 +341,7 @@ export default function AthleteCheckinPlanning() {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Send className="h-3 w-3" />
-                        {isFuture ? 'Programado para' : 'Enviado'} {format(parseISO(dispatch.sent_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        {!dispatch.sent_at || isFuture ? 'Programado para' : 'Enviado'} {format(parseISO(dispatch.sent_at || (dispatch as any).scheduled_for || (dispatch as any).created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                       </span>
                       {dispatch.due_at && (
                         <span className="flex items-center gap-1">

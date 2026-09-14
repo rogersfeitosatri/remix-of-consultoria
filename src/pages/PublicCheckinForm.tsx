@@ -159,6 +159,13 @@ export default function PublicCheckinForm() {
   useEffect(() => {
     const fetchForm = async () => {
       if (!formId) return;
+      setVerifiedClientId(null); setLinkExpired(false); setSubmitted(false);
+      // Resolve the invitation's version only after identity verification.
+      // A token must never redirect to another form or silently use live questions.
+      if (new URLSearchParams(location.search).has('t')) {
+        setForm({id:formId,title:'Check-in',description:null,is_active:true});
+        setQuestions([]); setLoading(false); return;
+      }
 
       try {
         // Resolve via RPC: returns the requested form OR a fallback active form
@@ -275,11 +282,10 @@ export default function PublicCheckinForm() {
     };
 
     fetchForm();
-  }, [formId]);
+  }, [formId, location.search]);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const masked = applyPhoneMask(e.target.value);
-    setAthletePhone(masked);
+    setAthletePhone(e.target.value);
     setVerifiedClientId(null);
   };
 
@@ -303,6 +309,9 @@ export default function PublicCheckinForm() {
   };
 
   const validatePhoneOrThrow = (): { normalizedInputPhone: string } => {
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(athletePhone.trim())) {
+      return { normalizedInputPhone: athletePhone.trim().toLowerCase() };
+    }
     const phoneDigits = athletePhone.replace(/\D/g, '');
     const hasDDI = phoneDigits.startsWith('55');
 
@@ -311,7 +320,7 @@ export default function PublicCheckinForm() {
       (!hasDDI && (phoneDigits.length === 10 || phoneDigits.length === 11));
 
     if (!valid) {
-      throw new Error('Telefone inválido. Use o código exatamente como recebeu no WhatsApp.');
+      throw new Error('Informe o telefone com DDD ou o e-mail cadastrado.');
     }
 
     return { normalizedInputPhone: normalizePhoneToE164(athletePhone) };
@@ -327,6 +336,7 @@ export default function PublicCheckinForm() {
       const { data, error } = await supabase.functions.invoke('verify-checkin-phone', {
         body: {
           clientId: clientParam,
+          dispatchToken: new URLSearchParams(location.search).get('t') || undefined,
           phone: normalizedInputPhone,
           formId: formId,
         },
@@ -335,7 +345,7 @@ export default function PublicCheckinForm() {
       if (error) throw error;
 
       if (!data?.valid || !data?.clientId) {
-        toast.error('Telefone não encontrado. Confirme o número que você recebeu no WhatsApp e tente novamente.');
+        toast.error(data?.message || 'Confira o telefone ou e-mail informado e tente novamente.');
         setVerifiedClientId(null);
         return;
       }
@@ -347,8 +357,18 @@ export default function PublicCheckinForm() {
         return;
       }
 
+      if (!data.formVersionId || !Array.isArray(data.questions) || !data.questions.length) {
+        throw new Error('Não foi possível carregar a versão deste check-in. Tente novamente.');
+      }
+      setForm(data.form);
+      setFormVersionId(data.formVersionId);
+      setQuestions(data.questions);
+      setAnswers(Object.fromEntries(data.questions.map((q: Question) => [q.id,
+        q.question_type === 'checkbox' ? [] : q.question_type === 'scale'
+          ? Math.floor(((q.scale_min ?? 0) + (q.scale_max ?? 10)) / 2) : ''])));
+      setComments({});
       setVerifiedClientId(data.clientId);
-      toast.success('Telefone confirmado!');
+      toast.success('Acesso confirmado!');
     } catch (err: any) {
       toast.error(err?.message || 'Não foi possível confirmar o telefone.');
       setVerifiedClientId(null);
@@ -361,7 +381,7 @@ export default function PublicCheckinForm() {
     e.preventDefault();
 
     if (!verifiedClientId) {
-      toast.error('Confirme o telefone antes de iniciar o preenchimento.');
+      toast.error('Confirme o telefone ou e-mail antes de iniciar o preenchimento.');
       return;
     }
     if (questions.length === 0) {
@@ -373,7 +393,7 @@ export default function PublicCheckinForm() {
     for (const question of visibleQuestions) {
       if (question.is_required) {
         const answer = answers[question.id];
-        if (!answer || (Array.isArray(answer) && answer.length === 0)) {
+        if (answer === undefined || answer === null || answer === '' || (Array.isArray(answer) && answer.length === 0)) {
           toast.error(`Por favor responda: ${question.question_text}`);
           return;
         }
@@ -415,12 +435,13 @@ export default function PublicCheckinForm() {
             clientId,
             dispatchToken: dispatchToken || undefined,
             phone: athletePhone,
+            formVersionId,
             responses: responsesWithComments,
           },
         },
       );
 
-      if (submitError || (result && result.error)) {
+      if (submitError || result?.success !== true) {
         const code = result?.error;
         if (code === 'EXPIRED') {
           setLinkExpired(true);
@@ -532,19 +553,19 @@ export default function PublicCheckinForm() {
               <div className="space-y-2">
                 <Label htmlFor="phone" className="flex items-center gap-2">
                   <Phone className="h-4 w-4" />
-                  Seu Telefone (código de acesso) *
+                  Seu telefone ou e-mail (código de acesso) *
                 </Label>
                 <Input
                   id="phone"
-                  type="tel"
+                  type="text"
                   value={athletePhone}
                   onChange={handlePhoneChange}
-                  placeholder="+55 (DD) 9XXXX-XXXX ou (DD) 9XXXX-XXXX"
+                  placeholder="Telefone com DDD ou e-mail cadastrado"
                   required
-                  maxLength={22}
+                  maxLength={254}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Cole exatamente o código que você recebeu no WhatsApp
+                  Use o telefone ou e-mail cadastrado no acompanhamento
                 </p>
               </div>
 
@@ -560,7 +581,7 @@ export default function PublicCheckinForm() {
                     Confirmando...
                   </>
                 ) : (
-                  <>Confirmar telefone</>
+                  <>Confirmar acesso</>
                 )}
               </Button>
 
@@ -750,7 +771,7 @@ export default function PublicCheckinForm() {
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">
-                  Confirme seu telefone acima para liberar o formulário.
+                  Confirme seu telefone ou e-mail acima para liberar o formulário.
                 </p>
               </CardContent>
             </Card>

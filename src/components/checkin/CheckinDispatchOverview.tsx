@@ -71,31 +71,19 @@ export function CheckinDispatchOverview() {
   }, [period, customRange]);
 
   const handleResend = async (dispatchId: string, clientName: string) => {
-    setResendingId(dispatchId);
-    try {
-      const { error } = await supabase.functions.invoke('resend-checkin-dispatch', {
-        body: { dispatchId },
-      });
-      if (error) throw error;
-      toast.success(`Check-in reenviado para ${clientName}`);
-      await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-overview'] });
-    } catch (err: any) {
-      toast.error(`Falha ao reenviar: ${err.message || 'erro desconhecido'}`);
-    } finally {
-      setResendingId(null);
-    }
+    toast.info('Os envios de check-in estão pausados.');
   };
 
   const [reprocessing, setReprocessing] = useState(false);
   const handleReprocess = async () => {
-    if (!confirm('Reprocessar check-ins de hoje? Vai disparar envios para atletas elegíveis ainda não enviados.')) return;
+
     setReprocessing(true);
     try {
       const { data, error } = await supabase.functions.invoke('process-checkin-dispatches', {
-        body: { source: 'manual', forceReprocess: false },
+        body: { source: 'manual', dryRun: true },
       });
       if (error) throw error;
-      toast.success(`Concluído: ${data?.dispatched || 0} enviados, ${data?.failed || 0} falhas`);
+      toast.info(`Envios pausados. ${data?.totalEligible || 0} check-ins elegíveis na simulação. Nenhuma mensagem enviada.`);
       await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-overview'] });
       await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-runs'] });
     } catch (err: any) {
@@ -148,7 +136,7 @@ export function CheckinDispatchOverview() {
 
       const { data: dispatches, error } = await supabase
         .from('checkin_dispatches')
-        .select('id, client_id, checkin_form_id, sent_at, status, error_message, clients(name, checkin_frequency)')
+        .select('id, client_id, checkin_form_id, sent_at, scheduled_for, created_at, status, error_message, clients(name, checkin_frequency)')
         .eq('user_id', user.id)
         .order('sent_at', { ascending: false })
         .limit(1000);
@@ -159,7 +147,7 @@ export function CheckinDispatchOverview() {
       const clientIds = Array.from(new Set(dispatches.map((d: any) => d.client_id)));
       const { data: responses } = await supabase
         .from('checkin_responses')
-        .select('client_id, form_id, submitted_at')
+        .select('client_id, form_id, dispatch_id, submitted_at')
         .in('client_id', clientIds)
         .order('submitted_at', { ascending: true });
 
@@ -176,13 +164,13 @@ export function CheckinDispatchOverview() {
       );
 
       return dispatches.map((d: any) => {
-        const sentAt = new Date(d.sent_at);
+        const sentAt = new Date(d.sent_at || d.scheduled_for || d.created_at);
         const match = respList.find(
           (r: any) =>
-            r.client_id === d.client_id &&
+            r.dispatch_id === d.id || (!r.dispatch_id && r.client_id === d.client_id &&
             r.form_id === d.checkin_form_id &&
             new Date(r.submitted_at) >= sentAt &&
-            new Date(r.submitted_at) <= new Date(sentAt.getTime() + 14 * 24 * 60 * 60 * 1000),
+            new Date(r.submitted_at) <= new Date(sentAt.getTime() + 14 * 24 * 60 * 60 * 1000)),
         );
         const respondedAt = match?.submitted_at || null;
         const hours = respondedAt
@@ -194,7 +182,7 @@ export function CheckinDispatchOverview() {
           client_id: d.client_id,
           client_name: d.clients?.name || 'Atleta removido',
           checkin_frequency: d.clients?.checkin_frequency || null,
-          sent_at: d.sent_at,
+          sent_at: d.sent_at || d.scheduled_for || d.created_at,
           status: d.status,
           error_message: d.error_message,
           responded_at: respondedAt,
@@ -267,7 +255,7 @@ export function CheckinDispatchOverview() {
           </div>
           <Button onClick={handleReprocess} disabled={reprocessing} size="sm">
             {reprocessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-            Reprocessar check-ins de hoje
+            Simular check-ins (envios pausados)
           </Button>
         </CardContent>
       </Card>

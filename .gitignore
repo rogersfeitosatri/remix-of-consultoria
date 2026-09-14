@@ -35,3 +35,7 @@ dist-ssr
 
 # Cache incremental do tsc (npx tsc -b). Artefato local, não versionado.
 *.tsbuildinfo
+.env*
+
+supabase/.temp/
+.vercel/

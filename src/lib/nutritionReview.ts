@@ -221,7 +221,7 @@ export function deriveConsultationMode(input: {
   if (!input.has_consultations) return 'none';
   if ((input.consultation_count ?? 0) > 1) return 'recurring';
   const f = (input.consultation_frequency || '').trim().toLowerCase();
-  if (f && !['single', 'unica', 'única', 'none'].includes(f)) return 'recurring';
+  if (f && !['single', 'once', 'unica', 'única', 'none'].includes(f)) return 'recurring';
   return 'initial_only';
 }
 

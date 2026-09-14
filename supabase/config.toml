@@ -1,4 +1,4 @@
-project_id = "vhzxnatgwravidvbehwi"
+project_id = "ikjntlmpnilxyugidhoz"
 
 [functions.kiwify-webhook]
 verify_jwt = false
@@ -128,4 +128,8 @@ verify_jwt = false
 
 
 [functions.submit-public-checkin]
+verify_jwt = false
+
+# Public check-in endpoint authenticates the invitation and contact in its handler.
+[functions.verify-checkin-phone]
 verify_jwt = false

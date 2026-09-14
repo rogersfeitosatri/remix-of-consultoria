@@ -1,474 +1,92 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
-import { requireInternal, denied, logSecurityEvent, restrictedCors } from "../_shared/authGuard.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.108.2";
+import { requireInternal, denied, restrictedCors } from "../_shared/authGuard.ts";
+import { occurrence } from "../_shared/checkinCadence.ts";
+import { identity, localDay, operational } from "../_shared/publicCheckin.ts";
 
-function formatPhoneAsAccessCode(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  const withDDI = digits.startsWith('55') ? digits : `55${digits}`;
-  if (withDDI.length === 13) {
-    return `+${withDDI.slice(0, 2)} (${withDDI.slice(2, 4)}) ${withDDI.slice(4, 9)}-${withDDI.slice(9)}`;
-  } else if (withDDI.length === 12) {
-    return `+${withDDI.slice(0, 2)} (${withDDI.slice(2, 4)}) ${withDDI.slice(4, 8)}-${withDDI.slice(8)}`;
+// User-directed exclusions/holds, kept outside the athlete's own record.
+// Deployment pause is intentional: changing secrets alone cannot resume outbound sends.
+const OUTBOUND_PAUSED = true;
+const EMAIL_CLIENTS = new Set(['6f8b9c07-4607-4ec1-8844-ed02996c39e9']);
+const EXCLUDED = new Set(['24fb6e32-b1e1-4101-9943-d3fcff32e5c9']);
+const HOLD = new Set(['5f718610-e763-43bf-8b29-918232a2e7b6']); // Flavia: 14/09 vs 21/09 not confirmed.
+Deno.serve(async(req)=>{
+ const cors=restrictedCors(req);
+ const reply=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{...cors,'Content-Type':'application/json'}});
+ if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{...cors,'Access-Control-Allow-Methods':'POST, OPTIONS'}});
+ if(req.method!=='POST')return reply({error:'method_not_allowed'},405);
+ const guard=await requireInternal(req);if(!guard.ok)return denied(guard,cors);
+ try {
+  const body=await req.json().catch(()=>({}));
+  if(!body || typeof body!=='object' || Array.isArray(body))return reply({error:'invalid_payload'},400);
+  const s=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const {data:cfg,error:cfgError}=await s.from('zapi_connection_settings').select('owner_user_id').eq('id',1).single();
+  if(cfgError||!cfg)return reply({error:'owner_not_configured'},503);
+  if(guard.caller?.kind==='admin'&&guard.caller.userId!==cfg.owner_user_id)return reply({error:'forbidden'},403);
+  const now=new Date(),today=localDay(now),day=new Date(today+'T12:00:00Z').getUTCDay();
+  const time=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Fortaleza',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(now);
+  const {data:schedules,error}=await s.from('athlete_checkin_schedules').select('*,clients:client_id(*)').eq('user_id',cfg.owner_user_id).eq('is_active',true);
+  if(error)return reply({error:'database_unavailable'},503);
+  const planned:any[]=[];const skipped:any[]=[];
+  for(const sch of schedules||[]){
+   const c=sch.clients;if(!c||EXCLUDED.has(c.id))continue;
+   if(!operational(c,today)){skipped.push({client:c.name,reason:'not_eligible'});continue;}
+   if(HOLD.has(c.id)){skipped.push({client:c.name,reason:'first_occurrence_to_confirm'});continue;}
+   const frequency=c.checkin_frequency,anchor=c.checkin_start_date||sch.start_date;
+   const due=occurrence(anchor,frequency,today);if(!due)continue;
+   // Query each candidate, including pending rows with NULL sent_at, without a global row cap.
+   const {data:history,error:he}=await s.from('checkin_dispatches').select('id,status')
+     .eq('user_id',cfg.owner_user_id).eq('client_id',c.id)
+     .gte('occurrence_date',due).limit(1);
+   const {data:calendar,error:ce}=await s.from('scheduled_checkins').select('status')
+     .eq('user_id',cfg.owner_user_id).eq('client_id',c.id).eq('scheduled_send_date',due);
+   if(he||ce)return reply({error:'database_unavailable'},503);
+   if(history?.length || calendar?.some(x=>x.status!=='pending'))continue;
+   const {data:unconfirmed,error:ue}=await s.from('checkin_dispatches').select('id')
+     .eq('user_id',cfg.owner_user_id).eq('client_id',c.id).eq('status','pending').limit(1);
+   if(ue)return reply({error:'database_unavailable'},503);
+   if(unconfirmed?.length){skipped.push({client:c.name,reason:'previous_send_unconfirmed'});continue;}
+   const {data:resolved,error:re}=await s.rpc('resolve_checkin_form_for_client',{p_client_id:c.id});
+   const form=resolved?.[0];if(re||!form?.form_id||!form.form_version_id||form.error_code){skipped.push({client:c.name,reason:form?.error_code||'form_not_configured'});continue;}
+   const {data:f}=await s.from('checkin_forms').select('user_id,is_active,archived_at').eq('id',form.form_id).maybeSingle();
+   if(!f?.is_active||f.archived_at||f.user_id!==c.user_id){skipped.push({client:c.name,reason:'form_not_active'});continue;}
+   const phone=identity(c.phone),email=identity(c.email);const channel=EMAIL_CLIENTS.has(c.id)?'email':phone?.startsWith('55')?'whatsapp':'email';
+   if((channel==='whatsapp'&&!phone)||(channel==='email'&&!email)){skipped.push({client:c.name,reason:'contact_not_configured'});continue;}
+   planned.push({clientId:c.id,name:c.name,channel,frequency,anchor,occurrence:due,catchUp:due<today,formId:form.form_id,versionId:form.form_version_id,scheduleId:sch.id,windowHours:c.checkin_response_window_hours??sch.due_in_hours??36,phone:c.phone,email:c.email,readyTime:time>=(sch.send_time||'07:00').slice(0,5)});
   }
-  return `+55 ${phone}`;
-}
-
-// E.164 validation: Brazilian mobile = +55 + 2 digit DDD + 8 or 9 digit number = 12 or 13 digits total
-function isValidE164BR(phone: string | null | undefined): boolean {
-  if (!phone) return false;
-  const digits = phone.replace(/\D/g, '');
-  const withDDI = digits.startsWith('55') ? digits : `55${digits}`;
-  return withDDI.length === 12 || withDDI.length === 13;
-}
-
-// True when phone is foreign (does NOT start with country code 55)
-function isForeignPhone(phone: string | null | undefined): boolean {
-  if (!phone) return false;
-  const digits = phone.replace(/\D/g, '');
-  return !digits.startsWith('55');
-}
-
-function getFrequencyWeeks(frequencyType: string): number {
-  switch (frequencyType) {
-    case 'weekly': return 1;
-    case 'biweekly': return 2;
-    case 'three_weeks': return 3;
-    case 'monthly': return 4;
-    case 'bimonthly': return 8;
-    case 'quarterly': return 12;
-    default: return 1;
+  // Explicit request AND both environment gates required. Defaults never send.
+  const enabled=!OUTBOUND_PAUSED&&Deno.env.get('CONSULTORIA_CHECKIN_SEND_ENABLED')==='true';
+  const dryRun=body.dryRun!==false||!enabled;
+  const safe=planned.map(({phone,email,versionId,...p})=>p);
+  if(dryRun)return reply({success:true,dryRun:true,paused:OUTBOUND_PAUSED,sendsEnabled:enabled,dispatched:0,totalEligible:planned.length,planned:safe,skipped});
+  if(day!==1&&body.source==='cron')return reply({success:true,dispatched:0,reason:'not_monday'});
+  // A manual send must name the reviewed clients; never bulk-send by accident.
+  if(body.source!=='cron'&&(!Array.isArray(body.clientIds)||!body.clientIds.length))return reply({error:'client_selection_required'},400);
+  const results:any[]=[];
+  for(const p of planned){
+   if(!p.readyTime||(body.source!=='cron'&&!body.clientIds.includes(p.clientId)))continue;
+   if(p.channel==='whatsapp'&&Deno.env.get('CONSULTORIA_ZAPI_SEND_ENABLED')!=='true'){results.push({name:p.name,status:'blocked',reason:'whatsapp_paused'});continue;}
+   if(p.channel==='email'&&Deno.env.get('CONSULTORIA_EMAIL_SEND_ENABLED')!=='true'){results.push({name:p.name,status:'blocked',reason:'email_pending_setup'});continue;}
+   const {data:c}=await s.from('clients').select('*').eq('id',p.clientId).single();if(!operational(c,today)||c.user_id!==cfg.owner_user_id)continue;
+   if(c.checkin_frequency!==p.frequency||(c.checkin_start_date||p.anchor)!==p.anchor||c.phone!==p.phone||c.email!==p.email)continue;
+   const {data:activeSchedule}=await s.from('athlete_checkin_schedules').select('id').eq('id',p.scheduleId).eq('user_id',cfg.owner_user_id).eq('is_active',true).maybeSingle();
+   const {data:activeForm}=await s.from('checkin_forms').select('id').eq('id',p.formId).eq('user_id',cfg.owner_user_id).eq('is_active',true).is('archived_at',null).maybeSingle();
+   if(!activeSchedule||!activeForm)continue;
+   const sentAt=new Date().toISOString(),deadline=new Date(Date.now()+p.windowHours*36e5).toISOString();
+   const {data:d,error:de}=await s.from('checkin_dispatches').insert({user_id:cfg.owner_user_id,client_id:p.clientId,schedule_id:p.scheduleId,checkin_form_id:p.formId,form_version_id:p.versionId,status:'pending',sent_at:null,scheduled_for:p.occurrence+'T10:00:00Z',due_at:deadline,response_deadline:deadline,channel:p.channel,source:body.source==='cron'?'cron':'manual',metadata:{managed_checkin_flow:true,frequency_type:p.frequency,cycle_anchor:p.anchor}}).select('id,dispatch_token').single();
+   if(de){results.push({name:p.name,status:'blocked',reason:de.code==='23505'?'duplicate_occurrence':'database_unavailable'});continue;}
+   const link='https://rogersfeitosa.com.br/form/'+p.formId+'?client='+p.clientId+'&t='+d.dispatch_token;
+   const {error:le}=await s.from('checkin_dispatches').update({link_checkin:link}).eq('id',d.id);if(le){results.push({name:p.name,status:'pending',reason:'link_save_failed'});continue;}
+   const email=p.channel==='email';
+   const {data:sent,error:se}=await s.functions.invoke(email?'send-transactional-email':'send-whatsapp',{headers:{Authorization:'Bearer '+Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')},body:email?{clientId:p.clientId,dispatchId:d.id,templateName:'checkin-link',recipientEmail:p.email,idempotencyKey:'checkin-'+d.id,templateData:{name:p.name.split(' ')[0],link,accessCode:p.email,dueHours:p.windowHours+'h'}}:{clientId:p.clientId,templateKey:'checkin_reminder',context:{nome:p.name.split(' ')[0],link_checkin:link,checkin_link:link,codigo_acesso:p.phone,prazo_resposta:p.windowHours+'h'}}});
+   if(se||sent?.success!==true||sent?.queued===true){
+    // Unknown provider outcomes stay pending to prevent accidental retries.
+    await s.from('checkin_dispatches').update({error_message:'send_not_confirmed'}).eq('id',d.id);
+    results.push({name:p.name,status:'pending',reason:'send_not_confirmed'});continue;
+   }
+   const {error:ue}=await s.from('checkin_dispatches').update({status:'sent',sent_at:new Date().toISOString(),provider_response:{accepted:true,delivered:false,read:false}}).eq('id',d.id);
+   if(!ue)await s.from('athlete_checkin_schedules').update({last_dispatched_at:new Date().toISOString()}).eq('id',p.scheduleId);
+   results.push({name:p.name,status:ue?'pending':'sent',reason:ue?'delivery_log_pending':undefined});
   }
-}
-
-function shouldSendForFrequency(
-  frequencyType: string,
-  currentDay: number,
-  weeklyDays: number[],
-  startDate: string,
-  lastDispatchedAt: string | null,
-  now: Date
-): boolean {
-  const freqWeeks = getFrequencyWeeks(frequencyType);
-  if (!weeklyDays.includes(currentDay)) return false;
-  if (freqWeeks === 1) return true;
-
-  const MS_PER_DAY = 24 * 60 * 60 * 1000;
-  const today = new Date(now.toISOString().split('T')[0] + 'T00:00:00Z');
-
-  if (!lastDispatchedAt) {
-    // Para cadências maiores que semanal (quinzenal, mensal, etc.),
-    // o primeiro envio acontece somente no primeiro dia válido (weekly_days)
-    // a partir de start_date + freqWeeks semanas (ex.: mensal = 4 semanas).
-    const start = new Date(startDate + 'T00:00:00Z');
-    const firstEligible = new Date(start.getTime() + freqWeeks * 7 * MS_PER_DAY);
-    return today.getTime() >= firstEligible.getTime();
-  }
-
-  const last = new Date(lastDispatchedAt);
-  const lastDay = new Date(last.toISOString().split('T')[0] + 'T00:00:00Z');
-  const daysSinceLast = Math.floor((today.getTime() - lastDay.getTime()) / MS_PER_DAY);
-  return daysSinceLast >= (freqWeeks * 7 - 1);
-}
-
-Deno.serve(async (req) => {
-  const corsHeaders = restrictedCors(req);
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  // ETAPA 6A — C. INTERNAL/CRON: nenhuma chamada anônima executa este processador.
-  const guard = await requireInternal(req);
-  if (!guard.ok) {
-    await logSecurityEvent({ eventType: 'processor_invocation_denied', fn: 'process-checkin-dispatches' });
-    return denied(guard, corsHeaders);
-  }
-
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
-  // Parse request body for source/options
-  let source = 'cron';
-  let forceReprocess = false;
-  try {
-    if (req.method === 'POST') {
-      const body = await req.json().catch(() => ({}));
-      source = body.source || 'cron';
-      forceReprocess = !!body.forceReprocess;
-    }
-  } catch (_) { /* ignore */ }
-
-  // Create run log
-  const { data: runRow } = await supabase
-    .from('checkin_dispatch_runs')
-    .insert({ source, status: 'running' })
-    .select()
-    .single();
-  const runId = runRow?.id;
-
-  let totalAnalyzed = 0;
-  let totalEligible = 0;
-  let dispatched = 0;
-  let skipped = 0;
-  let failed = 0;
-  const details: any[] = [];
-
-  try {
-    const now = new Date();
-    const currentDay = now.getDay();
-    const currentTime = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'America/Fortaleza' });
-
-    console.log(`[process-checkin-dispatches] Run ${runId} starting. day=${currentDay}, time=${currentTime}, source=${source}`);
-
-    // HARD GUARD: Mondays only for the automatic cron. Manual reprocess (forceReprocess)
-    // is allowed any day so admins can recover from failures.
-    if (currentDay !== 1 && source === 'cron' && !forceReprocess) {
-      console.log('[process-checkin-dispatches] Skipping automatic run: today is not Monday');
-      if (runId) {
-        await supabase.from('checkin_dispatch_runs').update({
-          finished_at: new Date().toISOString(),
-          status: 'success',
-          total_analyzed: 0, total_eligible: 0, total_dispatched: 0,
-          total_failed: 0, total_skipped: 0,
-          details: [{ reason: 'not_monday', dow: currentDay }],
-        }).eq('id', runId);
-      }
-      return new Response(
-        JSON.stringify({ success: true, skipped: true, reason: 'not_monday', dow: currentDay }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { data: schedules, error: sErr } = await supabase
-      .from('athlete_checkin_schedules')
-      .select(`
-        *,
-        clients:client_id (id, name, phone, email, user_id, end_date, is_active, is_frozen),
-        checkin_forms:checkin_form_id (id, title, is_active)
-      `)
-      .eq('is_active', true)
-      .lte('start_date', now.toISOString().split('T')[0]);
-
-    if (sErr) throw sErr;
-
-    // STEP 1: Promote pre-scheduled dispatches
-    const { data: scheduledDispatches } = await supabase
-      .from('checkin_dispatches')
-      .select(`
-        *,
-        clients:client_id (id, name, phone, email, user_id, end_date, is_active, is_frozen),
-        checkin_forms:checkin_form_id (id, title, is_active),
-        athlete_checkin_schedules:schedule_id (due_in_hours)
-      `)
-      .eq('status', 'scheduled')
-      .lte('sent_at', now.toISOString());
-
-    for (const dispatch of scheduledDispatches || []) {
-      try {
-        const client = (dispatch as any).clients;
-        const form = (dispatch as any).checkin_forms;
-        const sched = (dispatch as any).athlete_checkin_schedules;
-
-        const foreign = isForeignPhone(client?.phone);
-
-        if (!client?.phone || (!foreign && !isValidE164BR(client.phone))) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Telefone inválido (E.164)' }).eq('id', dispatch.id);
-          failed++;
-          continue;
-        }
-        if (foreign && !client.email) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Atleta estrangeiro sem email' }).eq('id', dispatch.id);
-          failed++;
-          continue;
-        }
-        if (!form?.is_active) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Formulário inativo' }).eq('id', dispatch.id);
-          failed++;
-          continue;
-        }
-        if (client.is_frozen || !client.is_active) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: 'Plano congelado/inativo' }).eq('id', dispatch.id);
-          skipped++;
-          continue;
-        }
-
-        const dueInHours = sched?.due_in_hours || 48;
-        const dueAt = dispatch.due_at || new Date(now.getTime() + dueInHours * 60 * 60 * 1000).toISOString();
-        const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`;
-        const codigoAcesso = foreign ? client.email : formatPhoneAsAccessCode(client.phone);
-
-        let sendError: any = null;
-        if (foreign) {
-          const { error } = await supabase.functions.invoke('send-transactional-email', {
-            body: {
-              templateName: 'checkin-link',
-              recipientEmail: client.email,
-              idempotencyKey: `checkin-${dispatch.id}`,
-              templateData: {
-                name: client.name.split(' ')[0],
-                link: checkinLink,
-                accessCode: client.email,
-                dueHours: `${dueInHours}h`,
-              },
-            },
-          });
-          sendError = error;
-        } else {
-          const { error } = await supabase.functions.invoke('send-whatsapp', {
-            body: {
-              clientId: client.id,
-              templateKey: 'checkin_reminder',
-              context: {
-                nome: client.name.split(' ')[0],
-                link_checkin: checkinLink,
-                checkin_link: checkinLink,
-                codigo_acesso: codigoAcesso,
-                prazo_resposta: `${dueInHours}h`,
-              },
-            },
-          });
-          sendError = error;
-        }
-
-        if (sendError) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: sendError.message }).eq('id', dispatch.id);
-          failed++;
-        } else {
-          await supabase.from('checkin_dispatches').update({
-            status: 'sent',
-            sent_at: now.toISOString(),
-            due_at: dueAt,
-            link_checkin: checkinLink,
-          }).eq('id', dispatch.id);
-          if (dispatch.schedule_id) {
-            await supabase.from('athlete_checkin_schedules').update({ last_dispatched_at: now.toISOString() }).eq('id', dispatch.schedule_id);
-          }
-          dispatched++;
-        }
-        await new Promise(r => setTimeout(r, 1000));
-      } catch (err: any) {
-        failed++;
-        console.error(`[process-checkin-dispatches] Error promoting dispatch ${dispatch.id}:`, err);
-      }
-    }
-
-    // STEP 2: Auto-generate from active schedules
-    for (const schedule of schedules || []) {
-      totalAnalyzed++;
-      try {
-        const client = schedule.clients as any;
-
-        if (!client?.phone) { skipped++; continue; }
-
-        // ETAPA 3C — resolução canônica: override individual > plano/produto > schedule.
-        // Nunca "primeiro formulário ativo". Sem configuração => erro operacional, não envio.
-        const { data: resolvedRows } = await supabase
-          .rpc('resolve_checkin_form_for_client', { p_client_id: client.id });
-        const resolved = Array.isArray(resolvedRows) ? resolvedRows[0] : resolvedRows;
-
-        if (!resolved?.form_id || !resolved?.form_version_id || resolved?.error_code) {
-          skipped++;
-          details.push({ client: client.name, reason: resolved?.error_code || 'checkin_form_not_configured' });
-          continue;
-        }
-
-        const form = { id: resolved.form_id as string, is_active: true };
-        const resolvedVersionId = resolved.form_version_id as string;
-        const resolvedSource = resolved.source as string;
-
-
-        const foreign = isForeignPhone(client.phone);
-
-        if (!foreign && !isValidE164BR(client.phone)) {
-          skipped++;
-          details.push({ client: client.name, reason: 'invalid_phone' });
-          continue;
-        }
-
-        if (foreign && !client.email) {
-          skipped++;
-          details.push({ client: client.name, reason: 'foreign_no_email' });
-          continue;
-        }
-
-        const todayDate = now.toISOString().split('T')[0];
-
-        if (client.is_frozen) { skipped++; continue; }
-
-        if (!client.is_active || (client.end_date && client.end_date < todayDate)) {
-          await supabase.from('athlete_checkin_schedules').update({ is_active: false }).eq('id', schedule.id);
-          skipped++;
-          continue;
-        }
-
-        const weeklyDays = schedule.weekly_days || [];
-
-        // Validation: weekly type requires weekly_days
-        if (!weeklyDays || weeklyDays.length === 0) {
-          skipped++;
-          details.push({ client: client.name, reason: 'missing_weekly_days' });
-          continue;
-        }
-
-        const shouldSendToday = shouldSendForFrequency(
-          schedule.frequency_type,
-          currentDay,
-          weeklyDays,
-          schedule.start_date,
-          forceReprocess ? null : schedule.last_dispatched_at,
-          now
-        );
-
-        if (!shouldSendToday) { skipped++; continue; }
-
-        const scheduleTime = schedule.send_time?.substring(0, 5) || '09:00';
-        if (!forceReprocess && currentTime < scheduleTime) { skipped++; continue; }
-
-        // Idempotency: by schedule OR by client (covers legacy pipeline)
-        const todayStr = now.toISOString().split('T')[0];
-        const { data: existing } = await supabase
-          .from('checkin_dispatches')
-          .select('id')
-          .or(`schedule_id.eq.${schedule.id},client_id.eq.${client.id}`)
-          .in('status', ['sent', 'scheduled'])
-          .gte('sent_at', `${todayStr}T00:00:00`)
-          .lte('sent_at', `${todayStr}T23:59:59`)
-          .limit(1);
-
-        if (existing && existing.length > 0 && !forceReprocess) { skipped++; continue; }
-
-        totalEligible++;
-
-        const dueAt = schedule.due_in_hours
-          ? new Date(now.getTime() + schedule.due_in_hours * 60 * 60 * 1000).toISOString()
-          : schedule.due_at || null;
-
-        const { data: dispatch, error: dErr } = await supabase
-          .from('checkin_dispatches')
-          .insert({
-            user_id: client.user_id,
-            client_id: client.id,
-            checkin_form_id: form.id,
-            form_version_id: resolvedVersionId,
-            schedule_id: schedule.id,
-            due_at: dueAt,
-            response_deadline: dueAt,
-            status: 'sent',
-            channel: foreign ? 'email' : 'whatsapp',
-            source: forceReprocess ? 'manual_reprocess' : source,
-            scheduled_for: now.toISOString(),
-            metadata: { frequency_type: schedule.frequency_type, run_id: runId, form_source: resolvedSource, form_version_id: resolvedVersionId },
-            link_checkin: `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}`,
-
-          })
-          .select()
-          .single();
-
-        if (dErr) {
-          // 23505 = unique_violation on (schedule_id, occurrence_date):
-          // outra execução já criou o dispatch desta ocorrência. Idempotência garantida pelo banco.
-          if ((dErr as any).code === '23505') {
-            skipped++;
-            details.push({ client: client.name, reason: 'duplicate_occurrence' });
-            continue;
-          }
-          failed++;
-          continue;
-        }
-
-        // ETAPA 3C — o link carrega o token do disparo: o atleta sempre responde
-        // exatamente a versão congelada no momento do envio.
-        const dispatchToken = (dispatch as any).dispatch_token as string | undefined;
-        const checkinLink = `https://rogersfeitosa.com.br/form/${form.id}?client=${client.id}${dispatchToken ? `&t=${dispatchToken}` : ''}`;
-        if (dispatchToken) {
-          await supabase.from('checkin_dispatches').update({ link_checkin: checkinLink }).eq('id', dispatch.id);
-        }
-
-        const codigoAcesso = foreign ? client.email : formatPhoneAsAccessCode(client.phone);
-        const dueHoursLabel = schedule.due_in_hours ? `${schedule.due_in_hours}h` : 'Sem prazo definido';
-
-        let sendError: any = null;
-        if (foreign) {
-          const { error } = await supabase.functions.invoke('send-transactional-email', {
-            body: {
-              templateName: 'checkin-link',
-              recipientEmail: client.email,
-              idempotencyKey: `checkin-${dispatch.id}`,
-              templateData: {
-                name: client.name.split(' ')[0],
-                link: checkinLink,
-                accessCode: client.email,
-                dueHours: dueHoursLabel,
-              },
-            },
-          });
-          sendError = error;
-        } else {
-          const { error } = await supabase.functions.invoke('send-whatsapp', {
-            body: {
-              clientId: client.id,
-              templateKey: 'checkin_reminder',
-              context: {
-                nome: client.name.split(' ')[0],
-                link_checkin: checkinLink,
-                checkin_link: checkinLink,
-                codigo_acesso: codigoAcesso,
-                prazo_resposta: dueHoursLabel,
-              },
-            },
-          });
-          sendError = error;
-        }
-
-        if (sendError) {
-          await supabase.from('checkin_dispatches').update({ status: 'failed', error_message: sendError.message }).eq('id', dispatch.id);
-          failed++;
-        } else {
-          await supabase.from('athlete_checkin_schedules').update({ last_dispatched_at: now.toISOString() }).eq('id', schedule.id);
-          dispatched++;
-        }
-        await new Promise(r => setTimeout(r, 1000));
-      } catch (err: any) {
-        failed++;
-        console.error(`[process-checkin-dispatches] Error schedule ${schedule.id}:`, err);
-      }
-    }
-
-    console.log(`[process-checkin-dispatches] Done. analyzed=${totalAnalyzed} eligible=${totalEligible} dispatched=${dispatched} failed=${failed} skipped=${skipped}`);
-
-    if (runId) {
-      await supabase.from('checkin_dispatch_runs').update({
-        finished_at: new Date().toISOString(),
-        status: 'success',
-        total_analyzed: totalAnalyzed,
-        total_eligible: totalEligible,
-        total_dispatched: dispatched,
-        total_failed: failed,
-        total_skipped: skipped,
-        details: details.slice(0, 50),
-      }).eq('id', runId);
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, runId, totalAnalyzed, totalEligible, dispatched, failed, skipped }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error: any) {
-    console.error('[process-checkin-dispatches] Fatal:', error);
-    if (runId) {
-      await supabase.from('checkin_dispatch_runs').update({
-        finished_at: new Date().toISOString(),
-        status: 'error',
-        error_message: error.message,
-        total_analyzed: totalAnalyzed,
-        total_eligible: totalEligible,
-        total_dispatched: dispatched,
-        total_failed: failed,
-        total_skipped: skipped,
-      }).eq('id', runId);
-    }
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
+  return reply({success:true,dryRun:false,dispatched:results.filter(r=>r.status==='sent').length,results,skipped});
+ }catch{return reply({error:'internal_error'},503);}
 });
