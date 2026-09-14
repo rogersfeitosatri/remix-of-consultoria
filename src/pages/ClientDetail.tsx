@@ -1,3 +1,4 @@
+import { invokeManualBooking } from '@/lib/sendManualBooking';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -169,41 +170,16 @@ export default function ClientDetail() {
     }
   };
   
-  const handleSendBooking = async () => {
-    if (!client?.phone) {
-      toast.error('Cliente não possui telefone cadastrado');
-      return;
-    }
-    if (!schedulingSettings?.booking_link_slug) {
-      toast.error('Configure o link de agendamento nas configurações');
-      return;
-    }
+  const handleSendBooking = async (dryRun = false) => {
+    if (!client) return;
     setSendingBooking(true);
     try {
-      const { data: schedule, error: scheduleError } = await supabase
-        .from('consultation_schedules')
-        .insert({
-          client_id: client.id,
-          user_id: schedulingSettings.user_id,
-          scheduled_date: format(new Date(), 'yyyy-MM-dd'),
-          send_link_date: format(new Date(), 'yyyy-MM-dd'),
-          status: 'pending',
-        })
-        .select()
-        .single();
-      if (scheduleError) throw scheduleError;
-      const { error } = await supabase.functions.invoke('send-booking-link', {
-        body: { consultationScheduleId: schedule.id },
-      });
-      if (error) throw error;
-      toast.success('Link de agendamento enviado via WhatsApp!');
-    } catch (error: any) {
-      toast.error('Erro ao enviar link: ' + (error.message || 'Verifique as configurações'));
-    } finally {
-      setSendingBooking(false);
-    }
+      const { data } = await invokeManualBooking({ body: { clientId: client.id, dryRun } });
+      toast.success(data.message);
+    } catch (error: any) { toast.error(error.message); }
+    finally { setSendingBooking(false); }
   };
-  
+
   const handleSendCredentials = async () => {
     if (!client?.phone || !client?.email || !client?.athlete_user_id) {
       toast.error('Cliente precisa ter telefone, email e conta de acesso criada');
@@ -348,6 +324,9 @@ export default function ClientDetail() {
             <Button variant="outline" size="sm" onClick={() => handleSendCheckin(true)} disabled={sendingCheckin}>
               Verificar envio
             </Button>
+            <Button variant="outline" size="sm" onClick={() => handleSendBooking(true)} disabled={sendingBooking}>
+              Verificar consulta
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setShowRenewDialog(true)}
               className="gap-1 text-primary border-primary/30 hover:bg-primary/10">
               <RefreshCw className="h-4 w-4" /> Renovar
@@ -361,7 +340,7 @@ export default function ClientDetail() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 {client.phone && (
-                  <DropdownMenuItem onClick={handleSendBooking} disabled={sendingBooking}>
+                  <DropdownMenuItem onClick={() => handleSendBooking()} disabled={sendingBooking}>
                     <CalendarCheck className="h-4 w-4 mr-2" /> Enviar link de consulta
                   </DropdownMenuItem>
                 )}

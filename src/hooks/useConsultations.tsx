@@ -1,3 +1,4 @@
+import { invokeManualBooking } from '@/lib/sendManualBooking';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -676,7 +677,7 @@ export function useSendBookingInvite() {
     mutationFn: async ({ clientId, bookingToken }: { clientId: string; bookingToken: string }) => {
       // Use send-booking-link function which uses the correct domain (rogersfeitosa.com.br)
       // and fetches template from database
-      const { data, error } = await supabase.functions.invoke('send-booking-link', {
+      const { data, error } = await invokeManualBooking( {
         body: {
           clientId,
           messageType: 'booking_invite',

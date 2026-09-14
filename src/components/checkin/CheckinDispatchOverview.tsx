@@ -1,3 +1,4 @@
+import { sendManualCheckin } from '@/lib/sendManualCheckin';
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,8 +71,14 @@ export function CheckinDispatchOverview() {
     }
   }, [period, customRange]);
 
-  const handleResend = async (dispatchId: string, clientName: string) => {
-    toast.info('Os envios de check-in estão pausados.');
+  const handleResend = async (dispatchId: string, clientId: string) => {
+    setResendingId(dispatchId);
+    try {
+      const result = await sendManualCheckin(clientId);
+      toast.success(result.message);
+      await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-overview'] });
+    } catch (error: any) { toast.error(error.message); }
+    finally { setResendingId(null); }
   };
 
   const [reprocessing, setReprocessing] = useState(false);
@@ -84,13 +91,13 @@ export function CheckinDispatchOverview() {
         body: { source: 'manual', dryRun: true },
       });
       if (error) throw error;
-      const summary = `Envios pausados. ${data?.totalEligible || 0} check-ins elegíveis na simulação. Nenhuma mensagem enviada.`;
+      const summary = `Envios automáticos pausados. ${data?.totalEligible || 0} check-ins elegíveis na simulação. Nenhuma mensagem enviada.`;
       setSimulationSummary(summary);
       toast.info(summary);
       await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-overview'] });
       await queryClient.invalidateQueries({ queryKey: ['checkin-dispatch-runs'] });
     } catch (err: any) {
-      setSimulationSummary('Não foi possível concluir a simulação. Os envios continuam pausados.');
+      setSimulationSummary('Não foi possível concluir a simulação. Os envios automáticos continuam pausados.');
       toast.error(`Falha ao reprocessar: ${err.message || 'erro'}`);
     } finally {
       setReprocessing(false);
@@ -472,7 +479,7 @@ export function CheckinDispatchOverview() {
                               size="sm"
                               variant="outline"
                               disabled={resendingId === d.id}
-                              onClick={() => handleResend(d.id, d.client_name)}
+                              onClick={() => handleResend(d.id, d.client_id)}
                               className="gap-1.5"
                             >
                               {resendingId === d.id ? (

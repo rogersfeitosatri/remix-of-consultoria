@@ -1,3 +1,4 @@
+import { invokeManualBooking } from '@/lib/sendManualBooking';
 import { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { DayAgendaPanel } from '@/components/calendar/DayAgendaPanel';
@@ -172,7 +173,7 @@ export default function CalendarPage() {
     try {
       setIsSending(true);
       toast.loading('Enviando link de agendamento...');
-      const { error } = await supabase.functions.invoke('send-booking-link', {
+      const { error } = await invokeManualBooking( {
         body: { consultationScheduleId: id },
       });
       toast.dismiss();

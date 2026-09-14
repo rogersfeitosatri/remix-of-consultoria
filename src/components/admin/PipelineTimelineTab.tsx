@@ -1,3 +1,4 @@
+import { invokeManualBooking } from '@/lib/sendManualBooking';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -67,7 +68,7 @@ export function PipelineTimelineTab({ clientId }: PipelineTimelineTabProps) {
   const handleResendLink = async (scheduleId: string) => {
     setResendingId(scheduleId);
     try {
-      const { data, error } = await supabase.functions.invoke('send-booking-link', {
+      const { data, error } = await invokeManualBooking( {
         body: {
           consultationScheduleId: scheduleId,
           clientId,

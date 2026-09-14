@@ -13,21 +13,9 @@ export function GoogleOAuthAlert() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      const { data: oauthConnection } = await supabase
-        .from('google_oauth_connections')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      const isExpired = oauthConnection?.token_expires_at && 
-        new Date(oauthConnection.token_expires_at) < new Date();
-      
-      const hasNoOAuth = !oauthConnection?.access_token && !oauthConnection?.refresh_token;
-
-      const isValid = oauthConnection?.access_token && 
-        oauthConnection?.refresh_token && !isExpired;
-
-      return { needsAttention: !isValid && (isExpired || hasNoOAuth), isExpired, hasNoOAuth };
+      const { data, error } = await supabase.functions.invoke('integration-readiness');
+      if (error || !data?.success) return { needsAttention: true, isExpired: false, hasNoOAuth: true };
+      return { needsAttention: !data.google.meetEnabled, isExpired: data.google.expired, hasNoOAuth: !data.google.savedAuthorization };
     },
     refetchInterval: 60000,
   });

@@ -1,3 +1,4 @@
+import { invokeManualBooking } from '@/lib/sendManualBooking';
 import { useState } from 'react';
 import { differenceInDays, parseISO, format, isPast, isToday, addMonths, addWeeks, nextMonday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -424,7 +425,7 @@ export function AthleteSummaryConsultCard({
     try {
       setIsSendingLink(scheduleId);
       toast.loading('Enviando link...');
-      const { data, error } = await supabase.functions.invoke('send-booking-link', {
+      const { data, error } = await invokeManualBooking( {
         body: {
           consultationScheduleId: scheduleId,
           messageType: 'booking_invite',

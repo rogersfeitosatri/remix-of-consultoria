@@ -1,3 +1,4 @@
+import { invokeManualBooking } from '@/lib/sendManualBooking';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
@@ -574,7 +575,7 @@ function SendNowConfirm({ row, onDone }: { row: PeriodicityRow; onDone: () => vo
   const send = useMutation({
     mutationFn: async () => {
       if (!user?.id) throw new Error('Sem sessão');
-      const { error } = await supabase.functions.invoke('send-booking-link', {
+      const { error } = await invokeManualBooking( {
         body: { client_id: row.client_id, triggered_by: 'manual_admin' },
       });
       if (error) throw error;

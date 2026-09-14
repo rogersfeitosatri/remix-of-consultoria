@@ -1,3 +1,4 @@
+import { invokeManualBooking } from '@/lib/sendManualBooking';
 import { useMemo, useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,7 +66,7 @@ export default function SchedulingAudit() {
   const handleResend = async (clientId: string, scheduleId: string) => {
     setResending(scheduleId);
     try {
-      const { data, error } = await supabase.functions.invoke('send-booking-link', {
+      const { data, error } = await invokeManualBooking( {
         body: {
           client_id: clientId,
           consultation_schedule_id: scheduleId,

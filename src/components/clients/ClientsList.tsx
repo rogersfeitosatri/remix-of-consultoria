@@ -1,3 +1,4 @@
+import { invokeManualBooking } from '@/lib/sendManualBooking';
 import { Client } from '@/hooks/useClients';
 import { calculateHealthScore } from '@/hooks/useAthleteHealthScore';
 import { HealthScoreBadge } from './HealthScoreBadge';
@@ -114,46 +115,12 @@ export function ClientsList({ clients, onEdit, onDelete }: ClientsListProps) {
   };
 
   const handleSendBookingManually = async (client: Client) => {
-    if (!client.phone) {
-      toast.error('Cliente não possui telefone cadastrado');
-      return;
-    }
-
-    if (!schedulingSettings?.booking_link_slug) {
-      toast.error('Configure o link de agendamento nas configurações');
-      return;
-    }
-
     setSendingBooking(client.id);
     try {
-      // Create a consultation schedule with booking token
-      const { data: schedule, error: scheduleError } = await supabase
-        .from('consultation_schedules')
-        .insert({
-          client_id: client.id,
-          user_id: schedulingSettings.user_id,
-          scheduled_date: format(new Date(), 'yyyy-MM-dd'),
-          send_link_date: format(new Date(), 'yyyy-MM-dd'),
-          status: 'pending',
-        })
-        .select()
-        .single();
-
-      if (scheduleError) throw scheduleError;
-
-      // Call edge function to send booking link
-      const { error } = await supabase.functions.invoke('send-booking-link', {
-        body: { consultationScheduleId: schedule.id },
-      });
-
-      if (error) throw error;
-      toast.success('Link de agendamento enviado via WhatsApp!');
-    } catch (error: any) {
-      console.error('Error sending booking:', error);
-      toast.error('Erro ao enviar link: ' + (error.message || 'Verifique as configurações'));
-    } finally {
-      setSendingBooking(null);
-    }
+      const { data } = await invokeManualBooking({ body: { clientId: client.id } });
+      toast.success(data.message);
+    } catch (error: any) { toast.error(error.message); }
+    finally { setSendingBooking(null); }
   };
 
   const handleSendCredentialsManually = async (client: Client) => {
