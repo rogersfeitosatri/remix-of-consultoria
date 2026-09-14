@@ -4,7 +4,8 @@
  * A Home mostra RESUMO + PRÓXIMAS AÇÕES; listas completas ficam em drawers.
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -186,6 +187,12 @@ export function DashboardHome() {
           )
         )}
       </header>
+      <div className="flex flex-wrap gap-2" aria-label="Ações do acompanhamento">
+        <Button asChild className="min-h-11"><Link to="/checkin-hub">Analisar check-ins</Link></Button>
+        <Button asChild variant="outline" className="min-h-11"><Link to="/calendar?booking=new">Agendar consulta</Link></Button>
+        <Button asChild variant="outline" className="min-h-11"><Link to="/tasks">Tarefas e retornos</Link></Button>
+      </div>
+
 
       {now.length > 0 && (
         <section className="space-y-1">
@@ -208,7 +215,7 @@ export function DashboardHome() {
       )}
 
       <section className="space-y-1">
-        <SectionTitle>Hoje</SectionTitle>
+        <SectionTitle>Consultas de hoje</SectionTitle>
         {appointments.length === 0 ? (
           <p className="px-1 py-2 text-sm text-muted-foreground">Nenhuma consulta</p>
         ) : (
@@ -247,8 +254,8 @@ export function DashboardHome() {
         <div className="divide-y divide-border/40">
           <LinkRow label="Pendências" count={total} onClick={() => setDrawer('pending')} />
           <LinkRow label="Contatos" count={contactsPending.length} onClick={() => setDrawer('contacts')} />
-          <LinkRow label="Radar" count={problems.length} onClick={() => setDrawer('radar')} />
-          <LinkRow label="Calendário" onClick={() => navigate('/calendar')} />
+          <LinkRow label="Atletas que precisam de atenção" count={problems.length} onClick={() => setDrawer('radar')} />
+          <LinkRow label="Consultas" onClick={() => navigate('/calendar')} />
           <LinkRow label="Atletas" onClick={() => navigate('/clients')} />
         </div>
       </section>

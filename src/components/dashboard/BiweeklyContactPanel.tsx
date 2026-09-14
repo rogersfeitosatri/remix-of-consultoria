@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Check, ChevronDown, ChevronRight, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useBiweeklyContacts, CONTACT_CYCLE_DAYS, type ContactRow } from '@/hooks/useBiweeklyContacts';
+import { useBiweeklyContacts, type ContactRow } from '@/hooks/useBiweeklyContacts';
 import { DashboardSection } from './DashboardSection';
 
 function waLink(phone: string | null, name: string): string | null {
@@ -15,16 +15,18 @@ function waLink(phone: string | null, name: string): string | null {
 }
 
 function sinceLabel(r: ContactRow): string {
-  if (r.daysSince == null) return 'nunca';
+  if (r.daysSince == null) return 'sem registro';
   if (r.daysSince === 0) return 'hoje';
   return `${r.daysSince} dias`;
 }
 
 export function BiweeklyContactPanel() {
-  const { pending, done, total, isLoading, markContacted, undoContact } = useBiweeklyContacts();
+  const { pending, done, total, isLoading, error, refetch, markContacted, undoContact } = useBiweeklyContacts();
   const [doneOpen, setDoneOpen] = useState(false);
 
-  if (isLoading || total === 0 || pending.length === 0) return null;
+  if (isLoading) return <p role="status">Carregando contatos…</p>;
+  if (error) return <div role="alert"><p>Não foi possível conferir os contatos.</p><button onClick={() => refetch()} className="min-h-11 underline">Tentar novamente</button></div>;
+  if (total === 0) return <p>Nenhum atleta vigente nesta fila.</p>;
 
   const openWa = (r: ContactRow) => {
     const link = waLink(r.phone, r.name);
@@ -34,6 +36,7 @@ export function BiweeklyContactPanel() {
 
   return (
     <DashboardSection title="Contatos" count={pending.length}>
+      <p className="px-3 pb-3 text-sm text-muted-foreground">Treino e ambos: semanal. Dieta: quinzenal. Sem registro significa contato a confirmar.</p>
       {pending.map((r) => (
         <div key={r.id} className="group flex items-center gap-2 rounded-md transition-colors hover:bg-muted/50">
           <button
@@ -48,8 +51,8 @@ export function BiweeklyContactPanel() {
           <button
             type="button"
             aria-label={`Marcar contato com ${r.name}`}
-            onClick={() => { markContacted(r.id); toast.success(`Contato com ${r.name.split(' ')[0]} registrado.`); }}
-            className="mr-1.5 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+            onClick={() => markContacted(r.id)}
+            className="mr-1.5 flex h-11 w-11 items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
           >
             <Check className="h-4 w-4" />
           </button>
@@ -59,7 +62,7 @@ export function BiweeklyContactPanel() {
       {done.length > 0 && (
         <Collapsible open={doneOpen} onOpenChange={setDoneOpen}>
           <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
-            Em dia neste ciclo de {CONTACT_CYCLE_DAYS} dias ({done.length})
+            Contatos registrados no prazo ({done.length})
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${doneOpen ? 'rotate-180' : ''}`} />
           </CollapsibleTrigger>
           <CollapsibleContent>

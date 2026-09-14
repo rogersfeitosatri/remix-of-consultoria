@@ -48,7 +48,7 @@ import { ManualBookingDialog } from '@/components/scheduling/ManualBookingDialog
 import { WeeklyPipelineView } from '@/components/scheduling/WeeklyPipelineView';
 import { PeriodicityControlView } from '@/components/scheduling/PeriodicityControlView';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   calendarEventsForDate,
   googleSyncState,
@@ -62,13 +62,20 @@ export default function CalendarPage() {
   const { data: allClients = [], isLoading: clientsLoading } = useClients();
   const { data: consultations = [], isLoading: consultationsLoading } = useConsultationSchedules();
   const { data: appointments = [] } = useConsultationAppointments();
-  const [activeTab, setActiveTab] = useState('pipeline');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = ['pipeline', 'calendar', 'periodicity', 'history'].includes(searchParams.get('tab') || '') ? searchParams.get('tab')! : 'pipeline';
+  const setActiveTab = (tab: string) => { const next = new URLSearchParams(searchParams); next.set('tab', tab); setSearchParams(next); };
   const [selectedAgendaDay, setSelectedAgendaDay] = useState<Date>(new Date());
   const [linkDialogDay, setLinkDialogDay] = useState<Date | null>(null);
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isManualBookingOpen, setIsManualBookingOpen] = useState(false);
+  const isManualBookingOpen = searchParams.get('booking') === 'new';
+  const setIsManualBookingOpen = (open: boolean) => {
+    const next = new URLSearchParams(searchParams);
+    if (open) next.set('booking', 'new'); else { next.delete('booking'); next.delete('client'); }
+    setSearchParams(next, { replace: !open });
+  };
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [newScheduleDate, setNewScheduleDate] = useState<Date | undefined>();
   const [editingSchedule, setEditingSchedule] = useState<(ConsultationSchedule & { client_name: string }) | null>(null);
@@ -283,30 +290,33 @@ export default function CalendarPage() {
             <div className="min-w-0">
               <h1 className="text-lg sm:text-2xl font-bold text-foreground flex items-center gap-2">
                 <CalendarDays className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
-                <span className="truncate">Calendário de Consultas</span>
+                <span className="truncate">Consultas</span>
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
-                Acompanhe o pipeline de envios, agendamentos e consultas
+                Agende, confira as consultas e acompanhe os próximos atendimentos.
               </p>
             </div>
-            <div className="flex gap-2 overflow-x-auto -mx-1 px-1 sm:overflow-visible">
+            <div className="flex flex-wrap items-start gap-2">
+              <details className="rounded-lg border border-border px-3">
+                <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring">Mais opções</summary>
+                <div className="flex flex-wrap gap-2 pb-3">
+                  <Button asChild variant="outline" size="sm"><Link to="/scheduling">Horários e bloqueios</Link></Button>
               <Button asChild size="sm" variant="outline" className="gap-1 shrink-0">
                 <Link to="/scheduling/audit">
                   <Shield className="h-4 w-4" />
-                  <span className="hidden sm:inline">Auditoria</span>
-                  <span className="sm:hidden text-xs">Audit</span>
+                  <span>Conferir inconsistências</span>
                 </Link>
               </Button>
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline" className="gap-1">
                     <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Tarefa</span>
+                    <span>Programar convite</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Adicionar Tarefa de Envio</DialogTitle>
+                    <DialogTitle>Programar convite de consulta</DialogTitle>
                     <DialogDescription>
                       Adicione uma tarefa de envio de link para um atleta.
                     </DialogDescription>
@@ -348,32 +358,34 @@ export default function CalendarPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+                </div>
+              </details>
               <Button
                 size="sm"
-                className="gap-1"
+                className="min-h-11 gap-2"
                 onClick={() => setIsManualBookingOpen(true)}
               >
                 <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Agendar</span>
+                <span>Agendar consulta</span>
               </Button>
             </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-4 h-auto sm:max-w-2xl gap-0.5 sm:gap-1">
-              <TabsTrigger value="pipeline" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-[10px] sm:text-sm">
+              <TabsTrigger value="pipeline" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-xs sm:text-sm">
                 <LayoutList className="h-4 w-4" />
-                <span>Pipeline</span>
+                <span>Semana</span>
               </TabsTrigger>
-              <TabsTrigger value="calendar" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-[10px] sm:text-sm">
+              <TabsTrigger value="calendar" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-xs sm:text-sm">
                 <CalendarDays className="h-4 w-4" />
-                <span>Mensal</span>
+                <span>Calendário</span>
               </TabsTrigger>
-              <TabsTrigger value="periodicity" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-[10px] sm:text-sm">
+              <TabsTrigger value="periodicity" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-xs sm:text-sm">
                 <Activity className="h-4 w-4" />
-                <span>Frequência</span>
+                <span>Próximas</span>
               </TabsTrigger>
-              <TabsTrigger value="history" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-[10px] sm:text-sm">
+              <TabsTrigger value="history" className="flex-col sm:flex-row gap-0.5 sm:gap-1.5 py-2 px-1 sm:px-3 text-xs sm:text-sm">
                 <History className="h-4 w-4" />
                 <span>Histórico</span>
               </TabsTrigger>
@@ -728,6 +740,7 @@ export default function CalendarPage() {
           </Tabs>
 
           <ManualBookingDialog
+            initialClientId={searchParams.get('client') || undefined}
             open={isManualBookingOpen}
             onOpenChange={setIsManualBookingOpen}
             onSuccess={() => {

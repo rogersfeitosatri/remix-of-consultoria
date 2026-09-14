@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { ADMIN_NAVIGATION, ADMIN_SETTINGS_ITEM } from '@/lib/adminNavigation';
 
 export interface SidebarItemConfig {
   key: string;
@@ -20,22 +21,7 @@ export interface LayoutSettings {
 }
 
 // Default sidebar items matching current navItems order
-export const DEFAULT_SIDEBAR_ITEMS: SidebarItemConfig[] = [
-  { key: '/admin', label: 'Dashboard', visible: true },
-  { key: '/tasks', label: 'Tarefas', visible: true },
-  { key: '/clients', label: 'Atletas', visible: true },
-  { key: '/meal-plans', label: 'Plano Alimentar', visible: true },
-  { key: '/checkin-hub', label: 'Check-ins', visible: true },
-  { key: '/adjustments', label: 'Ajustes', visible: true },
-  { key: '/financial', label: 'Financeiro', visible: true },
-  { key: '/calendar', label: 'Calendário', visible: true },
-  { key: '/scheduling', label: 'Agendamento', visible: true },
-  { key: '/content', label: 'Conteúdo Atleta', visible: true },
-  { key: '/forms', label: 'Formulários', visible: true },
-  { key: '/ai-training', label: 'Central de IA', visible: true },
-  { key: '/zn-assessoria', label: 'ZN Assessoria', visible: true },
-  { key: '/settings', label: 'Configurações', visible: true },
-];
+export const DEFAULT_SIDEBAR_ITEMS: SidebarItemConfig[] = [...ADMIN_NAVIGATION, ADMIN_SETTINGS_ITEM];
 
 export function useLayoutSettings() {
   const { user } = useAuth();
@@ -62,17 +48,8 @@ export function useLayoutSettings() {
     brand_subtitle: settings?.brand_subtitle || 'Nutrição & Treinamento',
     logo_url: settings?.logo_url || null,
     avatar_url: settings?.avatar_url || null,
-    sidebar_items: (() => {
-      // Routes moved into Settings — never show in sidebar
-      const HIDDEN_ROUTES = new Set(['/calls', '/scheduling-links', '/link-bio', '/periodization', '/metabolic-web']);
-      const saved = (settings?.sidebar_items || []) as unknown as SidebarItemConfig[];
-      const base = saved.length === 0 ? DEFAULT_SIDEBAR_ITEMS : (() => {
-        const savedKeys = new Set(saved.map(s => s.key));
-        const newItems = DEFAULT_SIDEBAR_ITEMS.filter(d => !savedKeys.has(d.key));
-        return [...saved, ...newItems];
-      })();
-      return base.filter(item => !HIDDEN_ROUTES.has(item.key));
-    })(),
+    // Old saved menus must not reintroduce duplicate destinations. Branding is preserved.
+    sidebar_items: DEFAULT_SIDEBAR_ITEMS,
   }), [settings]);
 
   const saveSettings = useMutation({

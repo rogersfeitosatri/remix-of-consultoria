@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useClients, usePayments, useAddClient, Client } from '@/hooks/useClients';
 import { Settings as SettingsIcon, Download, FileSpreadsheet, Loader2, CheckCircle, FileDown, Upload, AlertCircle, Users, Lock, ExternalLink, Palette, Flag, PhoneCall, Link as LinkIcon, Activity, Network, CalendarPlus, CreditCard, Database, HardDrive, Wrench, Shield, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { SECONDARY_TOOLS } from '@/lib/adminNavigation';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { format, parseISO, parse, isValid, addMonths } from 'date-fns';
 import * as XLSX from 'xlsx';
@@ -57,7 +59,7 @@ interface CategoryDef {
 }
 
 const CATEGORIES: CategoryDef[] = [
-  { key: 'aparencia', name: 'Aparência & Layout', description: 'Personalização visual e organização do menu', icon: Palette, itemCount: 1 },
+  { key: 'aparencia', name: 'Aparência', description: 'Nome, marca e imagens do sistema', icon: Palette, itemCount: 1 },
   { key: 'notificacoes', name: 'Notificações', description: 'Controle de alertas e eventos do sistema', icon: Bell, itemCount: 1 },
   { key: 'ia', name: 'Inteligência Artificial', description: 'Assistente automático via WhatsApp', icon: Bot, itemCount: 1 },
   { key: 'paginas', name: 'Páginas Públicas', description: 'Landing page e link da bio', icon: ExternalLink, itemCount: 2 },
@@ -70,6 +72,7 @@ const CATEGORIES: CategoryDef[] = [
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
   const { data: adminSettings } = useAdminSettings();
@@ -1381,6 +1384,18 @@ export default function Settings() {
             Gerencie as configurações do sistema
           </p>
         </div>
+
+        {activeCategory === null && (
+          <section aria-label="Ferramentas de apoio" className="space-y-3">
+            <h2 className="text-lg font-semibold">Ferramentas de apoio</h2>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {SECONDARY_TOOLS.map(tool => <Link key={tool.to} to={tool.to} className="rounded-lg border border-border p-4 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+                <span className="font-medium">{tool.label}</span><p className="mt-1 text-sm text-muted-foreground">{tool.description}</p>
+              </Link>)}
+            </div>
+            <Button variant="outline" onClick={() => signOut()} className="lg:hidden">Sair da conta</Button>
+          </section>
+        )}
 
         {activeCategory === null ? (
           /* Gallery View */

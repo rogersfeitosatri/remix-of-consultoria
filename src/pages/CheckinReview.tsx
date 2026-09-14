@@ -1,3 +1,4 @@
+import { checkinWorkflow } from '@/lib/checkinWorkflow';
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
@@ -44,6 +45,8 @@ interface CheckinResponse {
   client_id: string;
   responses: Record<string, any>;
   submitted_at: string;
+  review_status?: string | null;
+  closed_reason?: string | null;
   checkin_forms?: {
     title: string;
     description: string | null;
@@ -84,6 +87,8 @@ interface Feedback {
   status: 'pending' | 'approved' | 'sent';
   approved_at: string | null;
   sent_at: string | null;
+  publication_status?: string | null;
+  published_at?: string | null;
   admin_decision?: string | null;
 }
 
@@ -298,6 +303,9 @@ export default function CheckinReview() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checkin_response', responseId] });
+    queryClient.invalidateQueries({ queryKey: ['operational-dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['checkin_history'] });
+    queryClient.invalidateQueries({ queryKey: ['athlete-radar'] });
       queryClient.invalidateQueries({ queryKey: ['checkin_responses', 'all', checkinResponse?.client_id] });
       setEditingWeightQuestionId(null);
       setEditedWeightValue('');
@@ -360,46 +368,15 @@ export default function CheckinReview() {
     },
   });
 
-  // Ajuste incremental (patch) do plano v2 a partir do check-in — sem regenerar.
-  const patchV2 = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('checkin-plan-patch', {
-        body: { clientId: checkinResponse?.client_id },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: (data: any) => {
-      toast.success(data?.summaryForAthlete || 'Ajuste aplicado ao plano v2.', { duration: 8000 });
-      if (data?.professionalReviewRequired) toast.warning('Sinais que pedem sua avaliação direta — confira o histórico do plano.');
-    },
-    onError: (e: any) => toast.error(e.message || 'Erro ao aplicar ajuste'),
-  });
-
-  // Auto-complete the checkin_response task for this athlete
+  // Resolve only the task linked to this exact response, never another cycle.
   const autoCompleteCheckinTask = async (clientId: string) => {
-    try {
-      const { data: tasks } = await supabase
-        .from('tasks')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('task_type', 'checkin_response')
-        .in('status', ['pending', 'in_progress'])
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (tasks && tasks.length > 0) {
-        await supabase
-          .from('tasks')
-          .update({ status: 'done', completed_at: new Date().toISOString(), is_archived: true })
-          .eq('id', tasks[0].id);
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        queryClient.invalidateQueries({ queryKey: ['my-day-today'] });
-      }
-    } catch (err) {
-      console.error('Error auto-completing task:', err);
-    }
+    const { error } = await supabase.from('tasks')
+      .update({ status: 'done', completed_at: new Date().toISOString(), is_archived: true })
+      .eq('client_id', clientId).eq('source_type', 'checkin_response').eq('source_id', responseId!)
+      .in('status', ['pending', 'in_progress']);
+    if (error) { toast.error('Feedback salvo, mas a tarefa vinculada precisa ser conferida.'); return; }
+    queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['operational-dashboard'] });
   };
 
   /**
@@ -426,8 +403,11 @@ export default function CheckinReview() {
       .from('checkin_responses')
       .update(patch as never)
       .eq('id', responseId);
-    if (error) console.error('[checkin] falha ao atualizar estado da resposta', error);
+    if (error) throw error;
     queryClient.invalidateQueries({ queryKey: ['checkin_response', responseId] });
+    queryClient.invalidateQueries({ queryKey: ['operational-dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['checkin_history'] });
+    queryClient.invalidateQueries({ queryKey: ['athlete-radar'] });
   };
 
   // Mutation to approve feedback (rascunho aprovado, ainda NÃO publicado)
@@ -462,19 +442,12 @@ export default function CheckinReview() {
       await setResponseState('reviewed');
       return { sendWhatsApp };
     },
-    onSuccess: async (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
       queryClient.invalidateQueries({ queryKey: ['pending_checkin_reviews'] });
-      queryClient.invalidateQueries({ queryKey: ['pending_checkins_dashboard'] });
-      if (checkinResponse?.client_id) {
-        await autoCompleteCheckinTask(checkinResponse.client_id);
-      }
-      if (data?.sendWhatsApp) {
-        toast.success('Feedback aprovado! Pronto para publicar.');
-      } else {
-        toast.success('Check-in revisado com sucesso!');
-      }
-      setActiveTab('evolution');
+      queryClient.invalidateQueries({ queryKey: ['operational-dashboard'] });
+      toast.success('Feedback aprovado. Falta publicar e enviar.');
+      setActiveTab('feedback');
     },
     onError: (error) => {
       console.error('Error approving:', error);
@@ -494,7 +467,7 @@ export default function CheckinReview() {
             ai_analysis_id: aiAnalysis?.id,
             suggested_feedback: aiAnalysis?.suggested_feedback || null,
             final_feedback: editedFeedback || null,
-            status: 'sent',
+            status: 'pending',
             publication_status: 'not_published',
             approved_at: new Date().toISOString(),
             sent_via: 'manual_review',
@@ -505,7 +478,7 @@ export default function CheckinReview() {
           .from('checkin_feedbacks')
           .update({
             final_feedback: editedFeedback || feedback.final_feedback || null,
-            status: 'sent',
+            status: 'pending',
             publication_status: 'not_published',
             approved_at: feedback.approved_at || new Date().toISOString(),
             sent_via: 'manual_review',
@@ -546,9 +519,10 @@ export default function CheckinReview() {
       });
 
       if (error) throw error;
+      if (data?.success !== true || data?.skipped || data?.blocked) throw new Error(data?.error || data?.reason || 'O envio não foi confirmado.');
 
       const { data: auth } = await supabase.auth.getUser();
-      await supabase
+      const { error: publicationError } = await supabase
         .from('checkin_feedbacks')
         .update({
           status: 'sent',
@@ -560,7 +534,9 @@ export default function CheckinReview() {
         } as never)
         .eq('id', feedback.id);
 
+      if (publicationError) throw new Error('Envio confirmado, mas a publicação não foi registrada. Confira o histórico antes de reenviar.');
       await setResponseState('closed', 'feedback_published');
+      await autoCompleteCheckinTask(checkinResponse.client_id);
       return data;
     },
     onSuccess: () => {
@@ -568,10 +544,12 @@ export default function CheckinReview() {
       queryClient.invalidateQueries({ queryKey: ['pending_checkin_reviews'] });
       queryClient.invalidateQueries({ queryKey: ['pending_checkins_dashboard'] });
       toast.success('Feedback publicado para o atleta e enviado no WhatsApp!');
-      setActiveTab('evolution');
+      setActiveTab('feedback');
     },
     onError: (error: any) => {
       console.error('Error sending:', error);
+      queryClient.invalidateQueries({ queryKey: ['checkin_feedback', responseId] });
+      queryClient.invalidateQueries({ queryKey: ['pending_checkin_reviews'] });
       toast.error('Erro ao publicar feedback: ' + (error.message || 'Verifique a configuração'));
     },
   });
@@ -759,30 +737,11 @@ export default function CheckinReview() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            {checkinResponse?.client_id && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => patchV2.mutate()}
-                disabled={patchV2.isPending}
-                className="gap-2"
-                title="Aplica um ajuste incremental (patch) ao plano v2 — carbload e orientações — sem regenerar o plano"
-              >
-                {patchV2.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                <span className="hidden sm:inline">Ajuste rápido (v2)</span>
-              </Button>
-            )}
-            {checkinResponse?.client_id && (
-              <Button
-                size="sm"
-                onClick={() => navigate(`/meal-plans/${checkinResponse.client_id}?fromCheckin=1`)}
-                className="gap-2"
-              >
-                <Brain className="h-4 w-4" />
-                <span className="hidden sm:inline">Ajustar plano com IA</span>
-              </Button>
-            )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="min-h-11" onClick={() => setActiveTab('feedback')}>Preparar feedback</Button>
+            <details className="rounded-lg border border-border px-3">
+              <summary className="cursor-pointer py-3 text-sm">Exportar</summary>
+              <div className="flex flex-wrap gap-2 pb-3">
             {checkinResponse?.client_id && (
               <Button
                 variant="outline"
@@ -801,6 +760,8 @@ export default function CheckinReview() {
               athleteProfile={athleteProfile as any}
               targetRaceDays={targetRaceDays}
             />
+              </div>
+            </details>
             <Button
               variant="outline"
               size="sm"
@@ -808,9 +769,9 @@ export default function CheckinReview() {
               className="gap-2 text-green-600 border-green-600/30 hover:bg-green-600/10"
             >
               <Phone className="h-4 w-4" />
-              <span className="hidden sm:inline">WhatsApp</span>
+              <span>WhatsApp</span>
             </Button>
-            {getStatusBadge(feedback?.status)}
+            <Badge variant="outline">{checkinWorkflow(checkinResponse || {}, feedback).label}</Badge>
           </div>
         </div>
 
@@ -1260,7 +1221,7 @@ export default function CheckinReview() {
                     onChange={(e) => setEditedFeedback(e.target.value)}
                     placeholder="Escreva ou edite o feedback para o atleta..."
                     rows={6}
-                    disabled={feedback?.status === 'sent'}
+                    disabled={checkinWorkflow(checkinResponse || {}, feedback).resolved}
                   />
                   <p className="text-xs text-muted-foreground">
                     {editedFeedback.length}/500 caracteres
@@ -1268,7 +1229,7 @@ export default function CheckinReview() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 justify-end">
-                  {feedback?.status !== 'sent' && (
+                  {!checkinWorkflow(checkinResponse || {}, feedback).resolved && (
                     <>
                       {/* Finalizar sem enviar WhatsApp */}
                       <Button

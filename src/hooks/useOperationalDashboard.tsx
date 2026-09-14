@@ -12,6 +12,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useHolidays } from '@/hooks/useHolidays';
+import { fetchOpenCheckins } from '@/lib/checkinInbox';
+import { checkinWorkflow } from '@/lib/checkinWorkflow';
 import { getAthleteState } from '@/lib/athleteState';
 import {
   dedupeOperations,
@@ -59,26 +61,10 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
 
   // ---------- 1. Check-ins respondidos sem devolutiva ----------
   if (operationalIds.length) {
-    const { data: responses } = await supabase
-      .from('checkin_responses')
-      .select('id, client_id, submitted_at')
-      .in('client_id', operationalIds)
-      .order('submitted_at', { ascending: false })
-      .limit(200);
-
-    const ids = (responses || []).map((r: any) => r.id);
-    let answered = new Set<string>();
-    if (ids.length) {
-      const { data: feedbacks } = await supabase
-        .from('checkin_feedbacks')
-        .select('checkin_response_id')
-        .in('checkin_response_id', ids);
-      answered = new Set((feedbacks || []).map((f: any) => f.checkin_response_id));
-    }
+    const responses = await fetchOpenCheckins(userId);
 
     for (const r of responses || []) {
       const row = r as any;
-      if (answered.has(row.id)) continue;
       const c = byId.get(row.client_id);
       if (!c) continue;
       ops.push({
@@ -87,7 +73,8 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
         clientId: row.client_id,
         clientName: c.name,
         clientPhone: c.phone,
-        title: 'Devolutiva do check-in',
+        title: checkinWorkflow(r, r.feedback).action,
+        subtitle: checkinWorkflow(r, r.feedback).label,
         dueDate: slaDueDate(row.submitted_at, SLA_BUSINESS_DAYS.checkin_review!, holidays),
         createdAt: row.submitted_at,
         route: `/checkin-review/${row.id}`,
@@ -97,50 +84,8 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
     }
   }
 
-  // ---------- 2. Planos alimentares pendentes ----------
-  const { data: pendingPlans } = await supabase
-    .from('meal_plan_status')
-    .select('id, client_id, created_at')
-    .eq('user_id', userId)
-    .eq('status', 'pending');
-
-  const planClientIds = (pendingPlans || []).map((p: any) => p.client_id);
-  const anamneseByClient = new Map<string, { id: string; submitted_at: string }>();
-  if (planClientIds.length) {
-    const { data: anamneses } = await supabase
-      .from('anamnese_responses')
-      .select('id, client_id, submitted_at')
-      .in('client_id', planClientIds)
-      .order('submitted_at', { ascending: false });
-    for (const a of anamneses || []) {
-      const row = a as any;
-      if (row.client_id && !anamneseByClient.has(row.client_id)) {
-        anamneseByClient.set(row.client_id, { id: row.id, submitted_at: row.submitted_at });
-      }
-    }
-  }
-
-  for (const p of pendingPlans || []) {
-    const row = p as any;
-    const c = byId.get(row.client_id);
-    if (!c || !c.state.canReceiveMealPlanActions) continue;
-    const anamnese = anamneseByClient.get(row.client_id);
-    const ref = anamnese?.submitted_at || row.created_at;
-    ops.push({
-      id: `meal_plan:${row.id}`,
-      kind: 'meal_plan',
-      clientId: row.client_id,
-      clientName: c.name,
-      clientPhone: c.phone,
-      title: 'Montar e enviar plano alimentar',
-      subtitle: anamnese ? 'Anamnese respondida' : 'Sem anamnese vinculada',
-      dueDate: slaDueDate(ref, SLA_BUSINESS_DAYS.meal_plan!, holidays),
-      createdAt: ref,
-      route: `/meal-plans/${row.client_id}`,
-      sourceType: 'meal_plan_status',
-      sourceId: row.id,
-    });
-  }
+  // Plano alimentar é operado no Zona Nutri. O editor antigo continua em
+  // Configurações para consulta do histórico, sem gerar tarefas automáticas aqui.
 
   // ---------- 3. Anamneses sem atleta vinculado ----------
   const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString();
@@ -193,7 +138,7 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
       subtitle: row.scheduled_date ? `Consulta prevista para ${row.scheduled_date}` : undefined,
       dueDate: row.send_link_date,
       createdAt: null,
-      route: '/scheduling/periodicity',
+      route: '/calendar?tab=periodicity',
       sourceType: 'consultation_schedule',
       sourceId: row.id,
     });
@@ -228,7 +173,7 @@ async function fetchOperations(userId: string, holidays: HolidaySet): Promise<Op
       clientId: row.client_id,
       clientName: c.name,
       clientPhone: c.phone,
-      title: 'Revisão do plano (ciclo de 4 semanas)',
+      title: 'Revisar acompanhamento',
       subtitle: row.missing_information ? `Falta: ${row.missing_information}` : checkinNote,
       dueDate: row.scheduled_for,
       createdAt: null,

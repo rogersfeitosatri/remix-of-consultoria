@@ -33,9 +33,10 @@ interface ManualBookingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  initialClientId?: string;
 }
 
-export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBookingDialogProps) {
+export function ManualBookingDialog({ open, onOpenChange, onSuccess, initialClientId }: ManualBookingDialogProps) {
   const { user } = useAuth();
   const { data: clients = [] } = useClients();
   const { data: settings } = useSchedulingSettings();
@@ -43,6 +44,9 @@ export function ManualBookingDialog({ open, onOpenChange, onSuccess }: ManualBoo
   const { data: timeBlocks = [] } = useTimeBlocks(settings?.id);
   
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  useEffect(() => {
+    if (open) { setSelectedClientId(initialClientId || ''); setClientSearch(''); }
+  }, [open, initialClientId]);
   const [clientSearch, setClientSearch] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string>('');
