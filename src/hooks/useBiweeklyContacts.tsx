@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { contactCycleDays } from '@/lib/contactCadence';
+import { toast } from 'sonner';
 import { getAthleteState } from '@/lib/athleteState';
 
 // Contato quinzenal: além dos check-ins, um "oi" no WhatsApp a cada ~14 dias
@@ -12,8 +14,9 @@ export interface ContactRow {
   id: string;
   name: string;
   phone: string | null;
-  lastContactedAt: string | null; // ISO ou null (nunca)
-  daysSince: number | null;       // null = nunca
+  lastContactedAt: string | null; // ISO ou null (sem registro)
+  daysSince: number | null;       // null = sem registro
+  cycleDays: number;
   done: boolean;                  // contatado dentro do ciclo atual
 }
 
@@ -36,6 +39,7 @@ export function useBiweeklyContacts() {
         .from('clients')
         .select('id, name, phone, is_active, is_frozen, archived_at, ended_at, end_date, service_type, athlete_status')
         .eq('user_id', user!.id)
+        .neq('id', '24fb6e32-b1e1-4101-9943-d3fcff32e5c9')
         .order('name');
       if (cErr) throw cErr;
       // ETAPA 2B — estado operacional canônico.
@@ -44,23 +48,25 @@ export function useBiweeklyContacts() {
       // 2) Contatos recentes (janela de ~60 dias basta para o ciclo).
       const since = new Date(Date.now() - 60 * 86_400_000).toISOString();
       let contactByClient = new Map<string, string>(); // client_id → último contacted_at
-      try {
-        const { data: contacts } = await (supabase as any)
+      {
+        const { data: contacts, error: contactsError } = await (supabase as any)
           .from('client_contacts')
           .select('client_id, contacted_at')
           .eq('user_id', user!.id)
           .gte('contacted_at', since)
           .order('contacted_at', { ascending: false });
+        if (contactsError) throw contactsError;
         for (const c of (contacts || [])) {
           if (!contactByClient.has(c.client_id)) contactByClient.set(c.client_id, c.contacted_at);
         }
-      } catch { /* tabela pode não existir ainda → todos aparecem como pendentes */ }
+      }
 
       return operational.map((c: any) => {
         const last = contactByClient.get(c.id) ?? null;
         const daysSince = last ? daysBetween(last) : null;
-        const done = daysSince != null && daysSince < CONTACT_CYCLE_DAYS;
-        return { id: c.id, name: c.name, phone: c.phone ?? null, lastContactedAt: last, daysSince, done };
+        const cycleDays = contactCycleDays(c.service_type);
+        const done = daysSince != null && daysSince < cycleDays;
+        return { id: c.id, name: c.name, phone: c.phone ?? null, lastContactedAt: last, daysSince, cycleDays, done };
       });
     },
   });
@@ -76,13 +82,14 @@ export function useBiweeklyContacts() {
         .insert({ user_id: user!.id, client_id: clientId });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['biweekly-contacts', user?.id] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['biweekly-contacts', user?.id] }); toast.success('Contato registrado.'); },
+    onError: () => toast.error('Não foi possível registrar o contato. Tente novamente.'),
   });
 
   const undoContact = useMutation({
     mutationFn: async (clientId: string) => {
       // Remove os contatos do CICLO atual → volta a ser pendente.
-      const cutoff = new Date(Date.now() - CONTACT_CYCLE_DAYS * 86_400_000).toISOString();
+      const cutoff = new Date(Date.now() - (rows.find(row => row.id === clientId)?.cycleDays || CONTACT_CYCLE_DAYS) * 86_400_000).toISOString();
       const { error } = await (supabase as any)
         .from('client_contacts')
         .delete()
@@ -98,6 +105,8 @@ export function useBiweeklyContacts() {
     rows, pending, done,
     total: rows.length,
     isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
     markContacted: (id: string) => markContacted.mutate(id),
     undoContact: (id: string) => undoContact.mutate(id),
   };

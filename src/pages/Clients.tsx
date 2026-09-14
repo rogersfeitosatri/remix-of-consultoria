@@ -438,13 +438,16 @@ export default function Clients() {
           <div className="relative flex-1 sm:max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              aria-label="Buscar atleta por nome, e-mail ou telefone"
               placeholder="Buscar por nome, email ou telefone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
-          <div className="flex flex-wrap gap-2">
+          <details className="rounded-lg border border-border px-3" open={planFilter !== 'all' || serviceFilter !== 'all' || targetRaceFilter !== 'all' || undefined}>
+            <summary className="cursor-pointer py-3 text-sm">Filtros de serviço, plano e prova</summary>
+            <div className="flex flex-wrap gap-2 pb-3">
             <Select value={planFilter} onValueChange={setPlanFilter}>
               <SelectTrigger className="w-[160px]">
                 <Filter className="h-4 w-4 mr-2" />
@@ -484,31 +487,32 @@ export default function Clients() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+            </div>
+          </details>
         </div>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5">
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-5 [&>button]:min-h-11">
             <TabsTrigger value="active" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Ativos</span> ({activeClients.length})
+              <span >Ativos</span> ({activeClients.length})
             </TabsTrigger>
             <TabsTrigger value="frozen" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <Snowflake className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Congelados</span> ({frozenClients.length})
+              <span >Congelados</span> ({frozenClients.length})
             </TabsTrigger>
             <TabsTrigger value="inactive" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <UserX className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Encerrados</span> ({inactiveClients.length})
+              <span >Encerrados</span> ({inactiveClients.length})
             </TabsTrigger>
             <TabsTrigger value="archived" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <Archive className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Arquivados</span> ({archivedClients.length})
+              <span >Arquivados</span> ({archivedClients.length})
             </TabsTrigger>
             <TabsTrigger value="leads" className="gap-1 sm:gap-2 text-xs sm:text-sm">
               <UserPlus className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Leads ZN</span>
+              <span >Novos interessados</span>
             </TabsTrigger>
           </TabsList>
           

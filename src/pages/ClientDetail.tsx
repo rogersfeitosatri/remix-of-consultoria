@@ -1,5 +1,5 @@
 import { invokeManualBooking } from '@/lib/sendManualBooking';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -68,6 +68,8 @@ import { useAthleteLifecycle } from '@/hooks/useAthleteLifecycle';
 import { getAthleteState } from '@/lib/athleteState';
 import { AthleteStateBadges } from '@/components/clients/AthleteStateBadges';
 import { differenceInCalendarDays } from 'date-fns';
+import { CheckinHistoryList } from '@/components/checkin/CheckinHistoryList';
+import { ClientConsultations } from '@/components/clients/ClientConsultations';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -89,7 +91,7 @@ export default function ClientDetail() {
   const fromPeriodization = searchParams.get('from') === 'periodization';
   const fromMealPlanHub = searchParams.get('from') === 'meal-plan-hub';
   const goBack = () => {
-    if (fromPeriodization && clientId) navigate(`/nutritional-periodization?client=${clientId}`);
+    if (fromPeriodization && clientId) navigate(`/periodization?client=${clientId}`);
     else if (fromMealPlanHub && clientId) navigate(`/meal-plans/${clientId}`);
     else navigate('/clients');
   };
@@ -312,7 +314,7 @@ export default function ClientDetail() {
           
           {/* Ações: 3 principais visíveis; o resto no menu para reduzir ruído. */}
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => setShowEditForm(true)} className="gap-1">
+            <Button size="sm" onClick={() => setShowEditForm(true)} className="min-h-11 gap-1">
               <Edit2 className="h-4 w-4" /> Editar
             </Button>
             {client.phone && (
@@ -321,24 +323,20 @@ export default function ClientDetail() {
                 <MessageCircle className="h-4 w-4" /> {sendingCheckin ? '...' : 'Enviar check-in'}
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => handleSendCheckin(true)} disabled={sendingCheckin}>
-              Verificar envio
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleSendBooking(true)} disabled={sendingBooking}>
-              Verificar consulta
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowRenewDialog(true)}
-              className="gap-1 text-primary border-primary/30 hover:bg-primary/10">
-              <RefreshCw className="h-4 w-4" /> Renovar
-            </Button>
+            <Button asChild variant="outline" size="sm" className="min-h-11"><Link to={`/calendar?booking=new&client=${client.id}`}><CalendarCheck className="mr-1 h-4 w-4" />Agendar consulta</Link></Button>
+            <Button asChild variant="outline" size="sm" className="min-h-11"><Link to={`/clients/${client.id}?tab=history`}>Consultar check-ins</Link></Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1">
+                <Button variant="outline" size="sm" className="min-h-11 gap-1">
                   <MoreHorizontal className="h-4 w-4" /> Mais
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => setShowRenewDialog(true)}><RefreshCw className="mr-2 h-4 w-4" />Renovar plano</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSendCheckin(true)} disabled={sendingCheckin}>Verificar envio de check-in</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSendBooking(true)} disabled={sendingBooking}>Verificar convite de consulta</DropdownMenuItem>
+
                 {client.phone && (
                   <DropdownMenuItem onClick={() => handleSendBooking()} disabled={sendingBooking}>
                     <CalendarCheck className="h-4 w-4 mr-2" /> Enviar link de consulta
@@ -441,41 +439,26 @@ export default function ClientDetail() {
           onValueChange={(v) => {
             const params = new URLSearchParams(searchParams);
             params.set('tab', v);
-            setSearchParams(params, { replace: true });
+            setSearchParams(params);
           }}
           className="space-y-4"
         >
-          <TabsList className="flex-wrap h-auto">
-            <TabsTrigger value="timeline" className="gap-2">
-              <History className="h-4 w-4" />
-              Linha do tempo
-            </TabsTrigger>
-            <TabsTrigger value="gestao" className="gap-2">
-              <Settings2 className="h-4 w-4" />
-              Plano &amp; gestão
-            </TabsTrigger>
-            <TabsTrigger value="anamnese" className="gap-2">
-              <ClipboardCheck className="h-4 w-4" />
-              Anamnese
-            </TabsTrigger>
-            <TabsTrigger value="evolution" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Evolução
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2">
-              <MessageCircle className="h-4 w-4" />
-              Check-ins
-            </TabsTrigger>
-            <TabsTrigger value="pipeline" className="gap-2">
-              <GitBranch className="h-4 w-4" />
-              Pipeline
-            </TabsTrigger>
-            <TabsTrigger value="raceprep" className="gap-2">
-              <Trophy className="h-4 w-4" />
-              Preparação de Prova
-            </TabsTrigger>
+          <TabsList className="grid h-auto grid-cols-2 gap-1 sm:grid-cols-4">
+            <TabsTrigger value="timeline" className="min-h-11">Acompanhamento</TabsTrigger>
+            <TabsTrigger value="history" className="min-h-11">Check-ins</TabsTrigger>
+            <TabsTrigger value="consultas" className="min-h-11">Consultas</TabsTrigger>
+            <TabsTrigger value="gestao" className="min-h-11">Plano contratado</TabsTrigger>
           </TabsList>
-          
+          <details className="rounded-lg border border-border px-4">
+            <summary className="cursor-pointer py-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring">Mais informações do atleta</summary>
+            <div className="flex flex-wrap gap-2 pb-4">
+              {[
+                ['anamnese', 'Anamnese'], ['evolution', 'Evolução'], ['raceprep', 'Preparação de prova'], ['pipeline', 'Diagnóstico do cadastro'],
+              ].map(([tab, label]) => <Button key={tab} variant="outline" size="sm" onClick={() => { const params = new URLSearchParams(searchParams); params.set('tab', tab); setSearchParams(params); }}>{label}</Button>)}
+            </div>
+          </details>
+          <TabsContent value="consultas"><ClientConsultations clientId={client.id} /></TabsContent>
+
           <TabsContent value="timeline">
             <div className="glass-card rounded-xl p-4">
               <h3 className="text-sm font-semibold mb-3 text-foreground">Histórico de Interações</h3>
@@ -486,9 +469,6 @@ export default function ClientDetail() {
           {/* Plano & gestão: reúne o que antes ficava empilhado acima das abas. */}
           <TabsContent value="gestao" className="space-y-4">
             <AthleteSummarySection client={client} onEditClient={() => setShowEditForm(true)} />
-            {(client.has_agenda_access || client.plan_type === 'premium') && (
-              <PremiumClientDetails clientId={client.id} clientName={client.name} />
-            )}
             <AthleteCheckinSchedules clientId={client.id} />
             <AsaasSubscriptionCard client={client as any} />
             <PlanHistorySection clientId={client.id} />
@@ -516,34 +496,7 @@ export default function ClientDetail() {
             />
           </TabsContent>
           
-          <TabsContent value="history">
-            <div className="space-y-3">
-              {checkinResponses.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <ClipboardCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Nenhum check-in respondido</p>
-                </div>
-              ) : (
-                checkinResponses.map((response: any) => (
-                  <div 
-                    key={response.id}
-                    onClick={() => navigate(`/clients/${client.id}/history`)}
-                    className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors flex items-center justify-between"
-                  >
-                    <div>
-                      <p className="font-medium">{response.checkin_forms?.title || 'Check-in'}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(parseISO(response.submitted_at), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
-                      </p>
-                    </div>
-                    <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
-                      Respondido
-                    </Badge>
-                  </div>
-                ))
-              )}
-            </div>
-          </TabsContent>
+          <TabsContent value="history"><CheckinHistoryList clientId={client.id} /></TabsContent>
         </Tabs>
       </div>
       

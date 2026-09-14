@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClients } from '@/hooks/useClients';
 import { supabase } from '@/integrations/supabase/client';
+import { checkinWorkflow, type CheckinFeedbackState } from '@/lib/checkinWorkflow';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, startOfMonth, endOfMonth, subMonths, addMonths, isSameDay } from 'date-fns';
@@ -31,7 +32,7 @@ type AuditItem = {
   date: string;
   form_title: string;
   type: 'response' | 'unanswered' | 'cancelled';
-  feedback_status: 'pending' | 'sent' | 'reviewed' | 'no_feedback' | 'unanswered' | 'cancelled';
+  feedback_status: 'pending' | 'sent' | 'published' | 'reviewed' | 'no_feedback' | 'unanswered' | 'cancelled';
   response_id?: string;
   cancel_note?: string;
 };
@@ -56,11 +57,12 @@ export function CheckinAuditTab() {
   const monthEnd = endOfMonth(currentMonth);
 
   const { data: responses = [], isLoading: responsesLoading } = useQuery({
-    queryKey: ['checkin-audit-responses', monthStart.toISOString()],
+    queryKey: ['checkin-audit-responses', user?.id, monthStart.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('checkin_responses')
-        .select('id, client_id, form_id, submitted_at, checkin_forms(title)')
+        .select('id, client_id, form_id, submitted_at, review_status, closed_reason, clients!inner(user_id), checkin_forms(title)')
+        .eq('clients.user_id', user!.id)
         .gte('submitted_at', monthStart.toISOString())
         .lte('submitted_at', monthEnd.toISOString())
         .order('submitted_at', { ascending: false })
@@ -79,7 +81,7 @@ export function CheckinAuditTab() {
       if (responseIds.length === 0) return [];
       const { data, error } = await supabase
         .from('checkin_feedbacks')
-        .select('checkin_response_id, status, sent_at')
+        .select('checkin_response_id, status, publication_status, published_at, sent_at')
         .in('checkin_response_id', responseIds);
       if (error) throw error;
       return data || [];
@@ -164,8 +166,8 @@ export function CheckinAuditTab() {
   }, [clients]);
 
   const feedbackMap = useMemo(() => {
-    const map = new Map<string, { status: string; sent_at: string | null }>();
-    feedbacks.forEach(f => map.set(f.checkin_response_id, { status: f.status, sent_at: f.sent_at }));
+    const map = new Map<string, CheckinFeedbackState>();
+    feedbacks.forEach(f => map.set(f.checkin_response_id, f));
     return map;
   }, [feedbacks]);
 
@@ -189,11 +191,11 @@ export function CheckinAuditTab() {
     responses.forEach(r => {
       const fb = feedbackMap.get(r.id);
       let feedback_status: AuditItem['feedback_status'] = 'no_feedback';
-      if (fb) {
-        if (fb.status === 'sent' && fb.sent_at) feedback_status = 'sent';
-        else if (fb.status === 'sent') feedback_status = 'reviewed';
-        else feedback_status = 'pending';
-      }
+      const state = checkinWorkflow(r, fb);
+      if (fb?.status === 'sent' && fb.sent_at) feedback_status = 'sent';
+      else if (fb?.publication_status === 'published' && fb.published_at) feedback_status = 'published';
+      else if (state.resolved) feedback_status = 'reviewed';
+      else if (fb) feedback_status = 'pending';
       items.push({
         id: r.id,
         client_id: r.client_id,
@@ -292,6 +294,8 @@ export function CheckinAuditTab() {
     switch (status) {
       case 'sent':
         return <Badge className="bg-green-500/20 text-green-700 border-green-500/30"><CheckCircle className="h-3 w-3 mr-1" />Enviado</Badge>;
+      case 'published':
+        return <Badge variant="outline">Publicado</Badge>;
       case 'reviewed':
         return <Badge className="bg-blue-500/20 text-blue-700 border-blue-500/30"><CheckCircle className="h-3 w-3 mr-1" />Conferido</Badge>;
       case 'pending':

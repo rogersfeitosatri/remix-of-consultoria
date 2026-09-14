@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getAthleteState } from '@/lib/athleteState';
+import { fetchOpenCheckins } from '@/lib/checkinInbox';
 
 // Radar de atletas: cruza o CONTRATADO (periodicidade de check-in e consulta)
 // com o REALIZADO (envios, respostas, devolutivas, consultas) e aponta quem
@@ -66,9 +67,10 @@ export function useAthleteRadar() {
       const uid = user!.id;
       const since = new Date(Date.now() - 180 * DAY).toISOString();
 
-      const { data: clientsData } = await supabase.from('clients')
+      const { data: clientsData, error: clientsError } = await supabase.from('clients')
         .select('id, name, phone, checkin_frequency, has_checkin, consultation_frequency, has_consultations, last_consultation_at, is_active, is_frozen, archived_at, ended_at, end_date, service_type, athlete_status')
         .eq('user_id', uid).order('name');
+      if (clientsError) throw clientsError;
       // ETAPA 2B — estado operacional canônico (nada de if espalhado).
       const clients = (clientsData ?? []).filter((c: any) => getAthleteState(c).canAppearInOperationalQueues);
       if (!clients.length) return [];
@@ -76,7 +78,7 @@ export function useAthleteRadar() {
       // ids dos atletas do nutri (que já vieram filtrados por user_id).
       const ids = clients.map((c: any) => c.id);
 
-      const [dispatchRes, respRes, apptRes] = await Promise.all([
+      const [dispatchRes, respRes, apptRes, openResponses] = await Promise.all([
         (supabase as any).from('checkin_dispatches')
           .select('client_id, sent_at').in('client_id', ids).gte('sent_at', since)
           .order('sent_at', { ascending: false }).limit(2000),
@@ -85,9 +87,11 @@ export function useAthleteRadar() {
           .order('submitted_at', { ascending: false }).limit(2000),
         (supabase as any).from('appointments')
           .select('client_id, appointment_date, status').in('client_id', ids)
-          .in('status', ['completed', 'confirmed'])
+          .eq('status', 'completed')
           .order('appointment_date', { ascending: false }).limit(2000),
+        fetchOpenCheckins(uid),
       ]);
+      for (const result of [dispatchRes, respRes, apptRes]) if (result.error) throw result.error;
 
       // Último envio e última resposta por atleta (listas já vêm ordenadas desc).
       const lastSent = new Map<string, string>();
@@ -104,21 +108,9 @@ export function useAthleteRadar() {
         if (!lastAppt.has(a.client_id)) lastAppt.set(a.client_id, a.appointment_date);
       }
 
-      // Respostas SEM devolutiva enviada pelo nutri.
-      const answeredIds = responses.map((r) => r.id);
-      const repliedTo = new Set<string>();
-      if (answeredIds.length) {
-        try {
-          const { data: fb } = await (supabase as any)
-            .from('checkin_feedbacks')
-            .select('checkin_response_id, sent_at')
-            .in('checkin_response_id', answeredIds.slice(0, 1000));
-          for (const f of (fb ?? [])) if (f.sent_at) repliedTo.add(f.checkin_response_id);
-        } catch { /* sem feedbacks → tudo conta como pendente */ }
-      }
+      // Mesma obrigação usada na fila principal, inclusive rascunhos aprovados.
       const pendingByClient = new Map<string, { count: number; oldest: any }>();
-      for (const r of responses) {
-        if (repliedTo.has(r.id)) continue;
+      for (const r of openResponses) {
         const cur = pendingByClient.get(r.client_id);
         // `responses` está desc → o último visto é o mais antigo.
         if (cur) { cur.count += 1; cur.oldest = r; }
@@ -149,7 +141,7 @@ export function useAthleteRadar() {
         if (c.has_checkin && !pend && (dRef == null || dRef > tol)) {
           issues.push({
             kind: 'checkin_atrasado', days: dRef ?? undefined,
-            label: dRef == null ? 'Nunca teve check-in' : `Check-in atrasado (${dRef}d sem movimento)`,
+            label: dRef == null ? 'Sem check-in registrado nesta consulta' : `Check-in atrasado (${dRef}d sem movimento)`,
           });
         }
 
@@ -157,7 +149,7 @@ export function useAthleteRadar() {
         if (c.has_consultations) {
           const ctol = CONSULT_TOLERANCE[c.consultation_frequency ?? ''];
           if (!consultAt) {
-            issues.push({ kind: 'consulta_nunca', label: 'Contratou consulta e nunca realizou' });
+            issues.push({ kind: 'consulta_nunca', label: 'Sem consulta realizada registrada' });
           } else if (ctol) {
             const dc = daysSince(consultAt)!;
             if (dc > ctol) issues.push({ kind: 'consulta_atrasada', days: dc, label: `Consulta atrasada (última há ${dc}d)` });

@@ -38,7 +38,6 @@ export default function Financial() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter = searchParams.get('filter') || 'all';
-  const initialTab = searchParams.get('tab') || 'gestao';
   const startDateParam = searchParams.get('startDate');
   const endDateParam = searchParams.get('endDate');
   
@@ -54,7 +53,8 @@ export default function Financial() {
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [showReceiptScan, setShowReceiptScan] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const activeTab = ['atletas', 'gestao', 'ltv'].includes(searchParams.get('tab') || '') ? searchParams.get('tab')! : 'atletas';
+  const setActiveTab = (tab: string) => { const next = new URLSearchParams(searchParams); next.set('tab', tab); setSearchParams(next); };
   
   const { data: clients = [], isLoading: clientsLoading } = useClients();
   const { data: payments = [], isLoading: paymentsLoading } = usePayments();
@@ -156,7 +156,7 @@ export default function Financial() {
         {/* Header */}
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Financeiro</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Controle financeiro completo</p>
+          <p className="mt-1 text-sm text-muted-foreground">Pagamentos, vencimentos e continuidade dos planos.</p>
         </div>
 
         {/* Period filter (shared) */}
@@ -170,19 +170,9 @@ export default function Financial() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full sm:w-auto">
-            <TabsTrigger value="gestao" className="gap-2">
-              <Wallet className="h-4 w-4" />
-              Gestão Financeira
-            </TabsTrigger>
-            <TabsTrigger value="atletas" className="gap-2">
-              <Users className="h-4 w-4" />
-              Atletas
-            </TabsTrigger>
-            <TabsTrigger value="ltv" className="gap-2">
-              <TrendingUp className="h-4 w-4" />
-              LTV
-            </TabsTrigger>
+          <TabsList className="grid h-auto w-full grid-cols-2 sm:max-w-md">
+            <TabsTrigger value="atletas" className="min-h-11">Pagamentos e planos</TabsTrigger>
+            <TabsTrigger value="gestao" className="min-h-11">Custos e relatórios</TabsTrigger>
           </TabsList>
 
           {/* Gestão Financeira Tab */}
@@ -204,9 +194,11 @@ export default function Financial() {
               onAddNew={() => setShowAddExpense(true)}
             />
 
-            <ManagementCharts filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
-
-            <FinancialInsightsPanel filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
+            <details className="rounded-lg border border-border p-4"><summary className="cursor-pointer font-medium">Ver análises financeiras</summary><div className="mt-4 space-y-6">
+              <ManagementCharts filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
+              <FinancialInsightsPanel filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
+              <LtvDashboard />
+            </div></details>
 
             <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
               <TransactionsList filterStartDate={filterStartDate} filterEndDate={filterEndDate} />
@@ -253,6 +245,13 @@ export default function Financial() {
               </Button>
             </div>
 
+            <AthletePaymentSearch payments={payments} />
+
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
+              <IncomeList payments={incomePayments} title="Entradas Confirmadas" />
+              <ExpiringPlansList clients={expiringPlans} title="Planos Expirando" />
+            </div>
+            <details className="rounded-lg border border-border p-4"><summary className="cursor-pointer font-medium">Ver gráficos do período</summary><div className="mt-4">
             <FinancialCharts
               dailyIncomeData={dailyIncomeData}
               monthlyIncomeData={monthlyIncomeData}
@@ -260,12 +259,7 @@ export default function Financial() {
               monthlyDueData={monthlyDueData}
             />
 
-            <AthletePaymentSearch payments={payments} />
-
-            <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
-              <IncomeList payments={incomePayments} title="Entradas Confirmadas" />
-              <ExpiringPlansList clients={expiringPlans} title="Planos Expirando" />
-            </div>
+            </div></details>
           </TabsContent>
 
           {/* LTV Tab */}

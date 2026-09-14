@@ -1077,7 +1077,10 @@ export function ClientForm({ client, onSubmit, onClose }: ClientFormProps) {
           </div>
 
           {/* Periodização Nutricional + Prova Alvo */}
-          <NpRegistrationSection clientId={client?.id} />
+          <details className="rounded-lg border border-border px-4">
+            <summary className="cursor-pointer py-3 text-sm">Dados nutricionais complementares</summary>
+            <NpRegistrationSection clientId={client?.id} />
+          </details>
 
           {/* Status do Atleta */}
           <div className="grid gap-4 sm:grid-cols-2">

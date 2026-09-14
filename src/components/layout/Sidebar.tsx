@@ -1,162 +1,66 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Wallet, X, LogOut, CalendarDays, Settings, ChevronLeft, ChevronRight, ClipboardList, Clock, FileText, Link, CheckSquare, Activity, Network, ClipboardCheck, PhoneCall, CalendarPlus, SlidersHorizontal, Brain, UtensilsCrossed, Trophy } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, Home, LogOut, Settings, Users, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useLayoutSettings } from '@/hooks/useLayoutSettings';
-import { ViewAsAthleteSelector } from '@/components/layout/ViewAsAthleteSelector';
+import { ViewAsAthleteSelector } from './ViewAsAthleteSelector';
+import { ADMIN_NAVIGATION, getAdminArea } from '@/lib/adminNavigation';
 import logoRFDefault from '@/assets/logo-rf.jpg';
 
-const iconMap: Record<string, any> = {
-  '/admin': LayoutDashboard,
-  '/tasks': CheckSquare,
-  '/clients': Users,
-  '/meal-plans': UtensilsCrossed,
-  '/checkin-hub': ClipboardCheck,
-  '/adjustments': SlidersHorizontal,
-  '/periodization': Activity,
-  '/metabolic-web': Network,
-  '/financial': Wallet,
-  '/calendar': CalendarDays,
-  '/scheduling': Clock,
-  '/content': FileText,
-  '/link-bio': Link,
-  '/forms': ClipboardList,
-  '/calls': PhoneCall,
-  '/scheduling-links': CalendarPlus,
-  '/ai-training': Brain,
-  '/zn-assessoria': Trophy,
-  '/settings': Settings,
-};
+const icons = { '/admin': Home, '/clients': Users, '/checkin-hub': ClipboardCheck, '/calendar': CalendarDays, '/financial': Wallet };
+
+export function AdminNavLinks({ mobile = false, collapsed = false }: { mobile?: boolean; collapsed?: boolean }) {
+  const { pathname } = useLocation();
+  const area = getAdminArea(pathname);
+  return <>{ADMIN_NAVIGATION.map(item => {
+    const Icon = icons[item.key];
+    const active = area === item.key;
+    return (
+      <Link key={item.key} to={item.key} aria-label={item.label} aria-current={active ? 'page' : undefined}
+        title={collapsed ? item.label : undefined}
+        className={cn('flex min-h-11 items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          mobile ? 'min-w-0 flex-col justify-center gap-1 py-2 text-[11px]' : 'gap-3 px-4 py-3 text-sm',
+          collapsed && !mobile && 'justify-center px-2',
+          active ? 'bg-primary/10 font-semibold text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}>
+        <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+        {(!collapsed || mobile) && <span>{item.label}</span>}
+      </Link>
+    );
+  })}</>;
+}
 
 interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ isOpen, onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
-  const location = useLocation();
-  const { signOut, user } = useAuth();
+export function Sidebar({ isCollapsed = false, onToggleCollapse }: SidebarProps) {
+  const { signOut } = useAuth();
   const { settings } = useLayoutSettings();
-
-  const handleSignOut = async () => {
-    await signOut();
-  };
-
-  const logoSrc = settings.logo_url || logoRFDefault;
-  const visibleItems = settings.sidebar_items.filter(item => item.visible);
-
+  const { pathname } = useLocation();
   return (
-    <>
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={onClose}
-        />
-      )}
-      
-      {/* Sidebar */}
-      <aside 
-        className={cn(
-          "fixed left-0 top-0 z-50 h-screen border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-in-out",
-          "lg:translate-x-0 lg:z-40",
-          isOpen ? "translate-x-0" : "-translate-x-full",
-          isCollapsed ? "lg:w-16" : "w-64"
-        )}
-      >
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-            <div className={cn("flex items-center gap-3", isCollapsed && "lg:justify-center lg:w-full")}>
-              <img src={logoSrc} alt={settings.brand_name} className="h-10 w-10 rounded-lg object-cover flex-shrink-0" />
-              <div className={cn("min-w-0", isCollapsed && "lg:hidden")}>
-                <h1 className="text-lg font-bold text-sidebar-foreground truncate">{settings.brand_name}</h1>
-                <p className="text-xs text-muted-foreground">{settings.brand_subtitle}</p>
-              </div>
-            </div>
-            {/* Close button for mobile */}
-            <button 
-              onClick={onClose}
-              className="lg:hidden p-2 rounded-lg hover:bg-sidebar-accent transition-colors"
-            >
-              <X className="h-5 w-5 text-sidebar-foreground" />
-            </button>
-          </div>
-
-          {/* Collapse toggle button - desktop only */}
-          <button
-            onClick={onToggleCollapse}
-            className="hidden lg:flex absolute -right-3 top-20 h-6 w-6 items-center justify-center rounded-full border border-sidebar-border bg-sidebar hover:bg-sidebar-accent transition-colors z-50"
-            title={isCollapsed ? "Expandir menu" : "Recolher menu"}
-          >
-            {isCollapsed ? (
-              <ChevronRight className="h-3 w-3 text-sidebar-foreground" />
-            ) : (
-              <ChevronLeft className="h-3 w-3 text-sidebar-foreground" />
-            )}
-          </button>
-
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 p-4">
-            {visibleItems.map((item) => {
-              const isActive = location.pathname === item.key;
-              const Icon = iconMap[item.key] || LayoutDashboard;
-              return (
-                <NavLink
-                  key={item.key}
-                  to={item.key}
-                  onClick={onClose}
-                  title={isCollapsed ? item.label : undefined}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200',
-                    isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg shadow-primary/20'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                    isCollapsed && 'lg:justify-center lg:px-2'
-                  )}
-                >
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                  <span className={cn("truncate", isCollapsed && "lg:hidden")}>{item.label}</span>
-                </NavLink>
-              );
-            })}
-          </nav>
-
-          {/* Footer with user info and logout */}
-          <div className="border-t border-sidebar-border p-4 space-y-3">
-            {/* View as Athlete — admin preview or a specific athlete */}
-            <ViewAsAthleteSelector isCollapsed={isCollapsed} />
-            
-            {user && !isCollapsed && (
-              <div className="rounded-lg bg-sidebar-accent p-3 lg:block hidden">
-                <p className="text-xs font-medium text-sidebar-accent-foreground truncate">
-                  {user.email}
-                </p>
-              </div>
-            )}
-            {user && (
-              <div className={cn("rounded-lg bg-sidebar-accent p-3 lg:hidden")}>
-                <p className="text-xs font-medium text-sidebar-accent-foreground truncate">
-                  {user.email}
-                </p>
-              </div>
-            )}
-            <button
-              onClick={handleSignOut}
-              title={isCollapsed ? "Sair" : undefined}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors",
-                isCollapsed && "lg:justify-center lg:px-2"
-              )}
-            >
-              <LogOut className="h-5 w-5 flex-shrink-0" />
-              <span className={cn(isCollapsed && "lg:hidden")}>Sair</span>
-            </button>
-          </div>
-        </div>
-      </aside>
-    </>
+    <aside className={cn('fixed inset-y-0 left-0 z-40 hidden border-r border-sidebar-border bg-sidebar lg:flex lg:flex-col', isCollapsed ? 'w-16' : 'w-64')}>
+      <div className="flex h-20 items-center gap-3 px-3">
+        <img src={settings.logo_url || logoRFDefault} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+        {!isCollapsed && <div className="min-w-0"><p className="truncate font-semibold">{settings.brand_name}</p><p className="text-xs text-muted-foreground">Acompanhamento dos atletas</p></div>}
+      </div>
+      <button onClick={onToggleCollapse} aria-label={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
+        className="absolute -right-5 top-20 flex h-11 w-11 items-center justify-center rounded-full border bg-background focus-visible:ring-2 focus-visible:ring-ring">
+        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </button>
+      <nav aria-label="Navegação principal" className="flex-1 space-y-2 overflow-y-auto p-3 pt-8">
+        <AdminNavLinks collapsed={isCollapsed} />
+      </nav>
+      <div className="space-y-2 border-t border-border p-3">
+        <Link to="/settings" title={isCollapsed ? 'Configurações' : undefined} aria-current={getAdminArea(pathname) === '/settings' ? 'page' : undefined}
+          className={cn('flex min-h-11 items-center gap-3 rounded-lg p-3 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring', isCollapsed && 'justify-center')}>
+          <Settings className="h-5 w-5 shrink-0" aria-hidden="true" />{!isCollapsed && 'Configurações'}
+        </Link>
+        <ViewAsAthleteSelector isCollapsed={isCollapsed} />
+        <button onClick={() => signOut()} aria-label="Sair" className={cn('flex min-h-11 w-full items-center gap-3 rounded-lg p-3 text-sm text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring', isCollapsed && 'justify-center')}>
+          <LogOut className="h-5 w-5" aria-hidden="true" />{!isCollapsed && 'Sair'}
+        </button>
+      </div>
+    </aside>
   );
 }
