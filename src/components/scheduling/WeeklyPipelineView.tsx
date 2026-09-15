@@ -7,9 +7,10 @@ import { format, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks, isBefore,
 import { ptBR } from 'date-fns/locale';
 import {
   Send, User, Calendar, Clock, ChevronLeft, ChevronRight, CheckCircle2,
-  AlertTriangle, Video, ExternalLink, RefreshCw, Loader2, Eye, Copy
+  AlertTriangle, Video, ExternalLink, RefreshCw, Loader2, Eye, Copy, Undo2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { decideRow, consultationNumber, WORK_STATES } from '@/lib/consultationRow';
 import { ConsultationSchedule, Client } from '@/hooks/useClients';
 import { Link } from 'react-router-dom';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -28,6 +29,7 @@ interface WeeklyPipelineViewProps {
   appointments: any[];
   onSendLink: (id: string) => void;
   onMarkAsSent: (id: string) => void;
+  onUndoSend: (id: string) => void;
   isSending?: boolean;
 }
 
@@ -108,6 +110,7 @@ export function WeeklyPipelineView({
   appointments,
   onSendLink,
   onMarkAsSent,
+  onUndoSend,
   isSending,
 }: WeeklyPipelineViewProps) {
   const [weekOffset, setWeekOffset] = useState(0);
@@ -302,26 +305,31 @@ export function WeeklyPipelineView({
                   parseISO(apt.appointment_date) >= currentWeekStart
               );
 
-        // Calculate consultation number
-        const clientConsultations = consultations
-          .filter(c => c.client_id === schedule.client_id)
-          .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
-        const index = clientConsultations.findIndex(c => c.id === schedule.id);
-        const total = client?.consultation_count || 0;
-        const consultNum = total > 0 && index >= 0 ? `${index + 1}/${total}` : undefined;
+        // A posição dentro do ciclo atual, não da vida inteira do atleta.
+        const consultNum = consultationNumber(
+          consultations.filter(c => c.client_id === schedule.client_id),
+          schedule.id,
+          client?.start_date,
+          client?.consultation_count,
+        ) ?? undefined;
 
         let status: PipelineStatus;
         if (matchingAppointment) {
           status = statusFromAppointment(matchingAppointment);
         } else if (schedule.status === 'sent' || (schedule.status as string) === 'link_sent') {
-          const daysSince = Math.floor((today.getTime() - sendDate.getTime()) / (1000 * 60 * 60 * 24));
+          const enviadoEm = (schedule as any).link_sent_at
+            ? parseISO((schedule as any).link_sent_at as string)
+            : sendDate;
+          const daysSince = Math.floor((today.getTime() - enviadoEm.getTime()) / (1000 * 60 * 60 * 24));
           status = daysSince >= 3 ? 'no_show' : 'link_sent';
         } else {
           status = 'link_pending';
         }
 
         const daysSinceSent = schedule.status === 'sent' || (schedule.status as string) === 'link_sent'
-          ? Math.floor((today.getTime() - sendDate.getTime()) / (1000 * 60 * 60 * 24))
+          ? Math.max(0, Math.floor((today.getTime() - ((schedule as any).link_sent_at
+              ? parseISO((schedule as any).link_sent_at as string)
+              : sendDate).getTime()) / (1000 * 60 * 60 * 24)))
           : undefined;
 
         items.push({
@@ -426,16 +434,14 @@ export function WeeklyPipelineView({
     ? pipelineItems
     : pipelineItems.filter(i => i.status === statusFilter);
 
-  // Stats
+  // Contadores só do que pede trabalho. O resto da semana continua na lista,
+  // e o histórico tem a sua própria aba — contar tudo aqui só somava ruído.
   const stats = useMemo(() => ({
     total: pipelineItems.length,
     pending: pipelineItems.filter(i => i.status === 'link_pending').length,
-    sent: pipelineItems.filter(i => i.status === 'link_sent').length,
     overdue: pipelineItems.filter(i => i.status === 'no_show').length,
-    booked: pipelineItems.filter(i => i.status === 'booked' || i.status === 'first_consult').length,
     awaitingConfirmation: pipelineItems.filter(i => i.status === 'awaiting_confirmation').length,
-    completed: pipelineItems.filter(i => i.status === 'completed').length,
-    cancelled: pipelineItems.filter(i => i.status === 'cancelled').length,
+    work: pipelineItems.filter(i => WORK_STATES.includes(i.status as any)).length,
   }), [pipelineItems]);
 
   // Past appointments awaiting confirmation (independent of week navigation)
@@ -554,100 +560,57 @@ export function WeeklyPipelineView({
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          {/* Stats bar */}
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={cn(
-                "text-center p-2 rounded-lg border transition-colors",
-                statusFilter === 'all' ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
-              )}
-            >
-              <div className="text-lg font-bold text-foreground">{stats.total}</div>
-              <div className="text-[10px] text-muted-foreground">Total</div>
-            </button>
+          {/* Quatro contadores, e três deles são trabalho de verdade. Os estados
+              já resolvidos continuam na lista e no Histórico — contá-los aqui
+              só enchia a tela de número que não pede nada. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button
               onClick={() => setStatusFilter('link_pending')}
+              aria-pressed={statusFilter === 'link_pending'}
               className={cn(
-                "text-center p-2 rounded-lg border transition-colors",
+                "text-center p-2 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 statusFilter === 'link_pending' ? "border-amber-500 bg-amber-500/5" : "border-border hover:bg-muted/50"
               )}
             >
-              <div className="text-lg font-bold text-amber-600">{stats.pending}</div>
-              <div className="text-[10px] text-muted-foreground">Pendentes</div>
-            </button>
-            <button
-              onClick={() => setStatusFilter('link_sent')}
-              className={cn(
-                "text-center p-2 rounded-lg border transition-colors",
-                statusFilter === 'link_sent' ? "border-blue-500 bg-blue-500/5" : "border-border hover:bg-muted/50"
-              )}
-            >
-              <div className="text-lg font-bold text-blue-600">{stats.sent}</div>
-              <div className="text-[10px] text-muted-foreground">Enviados</div>
+              <div className={cn("text-lg font-bold", stats.pending > 0 ? "text-amber-600" : "text-muted-foreground")}>{stats.pending}</div>
+              <div className="text-[10px] text-muted-foreground">Enviar o link</div>
             </button>
             <button
               onClick={() => setStatusFilter('no_show')}
+              aria-pressed={statusFilter === 'no_show'}
               className={cn(
-                "text-center p-2 rounded-lg border transition-colors",
+                "text-center p-2 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 statusFilter === 'no_show' ? "border-destructive bg-destructive/5" : "border-border hover:bg-muted/50"
               )}
             >
               <div className={cn("text-lg font-bold", stats.overdue > 0 ? "text-destructive" : "text-muted-foreground")}>{stats.overdue}</div>
-              <div className="text-[10px] text-muted-foreground">Não Agendou</div>
-            </button>
-            <button
-              onClick={() => setStatusFilter('booked')}
-              className={cn(
-                "text-center p-2 rounded-lg border transition-colors",
-                statusFilter === 'booked' ? "border-emerald-500 bg-emerald-500/5" : "border-border hover:bg-muted/50"
-              )}
-            >
-              <div className="text-lg font-bold text-emerald-600">{stats.booked}</div>
-              <div className="text-[10px] text-muted-foreground">Agendados</div>
+              <div className="text-[10px] text-muted-foreground">Sem resposta</div>
             </button>
             <button
               onClick={() => setStatusFilter('awaiting_confirmation')}
+              aria-pressed={statusFilter === 'awaiting_confirmation'}
               className={cn(
-                "text-center p-2 rounded-lg border transition-colors",
+                "text-center p-2 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 statusFilter === 'awaiting_confirmation' ? "border-amber-500 bg-amber-500/10" : "border-border hover:bg-muted/50"
               )}
             >
               <div className={cn("text-lg font-bold", stats.awaitingConfirmation > 0 ? "text-amber-700" : "text-muted-foreground")}>{stats.awaitingConfirmation}</div>
-              <div className="text-[10px] text-muted-foreground">A confirmar</div>
+              <div className="text-[10px] text-muted-foreground">Aconteceu?</div>
             </button>
             <button
-              onClick={() => setStatusFilter('completed')}
+              onClick={() => setStatusFilter('all')}
+              aria-pressed={statusFilter === 'all'}
               className={cn(
-                "text-center p-2 rounded-lg border transition-colors",
-                statusFilter === 'completed' ? "border-emerald-500 bg-emerald-500/5" : "border-border hover:bg-muted/50"
+                "text-center p-2 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                statusFilter === 'all' ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
               )}
             >
-              <div className="text-lg font-bold text-emerald-600">{stats.completed}</div>
-              <div className="text-[10px] text-muted-foreground">Realizadas</div>
+              <div className="text-lg font-bold text-foreground">{stats.total}</div>
+              <div className="text-[10px] text-muted-foreground">Semana inteira</div>
             </button>
           </div>
         </CardContent>
       </Card>
-
-      {/* Alert for awaiting confirmation */}
-      {stats.awaitingConfirmation > 0 && statusFilter === 'all' && (
-        <Card className="border-amber-500/50 bg-amber-500/5">
-          <CardContent className="py-3 flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-amber-700">
-                {stats.awaitingConfirmation} consulta{stats.awaitingConfirmation > 1 ? 's' : ''} aguardando sua confirmação
-              </p>
-              <p className="text-xs text-muted-foreground">Marque como Realizada ou Cancelada usando os botões abaixo.</p>
-            </div>
-            <Button size="sm" variant="outline" className="text-xs" onClick={() => setStatusFilter('awaiting_confirmation')}>
-              Ver pendentes
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
 
       {/* Pipeline list */}
       {filteredItems.length === 0 ? (
@@ -666,11 +629,25 @@ export function WeeklyPipelineView({
           {filteredItems.map((item) => {
             const config = STATUS_CONFIG[item.status];
             const StatusIcon = config.icon;
+            const row = decideRow(item.status);
+            // O estado vive no selo, à direita. Aqui fica só o fato concreto
+            // daquele estado — a data marcada, ou há quanto tempo está calado.
+            const detalhe = item.appointmentDate
+              ? `${format(parseISO(item.appointmentDate), "EEE dd/MM", { locale: ptBR })}${item.appointmentTime ? ` às ${item.appointmentTime.substring(0, 5)}` : ''}`
+              : item.status === 'no_show' && item.daysSinceSent !== undefined
+                ? `há ${item.daysSinceSent} ${item.daysSinceSent === 1 ? 'dia' : 'dias'}, sem agendar`
+                : item.status === 'link_sent' && item.daysSinceSent !== undefined
+                  ? (item.daysSinceSent === 0
+                      ? 'enviado hoje'
+                      : `enviado há ${item.daysSinceSent} ${item.daysSinceSent === 1 ? 'dia' : 'dias'}`)
+                  : item.sendDate
+                    ? `previsto para ${format(parseISO(item.sendDate), "dd/MM", { locale: ptBR })}`
+                    : null;
 
             return (
               <Card key={`${item.clientId}-${item.scheduleId || 'apt'}`} className={cn("border", config.bgClass)}>
                 <CardContent className="py-3 px-4">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     {/* Left: Status icon + athlete info */}
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className={cn("rounded-full p-2 shrink-0", config.className)}>
@@ -682,7 +659,7 @@ export function WeeklyPipelineView({
                           {item.client && <PlanTypeBadge client={item.client} />}
                           {item.consultationNumber && (
                             <Badge variant="outline" className="text-[10px] shrink-0">
-                              Consulta #{item.consultationNumber}
+                              Consulta {item.consultationNumber}
                             </Badge>
                           )}
                           {item.status === 'first_consult' && (
@@ -692,60 +669,19 @@ export function WeeklyPipelineView({
                           )}
                         </div>
 
-                        {/* Pipeline progress line */}
-                        <div className="flex items-center gap-1 mt-1 text-[11px] text-muted-foreground">
-                          {/* Step 1: Link */}
-                          {item.scheduleId && (
-                            <>
-                              <span className={cn(
-                                "flex items-center gap-0.5",
-                                item.status === 'link_pending' ? "text-amber-600 font-medium" :
-                                  ['link_sent', 'no_show', 'booked', 'completed'].includes(item.status) ? "text-emerald-600" : ""
-                              )}>
-                                <Send className="h-3 w-3" />
-                                {item.status === 'link_pending' ? 'Pendente' : 'Enviado'}
-                              </span>
-                              <span className="text-muted-foreground/50">→</span>
-                            </>
-                          )}
+                        {/* Uma linha, um fato. A cadeia de três passos dizia o
+                            mesmo estado três vezes, e as três podiam discordar
+                            entre si — era o selo contra a cadeia contra o
+                            "Último link". O estado agora mora só no selo. */}
+                        {detalhe && (
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <Calendar className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{detalhe}</span>
+                          </div>
+                        )}
 
-                          {/* Step 2: Booking */}
-                          <span className={cn(
-                            "flex items-center gap-0.5",
-                            item.status === 'no_show' ? "text-destructive font-medium" :
-                              item.status === 'cancelled' ? "text-muted-foreground line-through" :
-                              item.status === 'link_sent' ? "text-blue-600" :
-                                ['booked', 'completed', 'awaiting_confirmation'].includes(item.status) ? "text-emerald-600" : ""
-                          )}>
-                            <Calendar className="h-3 w-3" />
-                            {item.status === 'no_show' ? `Sem resposta (${item.daysSinceSent}d)` :
-                              item.status === 'link_sent' ? 'Aguardando' :
-                                item.appointmentDate
-                                  ? `${format(parseISO(item.appointmentDate), 'EEE dd/MM', { locale: ptBR })}${item.appointmentTime ? ` ${item.appointmentTime.substring(0, 5)}` : ''}`
-                                  : 'Pendente'}
-                          </span>
-
-                          {/* Step 3: Consultation */}
-                          {['booked', 'completed', 'awaiting_confirmation', 'cancelled'].includes(item.status) && (
-                            <>
-                              <span className="text-muted-foreground/50">→</span>
-                              <span className={cn(
-                                "flex items-center gap-0.5",
-                                item.status === 'completed' ? "text-emerald-600 font-medium" :
-                                  item.status === 'awaiting_confirmation' ? "text-amber-700 font-medium" :
-                                  item.status === 'cancelled' ? "text-muted-foreground" : ""
-                              )}>
-                                <CheckCircle2 className="h-3 w-3" />
-                                {item.status === 'completed' ? 'Realizada' :
-                                  item.status === 'awaiting_confirmation' ? 'Confirmar?' :
-                                  item.status === 'cancelled' ? 'Cancelada' : 'Aguardando'}
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Last link sent + last completed consultation */}
-                        {(item.lastLinkSentAt || item.lastCompletedConsultDate) && (
+                        {/* Só onde ainda há decisão: é o que diz se vale reenviar. */}
+                        {row.needsWork && (item.lastLinkSentAt || item.lastCompletedConsultDate) && (
                           <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground/80">
                             {item.lastLinkSentAt && (
                               <span className="flex items-center gap-0.5">
@@ -765,9 +701,9 @@ export function WeeklyPipelineView({
                     </div>
 
                     {/* Right: Actions */}
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap sm:shrink-0">
                       <Badge variant="outline" className={cn("text-[10px]", config.className)}>
-                        {config.label}
+                        {row.label}
                       </Badge>
 
                       {/* Copy WhatsApp message (exact text sent to athlete) */}
@@ -776,7 +712,8 @@ export function WeeklyPipelineView({
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs gap-1"
-                          title="Copiar mensagem do WhatsApp para envio manual"
+                          title="Copiar a mensagem do WhatsApp"
+                          aria-label="Copiar a mensagem do WhatsApp"
                           onClick={() => handleCopyBookingMessage(item)}
                           disabled={copyingId === item.clientId}
                         >
@@ -805,11 +742,26 @@ export function WeeklyPipelineView({
                         <Button
                           size="sm"
                           variant="ghost"
-                          title="Registrar envio manual (feito fora do sistema)"
+                          title="Registrar um envio feito fora do sistema"
+                          aria-label="Registrar um envio feito fora do sistema"
                           className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
                           onClick={() => onMarkAsSent(item.scheduleId!)}
                         >
                           <CheckCircle2 className="h-3 w-3" />
+                        </Button>
+                      )}
+
+                      {/* Desfazer o registro de envio, para quando ele foi anotado por engano */}
+                      {(item.status === 'link_sent' || item.status === 'no_show') && item.scheduleId && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Desfazer o registro de envio: volta para pendente"
+                          aria-label="Desfazer o registro de envio"
+                          className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => onUndoSend(item.scheduleId!)}
+                        >
+                          <Undo2 className="h-3 w-3" />
                         </Button>
                       )}
 
@@ -858,8 +810,8 @@ export function WeeklyPipelineView({
 
                       {/* Meet link */}
                       {item.meetLink && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" asChild>
-                          <a href={item.meetLink} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" title="Abrir a sala da consulta" asChild>
+                          <a href={item.meetLink} target="_blank" rel="noopener noreferrer" aria-label="Abrir a sala da consulta">
                             <Video className="h-3 w-3" />
                           </a>
                         </Button>
@@ -867,16 +819,16 @@ export function WeeklyPipelineView({
 
                       {/* Appointment detail */}
                       {item.appointmentId && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" asChild>
-                          <Link to={`/appointments/${item.appointmentId}`}>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" title="Abrir a consulta" asChild>
+                          <Link to={`/appointments/${item.appointmentId}`} aria-label="Abrir a consulta">
                             <Eye className="h-3 w-3" />
                           </Link>
                         </Button>
                       )}
 
                       {/* View athlete */}
-                      <Button size="sm" variant="ghost" className="h-7 text-xs" title="Abrir perfil do atleta" asChild>
-                        <Link to={`/clients/${item.clientId}`}>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" title="Abrir o perfil do atleta" asChild>
+                        <Link to={`/clients/${item.clientId}`} aria-label="Abrir o perfil do atleta">
                           <User className="h-3 w-3" />
                         </Link>
                       </Button>

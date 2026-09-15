@@ -1,9 +1,9 @@
 import {handleManualBooking} from '../../supabase/functions/send-manual-booking/handler.ts';
 const id='11111111-1111-4111-8111-111111111111';
 function assert(v:unknown):asserts v {if(!v)throw new Error('Assertion failed');}
-function fixture(o:{dry?:boolean;internal?:boolean;ineligible?:boolean;disconnected?:boolean;duplicate?:boolean;timeout?:boolean;expired?:boolean;reject?:boolean}={}){
+function fixture(o:{dry?:boolean;internal?:boolean;ineligible?:boolean;disconnected?:boolean;duplicate?:boolean;timeout?:boolean;expired?:boolean;reject?:boolean;semCicloAberto?:boolean}={}){
  const writes:any[]=[],calls:string[]=[];
- const reads:any[]=[{id,user_id:'owner',name:'Teste',phone:'55999999999',is_active:true,end_date:'2099-01-01'},[{eligible:!o.ineligible}],{booking_link_slug:'consultoria'},{owner_user_id:'owner'},null,{id:'template',title:'Consulta',body:'Olá {nome}, acesse {booking_link}'},{id:'link',token:'test-token',expires_at:o.expired?'2000-01-01':null},o.duplicate?[{id:'old'}]:[]];
+ const reads:any[]=[o.semCicloAberto?[]:[{id:'ciclo-aberto'}],{id,user_id:'owner',name:'Teste',phone:'55999999999',is_active:true,end_date:'2099-01-01'},[{eligible:!o.ineligible}],{booking_link_slug:'consultoria'},{owner_user_id:'owner'},null,{id:'template',title:'Consulta',body:'Olá {nome}, acesse {booking_link}'},{id:'link',token:'test-token',expires_at:o.expired?'2000-01-01':null},o.duplicate?[{id:'old'}]:[]];
  function builder(table:string){let op='read',payload:any;const chain:any=new Proxy({},{get(_,prop){if(prop==='then')return(resolve:any)=>{if(op==='read')return Promise.resolve({data:reads.shift(),error:null}).then(resolve);writes.push({table,op,payload});return Promise.resolve({data:op==='insert'?{id:'reservation'}:null,error:null}).then(resolve);};return(arg:any)=>{if(prop==='insert'||prop==='update'){op=String(prop);payload=arg;}return chain;};}});return chain;}
  const deps:any={guard:async()=>({ok:true,caller:o.internal?{kind:'internal'}:{kind:'admin',userId:'owner'}}),db:()=>({from:builder,rpc:()=>Promise.resolve({data:reads.shift(),error:null})}),env:()=> 'configured',fetch:async(url:string,init:any)=>{calls.push(url.endsWith('/status')?'status':'send');if(url.endsWith('/status'))return new Response(JSON.stringify({connected:!o.disconnected}));if(o.timeout)throw new Error('timeout');assert(JSON.parse(init.body).message.includes('/agendar/consultoria?bt=test-token'));return new Response(JSON.stringify(o.reject?{error:'rejected'}:{messageId:'provider-id'}),{status:o.reject?400:200});}};
  return{writes,calls,run:()=>handleManualBooking(new Request('https://app.test',{method:'POST',body:JSON.stringify({clientId:id,dryRun:!!o.dry,send:!o.dry})}),deps)};
@@ -16,4 +16,21 @@ Deno.test('booking duplicate is blocked',async()=>{const f=fixture({duplicate:tr
 Deno.test('booking disconnected provider never creates reservation',async()=>{const f=fixture({disconnected:true});assert((await f.run()).status===503);assert(!f.writes.length);});
 Deno.test('booking acceptance records reservation before accepted state',async()=>{const f=fixture();assert((await f.run()).ok);assert(f.writes[0].table==='manual_booking_sends');assert(f.writes[1].payload.status==='sent');assert(f.calls.join()==='status,send');});
 Deno.test('booking timeout keeps reservation and never retries',async()=>{const f=fixture({timeout:true});assert((await f.run()).status===503);assert(f.writes.length===1&&f.calls.join()==='status,send');});
+Deno.test('booking por clientId marca o ciclo aberto com data e procedencia',async()=>{
+ const f=fixture();assert((await f.run()).ok);
+ const agenda=f.writes.find((w:any)=>w.table==='consultation_schedules');
+ assert(agenda);
+ assert(agenda.payload.status==='sent');
+ assert(typeof agenda.payload.link_sent_at==='string');
+ assert(agenda.payload.link_sent_source==='manual_admin');
+ assert(agenda.payload.link_sent_channel==='whatsapp');
+ const log=f.writes.find((w:any)=>w.table==='whatsapp_message_logs');
+ assert(log.payload.consultation_schedule_id==='ciclo-aberto');
+});
+Deno.test('booking sem ciclo aberto envia e nao inventa agenda',async()=>{
+ const f=fixture({semCicloAberto:true});assert((await f.run()).ok);
+ assert(!f.writes.some((w:any)=>w.table==='consultation_schedules'));
+ const log=f.writes.find((w:any)=>w.table==='whatsapp_message_logs');
+ assert(log.payload.consultation_schedule_id===null);
+});
 Deno.test('booking explicit refusal records failed, not sent',async()=>{const f=fixture({reject:true});assert((await f.run()).status===502);assert(f.writes.at(-1).payload.status==='failed');});

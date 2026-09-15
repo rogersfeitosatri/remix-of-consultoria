@@ -225,6 +225,35 @@ export default function CalendarPage() {
     }
   };
 
+  /** Desfaz o registro de envio: a linha volta a pendente, sem apagar a tarefa. */
+  const handleUndoSend = async (id: string) => {
+    try {
+      const schedule = consultations.find(c => c.id === id);
+      const { error } = await supabase
+        .from('consultation_schedules')
+        .update({
+          status: 'pending',
+          link_sent_at: null,
+          link_sent_source: null,
+          link_sent_channel: null,
+          link_sent_by: null,
+        } as any)
+        .eq('id', id);
+      if (error) throw error;
+      await logOperationalEvent({
+        clientId: schedule?.client_id ?? null,
+        entityType: 'consultation_schedule',
+        entityId: id,
+        eventType: 'booking_link_send_undone',
+        metadata: { previous_status: schedule?.status ?? null },
+      });
+      queryClient.invalidateQueries({ queryKey: ['consultation_schedules'] });
+      toast.success('Envio desfeito. A consulta voltou para pendente.');
+    } catch (error) {
+      toast.error('Erro ao desfazer o envio');
+    }
+  };
+
   const handleDeleteSchedule = async (id: string) => {
     try {
       await deleteSchedule.mutateAsync(id);
@@ -399,6 +428,7 @@ export default function CalendarPage() {
                 appointments={appointments}
                 onSendLink={handleSendBookingLink}
                 onMarkAsSent={handleMarkAsSent}
+                onUndoSend={handleUndoSend}
                 isSending={isSending}
               />
             </TabsContent>
