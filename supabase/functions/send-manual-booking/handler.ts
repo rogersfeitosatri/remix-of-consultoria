@@ -23,6 +23,14 @@ export async function handleManualBooking(req: Request, deps = { guard: requireI
       clientId=sch.client_id;scheduleId=sch.id;
     }
     if(!uuid(clientId))return fail('Selecione o atleta.');
+    // O envio pelo perfil do atleta manda só o clientId. Sem resolver o ciclo
+    // aberto aqui, a mensagem sai e a agenda continua marcada como pendente.
+    if(!scheduleId){
+      const {data:aberto}=await s.from('consultation_schedules').select('id')
+        .eq('client_id',clientId).eq('user_id',owner).eq('status','pending').is('appointment_id',null)
+        .order('send_link_date',{ascending:true}).order('scheduled_date',{ascending:true}).limit(1);
+      if(aberto?.length)scheduleId=aberto[0].id;
+    }
     const {data:c,error:ce}=await s.from('clients').select('id,user_id,name,phone,is_active,is_frozen,archived_at,ended_at,end_date').eq('id',clientId).eq('user_id',owner).maybeSingle();
     if(ce||!c)return fail('Atleta não encontrado para este administrador.',403);
     if(!c.is_active||c.is_frozen||c.archived_at||c.ended_at||(c.end_date&&c.end_date<today))return fail('Atleta inativo, congelado ou com plano encerrado.');
@@ -66,7 +74,7 @@ export async function handleManualBooking(req: Request, deps = { guard: requireI
     const {error:ue}=await s.from('manual_booking_sends').update({status:'sent',sent_at:sentAt,provider_id:providerId}).eq('id',r.id);
     if(ue)return fail('A Z-API aceitou o convite, mas o registro ficou pendente. Não repita o envio.',503);
     await s.from('booking_links').update({last_sent_at:sentAt}).eq('id',link.id);
-    if(scheduleId)await s.from('consultation_schedules').update({status:'sent',updated_at:sentAt}).eq('id',scheduleId).eq('user_id',owner);
+    if(scheduleId)await s.from('consultation_schedules').update({status:'sent',link_sent_at:sentAt,link_sent_source:'manual_admin',link_sent_channel:'whatsapp',link_sent_by:owner,updated_at:sentAt}).eq('id',scheduleId).eq('user_id',owner);
     await s.from('whatsapp_message_logs').insert({user_id:owner,client_id:c.id,consultation_schedule_id:scheduleId??null,message_type:'booking_invite',template_key:'weekly_booking_link',to_phone:phone,status:'sent',triggered_by:'manual_admin',metadata:{manual_booking_id:r.id,zapi_response:{messageId:providerId},template_id:template.id}});
     return reply({success:true,accepted:true,message:'Convite de consulta enviado ao WhatsApp. A entrega será confirmada pelo provedor.'});
   } catch {return fail(reservation?'O envio ficou sem confirmação. Confira o histórico antes de repetir.':'Não foi possível verificar o convite agora. Tente novamente.',503);}

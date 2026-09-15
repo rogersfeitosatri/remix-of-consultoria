@@ -7,7 +7,7 @@ import { format, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks, isBefore,
 import { ptBR } from 'date-fns/locale';
 import {
   Send, User, Calendar, Clock, ChevronLeft, ChevronRight, CheckCircle2,
-  AlertTriangle, Video, ExternalLink, RefreshCw, Loader2, Eye, Copy
+  AlertTriangle, Video, ExternalLink, RefreshCw, Loader2, Eye, Copy, Undo2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConsultationSchedule, Client } from '@/hooks/useClients';
@@ -28,6 +28,7 @@ interface WeeklyPipelineViewProps {
   appointments: any[];
   onSendLink: (id: string) => void;
   onMarkAsSent: (id: string) => void;
+  onUndoSend: (id: string) => void;
   isSending?: boolean;
 }
 
@@ -108,6 +109,7 @@ export function WeeklyPipelineView({
   appointments,
   onSendLink,
   onMarkAsSent,
+  onUndoSend,
   isSending,
 }: WeeklyPipelineViewProps) {
   const [weekOffset, setWeekOffset] = useState(0);
@@ -810,6 +812,20 @@ export function WeeklyPipelineView({
                           onClick={() => onMarkAsSent(item.scheduleId!)}
                         >
                           <CheckCircle2 className="h-3 w-3" />
+                        </Button>
+                      )}
+
+                      {/* Desfazer o registro de envio, para quando ele foi anotado por engano */}
+                      {(item.status === 'link_sent' || item.status === 'no_show') && item.scheduleId && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Desfazer o registro de envio: volta para pendente"
+                          aria-label="Desfazer o registro de envio"
+                          className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => onUndoSend(item.scheduleId!)}
+                        >
+                          <Undo2 className="h-3 w-3" />
                         </Button>
                       )}
 

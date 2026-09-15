@@ -50,6 +50,7 @@ export type OperationalEventType =
   | 'question_template_created'
   // ETAPA 4B — calendário operacional
   | 'booking_link_sent_manual'
+  | 'booking_link_send_undone'
   | 'appointment_completed'
   | 'appointment_rescheduled'
   // ETAPA 5A — revisões nutricionais
