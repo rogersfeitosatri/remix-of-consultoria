@@ -31,7 +31,7 @@ export const QUESTION_CATEGORIES = [
   { value: 'sono', label: 'Sono' },
   { value: 'treino', label: 'Treino' },
   { value: 'fome_saciedade', label: 'Fome/Saciedade' },
-  { value: 'comportamento', label: 'Comportamento' },
+  { value: 'comportamental', label: 'Comportamental' },
   { value: 'exames', label: 'Exames' },
   { value: 'suplementacao', label: 'Suplementação' },
   { value: 'alimentacao', label: 'Alimentação' },

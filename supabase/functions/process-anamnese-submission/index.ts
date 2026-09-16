@@ -1,5 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { notifyUser } from "../_shared/fcm.ts";
+import { METANOIA_PARCELAS, METANOIA_PLAN_SLUG, METANOIA_VALOR_PADRAO, camposDoPlanoMetanoia, ehFormularioMetanoia, vigenciaMetanoia } from "../_shared/metanoia.ts";
+import { asaasConfigurado, criarLinkDePagamentoMetanoia } from "../_shared/asaasPaymentLink.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -92,11 +94,15 @@ Deno.serve(async (req) => {
     }
 
     const adminUserId = form.user_id;
+    // Metanóia: o formulário único do programa tem id fixo. Quem responde por ele
+    // entra com o plano de 12 semanas e sai daqui com o link de pagamento.
+    const metanoia = ehFormularioMetanoia(form_id);
+    const env = (key: string) => Deno.env.get(key);
 
     // 2. Search for existing client by email under this admin
     const { data: existingClients } = await supabaseAdmin
       .from("clients")
-      .select("id, name, athlete_status")
+      .select("id, name, athlete_status, onboarding_status")
       .eq("user_id", adminUserId)
       .ilike("email", email)
       .limit(1);
@@ -116,6 +122,13 @@ Deno.serve(async (req) => {
           .eq("id", clientId)
           .is("phone", null);
       }
+      // Metanóia: quem já era atleta entra no programa sem perder o cadastro.
+      if (metanoia && existingClients[0].onboarding_status !== "paid") {
+        await supabaseAdmin
+          .from("clients")
+          .update({ ...camposDoPlanoMetanoia(), ...(extractedPhone ? { phone: extractedPhone } : {}) })
+          .eq("id", clientId);
+      }
     } else {
       // Client doesn't exist — create automatically
       const today = new Date().toISOString().split("T")[0];
@@ -124,23 +137,28 @@ Deno.serve(async (req) => {
       endDate.setMonth(endDate.getMonth() + 3);
       const endDateStr = endDate.toISOString().split("T")[0];
 
+      const novoAtleta: Record<string, unknown> = {
+        user_id: adminUserId,
+        name: name,
+        email: email,
+        phone: extractedPhone,
+        service_type: "nutrition",
+        plan_type: "consultoria",
+        start_date: today,
+        end_date: endDateStr,
+        monthly_value: 0,
+        is_active: true,
+        has_checkin: false,
+        athlete_status: "pending_plan",
+        registration_source: "anamnese_auto",
+      };
+      if (metanoia) {
+        // Nasce inativo: o pagamento confirmado (asaas-webhook) liga o atleta e fixa a vigência.
+        Object.assign(novoAtleta, camposDoPlanoMetanoia(), { is_active: false, end_date: vigenciaMetanoia(today).end_date });
+      }
       const { data: newClient, error: createError } = await supabaseAdmin
         .from("clients")
-        .insert({
-          user_id: adminUserId,
-          name: name,
-          email: email,
-          phone: extractedPhone,
-          service_type: "nutrition",
-          plan_type: "consultoria",
-          start_date: today,
-          end_date: endDateStr,
-          monthly_value: 0,
-          is_active: true,
-          has_checkin: false,
-          athlete_status: "pending_plan",
-          registration_source: "anamnese_auto",
-        })
+        .insert(novoAtleta)
         .select("id")
         .single();
 
@@ -226,12 +244,53 @@ Deno.serve(async (req) => {
       console.warn("Could not update athlete profile anamnese status:", profileUpdateError);
     }
 
+    // 5.0 Metanóia: o link de pagamento do Asaas, um por atleta, reaproveitado
+    // se já existir. Sem chave do Asaas configurada, a resposta fica salva e o
+    // administrador é avisado para mandar o link à mão.
+    let metanoiaPaymentLink: string | null = null;
+    let metanoiaPaymentError: string | null = null;
+    if (metanoia && clientId) {
+      try {
+        const { data: atual } = await supabaseAdmin
+          .from("clients")
+          .select("onboarding_status, asaas_payment_link_url")
+          .eq("id", clientId)
+          .maybeSingle();
+        if (atual?.onboarding_status === "paid") {
+          metanoiaPaymentError = "ja_pago";
+        } else if (atual?.asaas_payment_link_url) {
+          metanoiaPaymentLink = atual.asaas_payment_link_url;
+        } else if (!asaasConfigurado(env)) {
+          metanoiaPaymentError = "asaas_nao_configurado";
+        } else {
+          const { data: plano } = await supabaseAdmin
+            .from("onboarding_plans")
+            .select("price")
+            .eq("slug", METANOIA_PLAN_SLUG)
+            .maybeSingle();
+          const valor = Number(plano?.price) > 0 ? Number(plano!.price) : METANOIA_VALOR_PADRAO;
+          const link = await criarLinkDePagamentoMetanoia(
+            { clientId, nome: name, valor, parcelas: METANOIA_PARCELAS },
+            { fetch, env },
+          );
+          await supabaseAdmin
+            .from("clients")
+            .update({ asaas_payment_link_id: link.id, asaas_payment_link_url: link.url, onboarding_status: "awaiting_payment" })
+            .eq("id", clientId);
+          metanoiaPaymentLink = link.url;
+        }
+      } catch (e: any) {
+        metanoiaPaymentError = e?.message || "falha_ao_gerar_link";
+        console.error("Metanóia: link de pagamento não gerado:", metanoiaPaymentError);
+      }
+    }
+
     // 5.1 If athlete came from public onboarding (has selected_plan + awaiting_anamnese),
     // send the payment link now via WhatsApp.
     // Bloqueio: fluxo ZN Assessoria gerencia pagamento via Asaas — não disparar link MP.
     let paymentLinkSent = false;
     let paymentLinkError: string | null = null;
-    if (source !== "zn") try {
+    if (source !== "zn" && !metanoia) try {
       const { data: clientRow } = await supabaseAdmin
         .from("clients")
         .select("id, name, selected_plan_id, onboarding_status")
@@ -301,6 +360,10 @@ Deno.serve(async (req) => {
           ? `\n💳 Link de pagamento enviado para o atleta.`
           : paymentLinkError
           ? `\n⚠️ Link de pagamento NÃO enviado (${paymentLinkError}).`
+          : metanoia
+          ? (metanoiaPaymentLink
+            ? "\n💳 Metanóia: link de pagamento gerado e mostrado ao atleta."
+            : `\n⚠️ Metanóia: link de pagamento NÃO gerado (${metanoiaPaymentError}). Envie manualmente.`)
           : "";
         const message = clientCreated
           ? `📋 Nova anamnese recebida\n\n👤 ${name}\n📧 ${email}\n\n⚠️ Atleta criado automaticamente — aguardando configuração de plano.${paymentNote}`
@@ -340,6 +403,9 @@ Deno.serve(async (req) => {
         success: true,
         client_id: clientId,
         client_created: clientCreated,
+        metanoia,
+        payment_link: metanoiaPaymentLink,
+        payment_pending: metanoia && !metanoiaPaymentLink ? (metanoiaPaymentError ?? "sem_link") : null,
         message: clientCreated
           ? "Anamnese enviada e atleta criado automaticamente"
           : "Anamnese enviada e vinculada ao atleta existente",

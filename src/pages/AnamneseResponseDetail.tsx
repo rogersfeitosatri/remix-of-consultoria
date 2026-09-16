@@ -16,8 +16,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, Copy, FileText, Brain, CheckCircle, User, Mail, Calendar, RefreshCw, Download, UtensilsCrossed, TrendingUp, Apple, Target, AlertTriangle, Utensils, Pill, Activity, Settings2 } from 'lucide-react';
+import { ArrowLeft, Copy, FileText, FileJson, Brain, CheckCircle, User, Mail, Calendar, RefreshCw, Download, UtensilsCrossed, TrendingUp, Apple, Target, AlertTriangle, Utensils, Pill, Activity, Settings2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { montarPacoteDeAnamnese, nomeDoArquivoDoPacote } from '@/lib/anamnesePackage';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -30,6 +31,7 @@ import { EditableMealPlan } from '@/components/admin/EditableMealPlan';
 
 interface AnamneseQuestion {
   id: string;
+  question_key?: string | null;
   question_text: string;
   question_type: string;
   section: string;
@@ -258,6 +260,42 @@ export default function AnamneseResponseDetail() {
       caloric_deficit: analysis.caloric_deficit,
       updated_at: analysis.updated_at,
     };
+  };
+
+  // O pacote para o zonanutriapp: o mesmo arquivo que a ponte automática envia.
+  // Serve de plano B quando a integração falhar: baixa aqui, importa lá.
+  const baixarPacoteParaOApp = () => {
+    if (!responseData) { toast.error('Nenhum dado para exportar'); return; }
+    const relacoes = responseData as unknown as {
+      anamnese_forms?: { id: string; title: string } | null;
+      clients?: { id: string; name: string; email: string | null; phone: string | null } | null;
+    };
+    const formulario = relacoes.anamnese_forms ?? null;
+    const atleta = relacoes.clients ?? null;
+    const pacote = montarPacoteDeAnamnese({
+      formulario: { id: responseData.form_id, title: formulario?.title ?? 'Anamnese' },
+      resposta: {
+        id: responseData.id,
+        submitted_at: responseData.submitted_at,
+        respondent_name: responseData.respondent_name,
+        respondent_email: responseData.respondent_email,
+        responses: responseData.responses as Record<string, unknown>,
+      },
+      perguntas: questions,
+      atleta,
+    });
+    const blob = new Blob([JSON.stringify(pacote, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeDoArquivoDoPacote(pacote);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success(pacote.nao_mapeadas.length
+      ? `Pacote baixado. ${pacote.nao_mapeadas.length} resposta(s) sem chave ficaram listadas em "nao_mapeadas".`
+      : 'Pacote para o app baixado.');
   };
 
   const generatePDF = async (mode: 'complete' | 'meals' | 'analysis') => {
@@ -505,6 +543,10 @@ export default function AnamneseResponseDetail() {
                     Plano Alimentar IA
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem onClick={baixarPacoteParaOApp} className="gap-2 cursor-pointer">
+                  <FileJson className="h-4 w-4 text-primary" />
+                  Pacote para o app (JSON)
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

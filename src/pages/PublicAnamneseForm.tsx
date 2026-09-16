@@ -114,6 +114,8 @@ export default function PublicAnamneseForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // Metanóia: o envio salvo sem link de pagamento na hora (Asaas indisponível).
+  const [pagamentoPendente, setPagamentoPendente] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [loadingPrevious, setLoadingPrevious] = useState(false);
   const [previousLoaded, setPreviousLoaded] = useState(false);
@@ -459,6 +461,14 @@ export default function PublicAnamneseForm() {
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
 
+      // Metanóia: ao terminar a avaliação, o atleta segue para o pagamento.
+      const paymentLink = typeof data?.payment_link === 'string' ? data.payment_link : null;
+      if (paymentLink) {
+        toast.success('Avaliação enviada! Redirecionando para o pagamento...');
+        window.location.href = paymentLink;
+        return;
+      }
+      setPagamentoPendente(Boolean(data?.metanoia) && !isEditMode);
       setSubmitted(true);
       toast.success(isEditMode ? 'Respostas atualizadas com sucesso!' : 'Anamnese enviada com sucesso!');
     } catch (error: any) {
@@ -830,6 +840,8 @@ export default function PublicAnamneseForm() {
           <p className="text-muted-foreground mb-6">
             {isEditMode
               ? 'Suas respostas foram atualizadas com sucesso. Seu assessor será notificado das alterações.'
+              : pagamentoPendente
+              ? 'Recebemos a sua avaliação. O link para confirmar a sua vaga chega no seu WhatsApp em breve.'
               : 'Suas respostas foram registradas com sucesso. Seu assessor receberá uma notificação.'}
           </p>
           <div className="flex flex-col gap-3">
@@ -866,7 +878,8 @@ export default function PublicAnamneseForm() {
 
           <div className="mb-6">
             <div className="flex justify-between text-sm text-muted-foreground mb-2">
-              <span>Etapa {currentStepIndex + 1} de {wizardSteps.length}</span>
+              {/* Sem total de perguntas: o número assusta quem está começando. A seção situa, o percentual anda. */}
+              <span>{step.kind === 'plan' ? 'Seu plano' : ((step as { question?: { section?: string | null } }).question?.section || 'Sua avaliação')}</span>
               <span>{Math.round(wizProgress)}%</span>
             </div>
             <div className="h-2 w-full rounded-full bg-muted overflow-hidden">

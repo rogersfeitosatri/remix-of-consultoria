@@ -230,7 +230,7 @@ export default function AnamneseFormBuilder() {
         comment_field_required: question.comment_field_required || false,
         comment_field_label: question.comment_field_label || 'Comentário adicional',
         options: question.options || [],
-        scale_min: question.scale_min || 1,
+        scale_min: question.scale_min ?? 1,
         scale_max: question.scale_max || 10,
         info_body: question.config?.body || '',
         info_button_label: question.config?.buttonLabel || 'Vamos lá',

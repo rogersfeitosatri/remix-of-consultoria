@@ -25,7 +25,7 @@ export type AnamneseCompletaType =
   | 'text' | 'textarea' | 'number' | 'date' | 'time' | 'boolean'
   | 'select' | 'multiselect' | 'scale' | 'chips'
   | 'field_group' | 'structured_list' | 'meal_plan_editor'
-  | 'symptom_grid' | 'frequency_grid' | 'file_upload' | 'training_week';
+  | 'symptom_grid' | 'frequency_grid' | 'file_upload' | 'training_week' | 'info';
 
 export interface Condition {
   key?: string;

@@ -91,7 +91,7 @@ export function QuestionBankSection() {
       setQuestionType(template.question_type);
       setCategory(template.category);
       setOptions(template.options?.join('\n') || '');
-      setScaleMin(template.scale_min || 1);
+      setScaleMin(template.scale_min ?? 1);
       setScaleMax(template.scale_max || 10);
       setIsRequired(template.is_required);
       setHasCommentField(template.has_comment_field);
