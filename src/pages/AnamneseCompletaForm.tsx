@@ -236,8 +236,9 @@ export default function AnamneseCompletaForm({ form, questions, clientId }: Prop
       <div className="mb-4 space-y-1">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            Pergunta {Math.min(step + 1, visibleQuestions.length)} de {visibleQuestions.length}
-            {currentQuestion && ` · ${currentQuestion.section}`}
+            {/* Sem total de perguntas: a seção situa, o percentual anda. */}
+            {currentQuestion ? currentQuestion.section : 'Revisão e envio'}
+            {` · ${Math.round(stepProgress)}%`}
           </span>
           {saving ? <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> salvando…</span> : draftId ? <span>rascunho salvo</span> : null}
         </div>

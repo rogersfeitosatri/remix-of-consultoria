@@ -878,7 +878,8 @@ export default function PublicAnamneseForm() {
 
           <div className="mb-6">
             <div className="flex justify-between text-sm text-muted-foreground mb-2">
-              <span>Etapa {currentStepIndex + 1} de {wizardSteps.length}</span>
+              {/* Sem total de perguntas: o número assusta quem está começando. A seção situa, o percentual anda. */}
+              <span>{step.kind === 'plan' ? 'Seu plano' : ((step as { question?: { section?: string | null } }).question?.section || 'Sua avaliação')}</span>
               <span>{Math.round(wizProgress)}%</span>
             </div>
             <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
