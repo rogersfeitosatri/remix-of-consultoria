@@ -326,7 +326,7 @@ export function useCreateDefaultCheckinForm() {
                        template.question_type === 'long_text' ? 'long_text' :
                        template.question_type,
         options: template.options,
-        scale_min: template.scale_min || 1,
+        scale_min: template.scale_min ?? 1,
         scale_max: template.scale_max || 10,
         is_required: template.is_required,
         order_index: index,

@@ -379,7 +379,7 @@ export default function CheckinFormBuilder() {
       question_text: question.question_text,
       question_type: question.question_type,
       options: question.options || [''],
-      scale_min: question.scale_min || 1,
+      scale_min: question.scale_min ?? 1,
       scale_max: question.scale_max || 10,
       is_required: question.is_required,
       is_adjustment_trigger: question.is_adjustment_trigger || false,
