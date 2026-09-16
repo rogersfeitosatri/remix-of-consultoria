@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import fotoNutri from '@/assets/bio-hero.jpg';
 import {
   METANOIA_CONSULTAS_NAS_SEMANAS,
   METANOIA_SEMANAS,
@@ -61,6 +60,33 @@ function BotaoComecar({ className = '' }: { className?: string }) {
   );
 }
 
+const PERGUNTAS = [
+  {
+    pergunta: 'Eu já sei o que comer. Preciso mesmo de acompanhamento?',
+    resposta: 'Saber o que comer nunca foi o problema. O Metanóia trabalha o que acontece entre a vontade e o garfo, que é onde o plano se perde.',
+  },
+  {
+    pergunta: 'Isso não é coisa de psicólogo?',
+    resposta: 'Comer é comportamento, e comportamento alimentar faz parte do trabalho do nutricionista. Quem sente que precisa de psicólogo procura um em paralelo e continua no programa. Um acompanhamento soma ao outro.',
+  },
+  {
+    pergunta: 'Já fiz consultoria e não funcionou.',
+    resposta: 'Você recebeu um plano. Aqui a gente entende por que o plano não se sustentou, e treina isso uma semana de cada vez.',
+  },
+  {
+    pergunta: 'Vou ter que cortar tudo?',
+    resposta: 'Você vai fazer o oposto. A restrição é a origem do descontrole. O caminho é comer o suficiente, com regularidade, e entender os seus gatilhos.',
+  },
+  {
+    pergunta: 'Não tenho tempo pra responder toda semana.',
+    resposta: 'A Pausa da Semana leva uns dez minutos no domingo. É o menor esforço que você já fez pela sua relação com a comida.',
+  },
+  {
+    pergunta: 'Três meses é muito tempo?',
+    resposta: 'Você está no ciclo de restrição e culpa há anos. Doze semanas é o tempo de enxergar o padrão e reaprender.',
+  },
+];
+
 const SEMANAS = Array.from({ length: METANOIA_SEMANAS }, (_, i) => i + 1);
 const CONSULTAS = new Set<number>(METANOIA_CONSULTAS_NAS_SEMANAS);
 
@@ -98,9 +124,9 @@ export default function Metanoia() {
         <section className="mt-hero mt-wrap">
           <div className="mt-hero-text">
             <p className="mt-eyebrow">Programa de 12 semanas para corredores</p>
-            <h1 className="mt-h1">Comer com calma é possível.</h1>
+            <h1 className="mt-h1">Você sabe o que comer. O difícil é sustentar.</h1>
             <p className="mt-lead">
-              Para o corredor que quer seguir a dieta com mais consciência, mais constância e menos culpa.
+              Comer com calma é possível. Um programa de 12 semanas para o corredor que quer manter o resultado com mais consciência, mais constância e menos culpa.
             </p>
             <div className="mt-cta-row">
               <BotaoComecar />
@@ -127,7 +153,7 @@ export default function Metanoia() {
               <li>Treina com disciplina e come no automático.</li>
               <li>Segue o plano até a primeira semana difícil.</li>
               <li>Compensa depois do treino longo e se culpa em seguida.</li>
-              <li>Sabe o que comer. O difícil é sustentar.</li>
+              <li>Já fez todas as dietas. Todas funcionaram por três semanas.</li>
             </ul>
           </div>
           <p className="mt-turn">O Metanóia trabalha o que a planilha não alcança: a sua relação com a comida.</p>
@@ -151,7 +177,7 @@ export default function Metanoia() {
             <div>
               <p className="mt-label">O que a ciência do comportamento mostra</p>
               <p>Gatilho, resposta, recompensa. Repetido, esse ciclo vira um caminho no cérebro. É por isso que a força de vontade cansa.</p>
-              <p>Nosso cérebro se molda pela neuroplasticidade. Com percepção e repetição, ele aprende respostas novas. No acompanhamento, você treina isso por 12 semanas, até seguir a dieta vir da consciência em vez do esforço.</p>
+              <p>Nosso cérebro se molda pela neuroplasticidade. Com percepção e repetição, ele aprende respostas novas. No acompanhamento, você treina isso por 12 semanas, até sustentar o que você já sabe vir da consciência em vez do esforço.</p>
             </div>
           </div>
         </section>
@@ -167,7 +193,7 @@ export default function Metanoia() {
 
         <section className="mt-method mt-wrap" id="metodo">
           <h2 className="mt-h2">Dieta e comportamento, juntos</h2>
-          <p className="mt-intro">A dieta continua, ajustada ao seu treino. O que muda é a forma de se relacionar com ela.</p>
+          <p className="mt-intro">O plano alimentar continua, ajustado ao seu treino. O que muda é a forma de se relacionar com ele.</p>
           <ul className="mt-cols">
             <li><h3 className="mt-h3">Plano alimentar</h3><p>Montado para a sua rotina de corrida e revisado ao longo das 12 semanas.</p></li>
             <li><h3 className="mt-h3">Consciência</h3><p>Perceber fome, saciedade e gatilhos antes de agir no automático.</p></li>
@@ -201,6 +227,18 @@ export default function Metanoia() {
           </div>
         </section>
 
+        <section className="mt-faq mt-wrap" id="duvidas">
+          <h2 className="mt-h2">O que costumam me perguntar</h2>
+          <div className="mt-faq-list">
+            {PERGUNTAS.map((item) => (
+              <details key={item.pergunta}>
+                <summary>{item.pergunta}</summary>
+                <p>{item.resposta}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
         <section className="mt-steps mt-wrap" id="como-comeca">
           <h2 className="mt-h2">Como começa</h2>
           <ol>
@@ -214,24 +252,13 @@ export default function Metanoia() {
           <div className="mt-next-inner">
             <div>
               <p className="mt-label">Próximo passo</p>
-              <p className="mt-big">Vamos conversar.<small>12 semanas · 3 consultas individuais · Pausas da Semana</small></p>
             </div>
             <div>
-              <p className="mt-includes">Me chame no WhatsApp para saber mais e confirmar sua vaga.</p>
               <BotaoComecar />
             </div>
           </div>
         </section>
 
-        <section className="mt-who mt-wrap" aria-label="Quem conduz">
-          <div className="mt-who-inner">
-            <img src={fotoNutri} alt="Rogers Feitosa" width={88} height={88} />
-            <div>
-              <strong>Rogers Feitosa</strong>
-              <p>Nutricionista. Conduz o Metanóia com escuta, ciência e sem julgamento.</p>
-            </div>
-          </div>
-        </section>
       </main>
 
       <footer className="mt-footer">

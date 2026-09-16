@@ -161,20 +161,21 @@
 .mt-steps p { margin: 10px 0 0; color: var(--mt-muted); font-size: 1rem; max-width: 30ch; }
 @media (max-width: 759px) { .mt-steps ol { grid-template-columns: 1fr; gap: 22px; } }
 
+/* perguntas frequentes */
+.mt-faq { padding-block: clamp(56px, 8vw, 104px) 0; }
+.mt-faq-list { border-top: 1px solid var(--mt-teal-soft); }
+.mt-faq details { border-bottom: 1px solid var(--mt-teal-soft); }
+.mt-faq summary { cursor: pointer; list-style: none; padding: 20px 0; font-family: var(--mt-display); font-weight: 500; font-size: 1.15rem; letter-spacing: -0.01em; display: flex; justify-content: space-between; gap: 16px; color: var(--mt-teal); }
+.mt-faq summary::-webkit-details-marker { display: none; }
+.mt-faq summary::after { content: "+"; color: var(--mt-orange); font-weight: 400; font-size: 1.4rem; line-height: 1; flex: none; }
+.mt-faq details[open] summary::after { content: "–"; }
+.mt-faq summary:focus-visible { outline: 3px solid var(--mt-teal); outline-offset: 3px; }
+.mt-faq details p { margin: 0 0 22px; color: var(--mt-muted); font-size: 1.02rem; max-width: 60ch; }
+
 /* próximo passo */
 .mt-next { padding-block: clamp(24px, 4vw, 48px) clamp(64px, 8vw, 104px); }
 .mt-next-inner { border-top: 1px solid var(--mt-teal-soft); border-bottom: 1px solid var(--mt-teal-soft); padding-block: clamp(32px, 4vw, 48px); display: grid; grid-template-columns: 1fr 1fr; gap: clamp(24px, 4vw, 56px); align-items: center; }
-.mt-big { margin: 0; font-family: var(--mt-display); font-weight: 300; font-size: clamp(2.2rem, 4vw, 3.4rem); letter-spacing: -0.03em; line-height: 1; color: var(--mt-teal); }
-.mt-big small { display: block; margin-top: 10px; font-size: 1.05rem; letter-spacing: 0; font-weight: 400; color: var(--mt-muted); font-family: var(--mt-body); line-height: 1.5; }
-.mt-includes { margin: 0 0 22px; font-size: 1.05rem; color: var(--mt-muted); }
 @media (max-width: 759px) { .mt-next-inner { grid-template-columns: 1fr; } }
-
-/* quem conduz */
-.mt-who { padding-block: 0 clamp(64px, 8vw, 104px); }
-.mt-who-inner { display: flex; align-items: center; gap: 24px; }
-.mt-who img { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; object-position: center 20%; flex: none; }
-.mt-who strong { display: block; font-family: var(--mt-display); font-weight: 500; font-size: 1.2rem; letter-spacing: -0.01em; }
-.mt-who p { margin: 4px 0 0; color: var(--mt-muted); max-width: 44ch; }
 
 /* rodapé */
 .mt-footer .mt-wrap { border-top: 1px solid var(--mt-teal-soft); padding-block: 28px 40px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; color: var(--mt-muted); font-size: .9rem; }
