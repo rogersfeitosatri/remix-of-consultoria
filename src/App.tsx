@@ -61,6 +61,7 @@ const QuestionBank = lazy(() => import("./pages/QuestionBank"));
 const AppointmentDetail = lazy(() => import("./pages/AppointmentDetail"));
 const AnamneseResponseDetail = lazy(() => import("./pages/AnamneseResponseDetail"));
 const PlansLanding = lazy(() => import("./pages/PlansLanding"));
+const Metanoia = lazy(() => import("./pages/Metanoia"));
 const PublicMetabolicScreening = lazy(() => import("./pages/PublicMetabolicScreening"));
 const StrategicCallBuilder = lazy(() => import("./pages/StrategicCallBuilder"));
 const StrategicCallResponses = lazy(() => import("./pages/StrategicCallResponses"));
@@ -149,6 +150,7 @@ function AppRoutes() {
         <Route path="/" element={<Auth />} />
         <Route path="/bio" element={<LinkBio />} />
         <Route path="/plans" element={<PlansLanding />} />
+        <Route path="/metanoia" element={<Metanoia />} />
         <Route path="/assessoria" element={<AssessoriaLanding />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/form/:formId" element={<PublicCheckinForm />} />

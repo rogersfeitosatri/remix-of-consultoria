@@ -1,15 +1,8 @@
 import { requireInternal, restrictedCors, serviceClient } from '../_shared/authGuard.ts';
 import { localDay, operational, uuid } from '../_shared/publicCheckin.ts';
 
-export function phoneNumber(raw: string): string | null {
-  let d = (raw || '').replace(/\D/g, '').replace(/^0+/, '');
-  if (d.length >= 14 && d.startsWith('5555')) d = d.slice(2);
-  if (d.length === 10 || d.length === 11) d = '55' + d;
-  return /^55[1-9]\d\d{8,9}$/.test(d) ? d : null;
-}
-export function render(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{?\s*([a-zA-Z_]+)\s*\}?\}/g, (original, key) => vars[key] ?? original);
-}
+import { phoneNumber, render } from '../_shared/whatsappText.ts';
+export { phoneNumber, render };
 type Dependencies = { guard: typeof requireInternal; db: typeof serviceClient; fetch: typeof fetch; env: (key: string) => string | undefined };
 const defaults: Dependencies = { guard: requireInternal, db: serviceClient, fetch, env: key => Deno.env.get(key) };
 
