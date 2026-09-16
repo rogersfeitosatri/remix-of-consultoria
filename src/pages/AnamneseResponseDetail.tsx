@@ -64,7 +64,7 @@ export default function AnamneseResponseDetail() {
         .select(`
           id, client_id, form_id, responses, submitted_at, ai_analysis, ai_analyzed_at,
           respondent_name, respondent_email,
-          clients (id, name, email, phone),
+          clients (id, name, email, phone, start_date, end_date),
           anamnese_forms (id, title)
         `)
         .eq('id', responseId)
@@ -268,7 +268,7 @@ export default function AnamneseResponseDetail() {
     if (!responseData) { toast.error('Nenhum dado para exportar'); return; }
     const relacoes = responseData as unknown as {
       anamnese_forms?: { id: string; title: string } | null;
-      clients?: { id: string; name: string; email: string | null; phone: string | null } | null;
+      clients?: { id: string; name: string; email: string | null; phone: string | null; start_date: string | null; end_date: string | null } | null;
     };
     const formulario = relacoes.anamnese_forms ?? null;
     const atleta = relacoes.clients ?? null;
