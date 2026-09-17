@@ -60,6 +60,55 @@ function BotaoComecar({ className = '' }: { className?: string }) {
   );
 }
 
+const SEMANAS = Array.from({ length: METANOIA_SEMANAS }, (_, i) => i + 1);
+const CONSULTAS = new Set<number>(METANOIA_CONSULTAS_NAS_SEMANAS);
+
+/** "Semanas 1, 5 e 9" — escrito a partir da mesma lista que pinta a régua. */
+const SEMANAS_DE_CONSULTA = METANOIA_CONSULTAS_NAS_SEMANAS
+  .slice(0, -1)
+  .join(', ')
+  .concat(` e ${METANOIA_CONSULTAS_NAS_SEMANAS[METANOIA_CONSULTAS_NAS_SEMANAS.length - 1]}`);
+
+/** A semana do programa, do domingo à consulta. */
+const DIAS = [
+  {
+    titulo: 'Domingo',
+    selo: 'Pausa da Semana',
+    texto: 'Você responde, em uns 10 minutos, perguntas abertas sobre como foi comer, treinar e sentir.',
+  },
+  {
+    titulo: 'Segunda',
+    selo: 'Devolutiva e prática',
+    texto: 'Eu leio a sua Pausa e mando a devolutiva com a prática da semana, escolhida a partir do que você respondeu.',
+  },
+  {
+    titulo: 'Terça a sábado',
+    selo: 'Aplicar e conversar',
+    texto: 'Você aplica a prática no seu dia a dia e fala comigo no WhatsApp quando precisar.',
+  },
+  {
+    titulo: `Semanas ${SEMANAS_DE_CONSULTA}`,
+    selo: 'Consulta individual',
+    texto: 'Encontro por vídeo. Plano alimentar, o que apareceu nas Pausas e ajustes.',
+  },
+];
+
+const RECEBE = [
+  { item: 'Avaliação inicial', detalhe: 'Antes da primeira consulta.' },
+  { item: 'Plano alimentar ajustado ao treino', detalhe: 'Revisado a cada consulta.' },
+  { item: `${METANOIA_CONSULTAS_NAS_SEMANAS.length} consultas individuais por vídeo`, detalhe: `Semanas ${SEMANAS_DE_CONSULTA}.` },
+  { item: `${METANOIA_SEMANAS} Pausas da Semana com a minha devolutiva`, detalhe: null },
+  { item: `${METANOIA_SEMANAS} práticas comportamentais`, detalhe: 'Uma por semana.' },
+  { item: 'WhatsApp direto comigo', detalhe: `Durante as ${METANOIA_SEMANAS} semanas.` },
+];
+
+const DORES = [
+  'treina com disciplina e come no automático.',
+  'segue o plano até a primeira semana difícil.',
+  'compensa depois do treino longo e se culpa em seguida.',
+  'já fez todas as dietas. Todas funcionaram por três semanas.',
+];
+
 const PERGUNTAS = [
   {
     pergunta: 'Eu já sei o que comer. Preciso mesmo de acompanhamento?',
@@ -70,30 +119,21 @@ const PERGUNTAS = [
     resposta: 'Comer é comportamento, e comportamento alimentar faz parte do trabalho do nutricionista. Quem sente que precisa de psicólogo procura um em paralelo e continua no programa. Um acompanhamento soma ao outro.',
   },
   {
-    pergunta: 'Já fiz consultoria e não funcionou.',
-    resposta: 'Você recebeu um plano. Aqui a gente entende por que o plano não se sustentou, e treina isso uma semana de cada vez.',
-  },
-  {
-    pergunta: 'Vou ter que cortar tudo?',
-    resposta: 'Você vai fazer o oposto. A restrição é a origem do descontrole. O caminho é comer o suficiente, com regularidade, e entender os seus gatilhos.',
-  },
-  {
     pergunta: 'Não tenho tempo pra responder toda semana.',
     resposta: 'A Pausa da Semana leva uns dez minutos no domingo. É o menor esforço que você já fez pela sua relação com a comida.',
   },
-  {
-    pergunta: 'Três meses é muito tempo?',
-    resposta: 'Você está no ciclo de restrição e culpa há anos. Doze semanas é o tempo de enxergar o padrão e reaprender.',
-  },
 ];
 
-const SEMANAS = Array.from({ length: METANOIA_SEMANAS }, (_, i) => i + 1);
-const CONSULTAS = new Set<number>(METANOIA_CONSULTAS_NAS_SEMANAS);
+const PASSOS = [
+  { titulo: 'Chame no WhatsApp', texto: 'Você tira suas dúvidas direto comigo.' },
+  { titulo: 'Confirme sua vaga', texto: 'Com a vaga confirmada, você recebe o link da avaliação inicial.' },
+  { titulo: 'Agende a primeira consulta', texto: `A partir daí, caminhamos juntos por ${METANOIA_SEMANAS} semanas.` },
+];
 
 export default function Metanoia() {
   useEffect(() => {
     const tituloAnterior = document.title;
-    document.title = 'Metanóia · Comportamento alimentar';
+    document.title = 'Metanóia';
     if (!document.getElementById(FONTES_ID)) {
       const link = document.createElement('link');
       link.id = FONTES_ID;
@@ -123,10 +163,14 @@ export default function Metanoia() {
       <main>
         <section className="mt-hero mt-wrap">
           <div className="mt-hero-text">
-            <p className="mt-eyebrow">Programa de 12 semanas para corredores</p>
+            <p className="mt-eyebrow">Programa de {METANOIA_SEMANAS} semanas para corredores</p>
             <h1 className="mt-h1">Você sabe o que comer. O difícil é sustentar.</h1>
             <p className="mt-lead">
-              Comer com calma é possível. Um programa de 12 semanas para o corredor que quer manter o resultado com mais consciência, mais constância e menos culpa.
+              Acompanhamento de {METANOIA_SEMANAS} semanas, nutricional e comportamental:{' '}
+              <strong>
+                plano alimentar ajustado ao treino, {METANOIA_CONSULTAS_NAS_SEMANAS.length} consultas, um check-in e uma prática por semana
+              </strong>
+              , e eu no WhatsApp.
             </p>
             <div className="mt-cta-row">
               <BotaoComecar />
@@ -138,79 +182,57 @@ export default function Metanoia() {
           </div>
         </section>
 
-        <section className="mt-facts mt-wrap" aria-label="O que o programa inclui">
-          <ul>
-            <li>3 consultas individuais</li>
-            <li>Pausa da Semana, toda semana</li>
-            <li>12 semanas de acompanhamento</li>
-          </ul>
-        </section>
-
-        <section className="mt-pains mt-wrap" aria-label="Para quem é o programa">
+        <section className="mt-pains mt-wrap mt-rule" aria-label="Para quem é o programa">
           <div className="mt-pains-grid">
-            <h2 className="mt-h2">Talvez você se reconheça</h2>
+            <h2 className="mt-h2">Você</h2>
             <ul>
-              <li>Treina com disciplina e come no automático.</li>
-              <li>Segue o plano até a primeira semana difícil.</li>
-              <li>Compensa depois do treino longo e se culpa em seguida.</li>
-              <li>Já fez todas as dietas. Todas funcionaram por três semanas.</li>
+              {DORES.map((dor) => <li key={dor}>{dor}</li>)}
             </ul>
           </div>
-          <p className="mt-turn">O Metanóia trabalha o que a planilha não alcança: a sua relação com a comida.</p>
+          <p className="mt-big">O Metanóia trabalha o que a planilha não alcança: a sua relação com a comida.</p>
         </section>
 
-        <section className="mt-vision mt-wrap" id="visao" aria-label="Nossa visão">
-          <h2 className="mt-h2">O que faz diferença</h2>
-          <p className="mt-intro">
-            Comer fora do plano quase nunca é falta de informação, de disciplina ou de força de vontade.
-          </p>
-          <p className="mt-label">O que costuma estar por trás</p>
-          <ul className="mt-triggers">
-            <li><strong>Ambiente</strong><span>O que está à vista e ao alcance decide antes de você.</span></li>
-            <li><strong>Hábito</strong><span>A resposta automática que o cérebro aprendeu a repetir.</span></li>
-            <li><strong>Estado emocional</strong><span>Ansiedade, cansaço, estresse. A comida vira alívio.</span></li>
-            <li><strong>Rotina</strong><span>Dias desorganizados pedem soluções rápidas.</span></li>
-            <li><strong>Fome de verdade</strong><span>Fisiológica. Merece ser atendida, sem culpa.</span></li>
-          </ul>
-          <div className="mt-vision-close">
-            <p className="mt-turn">Quando você reconhece o gatilho, a escolha volta a ser sua.</p>
+        <section className="mt-weekin mt-wrap mt-rule" id="como-funciona">
+          <h2 className="mt-h2">Uma semana no Metanóia</h2>
+          <p className="mt-intro">É assim que o acompanhamento acontece, na prática.</p>
+          <ol className="mt-days">
+            {DIAS.map((dia) => (
+              <li key={dia.titulo}>
+                <h3 className="mt-h3">{dia.titulo}<small>{dia.selo}</small></h3>
+                <p>{dia.texto}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-sample">
             <div>
-              <p className="mt-label">O que a ciência do comportamento mostra</p>
-              <p>Gatilho, resposta, recompensa. Repetido, esse ciclo vira um caminho no cérebro. É por isso que a força de vontade cansa.</p>
-              <p>Nosso cérebro se molda pela neuroplasticidade. Com percepção e repetição, ele aprende respostas novas. No acompanhamento, você treina isso por 12 semanas, até sustentar o que você já sabe vir da consciência em vez do esforço.</p>
+              <p className="mt-label">Duas perguntas da Pausa da Semana</p>
+              <blockquote>Em que momento da semana comer foi mais difícil? O que estava acontecendo?</blockquote>
+              <blockquote>Depois do treino longo, o que você comeu e como se sentiu em seguida?</blockquote>
+            </div>
+            <div>
+              <p className="mt-label">Uma prática, por exemplo</p>
+              <blockquote>Antes de cada refeição, dar uma nota de 0 a 10 para a fome. Só perceber, sem mudar nada.</blockquote>
+              <p className="mt-note">A prática muda toda semana, conforme o que aparece na sua Pausa. Nada de cronograma fixo.</p>
             </div>
           </div>
         </section>
 
-        <section className="mt-band" aria-label="O significado de metanóia">
-          <div className="mt-watermark"><Simbolo /></div>
-          <div className="mt-wrap">
-            <p className="mt-word">metanóia</p>
-            <p className="mt-meaning">do grego, mudança de mente.</p>
-            <p className="mt-band-sub">A relação com a comida muda de dentro para fora.</p>
+        <section className="mt-receive mt-wrap mt-rule" id="o-que-recebe">
+          <div className="mt-receive-grid">
+            <h2 className="mt-h2">O que você recebe</h2>
+            <ul>
+              {RECEBE.map((linha) => (
+                <li key={linha.item}>
+                  <div>
+                    <strong>{linha.item}</strong>
+                    {linha.detalhe && <span>{linha.detalhe}</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-        </section>
-
-        <section className="mt-method mt-wrap" id="metodo">
-          <h2 className="mt-h2">Dieta e comportamento, juntos</h2>
-          <p className="mt-intro">O plano alimentar continua, ajustado ao seu treino. O que muda é a forma de se relacionar com ele.</p>
-          <ul className="mt-cols">
-            <li><h3 className="mt-h3">Plano alimentar</h3><p>Montado para a sua rotina de corrida e revisado ao longo das 12 semanas.</p></li>
-            <li><h3 className="mt-h3">Consciência</h3><p>Perceber fome, saciedade e gatilhos antes de agir no automático.</p></li>
-            <li><h3 className="mt-h3">Constância</h3><p>Práticas curtas, toda semana, que fazem a adesão durar.</p></li>
-          </ul>
-        </section>
-
-        <section className="mt-how mt-wrap" id="como-funciona">
-          <h2 className="mt-h2">Como funciona</h2>
-          <ul className="mt-cols">
-            <li><h3 className="mt-h3">Consultas<small>semanas 1, 5 e 9</small></h3><p>Três encontros individuais. Plano alimentar, devolutivas e ajustes.</p></li>
-            <li><h3 className="mt-h3">Pausa da Semana<small>toda semana</small></h3><p>Poucas perguntas para observar como foi comer, treinar e sentir. Você recebe uma devolutiva.</p></li>
-            <li><h3 className="mt-h3">Práticas comportamentais<small>uma por semana</small></h3><p>Uma atividade curta para treinar consciência à mesa e no dia a dia.</p></li>
-            <li><h3 className="mt-h3">Suporte e acompanhamento semanal<small>no WhatsApp</small></h3><p>Um canal direto durante as 12 semanas, sem esperar a próxima consulta.</p></li>
-          </ul>
-          <div className="mt-weeks-wrap" aria-label="As 12 semanas">
-            <p className="mt-label">As 12 semanas</p>
+          <div className="mt-weeks-wrap" aria-label={`As ${METANOIA_SEMANAS} semanas`}>
+            <p className="mt-weeks-title">As {METANOIA_SEMANAS} semanas</p>
             <ol className="mt-weeks">
               {SEMANAS.map((semana) => (
                 <li key={semana} className={CONSULTAS.has(semana) ? 'mt-week mt-consulta' : 'mt-week'}>
@@ -224,6 +246,26 @@ export default function Metanoia() {
               <li><i className="mt-c" />Consulta individual</li>
               <li><i />Pausa da Semana e prática comportamental</li>
             </ul>
+          </div>
+        </section>
+
+        <section className="mt-why mt-wrap mt-rule" id="por-que">
+          <h2 className="mt-h2">Por que funciona</h2>
+          <div className="mt-why-grid">
+            <p className="mt-big">Comer fora do plano quase nunca é falta de informação, de disciplina ou de força de vontade.</p>
+            <div>
+              <p>É gatilho, hábito e estado emocional. Repetido, esse ciclo vira um caminho no cérebro, e é por isso que a força de vontade cansa.</p>
+              <p>Com percepção e repetição, o cérebro aprende respostas novas. É isso que você treina por {METANOIA_SEMANAS} semanas.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-band" aria-label="O significado de metanóia">
+          <div className="mt-watermark"><Simbolo /></div>
+          <div className="mt-wrap">
+            <p className="mt-word">metanóia</p>
+            <p className="mt-meaning">do grego, mudança de mente.</p>
+            <p className="mt-band-sub">A relação com a comida muda de dentro para fora.</p>
           </div>
         </section>
 
@@ -242,32 +284,37 @@ export default function Metanoia() {
         <section className="mt-steps mt-wrap" id="como-comeca">
           <h2 className="mt-h2">Como começa</h2>
           <ol>
-            <li><h3 className="mt-h3">Chame no WhatsApp</h3><p>Você tira suas dúvidas direto comigo, sem compromisso.</p></li>
-            <li><h3 className="mt-h3">Confirme sua vaga</h3><p>Com a vaga confirmada, você recebe o link da avaliação inicial.</p></li>
-            <li><h3 className="mt-h3">Agende a primeira consulta</h3><p>A partir daí, caminhamos juntos por 12 semanas.</p></li>
+            {PASSOS.map((passo) => (
+              <li key={passo.titulo}>
+                <h3 className="mt-h3">{passo.titulo}</h3>
+                <p>{passo.texto}</p>
+              </li>
+            ))}
           </ol>
         </section>
 
-        <section className="mt-next mt-wrap" id="comecar">
-          <div className="mt-next-inner">
+        <section className="mt-invest mt-wrap" id="comecar">
+          <div className="mt-invest-inner">
             <div>
               <p className="mt-label">Próximo passo</p>
+              <p className="mt-big">Chame no WhatsApp. A primeira conversa é sem compromisso.</p>
             </div>
             <div>
               <BotaoComecar />
             </div>
           </div>
         </section>
-
       </main>
 
       <footer className="mt-footer">
         <div className="mt-wrap">
           <a className="mt-brand" href="/metanoia" aria-label="Metanóia">
             <Simbolo />
-            <span className="mt-wordmark">metanóia</span>
+            <span className="mt-wordmark">
+              metanóia<small>comportamento alimentar</small>
+            </span>
           </a>
-          <span>comportamento alimentar</span>
+          <span className="mt-sig">Rogers Feitosa <small>· Nutricionista esportivo · CRN 14885</small></span>
           <span>© {new Date().getFullYear()} Metanóia</span>
         </div>
       </footer>
