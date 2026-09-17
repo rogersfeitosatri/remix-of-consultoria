@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Upload, ZoomIn, Move } from 'lucide-react';
 import { toast } from 'sonner';
+import { erroLegivel } from '@/lib/erroLegivel';
 
 interface ImageUploadDialogProps {
   open: boolean;
@@ -262,9 +263,9 @@ export function ImageUploadDialog({ open, onOpenChange, onImageUploaded, current
       
       // Reset state
       resetState();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Erro ao fazer upload da imagem');
+      toast.error(erroLegivel(error, 'Erro ao fazer upload da imagem'));
     } finally {
       setIsUploading(false);
     }

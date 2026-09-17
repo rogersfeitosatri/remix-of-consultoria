@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useLinkBioItems, useCreateLinkBioItem, useUpdateLinkBioItem, useDeleteLinkBioItem, useReorderLinkBioItems, LinkBioItem } from '@/hooks/useLinkBio';
 import { Plus, Edit, Trash2, ExternalLink, Link as LinkIcon, Loader2, Eye, GripVertical, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { erroLegivel } from '@/lib/erroLegivel';
 import { Link } from 'react-router-dom';
 import { ImageUploadDialog } from '@/components/linkbio/ImageUploadDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -178,7 +179,7 @@ export default function LinkBioManager() {
         await reorderItems.mutateAsync(updates);
         toast.success('Ordem atualizada!');
       } catch (error) {
-        toast.error('Erro ao reordenar links');
+        toast.error(erroLegivel(error, 'Erro ao reordenar links'));
       }
     }
   };
@@ -237,7 +238,7 @@ export default function LinkBioManager() {
       setIsDialogOpen(false);
       resetForm();
     } catch (error) {
-      toast.error('Erro ao salvar link');
+      toast.error(erroLegivel(error, 'Erro ao salvar link'));
     }
   };
 
@@ -248,7 +249,7 @@ export default function LinkBioManager() {
       await deleteItem.mutateAsync(id);
       toast.success('Link excluído com sucesso!');
     } catch (error) {
-      toast.error('Erro ao excluir link');
+      toast.error(erroLegivel(error, 'Erro ao excluir link'));
     }
   };
 
@@ -260,7 +261,7 @@ export default function LinkBioManager() {
       });
       toast.success(item.is_active ? 'Link desativado' : 'Link ativado');
     } catch (error) {
-      toast.error('Erro ao atualizar link');
+      toast.error(erroLegivel(error, 'Erro ao atualizar link'));
     }
   };
 
