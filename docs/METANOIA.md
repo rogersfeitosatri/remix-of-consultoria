@@ -1,7 +1,9 @@
 # Metanóia — programa de comportamento alimentar
 
-Programa de 12 semanas para corredores, operado pela consultoria. O zonanutriapp
-entra só para montar e mostrar o plano alimentar (fases 2 e 3).
+Programa de 12 semanas de comportamento alimentar, aberto ao público geral e
+operado pela consultoria. Quem corre pode somar, como bônus opcional, o
+acompanhamento semanal individual do treino de corrida. O zonanutriapp entra só
+para montar e mostrar o plano alimentar (fases 2 e 3).
 
 ## A jornada do atleta (fase 1)
 

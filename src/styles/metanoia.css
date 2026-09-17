@@ -137,6 +137,7 @@
 .mt-receive-grid li::before { width: 9px; height: 9px; transform: translateY(-1px); }
 .mt-receive-grid strong { display: block; font-family: var(--mt-display); font-weight: 400; font-size: clamp(1.05rem, 1.4vw, 1.25rem); line-height: 1.3; }
 .mt-receive-grid span { display: block; margin-top: 3px; color: var(--mt-muted); font-size: .95rem; }
+.mt-receive-grid strong small { display: block; margin-bottom: 4px; font-family: var(--mt-body); font-weight: 500; font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--mt-orange); }
 @media (max-width: 759px) { .mt-receive-grid { grid-template-columns: 1fr; gap: 24px; } }
 .mt-weeks-wrap { margin-top: clamp(44px, 6vw, 72px); }
 .mt-weeks-title { margin: 0 0 18px; font-family: var(--mt-display); font-weight: 500; font-size: .8rem; letter-spacing: .22em; text-transform: uppercase; color: var(--mt-muted); }
