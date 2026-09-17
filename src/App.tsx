@@ -2,11 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Suspense, lazy, useState, useEffect, createContext, useContext } from "react";
+import { Suspense, lazy, useState, useEffect, createContext, useContext, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
+import { classeDoTema } from "@/lib/temaDaRota";
 
 // Theme context
 export const ThemeContext = createContext<{ theme: string; setTheme: (t: string) => void }>({ theme: 'dark', setTheme: () => {} });
@@ -216,6 +217,16 @@ function AppRoutes() {
   );
 }
 
+/**
+ * A casca que veste o tema do painel. Páginas públicas de paleta própria ficam
+ * de fora dele — veja `classeDoTema`. Ela mora dentro do BrowserRouter porque
+ * precisa da rota atual para decidir.
+ */
+function CascaDoTema({ theme, children }: { theme: string; children: ReactNode }) {
+  const { pathname } = useLocation();
+  return <div className={classeDoTema(pathname, theme)}>{children}</div>;
+}
+
 const App = () => {
   const [theme, setTheme] = useState(() => localStorage.getItem('rf-theme') || 'dark');
 
@@ -227,15 +238,15 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeContext.Provider value={{ theme, setTheme }}>
-          <div className={theme}>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
+          <BrowserRouter>
+            <CascaDoTema theme={theme}>
+              <Toaster />
+              <Sonner />
               <AuthProvider>
                 <AppRoutes />
               </AuthProvider>
-            </BrowserRouter>
-          </div>
+            </CascaDoTema>
+          </BrowserRouter>
         </ThemeContext.Provider>
       </TooltipProvider>
     </QueryClientProvider>

@@ -32,6 +32,9 @@ export interface AtletaDoPacote {
   name?: string | null;
   email?: string | null;
   phone?: string | null;
+  /** As datas do plano na consultoria (`clients.start_date` / `clients.end_date`). */
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 export interface FormularioDoPacote {
@@ -59,6 +62,26 @@ export interface PacoteDeAnamnese {
   respostas: ItemDoPacote[];
   comportamental: { notas: Record<string, number>; abertas: Record<string, string> };
   nao_mapeadas: Array<{ id: string; pergunta: string; resposta: unknown }>;
+  /**
+   * As datas do plano (`YYYY-MM-DD`), quando o atleta está vinculado e as tem:
+   * o app preenche o acesso com elas (o nutricionista ainda pode corrigir na
+   * importação). Sem atleta vinculado, ou com datas fora de ordem, fica nulo.
+   */
+  vigencia: { inicio: string; fim: string } | null;
+}
+
+const DIA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/** `2026-05-11` de um `date` do banco ou de um timestamp; vazio quando não é dia. */
+function diaIso(valor: unknown): string {
+  const dia = typeof valor === 'string' ? valor.trim().slice(0, 10) : '';
+  return DIA_ISO.test(dia) ? dia : '';
+}
+
+export function vigenciaDoAtleta(atleta: AtletaDoPacote | null | undefined): PacoteDeAnamnese['vigencia'] {
+  const inicio = diaIso(atleta?.start_date);
+  const fim = diaIso(atleta?.end_date);
+  return inicio && fim && fim >= inicio ? { inicio, fim } : null;
 }
 
 /** Separa {answer, comment} do valor cru, sem inventar comentário. */
@@ -124,6 +147,7 @@ export function montarPacoteDeAnamnese(entrada: {
     respostas: itens,
     comportamental: { notas, abertas },
     nao_mapeadas: naoMapeadas,
+    vigencia: vigenciaDoAtleta(atleta),
   };
 }
 

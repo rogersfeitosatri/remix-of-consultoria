@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { desdobrarResposta, montarPacoteDeAnamnese, nomeDoArquivoDoPacote } from './anamnesePackage';
+import { desdobrarResposta, montarPacoteDeAnamnese, nomeDoArquivoDoPacote, vigenciaDoAtleta } from './anamnesePackage';
 
 const perguntas = [
   { id: 'q-info', question_key: 'aval_abertura', question_text: 'Agora, sobre a comida', question_type: 'info', section: '7', order_index: 5 },
@@ -26,7 +26,7 @@ describe('pacote de anamnese', () => {
     formulario: { id: 'form-1', title: 'Anamnese Completa · Metanóia', version: 1 },
     resposta: { id: 'r-1', submitted_at: '2026-09-20T13:00:00.000Z', respondent_name: 'Ana', respondent_email: 'ANA@EXEMPLO.COM', responses },
     perguntas,
-    atleta: { id: 'c-1', name: 'Ana Souza', email: 'ana@exemplo.com', phone: '5599999999999' },
+    atleta: { id: 'c-1', name: 'Ana Souza', email: 'ana@exemplo.com', phone: '5599999999999', start_date: '2026-09-21', end_date: '2026-12-13' },
     agora: new Date('2026-09-21T10:00:00.000Z'),
   });
 
@@ -63,6 +63,17 @@ describe('pacote de anamnese', () => {
     });
     expect(solto.atleta).toEqual({ id: null, nome: 'Bia', email: 'bia@x.com', telefone: null });
     expect(solto.respostas).toEqual([]);
+    expect(solto.vigencia).toBeNull();
+  });
+
+  it('leva as datas do plano do atleta vinculado, para o app preencher o acesso', () => {
+    expect(pacote.vigencia).toEqual({ inicio: '2026-09-21', fim: '2026-12-13' });
+    // Um timestamp vira o dia; datas de trás para a frente ou incompletas não viram vigência.
+    expect(vigenciaDoAtleta({ start_date: '2026-05-11T00:00:00+00:00', end_date: '2026-11-11' })).toEqual({ inicio: '2026-05-11', fim: '2026-11-11' });
+    expect(vigenciaDoAtleta({ start_date: '2026-12-13', end_date: '2026-09-21' })).toBeNull();
+    expect(vigenciaDoAtleta({ start_date: '2026-09-21', end_date: null })).toBeNull();
+    expect(vigenciaDoAtleta({ start_date: '21/09/2026', end_date: '13/12/2026' })).toBeNull();
+    expect(vigenciaDoAtleta(null)).toBeNull();
   });
 
   it('nomeia o arquivo pelo atleta e pela data do envio', () => {
