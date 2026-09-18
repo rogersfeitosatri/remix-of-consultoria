@@ -17,6 +17,23 @@
 
     --primary: 43 74% 49%;
     --primary-foreground: 0 0% 8%;
+    /**
+     * O OURO QUE SERVE DE TEXTO — e por que ele não é o mesmo de `--primary`.
+     *
+     * #D9A520 sobre branco dá 2,25:1. O mínimo da WCAG AA para texto é 4,5:1,
+     * então todo `text-primary` deste app reprovava no tema claro: o item
+     * ativo do menu, os rótulos de destaque, os links de ação. Quem enxerga
+     * pouco não lia onde estava.
+     *
+     * O ouro CHEIO continua o de sempre: `bg-primary` leva
+     * `--primary-foreground` por cima e dá 9:1. O que muda é só a tinta, e só
+     * onde ela é tinta.
+     *
+     * 43 74% 30% = #856514, a mesma matiz e quase a mesma saturação, num
+     * degrau mais escuro. Medido: 5,43:1 sobre branco, 4,76:1 sobre `--muted`
+     * e 4,91:1 sobre o `primary/10` do item ativo do menu.
+     */
+    --primary-text: 43 74% 30%;
 
     --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 20%;
@@ -38,7 +55,19 @@
 
     --border: 0 0% 88%;
     --input: 0 0% 88%;
-    --ring: 43 74% 49%;
+    /**
+     * O ANEL DE FOCO PRECISA SER VISTO, e o ouro cheio não era.
+     *
+     * #D9A520 sobre branco dá 2,24:1. O mínimo da WCAG para um componente de
+     * interface é 3:1, e o anel de foco é o mais funcional de todos: é ele que
+     * diz onde o cursor está para quem navega por teclado. Abaixo de 3:1 a
+     * pessoa perde o rastro.
+     *
+     * Ele acompanha `--primary-text` (5,43:1) e não `--primary`. O anel só
+     * aparece no foco, então escurecê-lo não muda a cara do app em repouso —
+     * muda só a hora em que ele precisa ser visto.
+     */
+    --ring: 43 74% 30%;
 
     --radius: 0.75rem;
 
@@ -68,6 +97,10 @@
 
     --primary: 43 74% 49%;
     --primary-foreground: 0 0% 5%;
+    /* NO ESCURO O OURO CHEIO JÁ PASSA: 8,4:1 sobre `--background`. Escurecê-lo
+       aqui seria trocar um texto legível por um ilegível — o problema é do
+       fundo claro, e a correção mora com ele. */
+    --primary-text: 43 74% 49%;
 
     --secondary: 0 0% 14%;
     --secondary-foreground: 40 10% 90%;
@@ -143,6 +176,35 @@
 }
 
 @layer utilities {
+  /**
+   * ==================== O OURO COMO TINTA LÊ-SE ====================
+   *
+   * `text-primary` aparece em 476 lugares. Reescrever os 476 seria trocar um
+   * defeito por uma migração — e a próxima tela escreveria `text-primary` de
+   * novo, porque é o nome óbvio.
+   *
+   * Então a correção mora no NOME: `text-primary` passa a ler
+   * `--primary-text`, que no claro é um degrau mais escuro e no escuro é o
+   * ouro de sempre. Nenhuma chamada muda, e a tela nova herda a correção sem
+   * saber que ela existe.
+   *
+   * O QUE ESTA REGRA NÃO TOCA, de propósito: `bg-primary`, `border-primary`,
+   * `ring-primary` e `from-primary`. Eles continuam no ouro cheio, que é a
+   * marca. O problema nunca foi a cor — foi usá-la como tinta sobre claro.
+   *
+   * As variantes entram junto porque `hover:text-primary` é a MESMA pergunta
+   * num outro momento: um link que só se lê antes de passar o mouse não se lê.
+   */
+  .text-primary,
+  .hover\:text-primary:hover,
+  .focus\:text-primary:focus {
+    color: hsl(var(--primary-text));
+  }
+
+  .file\:text-primary::file-selector-button {
+    color: hsl(var(--primary-text));
+  }
+
   /* Fontes exclusivas da página pública /bio. O resto do app não as usa. */
   .font-bio-display {
     font-family: 'Sora', 'Plus Jakarta Sans', system-ui, sans-serif;
