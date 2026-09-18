@@ -1,5 +1,7 @@
 /**
- * Metanóia — o programa de comportamento alimentar para corredores.
+ * Metanóia — o programa de comportamento alimentar de 12 semanas, aberto ao
+ * público geral. Quem corre pode somar, como bônus, o acompanhamento semanal
+ * individual do treino.
  *
  * Constantes compartilhadas entre a landing (/metanoia), o formulário público
  * e as funções de borda. As funções rodam em Deno e não importam daqui; a

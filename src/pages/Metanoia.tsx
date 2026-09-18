@@ -74,7 +74,7 @@ const DIAS = [
   {
     titulo: 'Domingo',
     selo: 'Pausa da Semana',
-    texto: 'Você responde, em uns 10 minutos, perguntas abertas sobre como foi comer, treinar e sentir.',
+    texto: 'Você responde, em uns 10 minutos, perguntas abertas sobre como foi comer e como você se sentiu na semana.',
   },
   {
     titulo: 'Segunda',
@@ -93,19 +93,21 @@ const DIAS = [
   },
 ];
 
-const RECEBE = [
+const RECEBE: Array<{ item: string; detalhe: string | null; bonus?: boolean }> = [
   { item: 'Avaliação inicial', detalhe: 'Antes da primeira consulta.' },
-  { item: 'Plano alimentar ajustado ao treino', detalhe: 'Revisado a cada consulta.' },
+  { item: 'Plano alimentar ajustado à sua rotina', detalhe: 'Revisado a cada consulta.' },
   { item: `${METANOIA_CONSULTAS_NAS_SEMANAS.length} consultas individuais por vídeo`, detalhe: `Semanas ${SEMANAS_DE_CONSULTA}.` },
   { item: `${METANOIA_SEMANAS} Pausas da Semana com a minha devolutiva`, detalhe: null },
   { item: `${METANOIA_SEMANAS} práticas comportamentais`, detalhe: 'Uma por semana.' },
   { item: 'WhatsApp direto comigo', detalhe: `Durante as ${METANOIA_SEMANAS} semanas.` },
+  // O bônus é opcional: entra para quem corre e quiser somar o treino ao processo.
+  { item: 'Acompanhamento semanal individual do treino de corrida', detalhe: 'Opcional, para quem corre e quiser incluir.', bonus: true },
 ];
 
 const DORES = [
-  'treina com disciplina e come no automático.',
+  'faz tudo certo de dia e come no automático à noite.',
   'segue o plano até a primeira semana difícil.',
-  'compensa depois do treino longo e se culpa em seguida.',
+  'compensa depois de um dia difícil e se culpa em seguida.',
   'já fez todas as dietas. Todas funcionaram por três semanas.',
 ];
 
@@ -121,6 +123,10 @@ const PERGUNTAS = [
   {
     pergunta: 'Não tenho tempo pra responder toda semana.',
     resposta: 'A Pausa da Semana leva uns dez minutos no domingo. É o menor esforço que você já fez pela sua relação com a comida.',
+  },
+  {
+    pergunta: 'Eu corro. O treino entra no programa?',
+    resposta: 'Entra como bônus, se você quiser: acompanhamento semanal individual do treino de corrida, junto com o acompanhamento alimentar. É só me dizer no WhatsApp.',
   },
 ];
 
@@ -163,12 +169,12 @@ export default function Metanoia() {
       <main>
         <section className="mt-hero mt-wrap">
           <div className="mt-hero-text">
-            <p className="mt-eyebrow">Programa de {METANOIA_SEMANAS} semanas para corredores</p>
+            <p className="mt-eyebrow">Programa de {METANOIA_SEMANAS} semanas de comportamento alimentar</p>
             <h1 className="mt-h1">Você sabe o que comer. O difícil é sustentar.</h1>
             <p className="mt-lead">
               Acompanhamento de {METANOIA_SEMANAS} semanas, nutricional e comportamental:{' '}
               <strong>
-                plano alimentar ajustado ao treino, {METANOIA_CONSULTAS_NAS_SEMANAS.length} consultas, um check-in e uma prática por semana
+                plano alimentar ajustado à sua rotina, {METANOIA_CONSULTAS_NAS_SEMANAS.length} consultas, um check-in e uma prática por semana
               </strong>
               , e eu no WhatsApp.
             </p>
@@ -189,7 +195,7 @@ export default function Metanoia() {
               {DORES.map((dor) => <li key={dor}>{dor}</li>)}
             </ul>
           </div>
-          <p className="mt-big">O Metanóia trabalha o que a planilha não alcança: a sua relação com a comida.</p>
+          <p className="mt-big">O Metanóia trabalha o que a dieta não alcança: a sua relação com a comida.</p>
         </section>
 
         <section className="mt-weekin mt-wrap mt-rule" id="como-funciona">
@@ -207,7 +213,7 @@ export default function Metanoia() {
             <div>
               <p className="mt-label">Duas perguntas da Pausa da Semana</p>
               <blockquote>Em que momento da semana comer foi mais difícil? O que estava acontecendo?</blockquote>
-              <blockquote>Depois do treino longo, o que você comeu e como se sentiu em seguida?</blockquote>
+              <blockquote>No fim de um dia difícil, o que você comeu e como se sentiu em seguida?</blockquote>
             </div>
             <div>
               <p className="mt-label">Uma prática, por exemplo</p>
@@ -224,7 +230,7 @@ export default function Metanoia() {
               {RECEBE.map((linha) => (
                 <li key={linha.item}>
                   <div>
-                    <strong>{linha.item}</strong>
+                    <strong>{linha.bonus && <small>Bônus</small>}{linha.item}</strong>
                     {linha.detalhe && <span>{linha.detalhe}</span>}
                   </div>
                 </li>
