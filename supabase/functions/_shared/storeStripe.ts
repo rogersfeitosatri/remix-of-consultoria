@@ -21,7 +21,9 @@ export async function stripeRequest(path: string, deps: Pick<StoreDeps,'env'|'fe
 export function checkoutForm(order: { id: string; buyer_email: string; product_title: string; price_cents: number }) {
   return new URLSearchParams({
     mode: 'payment', client_reference_id: `loja_${order.id}`, customer_email: order.buyer_email,
-    'payment_method_types[0]': 'card', 'line_items[0][price_data][currency]': 'brl',
+    // Stripe manages available methods in Dashboard; explicit method types are
+    // rejected by the current Checkout API. Payment still requires server confirmation.
+    'line_items[0][price_data][currency]': 'brl',
     'line_items[0][price_data][unit_amount]': String(order.price_cents),
     'line_items[0][price_data][product_data][name]': order.product_title,
     'line_items[0][quantity]': '1', 'metadata[store_order_id]': order.id,

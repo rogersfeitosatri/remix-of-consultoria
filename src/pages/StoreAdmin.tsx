@@ -2,14 +2,14 @@ import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { BookOpen, ExternalLink, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Layout } from '@/components/layout/Layout';
+import { StoreLayout } from '@/components/store/StoreLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { getStoreConnection } from '@/integrations/supabase/storeClient';
 import { storeAction, storeDb } from '@/lib/storeApi';
 import { storeCurrency, storeSlug, stripeLink, type StoreProduct } from '@/lib/storeTypes';
 
@@ -20,6 +20,7 @@ function formFor(p?: StoreProduct): Form {
 type Integration = { provider: string; secret_key: boolean; webhook_secret: boolean; ready: boolean; mode: string; webhook_url: string };
 export default function StoreAdmin() {
   const qc = useQueryClient();
+  const connection = getStoreConnection();
   const { toast } = useToast();
   const [tab, setTab] = useState<'books' | 'orders' | 'payments'>('books');
   const [form, setForm] = useState<Form | null>(null);
@@ -75,15 +76,15 @@ export default function StoreAdmin() {
         setBusy('Enviando capa…');
         const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[cover.type];
         const path = `${working.id}/${crypto.randomUUID()}.${ext}`;
-        const { error } = await supabase.storage.from('store-covers').upload(path, cover, { contentType: cover.type, upsert: false });
+        const { error } = await storeDb.storage.from('store-covers').upload(path, cover, { contentType: cover.type, upsert: false });
         if (error) throw error;
-        working.coverUrl = supabase.storage.from('store-covers').getPublicUrl(path).data.publicUrl;
+        working.coverUrl = storeDb.storage.from('store-covers').getPublicUrl(path).data.publicUrl;
         setForm(f => f ? { ...f, coverUrl: working.coverUrl } : null); setCover(null);
       }
       if (pdf) {
         setBusy('Enviando PDF privado…');
         const id = crypto.randomUUID(); const path = `${working.id}/${id}.pdf`;
-        const { error } = await supabase.storage.from('store-originals').upload(path, pdf, { contentType: 'application/pdf', upsert: false });
+        const { error } = await storeDb.storage.from('store-originals').upload(path, pdf, { contentType: 'application/pdf', upsert: false });
         if (error) throw error;
         const { error: fileError } = await storeDb.from('store_product_files').insert({ id, product_id: working.id, storage_path: path, original_name: pdf.name, size_bytes: pdf.size, page_count: pdfPages });
         if (fileError) throw fileError;
@@ -108,7 +109,7 @@ export default function StoreAdmin() {
     else { await qc.invalidateQueries({ queryKey: ['store'] }); toast({ title: 'Livro retirado da loja' }); }
     setBusy('');
   }
-  return <Layout><div className="mx-auto max-w-6xl space-y-7">
+  return <StoreLayout><div className="mx-auto max-w-6xl space-y-7">
     <div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-semibold">Loja digital</h1><p className="mt-1 text-sm text-muted-foreground">Gerencie seus livros e acompanhe as compras.</p></div><div className="flex gap-3"><Button variant="outline" asChild><Link to="/loja" target="_blank">Ver loja<ExternalLink className="ml-2 h-4 w-4" /></Link></Button><Button onClick={() => edit()}><Plus className="mr-2 h-4 w-4" />Cadastrar livro</Button></div></div>
     <div className="flex gap-6 border-b" role="tablist" aria-label="Administração da loja">{([['books','Livros'],['orders','Pedidos'],['payments','Pagamentos']] as const).map(([key,label]) => <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`min-h-11 border-b-2 px-1 pb-3 text-sm ${tab === key ? 'border-primary font-semibold text-primary' : 'border-transparent text-muted-foreground'}`}>{label}</button>)}</div>
     {tab === 'books' && <section aria-label="Livros cadastrados">{products.isPending ? <p>Carregando livros…</p> : products.isError ? <p role="alert">Não foi possível carregar. <button className="underline" onClick={() => products.refetch()}>Tentar novamente</button></p> : !products.data?.length ? <div className="rounded-xl border border-dashed py-16 text-center"><BookOpen className="mx-auto mb-4 h-8 w-8 text-muted-foreground" /><h2 className="font-medium">Cadastre seu primeiro livro</h2><p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">Adicione título, preço, capa e o PDF. Você decide quando ele aparece na loja.</p><Button className="mt-5" onClick={() => edit()}>Cadastrar livro</Button></div>
@@ -116,7 +117,7 @@ export default function StoreAdmin() {
     {tab === 'orders' && <section aria-label="Pedidos da loja"><p className="mb-4 text-sm text-muted-foreground">Últimos 200 pedidos. A liberação é feita pela confirmação de pagamento.</p>{orders.isPending ? <p>Carregando pedidos…</p> : orders.isError ? <p role="alert">Não foi possível carregar os pedidos.</p> : !orders.data?.length ? <p className="py-10 text-muted-foreground">Os pedidos aparecerão aqui após a primeira compra.</p> : <div className="overflow-x-auto rounded-lg border"><table className="w-full text-left text-sm"><thead className="bg-muted"><tr>{['Livro','Comprador','Valor','Status','Data'].map(h => <th className="p-3 font-medium" key={h}>{h}</th>)}</tr></thead><tbody>{orders.data.map(o => <tr key={o.id} className="border-t"><td className="p-3">{o.product_title}</td><td className="p-3">{o.buyer_email}</td><td className="whitespace-nowrap p-3">{storeCurrency(o.price_cents)}</td><td className="p-3">{{ pending:'Pendente', paid:'Pago', refunded:'Reembolsado', disputed:'Contestado', cancelled:'Cancelado' }[o.status]}{o.is_live === false && ' (teste)'}</td><td className="p-3">{new Date(o.created_at).toLocaleDateString('pt-BR')}</td></tr>)}</tbody></table></div>}</section>}
     {tab === 'payments' && <section className="max-w-3xl space-y-5"><h2 className="text-lg font-medium">Stripe</h2><p className="text-sm text-muted-foreground">Cobranças em reais, com cartões brasileiros e internacionais. Você pode cadastrar um Payment Link da Stripe por livro ou deixar o campo vazio para gerar um checkout exclusivo para cada pedido.</p>
       {integration.isPending ? <p>Verificando configuração…</p> : integration.isError ? <p role="alert" className="text-sm">Não foi possível verificar a configuração. <button className="underline" onClick={() => integration.refetch()}>Tentar novamente</button></p> : <div className="space-y-3 rounded-lg border p-5"><p className="font-medium">{integration.data?.ready ? `Configuração disponível · ${integration.data.mode === 'live' ? 'produção' : 'modo de teste'}` : 'Configuração pendente'}</p><p className="text-sm">Chave da Stripe: {integration.data?.secret_key ? 'configurada' : 'pendente'}<br />Assinatura do webhook: {integration.data?.webhook_secret ? 'configurada' : 'pendente'}</p><Button size="sm" variant="outline" onClick={() => integration.refetch()}>Verificar novamente</Button></div>}
-      <details className="rounded-lg border p-5"><summary className="cursor-pointer font-medium">Como ativar os pagamentos</summary><div className="mt-4 space-y-4 text-sm text-muted-foreground"><p>1. No painel da Stripe, obtenha a chave secreta da sua conta. No Supabase, salve-a como <code>STRIPE_SECRET_KEY</code>.</p><p>2. Crie um webhook na Stripe com este endereço:</p><p className="break-all rounded bg-muted p-3 font-mono text-xs">https://ikjntlmpnilxyugidhoz.supabase.co/functions/v1/store-stripe-webhook</p><p>3. Ative os eventos <code>checkout.session.completed</code>, <code>checkout.session.async_payment_succeeded</code>, <code>checkout.session.async_payment_failed</code>, <code>charge.refunded</code> e <code>charge.dispute.created</code>.</p><p>4. Salve a chave de assinatura do webhook como <code>STRIPE_WEBHOOK_SECRET</code> nas secrets do Supabase. Use chaves de teste para testar e chaves de produção para vender.</p><div className="flex flex-wrap gap-4"><a className="underline" href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noreferrer">Abrir Stripe</a><a className="underline" href="https://supabase.com/dashboard/project/ikjntlmpnilxyugidhoz/functions/secrets" target="_blank" rel="noreferrer">Abrir secrets do Supabase</a></div></div></details>
+      <details className="rounded-lg border p-5"><summary className="cursor-pointer font-medium">Como ativar os pagamentos</summary><div className="mt-4 space-y-4 text-sm text-muted-foreground"><p>1. No painel da Stripe, obtenha a chave secreta da sua conta. No Supabase, salve-a como <code>STRIPE_SECRET_KEY</code>.</p><p>2. Crie um webhook na Stripe com este endereço:</p><p className="break-all rounded bg-muted p-3 font-mono text-xs">{integration.data?.webhook_url || connection.webhookUrl}</p><p>3. Ative os eventos <code>checkout.session.completed</code>, <code>checkout.session.async_payment_succeeded</code>, <code>checkout.session.async_payment_failed</code>, <code>charge.refunded</code> e <code>charge.dispute.created</code>.</p><p>4. Salve a chave de assinatura do webhook como <code>STRIPE_WEBHOOK_SECRET</code> nas secrets do Supabase. Use chaves de teste para testar e chaves de produção para vender.</p><div className="flex flex-wrap gap-4"><a className="underline" href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noreferrer">Abrir Stripe</a><a className="underline" href={connection.secretsUrl} target="_blank" rel="noreferrer">Abrir secrets do Supabase</a></div></div></details>
     </section>}
     <Dialog open={!!form} onOpenChange={open => { if (!open && !busy) setForm(null); }}><DialogContent className="max-h-[90svh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle>{form?.existing ? 'Editar livro' : 'Cadastrar livro'}</DialogTitle><DialogDescription>O PDF original fica privado. Cada comprador recebe uma cópia com seu e-mail na margem de todas as páginas.</DialogDescription></DialogHeader>
       {form && <form onSubmit={save} className="space-y-5"><div className="space-y-2"><Label htmlFor="book-title">Título</Label><Input id="book-title" value={form.title} maxLength={160} required onChange={e => field('title', e.target.value)} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="book-author">Autor</Label><Input id="book-author" value={form.author} maxLength={160} onChange={e => field('author', e.target.value)} /></div><div className="space-y-2"><Label htmlFor="book-price">Preço (R$)</Label><Input id="book-price" type="number" step="0.01" min="1" max="99999.99" value={form.price} required onChange={e => field('price', e.target.value)} /></div></div>
@@ -159,5 +160,5 @@ export default function StoreAdmin() {
         <div className="flex justify-end gap-3"><Button type="button" variant="outline" disabled={!!busy} onClick={() => setForm(null)}>Cancelar</Button><Button type="submit" disabled={!!busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{busy || 'Salvar livro'}</Button></div>
       </form>}
     </DialogContent></Dialog>
-  </div></Layout>;
+  </div></StoreLayout>;
 }

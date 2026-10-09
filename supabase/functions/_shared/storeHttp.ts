@@ -27,7 +27,7 @@ export async function storeUser(req: Request, db: StoreClient) {
   return data.user;
 }
 export async function storeIsAdmin(db: StoreClient, userId: string) {
-  const { data, error } = await db.from('user_roles').select('id').eq('user_id', userId).eq('role', 'admin').limit(1);
+  const { data, error } = await db.from('store_admins').select('user_id').eq('user_id', userId).limit(1);
   if (error) throw error;
   return !!data?.length;
 }

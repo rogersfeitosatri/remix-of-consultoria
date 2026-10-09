@@ -74,6 +74,7 @@ describe('store payment authentication and association',()=>{
     db.auth.getUser.mockResolvedValueOnce({data:{user:{id:USER,email:'buyer@example.com',email_confirmed_at:now.toISOString(),user_metadata:{role:'admin'}}},error:null} as any);
     const res=await handleStoreApi(request({action:'integration-status'}),depsFor(db));
     expect(res.status).toBe(403);
+    expect(db.from).toHaveBeenCalledWith('store_admins');
   });
   it('returns 503 when the payment integration is incomplete',async()=>{
     const deps=depsFor(authDb());deps.env=()=>undefined;

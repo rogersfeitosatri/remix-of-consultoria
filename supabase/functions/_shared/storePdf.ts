@@ -18,10 +18,17 @@ export async function personaliseStorePdf(bytes: Uint8Array, email: string): Pro
   // Fail closed if an unsupported character cannot be printed. Never return an
   // unmarked PDF, a truncated e-mail, or the original file as a fallback.
   font.encodeText(label);
-  for (const page of source.getPages()) {
-    const crop = page.getCropBox();
-    if (crop.width < 50 || crop.height < 50) throw new Error('pdf_page_too_small');
-    const embedded = await out.embedPage(page, { left:crop.x, bottom:crop.y, right:crop.x+crop.width, top:crop.y+crop.height });
+  const pages = source.getPages();
+  const crops = pages.map(page => page.getCropBox());
+  if (crops.some(crop => crop.width < 50 || crop.height < 50)) throw new Error('pdf_page_too_small');
+  // One batch shares copied fonts/images across pages instead of duplicating
+  // the same resources for every page in a long book.
+  const embeddedPages = await out.embedPages(pages, crops.map(crop => ({
+    left:crop.x, bottom:crop.y, right:crop.x+crop.width, top:crop.y+crop.height,
+  })));
+  for (const [index, page] of pages.entries()) {
+    const crop = crops[index];
+    const embedded = embeddedPages[index];
     const rotation = ((page.getRotation().angle % 360) + 360) % 360;
     if (![0,90,180,270].includes(rotation)) throw new Error('pdf_rotation_unsupported');
     const sideways = rotation === 90 || rotation === 270;

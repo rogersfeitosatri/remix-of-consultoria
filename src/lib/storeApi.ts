@@ -1,12 +1,8 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import type { StoreDatabase } from './storeTypes';
-
-// Retype the same authenticated client; do not create a second auth/session store.
-export const storeDb = supabase as unknown as SupabaseClient<StoreDatabase>;
+import { storeDb } from '@/integrations/supabase/storeClient';
+export { storeDb };
 
 export async function storeAction<T>(action: string, input: Record<string, unknown> = {}): Promise<T> {
-  const { data, error } = await supabase.functions.invoke('store-api', { body: { action, ...input } });
+  const { data, error } = await storeDb.functions.invoke('store-api', { body: { action, ...input } });
   if (error) {
     const detail = await error.context?.json?.().catch(() => null);
     throw new Error(detail?.error || 'Não foi possível concluir. Tente novamente em instantes.');
@@ -16,7 +12,7 @@ export async function storeAction<T>(action: string, input: Record<string, unkno
 }
 
 export async function downloadStoreBook(orderId: string, title: string): Promise<void> {
-  const { data, error } = await supabase.functions.invoke('store-download', { body: { order_id: orderId } });
+  const { data, error } = await storeDb.functions.invoke('store-download', { body: { order_id: orderId } });
   if (error) {
     const detail = await error.context?.json?.().catch(() => null);
     throw new Error(detail?.error || 'Não foi possível preparar o livro. Tente novamente.');
