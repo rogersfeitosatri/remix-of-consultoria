@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { ADMIN_NAVIGATION, getAdminArea, SECONDARY_TOOLS } from './adminNavigation';
 import { contactCycleDays } from './contactCadence';
 
-describe('five work areas', () => {
+describe('admin work areas', () => {
   it('keeps manual booking and response details in the correct area', () => {
-    expect(ADMIN_NAVIGATION.map(item => item.label)).toEqual(['Hoje', 'Atletas', 'Check-ins', 'Consultas', 'Financeiro']);
+    expect(ADMIN_NAVIGATION.map(item => item.label)).toEqual(['Hoje', 'Atletas', 'Check-ins', 'Consultas', 'Financeiro', 'Loja']);
+    expect(getAdminArea('/admin/loja')).toBe('/admin/loja');
     expect(getAdminArea('/appointments/example')).toBe('/calendar');
     expect(getAdminArea('/scheduling/periodicity')).toBe('/calendar');
     expect(getAdminArea('/checkin-review/example')).toBe('/checkin-hub');

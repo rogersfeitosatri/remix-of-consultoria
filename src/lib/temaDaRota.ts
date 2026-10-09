@@ -12,7 +12,7 @@
  * painel é o escuro). Essas rotas ficam FORA da casca do tema: a folha delas
  * já traz a paleta inteira, escopada na própria página.
  */
-export const ROTAS_DE_TEMA_PROPRIO = ['/metanoia'];
+export const ROTAS_DE_TEMA_PROPRIO = ['/metanoia', '/loja'];
 
 /** A rota tem paleta própria? Vale a rota e o que estiver abaixo dela. */
 export function temaProprioDaRota(pathname: string): boolean {

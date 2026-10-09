@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { classeDoTema, temaProprioDaRota } from './temaDaRota';
 
 describe('a casca do tema', () => {
+  it('a loja mantém a paleta branca em todas as suas páginas, sem alterar o admin', () => {
+    for (const route of ['/loja','/loja/entrar','/loja/pedidos','/loja/livro/nutricao']) expect(classeDoTema(route,'dark')).toBe('');
+    expect(classeDoTema('/admin/loja','dark')).toBe('dark');
+    expect(classeDoTema('/lojax','dark')).toBe('dark');
+  });
   it('a landing do Metanóia fica fora do tema do painel: a paleta dela é própria', () => {
     expect(temaProprioDaRota('/metanoia')).toBe(true);
     expect(classeDoTema('/metanoia', 'dark')).toBe('');

@@ -1,5 +1,14 @@
 project_id = "ikjntlmpnilxyugidhoz"
 
+[functions.store-api]
+verify_jwt = true
+
+[functions.store-download]
+verify_jwt = true
+
+[functions.store-stripe-webhook]
+verify_jwt = false
+
 [functions.kiwify-webhook]
 verify_jwt = false
 
