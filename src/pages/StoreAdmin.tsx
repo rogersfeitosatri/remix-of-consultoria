@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { BookOpen, ExternalLink, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
@@ -25,6 +25,9 @@ export default function StoreAdmin() {
   const [form, setForm] = useState<Form | null>(null);
   const [pdf, setPdf] = useState<File | null>(null);
   const [cover, setCover] = useState<File | null>(null);
+  const pdfInput = useRef<HTMLInputElement>(null);
+  const coverInput = useRef<HTMLInputElement>(null);
+  const [pdfError, setPdfError] = useState('');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const products = useQuery({ queryKey: ['store', 'admin', 'products'], queryFn: async () => {
@@ -39,7 +42,7 @@ export default function StoreAdmin() {
   const currentFile = useQuery({ queryKey: ['store', 'file', form?.fileId], enabled: !!form?.fileId, queryFn: async () => {
     const { data, error } = await storeDb.from('store_product_files').select('*').eq('id', form!.fileId!).single(); if (error) throw error; return data;
   }});
-  function edit(product?: StoreProduct) { setForm(formFor(product)); setPdf(null); setCover(null); setError(''); }
+  function edit(product?: StoreProduct) { setForm(formFor(product)); setPdf(null); setCover(null); setPdfError(''); setError(''); }
   function field<K extends keyof Form>(key: K, value: Form[K]) { setForm(f => f ? { ...f, [key]: value } : null); }
   async function save(e: React.FormEvent) {
     e.preventDefault(); if (!form || busy) return; setError(''); setBusy('Salvando…');
@@ -120,13 +123,37 @@ export default function StoreAdmin() {
         <div className="space-y-2"><Label htmlFor="book-description">Descrição</Label><Textarea id="book-description" rows={4} value={form.description} maxLength={12000} onChange={e => field('description', e.target.value)} /></div>
         <div className="space-y-2"><Label htmlFor="book-slug">Endereço do livro</Label><Input id="book-slug" value={form.slug} placeholder={storeSlug(form.title) || 'nome-do-livro'} onChange={e => field('slug', e.target.value)} /><p className="break-all text-xs text-muted-foreground">rogersfeitosa.com.br/loja/livro/{storeSlug(form.slug || form.title)}</p></div>
         <div className="space-y-2"><Label htmlFor="book-link">Link de pagamento Stripe (opcional)</Label><Input id="book-link" type="url" value={form.paymentLink} placeholder="https://buy.stripe.com/…" onChange={e => field('paymentLink', e.target.value)} /><p className="text-xs text-muted-foreground">Se cadastrar um link, use o mesmo preço em reais informado acima, sem descontos ou taxas extras no checkout. Sem link, a loja gera o pagamento automaticamente pelo preço cadastrado.</p></div>
-        <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="book-cover">Capa</Label><Input id="book-cover" type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setCover(e.target.files?.[0] ?? null)} /><p className="text-xs text-muted-foreground">JPG, PNG ou WebP, até 5 MB.</p>{form.coverUrl && <img src={form.coverUrl} alt="Capa atual" className="h-24 rounded object-contain" />}</div><div className="space-y-2"><Label htmlFor="book-pdf">Arquivo PDF</Label>
-          {/* Mobile file providers can omit the PDF MIME type. Validate the file
-              contents in save() instead of hiding it in the system picker. */}
-          <Input id="book-pdf" type="file" aria-describedby="book-pdf-help" onChange={e => setPdf(e.target.files?.[0] ?? null)} />
-          <p id="book-pdf-help" className="text-xs text-muted-foreground">Escolha um arquivo .pdf em Arquivos ou Downloads. Sem senha, até 25 MB e 600 páginas.</p>
-          {pdf && <p className="break-all text-xs text-muted-foreground" role="status">Selecionado: {pdf.name}. Clique em Salvar livro para enviar.</p>}
-          {currentFile.data && <p className="break-all text-xs text-muted-foreground">Atual: {currentFile.data.original_name} ({currentFile.data.page_count} páginas)</p>}</div></div>
+        <section aria-labelledby="book-pdf-heading" className="space-y-3 rounded-lg border p-4">
+          <h3 id="book-pdf-heading" className="font-medium">Livro em PDF</h3>
+          <p id="book-pdf-help" className="text-sm text-muted-foreground">Anexe aqui o livro completo que o comprador vai receber. PDF sem senha, até 25 MB e 600 páginas.</p>
+          {/* Keep this picker unrestricted: iCloud providers may omit the MIME type.
+              Check extension/size on selection and parse the PDF before upload. */}
+          <input ref={pdfInput} id="book-pdf" type="file" className="hidden" aria-label="Arquivo PDF" aria-describedby="book-pdf-help" disabled={!!busy} onChange={e => {
+            const file = e.currentTarget.files?.[0];
+            e.currentTarget.value = '';
+            if (!file) return;
+            if (!file.name.toLowerCase().endsWith('.pdf')) { setPdfError('Esse arquivo não é um PDF. Selecione o livro com a extensão .pdf.'); return; }
+            if (file.size > 25 * 1024 * 1024) { setPdfError('O PDF deve ter até 25 MB.'); return; }
+            setPdfError(''); setPdf(file);
+          }} />
+          <Button type="button" className="min-h-12 w-full" disabled={!!busy} onClick={() => pdfInput.current?.click()}><BookOpen className="mr-2 h-4 w-4" />Selecionar PDF do livro</Button>
+          {pdfError && <p className="text-sm text-destructive" role="alert">{pdfError}</p>}
+          {pdf && <p className="break-all text-sm" role="status">Selecionado: {pdf.name}. Clique em Salvar livro para enviar.</p>}
+          {currentFile.data && <p className="break-all text-xs text-muted-foreground">PDF salvo: {currentFile.data.original_name} ({currentFile.data.page_count} páginas)</p>}
+          <details className="text-sm text-muted-foreground"><summary className="cursor-pointer py-1">Não encontrou o PDF no iPhone?</summary><p className="mt-2">Na janela de arquivos, toque em Navegar e abra iCloud Drive ou Downloads. Se o livro só aparecer no app Arquivos, abra-o por lá e aguarde o download. Você também pode copiar o PDF para uma pasta em “No Meu iPhone” e selecioná-lo nessa pasta.</p></details>
+        </section>
+        <section aria-labelledby="book-cover-heading" className="space-y-3 rounded-lg border p-4">
+          <h3 id="book-cover-heading" className="font-medium">Imagem da capa (opcional)</h3>
+          <p className="text-sm text-muted-foreground">Uma imagem para exibir na loja. JPG, PNG ou WebP, até 5 MB.</p>
+          <input ref={coverInput} id="book-cover" type="file" className="hidden" aria-label="Imagem da capa" accept="image/jpeg,image/png,image/webp" disabled={!!busy} onChange={e => {
+            const file = e.currentTarget.files?.[0];
+            e.currentTarget.value = '';
+            if (file) setCover(file);
+          }} />
+          <Button type="button" variant="outline" className="min-h-11 w-full" disabled={!!busy} onClick={() => coverInput.current?.click()}>Escolher imagem da capa</Button>
+          {cover && <p className="break-all text-xs text-muted-foreground" role="status">Capa selecionada: {cover.name}</p>}
+          {form.coverUrl && <img src={form.coverUrl} alt="Capa atual" className="h-24 rounded object-contain" />}
+        </section>
         <label className="flex items-start gap-3 rounded-lg border p-4"><input type="checkbox" className="mt-1 h-4 w-4" checked={form.published} onChange={e => field('published', e.target.checked)} /><span className="text-sm"><span className="font-medium">Publicar na loja</span><br /><span className="text-muted-foreground">Desmarque para manter como rascunho.</span></span></label>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <div className="flex justify-end gap-3"><Button type="button" variant="outline" disabled={!!busy} onClick={() => setForm(null)}>Cancelar</Button><Button type="submit" disabled={!!busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{busy || 'Salvar livro'}</Button></div>
