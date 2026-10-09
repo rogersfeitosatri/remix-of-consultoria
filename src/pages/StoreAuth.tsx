@@ -67,6 +67,6 @@ export default function StoreAuth() {
     </form>
     {mode === 'login' ? <><p className="store-form-switch">Ainda não tem conta?<button className="store-text-button" onClick={() => changeMode('signup')}>Criar conta</button></p><button className="store-text-button" onClick={() => changeMode('forgot')}>Esqueci minha senha</button></>
       : <p className="store-form-switch"><button className="store-text-button" onClick={() => changeMode('login')}>Voltar para entrar</button></p>}
-    <p className="store-product-note">Ao criar sua conta, você concorda com os <Link className="store-text-button" to="/termos">termos de uso e privacidade</Link>.</p>
+    <p className="store-product-note">Ao criar sua conta, você concorda com os <Link className="store-text-button" to="/loja/termos">termos de uso e privacidade da loja</Link>.</p>
   </section></StoreLayout>;
 }

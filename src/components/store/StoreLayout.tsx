@@ -21,7 +21,7 @@ export function StoreLayout({ children }: { children: ReactNode }) {
       </nav>
     </header>
     <main id="store-main" className="store-main store-container" tabIndex={-1}>{children}</main>
-    <footer className="store-footer store-container"><span>© {new Date().getFullYear()} Rogers Feitosa</span><nav aria-label="Informações da loja"><Link to="/loja/ajuda">Atendimento e acesso</Link><Link to="/termos">Termos e privacidade</Link></nav></footer>
+    <footer className="store-footer store-container"><span>© {new Date().getFullYear()} Rogers Feitosa</span><nav aria-label="Informações da loja"><Link to="/loja/ajuda">Atendimento e acesso</Link><Link to="/loja/termos">Termos e privacidade</Link></nav></footer>
   </div>;
 }
 
