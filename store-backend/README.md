@@ -5,26 +5,38 @@ continua usando `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`.
 
 ## Projeto configurado
 
-Em 9 de outubro de 2026, a estrutura foi instalada no projeto **Loja RF**,
-`waorkzagibttftzvwukv`, informado pelo proprietário. O projeto estava vazio,
-sem usuários, buckets, tabelas públicas ou funções antes da instalação.
+A estrutura está instalada no projeto **Loja RF**, `waorkzagibttftzvwukv`,
+informado pelo proprietário. Estado conferido em 9 de outubro de 2026:
 
-- Migração aplicada; três Edge Functions publicadas e ativas.
-- Teste transacional `store_access.sql` aprovado no Supabase real.
-- Advisor de segurança sem alertas. O de desempenho informa apenas
-  [índices ainda sem uso](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index),
-  esperado no banco novo; índices de consultas e FKs foram mantidos.
-- HTTP real: catálogo anônimo permitido; pedidos privados e funções sem usuário
-  válido negados. Cadastro por e-mail está habilitado com confirmação obrigatória.
-- Webhook responde 503 por configuração Stripe incompleta; vendas ainda não estão
-  prontas. Endpoint: `https://waorkzagibttftzvwukv.supabase.co/functions/v1/store-stripe-webhook`.
+- Migração, RLS e três Edge Functions da loja instaladas; testes de acesso
+  aprovados. Originais em bucket privado e capas em bucket público.
+- Conta administrativa `nutri.rogersfeitosa@gmail.com` criada, confirmada e
+  associada a `store_admins` pelo UUID `074538fb-0006-49e9-9f74-ac5c74490a59`.
+- Chave Stripe de produção autenticada: consultas a Checkout Sessions,
+  Payment Intents, Charges, Products, Prices, Payment Links e Webhook Endpoints
+  retornaram HTTP 200. Não houve cobrança nem teste de escrita/compra real.
+- Webhook Stripe `we_1UOenlECI23X8v43LAigVcPu` ativo em produção, apontando para
+  `https://waorkzagibttftzvwukv.supabase.co/functions/v1/store-stripe-webhook`,
+  com os cinco eventos previstos. Secret de assinatura presente; a correspondência
+  com a Stripe e a entrega real ainda precisam de validação com evento assinado.
+- Cópia de **O Ciclo da Maratona** preparada como **rascunho**, pelo mesmo ID e
+  slug do catálogo atual, com descrição, capa copiada e preço de **R$ 35,90**.
+  PDF fornecido pelo proprietário no chat: 145 páginas, 391.811 bytes,
+  SHA-256 `70dd4d539767c0d505ce20cd16d229b1fb49e1c51144f84bd5f3d86a85ca2645`.
+  Conteúdo armazenado conferido por SHA-256; download público do original não
+  foi habilitado. Não foi possível comparar com o original privado do projeto antigo.
+- Funções temporárias `store-payment-link-setup` e `store-migration-upload`
+  desativadas após uso: corpo responde 404, verificação JWT habilitada e acesso
+  sem credenciais responde 401. Não contêm operações administrativas ativas.
 - Variáveis `VITE_STORE_*` cadastradas apenas no preview da branch
-  `feat/loja-supabase-independente` na Vercel. Produção continua no projeto anterior.
+  `feat/loja-supabase-independente`. A produção continua no Supabase antigo
+  `ikjntlmpnilxyugidhoz`, cujo acesso administrativo pelo conector está indisponível.
 
-Pendente: criação/validação da conta administrativa indicada pelo proprietário,
-permissão em `store_admins`, SMTP e redirects, secrets Stripe, validação do fluxo
-completo e confirmação de eventual conteúdo/compras a transferir. O acesso ao
-projeto anterior segue indisponível pela conexão Supabase.
+Pendente: proprietário confirmar existência de clientes/compras antigos;
+configurar **Resend SMTP** (provedor escolhido pelo proprietário), domínio de
+remetente e redirects; testar cadastro e recuperação com e-mail externo;
+concluir transferência de quaisquer acessos/pedidos existentes; validar checkout,
+confirmação Stripe e PDF timbrado antes de concluir a troca em produção.
 
 ## Antes da troca em produção
 
