@@ -1,0 +1,39 @@
+project_id = "rogers-loja"
+
+[api]
+enabled = true
+port = 55321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 55322
+shadow_port = 55320
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://localhost:8080/loja/entrar"
+additional_redirect_urls = ["http://localhost:8080/loja/entrar", "http://localhost:8080/loja/entrar?**"]
+enable_signup = true
+minimum_password_length = 8
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+# Handlers validate Bearer tokens with auth.getUser(token). The gateway's legacy
+# verifier is disabled to support new projects using asymmetric JWT signing keys.
+[functions.store-api]
+verify_jwt = false
+
+[functions.store-download]
+verify_jwt = false
+
+# Stripe uses its own HMAC signature, not a Supabase user JWT.
+[functions.store-stripe-webhook]
+verify_jwt = false

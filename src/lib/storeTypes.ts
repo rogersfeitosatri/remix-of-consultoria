@@ -46,7 +46,7 @@ export interface StoreOrder {
 type Table<T> = { Row: { [K in keyof T]: T[K] }; Insert: { [K in keyof T]?: T[K] }; Update: { [K in keyof T]?: T[K] }; Relationships: [] };
 export interface StoreDatabase {
   public: {
-    Tables: { store_products: Table<StoreProduct>; store_product_files: Table<StoreFile>; store_orders: Table<StoreOrder> };
+    Tables: { store_products: Table<StoreProduct>; store_product_files: Table<StoreFile>; store_orders: Table<StoreOrder>; store_admins: Table<{ user_id: string; created_at: string }> };
     Views: Record<never, never>;
     Functions: Record<never, never>;
     Enums: Record<never, never>;

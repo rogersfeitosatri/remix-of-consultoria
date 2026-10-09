@@ -4,13 +4,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { StoreLayout, StoreMessage } from '@/components/store/StoreLayout';
 import { BookCover } from '@/components/store/BookCover';
-import { useAuth } from '@/hooks/useAuth';
+import { useStoreAuth } from '@/hooks/useStoreAuth';
 import { storeAction, storeDb } from '@/lib/storeApi';
 import { storeCurrency } from '@/lib/storeTypes';
 
 export default function StoreProduct() {
   const { slug } = useParams();
-  const { user } = useAuth();
+  const { user } = useStoreAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

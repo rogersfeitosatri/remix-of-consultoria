@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { storeDb } from '@/integrations/supabase/storeClient';
+import { useStoreAuth } from '@/hooks/useStoreAuth';
 import { StoreLayout } from '@/components/store/StoreLayout';
 import { safeStoreNext } from '@/lib/storeTypes';
 
 type Mode = 'login' | 'signup' | 'forgot' | 'reset';
 export default function StoreAuth() {
-  const { user, loading } = useAuth();
+  const { user, loading } = useStoreAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>(() => params.get('reset') === '1' ? 'reset' : 'login');
@@ -23,7 +23,7 @@ export default function StoreAuth() {
     if (!loading && user && mode !== 'reset') navigate(next, { replace: true });
   }, [loading, user, mode, next, navigate]);
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => { if (event === 'PASSWORD_RECOVERY') setMode('reset'); });
+    const { data: { subscription } } = storeDb.auth.onAuthStateChange(event => { if (event === 'PASSWORD_RECOVERY') setMode('reset'); });
     return () => subscription.unsubscribe();
   }, []);
   const changeMode = (value: Mode) => { setMode(value); setError(''); setNotice(''); setPassword(''); };
@@ -31,7 +31,7 @@ export default function StoreAuth() {
     e.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
       if (mode === 'signup') {
-        const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: {
+        const { data, error } = await storeDb.auth.signUp({ email: email.trim(), password, options: {
           data: { full_name: name.trim() },
           emailRedirectTo: `${window.location.origin}/loja/entrar?next=${encodeURIComponent(next)}`,
         }});
@@ -39,15 +39,15 @@ export default function StoreAuth() {
         if (data.session) navigate(next, { replace: true });
         else setNotice('Confira seu e-mail para confirmar a conta. Depois, entre aqui para continuar. Se já tiver uma conta, use Entrar ou recupere sua senha.');
       } else if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        const { error } = await storeDb.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
         navigate(next, { replace: true });
       } else if (mode === 'forgot') {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/loja/entrar?reset=1` });
+        const { error } = await storeDb.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/loja/entrar?reset=1` });
         if (error) throw error;
         setNotice('Se houver uma conta com esse e-mail, você receberá o link para definir uma nova senha.');
       } else {
-        const { error } = await supabase.auth.updateUser({ password });
+        const { error } = await storeDb.auth.updateUser({ password });
         if (error) throw error;
         navigate('/loja/pedidos', { replace: true });
       }
@@ -57,7 +57,7 @@ export default function StoreAuth() {
     } finally { setBusy(false); }
   }
   const title = { login: 'Entre na sua conta', signup: 'Crie sua conta', forgot: 'Recupere sua senha', reset: 'Defina uma nova senha' }[mode];
-  return <StoreLayout><section className="store-auth"><h1>{title}</h1><p>{mode === 'signup' ? 'Cadastre-se gratuitamente para comprar e acessar seus livros.' : mode === 'login' ? 'Seus livros e pedidos, em um só lugar.' : 'Use o e-mail cadastrado na loja.'}</p>
+  return <StoreLayout><section className="store-auth"><h1>{title}</h1><p>{mode === 'signup' ? 'Cadastre-se gratuitamente para comprar e acessar seus livros.' : mode === 'login' ? 'Use sua conta da loja para acessar os livros. O acesso é separado da consultoria.' : 'Use o e-mail cadastrado na loja.'}</p>
     <form className="store-form" onSubmit={submit}>
       {mode === 'signup' && <label>Seu nome<input autoComplete="name" value={name} maxLength={120} required onChange={e => setName(e.target.value)} /></label>}
       {mode !== 'reset' && <label>E-mail<input type="email" autoComplete="email" value={email} required maxLength={254} onChange={e => setEmail(e.target.value)} /></label>}

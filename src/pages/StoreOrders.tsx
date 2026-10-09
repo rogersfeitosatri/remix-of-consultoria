@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Download, Loader2 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useStoreAuth } from '@/hooks/useStoreAuth';
 import { StoreLayout, StoreMessage } from '@/components/store/StoreLayout';
 import { downloadStoreBook, storeAction, storeDb } from '@/lib/storeApi';
 import { storeCurrency, type StoreOrder } from '@/lib/storeTypes';
 
 const labels = { pending: 'Aguardando confirmação do pagamento', paid: 'Disponível para download', refunded: 'Pagamento reembolsado', disputed: 'Pagamento em contestação', cancelled: 'Pagamento não concluído' };
 export default function StoreOrders() {
-  const { user, loading } = useAuth();
+  const { user, loading } = useStoreAuth();
   const [params] = useSearchParams();
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');

@@ -80,6 +80,8 @@ const PublicOnboarding = lazy(() => import("./pages/PublicOnboarding"));
 const ZnAssessoria = lazy(() => import("./pages/ZnAssessoria"));
 const PublicZnSubscribe = lazy(() => import("./pages/PublicZnSubscribe"));
 const PublicPromoterStats = lazy(() => import("./pages/PublicPromoterStats"));
+const StoreAdminGuard = lazy(() => import("./components/store/StoreBoundary").then(module => ({ default: module.StoreAdminGuard })));
+const StoreBoundary = lazy(() => import("./components/store/StoreBoundary"));
 const Store = lazy(() => import("./pages/Store"));
 const StoreProduct = lazy(() => import("./pages/StoreProduct"));
 const StoreAuth = lazy(() => import("./pages/StoreAuth"));
@@ -157,13 +159,16 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<Auth />} />
         <Route path="/bio" element={<LinkBio />} />
+        <Route element={<StoreBoundary />}>
         <Route path="/loja" element={<Store />} />
         <Route path="/loja/livro/:slug" element={<StoreProduct />} />
         <Route path="/loja/entrar" element={<StoreAuth />} />
         <Route path="/loja/pedidos" element={<StoreOrders />} />
         <Route path="/loja/ajuda" element={<StoreHelp />} />
         <Route path="/loja/termos" element={<StoreTerms />} />
-        <Route path="/admin/loja" element={<ProtectedRoute adminOnly><StoreAdmin /></ProtectedRoute>} />
+        <Route path="/loja/admin" element={<StoreAdminGuard><StoreAdmin /></StoreAdminGuard>} />
+        </Route>
+        <Route path="/admin/loja" element={<Navigate to="/loja/admin" replace />} />
         <Route path="/plans" element={<PlansLanding />} />
         <Route path="/metanoia" element={<Metanoia />} />
         <Route path="/assessoria" element={<AssessoriaLanding />} />
