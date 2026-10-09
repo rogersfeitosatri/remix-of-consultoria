@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getPublicBook, renderBookPage, type PublicBook } from '../../server/storeProductPage';
-import { GET } from '../../api/store-product';
+import { getPublicBook, renderBookPage } from '../../server/storeProductPage.mjs';
+import handler, { GET } from '../../api/store-product.mjs';
 const template = '<html lang="en"><head><title>Consultoria</title><meta name="description" content="Consultoria"><meta property="og:title" content="Consultoria"><meta property="og:image" content="https://example.com/old.jpg"><meta name="twitter:title" content="Consultoria"></head><body><div id="root"></div><script src="/assets/app.js"></script></body></html>';
-const book: PublicBook = { id:'book-id',slug:'o-ciclo-da-maratona',title:'O Ciclo da Maratona',description:'Textos sobre o ciclo.',author:'Rogers Feitosa',price_cents:3590,currency:'brl',cover_url:'https://example.com/cover.png',gallery_urls:['https://example.com/page.png'] };
+const book = { id:'book-id',slug:'o-ciclo-da-maratona',title:'O Ciclo da Maratona',description:'Textos sobre o ciclo.',author:'Rogers Feitosa',price_cents:3590,currency:'brl',cover_url:'https://example.com/cover.png',gallery_urls:['https://example.com/page.png'] };
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe('public product HTML', () => {
  it('contains current title, cover, price and explicit digital format without running JavaScript', () => {
@@ -51,6 +51,17 @@ describe('public product HTML', () => {
   const human=await GET(new Request(url));const crawler=await GET(new Request(url,{headers:{'User-Agent':'facebookexternalhit/1.1'}}));
   expect(human.status).toBe(200);expect(await human.text()).toBe(await crawler.text());
   expect(mock.mock.calls[0][0].searchParams.get('slug')).toBe('eq.'+book.slug);
+ });
+ it('handles native Node requests and sends no body on HEAD', async () => {
+  vi.stubEnv('VITE_STORE_SUPABASE_URL','https://storeproject.supabase.co');vi.stubEnv('VITE_STORE_SUPABASE_PUBLISHABLE_KEY','public-key');
+  vi.stubGlobal('fetch',vi.fn().mockImplementation(()=>Promise.resolve(Response.json([book]))));
+  const response={statusCode:0,setHeader:vi.fn(),end:vi.fn()};
+  await handler({url:'/api/store-product?slug='+book.slug,method:'GET'},response);
+  expect(response.statusCode).toBe(200);
+  expect(response.end.mock.calls[0][0]).toContain('<h1>O Ciclo da Maratona</h1>');
+  response.end.mockClear();
+  await handler({url:'/api/store-product?slug='+book.slug,method:'HEAD'},response);
+  expect(response.end).toHaveBeenCalledWith(undefined);
  });
  it('returns noindex and 404 for unpublished or missing books', async () => {
   vi.stubEnv('VITE_STORE_SUPABASE_URL','https://storeproject.supabase.co');vi.stubEnv('VITE_STORE_SUPABASE_PUBLISHABLE_KEY','public-key');vi.stubGlobal('fetch',vi.fn().mockResolvedValue(Response.json([])));
