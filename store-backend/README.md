@@ -3,6 +3,29 @@
 Este diretório contém somente o banco e a configuração da loja. A consultoria
 continua usando `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`.
 
+## Projeto configurado
+
+Em 9 de outubro de 2026, a estrutura foi instalada no projeto **Loja RF**,
+`waorkzagibttftzvwukv`, informado pelo proprietário. O projeto estava vazio,
+sem usuários, buckets, tabelas públicas ou funções antes da instalação.
+
+- Migração aplicada; três Edge Functions publicadas e ativas.
+- Teste transacional `store_access.sql` aprovado no Supabase real.
+- Advisor de segurança sem alertas. O de desempenho informa apenas
+  [índices ainda sem uso](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index),
+  esperado no banco novo; índices de consultas e FKs foram mantidos.
+- HTTP real: catálogo anônimo permitido; pedidos privados e funções sem usuário
+  válido negados. Cadastro por e-mail está habilitado com confirmação obrigatória.
+- Webhook responde 503 por configuração Stripe incompleta; vendas ainda não estão
+  prontas. Endpoint: `https://waorkzagibttftzvwukv.supabase.co/functions/v1/store-stripe-webhook`.
+- Variáveis `VITE_STORE_*` cadastradas apenas no preview da branch
+  `feat/loja-supabase-independente` na Vercel. Produção continua no projeto anterior.
+
+Pendente: criação/validação da conta administrativa indicada pelo proprietário,
+permissão em `store_admins`, SMTP e redirects, secrets Stripe, validação do fluxo
+completo e confirmação de eventual conteúdo/compras a transferir. O acesso ao
+projeto anterior segue indisponível pela conexão Supabase.
+
 ## Antes da troca em produção
 
 1. Criar um projeto novo e confirmar seu ID com o proprietário. Não aplicar estas
@@ -88,5 +111,6 @@ preservar os pedidos e acessos criados no novo banco.
   pagamento pendente/pago/reembolsado, download, login separado, saída sem afetar
   a consultoria e recuperação de senha isolada.
 
-O projeto Supabase real, envio de e-mails e integração Stripe continuam pendentes
-até serem configurados e verificados com o proprietário.
+O banco Supabase real e seus advisors já foram verificados. Envio de e-mails,
+integração Stripe e o fluxo de compra completo continuam pendentes de configuração
+e validação com o proprietário.
