@@ -23,7 +23,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main id="main-content" tabIndex={-1} className={cn('min-h-screen pt-14 pb-20 lg:py-0', sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64')}>
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
-      <nav aria-label="Navegação principal no celular" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 gap-1 border-t border-border bg-background px-1 pb-[env(safe-area-inset-bottom,0px)] lg:hidden">
+      <nav aria-label="Navegação principal no celular" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 gap-1 border-t border-border bg-background px-1 pb-[env(safe-area-inset-bottom,0px)] lg:hidden">
         <AdminNavLinks mobile />
       </nav>
     </div>

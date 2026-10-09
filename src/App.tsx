@@ -80,6 +80,12 @@ const PublicOnboarding = lazy(() => import("./pages/PublicOnboarding"));
 const ZnAssessoria = lazy(() => import("./pages/ZnAssessoria"));
 const PublicZnSubscribe = lazy(() => import("./pages/PublicZnSubscribe"));
 const PublicPromoterStats = lazy(() => import("./pages/PublicPromoterStats"));
+const Store = lazy(() => import("./pages/Store"));
+const StoreProduct = lazy(() => import("./pages/StoreProduct"));
+const StoreAuth = lazy(() => import("./pages/StoreAuth"));
+const StoreOrders = lazy(() => import("./pages/StoreOrders"));
+const StoreHelp = lazy(() => import("./pages/StoreHelp"));
+const StoreAdmin = lazy(() => import("./pages/StoreAdmin"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -150,6 +156,12 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<Auth />} />
         <Route path="/bio" element={<LinkBio />} />
+        <Route path="/loja" element={<Store />} />
+        <Route path="/loja/livro/:slug" element={<StoreProduct />} />
+        <Route path="/loja/entrar" element={<StoreAuth />} />
+        <Route path="/loja/pedidos" element={<StoreOrders />} />
+        <Route path="/loja/ajuda" element={<StoreHelp />} />
+        <Route path="/admin/loja" element={<ProtectedRoute adminOnly><StoreAdmin /></ProtectedRoute>} />
         <Route path="/plans" element={<PlansLanding />} />
         <Route path="/metanoia" element={<Metanoia />} />
         <Route path="/assessoria" element={<AssessoriaLanding />} />

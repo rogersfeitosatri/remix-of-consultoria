@@ -5,11 +5,13 @@ export const ADMIN_NAVIGATION = [
   { key: '/checkin-hub', label: 'Check-ins', visible: true },
   { key: '/calendar', label: 'Consultas', visible: true },
   { key: '/financial', label: 'Financeiro', visible: true },
+  { key: '/admin/loja', label: 'Loja', visible: true },
 ] as const;
 
 export const ADMIN_SETTINGS_ITEM = { key: '/settings', label: 'Configurações', visible: true };
 
 export function getAdminArea(pathname: string): string {
+  if (/^\/admin\/loja(\/|$)/.test(pathname)) return '/admin/loja';
   if (/^\/(clients)(\/|$)/.test(pathname)) return '/clients';
   if (/^\/(checkin-hub|checkin-review|checkin|adjustments)(\/|$)/.test(pathname)) return '/checkin-hub';
   if (/^\/(calendar|appointments|scheduling)(\/|$)/.test(pathname)) return '/calendar';

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, Home, LogOut, Settings, Users, Wallet } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, Home, LogOut, Settings, Users, Wallet, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useLayoutSettings } from '@/hooks/useLayoutSettings';
@@ -7,7 +7,7 @@ import { ViewAsAthleteSelector } from './ViewAsAthleteSelector';
 import { ADMIN_NAVIGATION, getAdminArea } from '@/lib/adminNavigation';
 import logoRFDefault from '@/assets/logo-rf.jpg';
 
-const icons = { '/admin': Home, '/clients': Users, '/checkin-hub': ClipboardCheck, '/calendar': CalendarDays, '/financial': Wallet };
+const icons = { '/admin': Home, '/clients': Users, '/checkin-hub': ClipboardCheck, '/calendar': CalendarDays, '/financial': Wallet, '/admin/loja': BookOpen };
 
 export function AdminNavLinks({ mobile = false, collapsed = false }: { mobile?: boolean; collapsed?: boolean }) {
   const { pathname } = useLocation();
