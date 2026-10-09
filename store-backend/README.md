@@ -14,7 +14,13 @@ informado pelo proprietário. Estado conferido em 9 de outubro de 2026:
   associada a `store_admins` pelo UUID `074538fb-0006-49e9-9f74-ac5c74490a59`.
 - Chave Stripe de produção autenticada: consultas a Checkout Sessions,
   Payment Intents, Charges, Products, Prices, Payment Links e Webhook Endpoints
-  retornaram HTTP 200. Não houve cobrança nem teste de escrita/compra real.
+  retornaram HTTP 200. Checkout de produção criado por R$ 35,90 e expirado sem
+  pagamento (`cs_live_a1NCd3QalKaWGjDFY9Y8ke6FMIbl0iMBZhTQxN2PeWGyeC3iPB6BgzLkfE`).
+  Produtos/preços automáticos dessa sessão são imutáveis na Stripe e permanecem
+  como histórico técnico; o checkout está expirado e não há pedido de comprador.
+  O parâmetro `payment_method_types` foi removido após rejeição pela API atual;
+  os métodos agora seguem a configuração do Dashboard. Correção publicada em
+  `store-api` e validada por 33 testes de segurança/isolamento e Deno check.
 - Webhook Stripe `we_1UOenlECI23X8v43LAigVcPu` ativo em produção, apontando para
   `https://waorkzagibttftzvwukv.supabase.co/functions/v1/store-stripe-webhook`,
   com os cinco eventos previstos. Secret de assinatura presente; a correspondência
@@ -38,10 +44,15 @@ O proprietário confirmou que **não houve compras nem cadastros de clientes**
 na loja anterior. Não há acessos de compradores a transferir. Domínio cadastrado
 no Resend; registros DNS DKIM e de envio já visíveis publicamente.
 
-Pendente: concluir **Resend SMTP** (provedor escolhido pelo proprietário),
-confirmar verificação do domínio no provedor e configurar redirects;
-testar cadastro e recuperação com e-mail externo; validar checkout,
-confirmação Stripe e PDF timbrado antes de concluir a troca em produção.
+**Resend SMTP:** teste de recuperação aceito pelo Supabase (HTTP 200); o
+proprietário confirmou recebimento em seu Gmail a partir de
+`loja@rogersfeitosa.com.br`. Cadastro por e-mail habilitado com confirmação
+obrigatória. A senha do usuário não foi alterada.
+
+Pendente: proprietário concluir Site URL/Redirect URLs; validar confirmação de
+novo cadastro e retorno da recuperação; publicar a troca do frontend e o livro;
+validar confirmação real da Stripe e PDF timbrado. O checkout já abriu em produção,
+mas nenhuma compra foi efetuada e o fluxo de entrega ainda não foi testado de ponta a ponta.
 
 ## Antes da troca em produção
 
