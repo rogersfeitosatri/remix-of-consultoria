@@ -7,6 +7,7 @@ export interface StoreProduct {
   price_cents: number;
   currency: string;
   cover_url: string | null;
+  gallery_urls: string[];
   payment_link_url: string | null;
   status: 'draft' | 'published' | 'archived';
   current_file_id: string | null;
