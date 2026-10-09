@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { BookOpen, ExternalLink, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { BookGalleryEditor, galleryImageType, MAX_GALLERY_IMAGES, type GalleryImage } from '@/components/store/BookGalleryEditor';
 import { StoreLayout } from '@/components/store/StoreLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,9 +14,9 @@ import { getStoreConnection } from '@/integrations/supabase/storeClient';
 import { storeAction, storeDb } from '@/lib/storeApi';
 import { storeCurrency, storeSlug, stripeLink, type StoreProduct } from '@/lib/storeTypes';
 
-type Form = { id: string; title: string; slug: string; description: string; author: string; price: string; coverUrl: string; paymentLink: string; published: boolean; fileId: string | null; existing: boolean };
+type Form = { id: string; title: string; slug: string; description: string; author: string; price: string; coverUrl: string; galleryImages: GalleryImage[]; paymentLink: string; published: boolean; fileId: string | null; existing: boolean };
 function formFor(p?: StoreProduct): Form {
-  return { id: p?.id ?? crypto.randomUUID(), title: p?.title ?? '', slug: p?.slug ?? '', description: p?.description ?? '', author: p?.author ?? 'Rogers Feitosa', price: p ? (p.price_cents / 100).toFixed(2) : '', coverUrl: p?.cover_url ?? '', paymentLink: p?.payment_link_url ?? '', published: p?.status === 'published', fileId: p?.current_file_id ?? null, existing: !!p };
+  return { id: p?.id ?? crypto.randomUUID(), title: p?.title ?? '', slug: p?.slug ?? '', description: p?.description ?? '', author: p?.author ?? 'Rogers Feitosa', price: p ? (p.price_cents / 100).toFixed(2) : '', coverUrl: p?.cover_url ?? '', galleryImages: (p?.gallery_urls ?? []).map(url => ({ id: crypto.randomUUID(), url })), paymentLink: p?.payment_link_url ?? '', published: p?.status === 'published', fileId: p?.current_file_id ?? null, existing: !!p };
 }
 type Integration = { provider: string; secret_key: boolean; webhook_secret: boolean; ready: boolean; mode: string; webhook_url: string };
 export default function StoreAdmin() {
@@ -66,6 +67,10 @@ export default function StoreAdmin() {
         if (pdfPages < 1 || pdfPages > 600) throw new Error('O PDF deve ter entre 1 e 600 páginas.');
       }
       if (cover && (!['image/jpeg','image/png','image/webp'].includes(cover.type) || cover.size > 5 * 1024 * 1024)) throw new Error('Use uma capa JPG, PNG ou WebP de até 5 MB.');
+      if (working.galleryImages.length > MAX_GALLERY_IMAGES) throw new Error('Adicione no máximo oito imagens extras.');
+      for (const image of working.galleryImages) {
+        if (image.file && (!galleryImageType(image.file) || image.file.size > 5 * 1024 * 1024)) throw new Error('Use imagens JPG, PNG ou WebP de até 5 MB cada.');
+      }
       const values = { title, slug, description: working.description.trim(), author: working.author.trim() || 'Rogers Feitosa', price_cents: Math.round(price * 100), payment_link_url: paymentLink, updated_at: new Date().toISOString() };
       if (!working.existing) {
         const { error } = await storeDb.from('store_products').insert({ ...values, id: working.id, status: 'draft' });
@@ -81,6 +86,19 @@ export default function StoreAdmin() {
         working.coverUrl = storeDb.storage.from('store-covers').getPublicUrl(path).data.publicUrl;
         setForm(f => f ? { ...f, coverUrl: working.coverUrl } : null); setCover(null);
       }
+      for (const image of working.galleryImages) {
+        if (!image.file) continue;
+        setBusy('Enviando imagens do livro…');
+        const contentType = galleryImageType(image.file)!;
+        const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[contentType];
+        const path = `${working.id}/gallery/${crypto.randomUUID()}.${ext}`;
+        const { error } = await storeDb.storage.from('store-covers').upload(path, image.file, { contentType, upsert: false });
+        if (error) throw error;
+        const url = storeDb.storage.from('store-covers').getPublicUrl(path).data.publicUrl;
+        // Remember successful uploads so a retry does not upload them again.
+        working.galleryImages = working.galleryImages.map(item => item.id === image.id ? { id: item.id, url } : item);
+        setForm(f => f ? { ...f, galleryImages: working.galleryImages } : null);
+      }
       if (pdf) {
         setBusy('Enviando PDF privado…');
         const id = crypto.randomUUID(); const path = `${working.id}/${id}.pdf`;
@@ -91,7 +109,7 @@ export default function StoreAdmin() {
         working.fileId = id; setForm(f => f ? { ...f, fileId: id } : null); setPdf(null);
       }
       setBusy('Finalizando…');
-      const { error } = await storeDb.from('store_products').update({ ...values, cover_url: working.coverUrl || null, current_file_id: working.fileId, status: working.published ? 'published' : 'draft' }).eq('id', working.id);
+      const { error } = await storeDb.from('store_products').update({ ...values, cover_url: working.coverUrl || null, gallery_urls: working.galleryImages.map(image => image.url), current_file_id: working.fileId, status: working.published ? 'published' : 'draft' }).eq('id', working.id);
       if (error) throw error;
       await qc.invalidateQueries({ queryKey: ['store'] }); setForm(null);
       toast({ title: working.published ? 'Livro publicado na loja' : 'Rascunho salvo' });
@@ -120,7 +138,7 @@ export default function StoreAdmin() {
       <details className="rounded-lg border p-5"><summary className="cursor-pointer font-medium">Como ativar os pagamentos</summary><div className="mt-4 space-y-4 text-sm text-muted-foreground"><p>1. No painel da Stripe, obtenha a chave secreta da sua conta. No Supabase, salve-a como <code>STRIPE_SECRET_KEY</code>.</p><p>2. Crie um webhook na Stripe com este endereço:</p><p className="break-all rounded bg-muted p-3 font-mono text-xs">{integration.data?.webhook_url || connection.webhookUrl}</p><p>3. Ative os eventos <code>checkout.session.completed</code>, <code>checkout.session.async_payment_succeeded</code>, <code>checkout.session.async_payment_failed</code>, <code>charge.refunded</code> e <code>charge.dispute.created</code>.</p><p>4. Salve a chave de assinatura do webhook como <code>STRIPE_WEBHOOK_SECRET</code> nas secrets do Supabase. Use chaves de teste para testar e chaves de produção para vender.</p><div className="flex flex-wrap gap-4"><a className="underline" href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noreferrer">Abrir Stripe</a><a className="underline" href={connection.secretsUrl} target="_blank" rel="noreferrer">Abrir secrets do Supabase</a></div></div></details>
     </section>}
     <Dialog open={!!form} onOpenChange={open => { if (!open && !busy) setForm(null); }}><DialogContent className="max-h-[90svh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle>{form?.existing ? 'Editar livro' : 'Cadastrar livro'}</DialogTitle><DialogDescription>O PDF original fica privado. Cada comprador recebe uma cópia com seu e-mail na margem de todas as páginas.</DialogDescription></DialogHeader>
-      {form && <form onSubmit={save} className="space-y-5"><div className="space-y-2"><Label htmlFor="book-title">Título</Label><Input id="book-title" value={form.title} maxLength={160} required onChange={e => field('title', e.target.value)} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="book-author">Autor</Label><Input id="book-author" value={form.author} maxLength={160} onChange={e => field('author', e.target.value)} /></div><div className="space-y-2"><Label htmlFor="book-price">Preço (R$)</Label><Input id="book-price" type="number" step="0.01" min="1" max="99999.99" value={form.price} required onChange={e => field('price', e.target.value)} /></div></div>
+      {form && <form onSubmit={save} className="space-y-5"><fieldset disabled={!!busy} className="min-w-0 space-y-5"><div className="space-y-2"><Label htmlFor="book-title">Título</Label><Input id="book-title" value={form.title} maxLength={160} required onChange={e => field('title', e.target.value)} /></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="book-author">Autor</Label><Input id="book-author" value={form.author} maxLength={160} onChange={e => field('author', e.target.value)} /></div><div className="space-y-2"><Label htmlFor="book-price">Preço (R$)</Label><Input id="book-price" type="number" step="0.01" min="1" max="99999.99" value={form.price} required onChange={e => field('price', e.target.value)} /></div></div>
         <div className="space-y-2"><Label htmlFor="book-description">Descrição</Label><Textarea id="book-description" rows={4} value={form.description} maxLength={12000} onChange={e => field('description', e.target.value)} /></div>
         <div className="space-y-2"><Label htmlFor="book-slug">Endereço do livro</Label><Input id="book-slug" value={form.slug} placeholder={storeSlug(form.title) || 'nome-do-livro'} onChange={e => field('slug', e.target.value)} /><p className="break-all text-xs text-muted-foreground">rogersfeitosa.com.br/loja/livro/{storeSlug(form.slug || form.title)}</p></div>
         <div className="space-y-2"><Label htmlFor="book-link">Link de pagamento Stripe (opcional)</Label><Input id="book-link" type="url" value={form.paymentLink} placeholder="https://buy.stripe.com/…" onChange={e => field('paymentLink', e.target.value)} /><p className="text-xs text-muted-foreground">Se cadastrar um link, use o mesmo preço em reais informado acima, sem descontos ou taxas extras no checkout. Sem link, a loja gera o pagamento automaticamente pelo preço cadastrado.</p></div>
@@ -155,10 +173,11 @@ export default function StoreAdmin() {
           {cover && <p className="break-all text-xs text-muted-foreground" role="status">Capa selecionada: {cover.name}</p>}
           {form.coverUrl && <img src={form.coverUrl} alt="Capa atual" className="h-24 rounded object-contain" />}
         </section>
+        <BookGalleryEditor images={form.galleryImages} onChange={images => field('galleryImages', images)} disabled={!!busy} />
         <label className="flex items-start gap-3 rounded-lg border p-4"><input type="checkbox" className="mt-1 h-4 w-4" checked={form.published} onChange={e => field('published', e.target.checked)} /><span className="text-sm"><span className="font-medium">Publicar na loja</span><br /><span className="text-muted-foreground">Desmarque para manter como rascunho.</span></span></label>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
         <div className="flex justify-end gap-3"><Button type="button" variant="outline" disabled={!!busy} onClick={() => setForm(null)}>Cancelar</Button><Button type="submit" disabled={!!busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{busy || 'Salvar livro'}</Button></div>
-      </form>}
+      </fieldset></form>}
     </DialogContent></Dialog>
   </div></StoreLayout>;
 }
