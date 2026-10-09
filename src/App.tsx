@@ -85,6 +85,7 @@ const StoreProduct = lazy(() => import("./pages/StoreProduct"));
 const StoreAuth = lazy(() => import("./pages/StoreAuth"));
 const StoreOrders = lazy(() => import("./pages/StoreOrders"));
 const StoreHelp = lazy(() => import("./pages/StoreHelp"));
+const StoreTerms = lazy(() => import("./pages/StoreTerms"));
 const StoreAdmin = lazy(() => import("./pages/StoreAdmin"));
 
 const queryClient = new QueryClient({
@@ -161,6 +162,7 @@ function AppRoutes() {
         <Route path="/loja/entrar" element={<StoreAuth />} />
         <Route path="/loja/pedidos" element={<StoreOrders />} />
         <Route path="/loja/ajuda" element={<StoreHelp />} />
+        <Route path="/loja/termos" element={<StoreTerms />} />
         <Route path="/admin/loja" element={<ProtectedRoute adminOnly><StoreAdmin /></ProtectedRoute>} />
         <Route path="/plans" element={<PlansLanding />} />
         <Route path="/metanoia" element={<Metanoia />} />
