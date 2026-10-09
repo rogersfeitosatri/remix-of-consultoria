@@ -35,7 +35,7 @@ export default function StoreProduct() {
     {book.isPending ? <StoreMessage title="Carregando livro…" /> : book.isError ? <StoreMessage title="Não foi possível carregar o livro" error><button className="store-text-button" onClick={() => book.refetch()}>Tentar novamente</button></StoreMessage>
       : !book.data ? <StoreMessage title="Este livro não está disponível"><Link className="store-text-button" to="/loja">Conhecer outros livros</Link></StoreMessage>
       : <article className="store-product-detail"><BookCover product={book.data} large /><div className="store-product-copy"><span className="store-eyeline">Livro digital em PDF</span><h1>{book.data.title}</h1><p className="store-product-author">{book.data.author}</p><p className="store-product-price">{storeCurrency(book.data.price_cents)}</p>
-        <button className="store-button" disabled={busy} onClick={buy}>{busy && <Loader2 size={17} className="animate-spin" />}{busy ? 'Preparando pagamento…' : 'Comprar livro'}</button>
+        <button className="store-button" disabled={busy} onClick={buy}>{busy && <Loader2 size={17} className="animate-spin" />}{busy ? 'Preparando pagamento…' : 'Comprar livro digital'}</button>
         {error && <p className="store-error" role="alert">{error}</p>}
         <p className="store-product-note">Após a confirmação do pagamento, seu livro ficará em Meus pedidos. O PDF será identificado com o e-mail da sua conta, em uma margem reservada em todas as páginas.</p>
         <div className="store-description">{book.data.description}</div>
