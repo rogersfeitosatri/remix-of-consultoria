@@ -6,6 +6,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/loja/livro/:slug",
+      "destination": "/api/store-product?slug=:slug"
+    },
+    {
       "source": "/api/store-product",
       "destination": "/api/store-product"
     },
