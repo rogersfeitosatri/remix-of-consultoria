@@ -28,14 +28,19 @@ informado pelo proprietário. Estado conferido em 9 de outubro de 2026:
 - Funções temporárias `store-payment-link-setup` e `store-migration-upload`
   desativadas após uso: corpo responde 404, verificação JWT habilitada e acesso
   sem credenciais responde 401. Não contêm operações administrativas ativas.
-- Variáveis `VITE_STORE_*` cadastradas apenas no preview da branch
-  `feat/loja-supabase-independente`. A produção continua no Supabase antigo
+- Variáveis `VITE_STORE_*` cadastradas no preview da branch
+  `feat/loja-supabase-independente` e preparadas no ambiente de produção.
+  O código de produção ainda não as utiliza: a troca depende da publicação desta PR.
+  A loja pública continua no Supabase antigo
   `ikjntlmpnilxyugidhoz`, cujo acesso administrativo pelo conector está indisponível.
 
-Pendente: proprietário confirmar existência de clientes/compras antigos;
-configurar **Resend SMTP** (provedor escolhido pelo proprietário), domínio de
-remetente e redirects; testar cadastro e recuperação com e-mail externo;
-concluir transferência de quaisquer acessos/pedidos existentes; validar checkout,
+O proprietário confirmou que **não houve compras nem cadastros de clientes**
+na loja anterior. Não há acessos de compradores a transferir. Domínio cadastrado
+no Resend; registros DNS DKIM e de envio já visíveis publicamente.
+
+Pendente: concluir **Resend SMTP** (provedor escolhido pelo proprietário),
+confirmar verificação do domínio no provedor e configurar redirects;
+testar cadastro e recuperação com e-mail externo; validar checkout,
 confirmação Stripe e PDF timbrado antes de concluir a troca em produção.
 
 ## Antes da troca em produção
