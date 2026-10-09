@@ -22,7 +22,7 @@ export default function Store() {
     return result;
   }, [catalog.data, search, sort]);
   return <StoreLayout>
-    <section className="store-intro"><h1>Loja digital</h1><p>Livros para a sua rotina de treinos.</p></section>
+    <section className="store-intro"><h1>Loja digital</h1><p>Livros digitais para a sua rotina de treinos.</p></section>
     <div className="store-catalog-bar">
       <span className="store-active-tab">Livros digitais</span>
       <div className="store-catalog-controls"><label className="store-search"><Search size={18} aria-hidden="true" /><input type="search" aria-label="Buscar livro" placeholder="Buscar livro" value={search} onChange={e => setSearch(e.target.value)} /></label>
@@ -31,6 +31,6 @@ export default function Store() {
     {catalog.isPending ? <div className="store-grid" aria-label="Carregando livros" aria-busy="true">{[1,2,3].map(i => <div key={i} className="store-skeleton" />)}</div>
       : catalog.isError ? <StoreMessage title="Não foi possível carregar os livros" error><button className="store-text-button" onClick={() => catalog.refetch()}>Tentar novamente</button></StoreMessage>
       : !books.length ? <StoreMessage title={search ? 'Nenhum livro encontrado' : 'Novos livros estão a caminho'}><p>{search ? 'Tente buscar por outro título ou autor.' : 'Em breve, os primeiros títulos estarão disponíveis aqui.'}</p>{search && <button className="store-text-button" onClick={() => setSearch('')}>Limpar busca</button>}</StoreMessage>
-      : <div className="store-grid">{books.map(book => <article key={book.id} className="store-book"><Link to={`/loja/livro/${book.slug}`}><BookCover product={book} /><div className="store-book-info"><span>Livro digital · PDF</span><h2>{book.title}</h2><p>{storeCurrency(book.price_cents)}</p></div></Link></article>)}</div>}
+      : <div className="store-grid">{books.map(book => <article key={book.id} className="store-book"><Link to={`/loja/livro/${book.slug}`}><BookCover product={book} /><div className="store-book-info"><span>Livro digital em PDF</span><h2>{book.title}</h2><p>{storeCurrency(book.price_cents)}</p></div></Link></article>)}</div>}
   </StoreLayout>;
 }

@@ -12,7 +12,7 @@ export function StoreLayout({ children }: { children: ReactNode }) {
     <a className="store-skip" href="#store-main">Ir para o conteúdo</a>
     <header className="store-header store-container">
       <Link className="store-brand" to="/loja" aria-label="Rogers Feitosa — loja">
-        <span className="store-monogram" aria-hidden="true">RF</span><span>Rogers Feitosa</span>
+        <span className="store-monogram" aria-hidden="true">RF</span>
       </Link>
       <nav aria-label="Navegação da loja">
         <Link className="store-home-link" to="/">Voltar ao site</Link>
