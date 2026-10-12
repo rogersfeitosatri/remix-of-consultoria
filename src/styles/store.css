@@ -26,3 +26,5 @@
 .store-gallery-thumbnails button[aria-pressed=true]{border-color:#9b834b;box-shadow:0 0 0 1px #9b834b}
 .store-gallery-thumbnails img{width:100%;height:100%;object-fit:contain}
 @media(max-width:640px){.store-gallery{width:min(100%,260px)}.store-gallery-slide{max-height:360px}}
+
+.store-price{display:inline-flex;flex-direction:column;gap:3px;line-height:1.4}.store-price-original{font-size:.72em;color:var(--store-muted);font-weight:400}.store-price-original s{text-decoration-thickness:1px}.store-price-current{font-weight:500}.store-price-prefix{font-size:.72em;font-weight:400}.store-price-inline{flex-direction:row;align-items:baseline;gap:8px;flex-wrap:wrap}
