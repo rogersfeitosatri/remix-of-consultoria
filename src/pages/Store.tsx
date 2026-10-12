@@ -5,7 +5,8 @@ import { Search } from 'lucide-react';
 import { StoreLayout, StoreMessage } from '@/components/store/StoreLayout';
 import { BookCover } from '@/components/store/BookCover';
 import { storeDb } from '@/lib/storeApi';
-import { storeCurrency } from '@/lib/storeTypes';
+import { BookPrice } from '@/components/store/BookPrice';
+import { storePrice } from '@/lib/storeTypes';
 
 export default function Store() {
   const [search, setSearch] = useState('');
@@ -17,8 +18,8 @@ export default function Store() {
   }});
   const books = useMemo(() => {
     const result = (catalog.data ?? []).filter(p => `${p.title} ${p.author}`.toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR').trim()));
-    if (sort === 'price-asc') result.sort((a,b) => a.price_cents - b.price_cents);
-    if (sort === 'price-desc') result.sort((a,b) => b.price_cents - a.price_cents);
+    if (sort === 'price-asc') result.sort((a,b) => storePrice(a) - storePrice(b));
+    if (sort === 'price-desc') result.sort((a,b) => storePrice(b) - storePrice(a));
     return result;
   }, [catalog.data, search, sort]);
   return <StoreLayout>
@@ -31,6 +32,6 @@ export default function Store() {
     {catalog.isPending ? <div className="store-grid" aria-label="Carregando livros" aria-busy="true">{[1,2,3].map(i => <div key={i} className="store-skeleton" />)}</div>
       : catalog.isError ? <StoreMessage title="Não foi possível carregar os livros" error><button className="store-text-button" onClick={() => catalog.refetch()}>Tentar novamente</button></StoreMessage>
       : !books.length ? <StoreMessage title={search ? 'Nenhum livro encontrado' : 'Novos livros estão a caminho'}><p>{search ? 'Tente buscar por outro título ou autor.' : 'Em breve, os primeiros títulos estarão disponíveis aqui.'}</p>{search && <button className="store-text-button" onClick={() => setSearch('')}>Limpar busca</button>}</StoreMessage>
-      : <div className="store-grid">{books.map(book => <article key={book.id} className="store-book"><Link to={`/loja/livro/${book.slug}`}><BookCover product={book} /><div className="store-book-info"><span>Livro digital em PDF</span><h2>{book.title}</h2><p>{storeCurrency(book.price_cents)}</p></div></Link></article>)}</div>}
+      : <div className="store-grid">{books.map(book => <article key={book.id} className="store-book"><Link to={`/loja/livro/${book.slug}`}><BookCover product={book} /><div className="store-book-info"><span>Livro digital em PDF</span><h2>{book.title}</h2><p><BookPrice product={book} /></p></div></Link></article>)}</div>}
   </StoreLayout>;
 }

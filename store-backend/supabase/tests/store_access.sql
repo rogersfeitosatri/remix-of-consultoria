@@ -36,6 +36,9 @@ do $$ declare updated integer; begin
   update public.store_products set price_cents=100 where id=(select published from store_test_ids);
   get diagnostics updated = row_count;
   if updated <> 0 then raise exception 'buyer_can_change_price'; end if;
+  update public.store_products set sale_price_cents=100 where id=(select published from store_test_ids);
+  get diagnostics updated = row_count;
+  if updated <> 0 then raise exception 'buyer_can_change_sale_price'; end if;
   if exists(select 1 from public.store_admins) then raise exception 'buyer_has_admin_membership'; end if;
   if has_table_privilege('authenticated','public.store_admins','insert') or has_table_privilege('authenticated','public.store_admins','update') then raise exception 'buyer_can_promote_self'; end if;
   if has_table_privilege('authenticated','public.store_orders','update') then raise exception 'buyer_can_change_payment'; end if;
@@ -56,6 +59,22 @@ reset role;
 select set_config('request.jwt.claims',json_build_object('sub',administrator,'role','authenticated')::text,true) from store_test_ids;
 set local role authenticated;
 do $$ begin
+  update public.store_products set sale_price_cents=1490 where id=(select published from store_test_ids);
+  if (select sale_price_cents from public.store_products where id=(select published from store_test_ids)) <> 1490 then raise exception 'admin_cannot_set_sale_price'; end if;
+  begin
+    update public.store_products set sale_price_cents=1990 where id=(select published from store_test_ids);
+    raise exception 'sale_price_must_be_lower';
+  exception when check_violation then null; end;
+  begin
+    update public.store_products set sale_price_cents=0 where id=(select published from store_test_ids);
+    raise exception 'sale_price_must_be_positive';
+  exception when check_violation then null; end;
+  begin
+    update public.store_products set price_cents=1000 where id=(select published from store_test_ids);
+    raise exception 'original_price_cannot_be_lower_than_sale';
+  exception when check_violation then null; end;
+  update public.store_products set sale_price_cents=null where id=(select published from store_test_ids);
+  if (select sale_price_cents from public.store_products where id=(select published from store_test_ids)) is not null then raise exception 'admin_cannot_remove_sale_price'; end if;
   if (select count(*) from public.store_products where id in (select published from store_test_ids union all select draft from store_test_ids)) <> 2 then raise exception 'admin_cannot_read_drafts'; end if;
   if (select count(*) from public.store_product_files where id=(select file_id from store_test_ids)) <> 1 then raise exception 'admin_cannot_read_file_metadata'; end if;
   if (select count(*) from storage.objects where bucket_id='store-originals' and name=(select published||'/'||file_id||'.pdf' from store_test_ids)) <> 1 then raise exception 'admin_cannot_read_original'; end if;

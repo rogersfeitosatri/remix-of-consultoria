@@ -19,6 +19,14 @@ describe('public product HTML', () => {
   expect(data.offers.priceCurrency).toBe('BRL');
   expect(html).toContain('/assets/app.js');
  });
+ it('publishes the promotional price in metadata and shows the original price struck through', () => {
+  const html=renderBookPage(template,{...book,sale_price_cents:2490});
+  expect(html).toContain('property="product:price:amount" content="24.90"');
+  expect(html).toMatch(/De <s>R\$\s35,90<\/s><br>Por R\$\s24,90/);
+  const data=JSON.parse(html.match(/application\/ld\+json">(.*?)<\/script>/s)![1]);
+  expect(data.offers.price).toBe('24.90');
+  expect(renderBookPage(template,{...book,sale_price_cents:null})).not.toContain('<s>');
+ });
  it('escapes injected HTML, JSON script terminators and replacement-string dollar sequences', () => {
   const hostile={...book,title:'$& <img src=x onerror=alert(1)>',description:'</script><script>alert(1)</script>',cover_url:'javascript:alert(1)'};
   const html=renderBookPage(template,hostile);

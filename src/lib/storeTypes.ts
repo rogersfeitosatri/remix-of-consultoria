@@ -1,3 +1,4 @@
+export { storePrice } from '../../supabase/functions/_shared/storePricing';
 export interface StoreProduct {
   id: string;
   slug: string;
@@ -5,6 +6,7 @@ export interface StoreProduct {
   description: string;
   author: string;
   price_cents: number;
+  sale_price_cents: number | null;
   currency: string;
   cover_url: string | null;
   gallery_urls: string[];
