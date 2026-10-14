@@ -18,8 +18,8 @@ export async function stripeRequest(path: string, deps: Pick<StoreDeps,'env'|'fe
   }
   return data;
 }
-export function checkoutForm(order: { id: string; buyer_email: string; product_title: string; price_cents: number }) {
-  return new URLSearchParams({
+export function checkoutForm(order: { id: string; buyer_email: string; product_title: string; price_cents: number; coupon_code?: string | null; discount_cents?: number; subtotal_cents?: number | null }) {
+  const form = new URLSearchParams({
     mode: 'payment', client_reference_id: `loja_${order.id}`, customer_email: order.buyer_email,
     // Stripe manages available methods in Dashboard; explicit method types are
     // rejected by the current Checkout API. Payment still requires server confirmation.
@@ -31,6 +31,13 @@ export function checkoutForm(order: { id: string; buyer_email: string; product_t
     success_url: `${SITE}/loja/pedidos?checkout=success`, cancel_url: `${SITE}/loja/pedidos?checkout=cancelled`,
     locale: 'pt-BR', 'adaptive_pricing[enabled]': 'false',
   });
+  if (order.coupon_code && order.discount_cents && order.subtotal_cents) {
+    const money = (cents: number) => new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format(cents / 100);
+    form.set('line_items[0][price_data][product_data][description]', `Cupom ${order.coupon_code}: desconto de ${money(order.discount_cents)} sobre ${money(order.subtotal_cents)}.`);
+    form.set('metadata[store_coupon_code]', order.coupon_code);
+    form.set('payment_intent_data[metadata][store_coupon_code]', order.coupon_code);
+  }
+  return form;
 }
 export function paymentLinkForOrder(link: string, order: { id: string; buyer_email: string }) {
   const url = new URL(link);

@@ -26,7 +26,17 @@ export interface StoreFile {
   page_count: number;
   created_at: string;
 }
+export interface StoreCoupon {
+  id: string; code: string; discount_type: 'percent' | 'fixed'; discount_value: number;
+  product_id: string | null; active: boolean; expires_at: string | null; deleted_at: string | null;
+  created_at: string; updated_at: string;
+}
+export interface StoreQuote { subtotal_cents: number; discount_cents: number; total_cents: number; coupon_code: string | null }
 export interface StoreOrder {
+  coupon_id: string | null;
+  coupon_code: string | null;
+  subtotal_cents: number | null;
+  discount_cents: number;
   id: string;
   user_id: string;
   product_id: string;
@@ -49,7 +59,7 @@ export interface StoreOrder {
 type Table<T> = { Row: { [K in keyof T]: T[K] }; Insert: { [K in keyof T]?: T[K] }; Update: { [K in keyof T]?: T[K] }; Relationships: [] };
 export interface StoreDatabase {
   public: {
-    Tables: { store_products: Table<StoreProduct>; store_product_files: Table<StoreFile>; store_orders: Table<StoreOrder>; store_admins: Table<{ user_id: string; created_at: string }> };
+    Tables: { store_coupons: Table<StoreCoupon>; store_products: Table<StoreProduct>; store_product_files: Table<StoreFile>; store_orders: Table<StoreOrder>; store_admins: Table<{ user_id: string; created_at: string }> };
     Views: Record<never, never>;
     Functions: Record<never, never>;
     Enums: Record<never, never>;
