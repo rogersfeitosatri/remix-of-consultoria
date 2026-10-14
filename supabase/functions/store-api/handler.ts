@@ -1,4 +1,4 @@
-import { storePrice } from '../_shared/storePricing.ts';
+import { couponQuote } from '../_shared/storeCoupons.ts';
 import { realStoreDeps, requireUuid, StoreError, storeCors, storeFailure, storeIsAdmin, storeJson, storeUser, type StoreDeps } from '../_shared/storeHttp.ts';
 import { checkoutForm, paymentLinkForOrder, reconcileStripeSession, requireStripe, stripeMode, stripeRequest } from '../_shared/storeStripe.ts';
 
@@ -20,21 +20,32 @@ export async function handleStoreApi(req: Request, deps: StoreDeps = realStoreDe
       for (const order of data ?? []) await reconcileStripeSession(order.checkout_id, `sync:${order.checkout_id}`, 'checkout.sync', deps, order.id);
       return storeJson(req, { ok: true });
     }
-    if (body.action !== 'checkout') throw new StoreError(400, 'Ação inválida.');
-    requireStripe(deps.env);
+    if (!['checkout','quote'].includes(body.action)) throw new StoreError(400, 'Ação inválida.');
+    if (body.action === 'checkout') requireStripe(deps.env);
     const productId = requireUuid(body.product_id);
     const live = stripeMode(deps.env) === 'live';
-    if (!live && !await storeIsAdmin(db, user.id)) throw new StoreError(503, 'As compras estarão disponíveis em breve.');
-    const { data: existing, error: existingError } = await db.from('store_orders').select('*').eq('user_id', user.id).eq('product_id', productId).in('status',['paid','pending']).maybeSingle();
+    if (body.action === 'checkout' && !live && !await storeIsAdmin(db, user.id)) throw new StoreError(503, 'As compras estarão disponíveis em breve.');
+    const { data: existing, error: existingError } = body.action === 'quote' ? { data:null, error:null } : await db.from('store_orders').select('*').eq('user_id', user.id).eq('product_id', productId).in('status',['paid','pending']).maybeSingle();
     if (existingError) throw existingError;
     if (existing?.status === 'paid') return storeJson(req, { owned: true });
     const { data: product, error: productError } = await db.from('store_products').select('*').eq('id',productId).eq('status','published').is('deleted_at',null).maybeSingle();
     if (productError) throw productError;
     if (!product?.current_file_id) throw new StoreError(404, 'Este livro não está disponível para compra.');
-    const currentPrice = storePrice(product);
+    // An omitted code (Meus pedidos) retains the previous choice. Explicit null
+    // removes it. Browser-supplied amounts never determine the actual charge.
+    const requestedCode = body.action === 'checkout' && !Object.hasOwn(body, 'coupon_code') ? existing?.coupon_code : body.coupon_code;
+    const quote = await couponQuote(db, product, requestedCode, deps.now());
+    if (body.action === 'quote') {
+      const { coupon_id: _id, ...publicQuote } = quote;
+      return storeJson(req, publicQuote);
+    }
+    if (body.expected_total_cents !== undefined && body.expected_total_cents !== quote.total_cents) throw new StoreError(409, 'O valor mudou. Confira o preço e aplique o cupom novamente antes de pagar.');
+    const currentPrice = quote.total_cents;
+    const priceValues = { price_cents:currentPrice, subtotal_cents:quote.subtotal_cents, discount_cents:quote.discount_cents, coupon_id:quote.coupon_id, coupon_code:quote.coupon_code };
+    const sameCoupon = (o: { coupon_id?: string | null; coupon_code?: string | null; discount_cents?: number }) => (o.coupon_id ?? null) === quote.coupon_id && (o.coupon_code ?? null) === quote.coupon_code && (o.discount_cents ?? 0) === quote.discount_cents;
     let order = existing;
     if (order && order.is_live !== live) throw new StoreError(409, 'Este pedido pertence a outro modo de pagamento. Contate o atendimento.');
-    if (order && order.price_cents !== currentPrice) {
+    if (order && (order.price_cents !== currentPrice || !sameCoupon(order))) {
       // Never change the amount of a session that can still be paid, or of a
       // completed asynchronous payment awaiting confirmation (e.g. Pix).
       if (order.checkout_id) {
@@ -53,7 +64,7 @@ export async function handleStoreApi(req: Request, deps: StoreDeps = realStoreDe
       } else if (order.checkout_url) {
         throw new StoreError(409, 'Este pedido tem um link de pagamento anterior. Contate o atendimento para atualizar o valor.');
       }
-      const { data: refreshed, error: refreshError } = await db.from('store_orders').update({ price_cents:currentPrice, checkout_url:null, checkout_id:null, checkout_expires_at:null, updated_at:deps.now().toISOString() }).eq('id',order.id).eq('status','pending').eq('price_cents',order.price_cents).eq('updated_at',order.updated_at).select('*').maybeSingle();
+      const { data: refreshed, error: refreshError } = await db.from('store_orders').update({ ...priceValues, checkout_url:null, checkout_id:null, checkout_expires_at:null, updated_at:deps.now().toISOString() }).eq('id',order.id).eq('status','pending').eq('price_cents',order.price_cents).eq('updated_at',order.updated_at).select('*').maybeSingle();
       if (refreshError) throw refreshError;
       if (!refreshed) throw new StoreError(409, 'O pedido foi atualizado. Tente novamente.');
       order = refreshed;
@@ -63,7 +74,7 @@ export async function handleStoreApi(req: Request, deps: StoreDeps = realStoreDe
       const { count, error: rateError } = await db.from('store_orders').select('id', { count: 'exact', head: true }).eq('user_id',user.id).gte('created_at', new Date(deps.now().getTime()-3600000).toISOString());
       if (rateError) throw rateError;
       if ((count ?? 0) >= 20) throw new StoreError(429, 'Aguarde alguns minutos antes de iniciar outra compra.');
-      const { data, error } = await db.from('store_orders').insert({ user_id:user.id, product_id:product.id, file_id:product.current_file_id, buyer_email:user.email, product_title:product.title, price_cents:currentPrice, currency:'brl', is_live:live }).select('*').single();
+      const { data, error } = await db.from('store_orders').insert({ user_id:user.id, product_id:product.id, file_id:product.current_file_id, buyer_email:user.email, product_title:product.title, ...priceValues, currency:'brl', is_live:live }).select('*').single();
       if (error?.code === '23505') {
         const { data: concurrent, error: concurrentError } = await db.from('store_orders').select('*').eq('user_id',user.id).eq('product_id',productId).in('status',['pending','paid']).single();
         if (concurrentError) throw concurrentError; order = concurrent;
@@ -71,9 +82,9 @@ export async function handleStoreApi(req: Request, deps: StoreDeps = realStoreDe
     }
     if (order.status === 'paid') return storeJson(req, { owned:true });
     if (order.is_live !== live) throw new StoreError(409, 'Este pedido pertence a outro modo de pagamento. Contate o atendimento.');
-    if (order.price_cents !== currentPrice) throw new StoreError(409, 'O preço foi atualizado. Tente novamente.');
+    if (order.price_cents !== currentPrice || !sameCoupon(order)) throw new StoreError(409, 'O preço foi atualizado. Tente novamente.');
     let checkoutUrl: string; let checkoutId: string | null = null; let expires: string | null = null;
-    if (product.payment_link_url && product.sale_price_cents == null) {
+    if (product.payment_link_url && product.sale_price_cents == null && !quote.coupon_id) {
       // Stripe sends client_reference_id in the signed Checkout Session webhook.
       // Never use payer-entered e-mail to locate or grant another user's order.
       if (order.price_cents !== currentPrice) throw new StoreError(409, 'O preço deste livro mudou. Contate o atendimento para atualizar seu pedido.');
