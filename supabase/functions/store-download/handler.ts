@@ -23,9 +23,21 @@ export async function handleStoreDownload(req: Request, deps: StoreDeps = realSt
     let marked: Uint8Array;
     try { marked = await personaliseStorePdf(new Uint8Array(await original.arrayBuffer()),order.buyer_email); }
     catch { throw new StoreError(422,'Não foi possível preparar sua cópia. Contate o atendimento para revisar o PDF.'); }
+    // Instagram's Android WebView cannot reliably save blob: URLs. Store only
+    // the personalised copy in a server-only bucket and issue a short HTTPS URL.
+    const deliveryPath = `${order.id}/${order.file_id}.pdf`;
+    if (body.delivery === 'link') {
+      const { error:uploadError } = await db.storage.from('store-deliveries').upload(deliveryPath,marked,{ contentType:'application/pdf',cacheControl:'0',upsert:true });
+      if (uploadError) throw new StoreError(503,'Não foi possível preparar o link. Tente novamente.');
+    }
     // Recheck after processing: a refund can arrive while the PDF is being built.
     const { data:current,error:currentError } = await db.from('store_orders').select('status').eq('id',order.id).eq('user_id',user.id).single();
     if (currentError || current?.status !== 'paid') throw new StoreError(403,'O download deste pedido não está mais disponível.');
+    if (body.delivery === 'link') {
+      const { data:link,error:linkError } = await db.storage.from('store-deliveries').createSignedUrl(deliveryPath,120,{ download:`livro-${order.id.slice(0,8)}.pdf` });
+      if (linkError || !link?.signedUrl) throw new StoreError(503,'Não foi possível gerar o link. Tente novamente.');
+      return storeJson(req,{ download_url:link.signedUrl,expires_at:new Date(deps.now().getTime()+120000).toISOString() });
+    }
     return new Response(marked as unknown as BodyInit,{ headers:{ ...storeCors(req),'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="livro-${order.id.slice(0,8)}.pdf"`,'X-Content-Type-Options':'nosniff' } });
   } catch(e) { return storeFailure(req,e); }
 }

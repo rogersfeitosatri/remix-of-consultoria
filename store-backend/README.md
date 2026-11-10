@@ -1,5 +1,27 @@
 # Supabase exclusivo da loja
 
+## Downloads HTTPS (10 de novembro de 2026)
+
+O navegador interno do Instagram no Android pode receber o PDF e ainda assim
+não salvar um link `blob:`. A loja agora solicita `delivery: "link"` à função
+`store-download` e apresenta um link HTTPS acionado pelo comprador em “Salvar
+livro”. A resposta binária antiga continua disponível para páginas já abertas.
+
+Aplique `20261110194620_loja_https_downloads.sql` somente no projeto Loja RF
+e publique `store-download` antes do frontend. O bucket privado
+`store-deliveries` contém apenas cópias personalizadas, uma por pedido/arquivo.
+Uma política restritiva bloqueia acesso direto de anon/authenticated. A função
+verifica dono e pagamento, personaliza todas as páginas, armazena a cópia,
+reconfirma o pagamento e assina o download por 120 segundos. Reembolso impede
+novos links; um link já emitido pode funcionar pelos segundos restantes.
+As cópias ficam privadas para futuras entregas e usam espaço adicional de
+armazenamento; tentativas repetidas substituem a mesma cópia. Não se registra o
+token assinado em logs. O frontend remove o link ao expirar ou trocar de conta.
+
+Validação automatizada: propriedade do pedido, pagamento pendente/reembolsado,
+reembolso durante a preparação, falha de armazenamento, identificação nas
+páginas, validade de 120 segundos e compatibilidade com a resposta binária.
+
 Este diretório contém somente o banco e a configuração da loja. A consultoria
 continua usando `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`.
 
